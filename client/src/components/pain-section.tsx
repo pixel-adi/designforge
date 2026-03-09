@@ -26,31 +26,18 @@ export function PainSection() {
       
       boxes?.forEach((box, i) => {
         gsap.fromTo(box,
-          { y: 50, opacity: 0 },
+          { y: 40, opacity: 0 },
           { 
             y: 0, 
             opacity: 1, 
             duration: 0.6, 
-            ease: "back.out(1.5)",
+            ease: "power2.out",
             scrollTrigger: {
               trigger: box,
               start: "top 85%",
             }
           }
         );
-        
-        // Add subtle hover wiggle using vanilla JS event listeners in React
-        const handleEnter = () => gsap.to(box, { y: -5, rotation: i%2===0?1:-1, duration: 0.3 });
-        const handleLeave = () => gsap.to(box, { y: 0, rotation: 0, duration: 0.3 });
-        
-        box.addEventListener('mouseenter', handleEnter);
-        box.addEventListener('mouseleave', handleLeave);
-        
-        // Cleanup listeners
-        return () => {
-          box.removeEventListener('mouseenter', handleEnter);
-          box.removeEventListener('mouseleave', handleLeave);
-        };
       });
       
     }, sectionRef);
@@ -60,56 +47,57 @@ export function PainSection() {
 
   return (
     <section ref={sectionRef} className="py-24 relative bg-white">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         
-        <div className="text-center max-w-3xl mx-auto mb-20">
-          <p className="text-primary font-medium mb-4 text-xs uppercase tracking-widest">The Problem</p>
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <p className="text-primary font-bold mb-4 text-xs uppercase tracking-widest">The Problem</p>
           <h2 className="text-3xl md:text-5xl font-heading font-bold mb-6 text-foreground leading-tight">
             The hardest part of design preparation is often not effort — it's direction.
           </h2>
-          <p className="desc-text text-lg text-muted-foreground font-light">
+          <p className="desc-text text-lg text-muted-foreground">
             Many aspirants are willing to work hard, but they are stuck between too many resources, too little feedback, and no clear sense of what actually improves their chances.
           </p>
         </div>
 
+        {/* Structured Grid instead of loose floaters */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           
-          <div className="pain-box bg-white p-8 rounded-2xl border-2 border-foreground shadow-[4px_4px_0_0_rgba(0,0,0,1)] flex flex-col items-center text-center transition-all hover:bg-muted/30">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-6">
-              <Map strokeWidth={1.5} className="w-8 h-8 text-secondary" />
+          <div className="pain-box struct-card p-6 flex flex-col hover:border-primary/50 transition-colors">
+            <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center mb-5 border border-border">
+              <Map className="w-6 h-6 text-foreground" />
             </div>
-            <p className="font-heading font-bold text-lg text-foreground">Trapped in templates</p>
-            <p className="text-sm text-muted-foreground mt-2 font-light">Following expected answers instead of original thought.</p>
+            <h3 className="font-heading font-bold text-lg text-foreground mb-2">Trapped in templates</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">Following expected answers instead of cultivating original thought and reasoning.</p>
           </div>
 
-          <div className="pain-box bg-white p-8 rounded-2xl border-2 border-foreground shadow-[4px_4px_0_0_rgba(0,0,0,1)] flex flex-col items-center text-center transition-all hover:bg-muted/30">
-            <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center mb-6">
-              <EyeOff strokeWidth={1.5} className="w-8 h-8 text-primary" />
+          <div className="pain-box struct-card p-6 flex flex-col hover:border-primary/50 transition-colors">
+            <div className="w-12 h-12 rounded-lg bg-accent flex items-center justify-center mb-5 border border-primary/20">
+              <EyeOff className="w-6 h-6 text-primary" />
             </div>
-            <p className="font-heading font-bold text-lg text-foreground">Practicing blind</p>
-            <p className="text-sm text-muted-foreground mt-2 font-light">Working hard alone without meaningful critique.</p>
+            <h3 className="font-heading font-bold text-lg text-foreground mb-2">Practicing blind</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">Working hard alone without meaningful critique or professional feedback loops.</p>
           </div>
 
-          <div className="pain-box bg-white p-8 rounded-2xl border-2 border-foreground shadow-[4px_4px_0_0_rgba(0,0,0,1)] flex flex-col items-center text-center transition-all hover:bg-muted/30">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-6">
-              <XCircle strokeWidth={1.5} className="w-8 h-8 text-secondary" />
+          <div className="pain-box struct-card p-6 flex flex-col hover:border-primary/50 transition-colors">
+            <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center mb-5 border border-border">
+              <XCircle className="w-6 h-6 text-foreground" />
             </div>
-            <p className="font-heading font-bold text-lg text-foreground">Information overload</p>
-            <p className="text-sm text-muted-foreground mt-2 font-light">Too many resources but no clear path forward.</p>
+            <h3 className="font-heading font-bold text-lg text-foreground mb-2">Information overload</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">Too many resources but no clear, structured path forward for consistent growth.</p>
           </div>
 
-          <div className="pain-box bg-white p-8 rounded-2xl border-2 border-foreground shadow-[4px_4px_0_0_rgba(0,0,0,1)] flex flex-col items-center text-center transition-all hover:bg-muted/30">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-6">
-              <Frown strokeWidth={1.5} className="w-8 h-8 text-secondary" />
+          <div className="pain-box struct-card p-6 flex flex-col hover:border-primary/50 transition-colors">
+            <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center mb-5 border border-border">
+              <Frown className="w-6 h-6 text-foreground" />
             </div>
-            <p className="font-heading font-bold text-lg text-foreground">Interview anxiety</p>
-            <p className="text-sm text-muted-foreground mt-2 font-light">Reaching the final rounds but lacking presentation confidence.</p>
+            <h3 className="font-heading font-bold text-lg text-foreground mb-2">Interview anxiety</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">Reaching the final rounds but lacking presentation confidence and articulation.</p>
           </div>
 
         </div>
 
-        <div className="mt-20 text-center flex justify-center">
-          <div className="inline-block px-8 py-3 bg-secondary text-white font-heading font-bold rounded-full transform -rotate-2 hover:rotate-0 transition-transform cursor-default shadow-lg">
+        <div className="mt-16 text-center">
+          <div className="inline-block px-6 py-2 bg-secondary text-white font-heading font-bold rounded-lg shadow-sm">
              Designforge exists to change that.
           </div>
         </div>

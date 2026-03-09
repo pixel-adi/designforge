@@ -38,37 +38,38 @@
 :root {
   /* Minimal White background */
   --background: 0 0% 100%;
-  --foreground: 0 0% 20%;
+  --foreground: 0 0% 15%;
 
   /* White cards */
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 20%;
+  --card-foreground: 0 0% 15%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 20%;
+  --popover-foreground: 0 0% 15%;
 
   /* Soft Orange */
-  --primary: 27 75% 64%;
+  --primary: 27 85% 60%;
   --primary-foreground: 0 0% 100%;
 
   /* Dark Slate / Teal */
-  --secondary: 198 24% 35%;
+  --secondary: 198 30% 30%;
   --secondary-foreground: 0 0% 100%;
 
-  /* Muted off-white */
-  --muted: 198 10% 96%;
-  --muted-foreground: 0 0% 50%;
+  /* Muted off-white - slightly darker for better contrast */
+  --muted: 0 0% 96%;
+  --muted-foreground: 0 0% 45%;
 
   /* Light Orange Accent */
-  --accent: 27 75% 95%;
-  --accent-foreground: 27 75% 40%;
+  --accent: 27 85% 95%;
+  --accent-foreground: 27 85% 40%;
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 0 0% 92%;
-  --input: 0 0% 92%;
-  --ring: 27 75% 64%;
+  /* Darker borders for structure */
+  --border: 0 0% 85%;
+  --input: 0 0% 85%;
+  --ring: 27 85% 60%;
 
   --radius: 0.5rem;
 }
@@ -102,38 +103,44 @@
 
 /* Minimalist Button shadow override mimicking the reference */
 .btn-orange {
-  background: linear-gradient(to bottom, hsl(27, 80%, 68%), hsl(27, 75%, 60%));
-  box-shadow: 0 2px 4px rgba(232, 156, 94, 0.3), inset 0 1px 0 rgba(255,255,255,0.3);
+  background: linear-gradient(to bottom, hsl(27, 85%, 65%), hsl(27, 85%, 58%));
+  box-shadow: 0 2px 4px rgba(232, 156, 94, 0.4), inset 0 1px 0 rgba(255,255,255,0.3);
   text-shadow: 0 1px 1px rgba(0,0,0,0.1);
   transition: all 0.2s ease;
 }
 .btn-orange:hover {
   filter: brightness(1.05);
   transform: translateY(-1px);
-  box-shadow: 0 4px 6px rgba(232, 156, 94, 0.4), inset 0 1px 0 rgba(255,255,255,0.4);
+  box-shadow: 0 4px 8px rgba(232, 156, 94, 0.5), inset 0 1px 0 rgba(255,255,255,0.4);
 }
 .btn-orange:active {
   transform: translateY(1px);
   box-shadow: 0 1px 2px rgba(232, 156, 94, 0.3);
 }
 
-/* Background scattered dots mimicking confetti */
-.bg-dots {
+/* Structured background grid instead of messy dots */
+.bg-grid {
   position: relative;
 }
-.bg-dots::before {
+.bg-grid::before {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
   background-image: 
-    radial-gradient(circle at 15% 25%, hsl(27, 75%, 64%) 2px, transparent 2px),
-    radial-gradient(circle at 85% 15%, hsl(198, 24%, 35%) 1.5px, transparent 1.5px),
-    radial-gradient(circle at 10% 75%, hsl(198, 24%, 35%) 2px, transparent 2px),
-    radial-gradient(circle at 80% 85%, hsl(27, 75%, 64%) 1.5px, transparent 1.5px),
-    radial-gradient(circle at 50% 10%, hsl(27, 75%, 64%) 1px, transparent 1px),
-    radial-gradient(circle at 40% 90%, hsl(198, 24%, 35%) 2px, transparent 2px);
-  background-size: 300px 300px;
-  opacity: 0.4;
+    linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
   z-index: 0;
+}
+
+.bg-grid-white::before {
+  background-image: 
+    linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+}
+
+/* Base card styling for structural consistency */
+.struct-card {
+  @apply bg-white border border-border shadow-sm rounded-xl overflow-hidden;
 }

@@ -8,133 +8,95 @@ export function DifferenceSection() {
   
   useEffect(() => {
     const ctx = gsap.context(() => {
-      const cards = sectionRef.current?.querySelectorAll('.diff-card');
+      const cards = sectionRef.current?.querySelectorAll('.diff-row');
       
       cards?.forEach((card, i) => {
-        // Find children within each card for staggered inner animation
-        const icon = card.querySelector('.icon-wrapper');
-        const textElements = card.querySelectorAll('p, h3');
-        
-        const tl = gsap.timeline({
-          scrollTrigger: {
-            trigger: card,
-            start: "top 85%", // Start animation when card enters 85% of viewport
-            toggleActions: "play none none reverse" // Play on enter, reverse on leave back
-          }
-        });
-        
-        // Decide start position based on odd/even for left/right slide in
-        const xOffset = i % 2 === 0 ? -50 : 50;
-        
-        tl.fromTo(card,
-          { opacity: 0, x: xOffset },
-          { opacity: 1, x: 0, duration: 0.8, ease: "power2.out" }
-        )
-        .fromTo(icon,
-          { scale: 0, rotation: -45 },
-          { scale: 1, rotation: 0, duration: 0.5, ease: "back.out(1.7)" },
-          "-=0.4"
-        )
-        .fromTo(textElements,
-          { opacity: 0, y: 10 },
-          { opacity: 1, y: 0, duration: 0.4, stagger: 0.1 },
-          "-=0.3"
-        );
-      });
-
-      // Animate the connecting svg doodle
-      const svgPath = sectionRef.current?.querySelector('.connector-svg path');
-      if (svgPath) {
-        // Simple draw-in effect using stroke-dasharray/offset
-        gsap.fromTo(svgPath,
-          { strokeDashoffset: 100 },
+        gsap.fromTo(card,
+          { opacity: 0, y: 20 },
           { 
-            strokeDashoffset: 0, 
-            duration: 2, 
-            ease: "none",
+            opacity: 1, 
+            y: 0, 
+            duration: 0.6, 
+            ease: "power2.out",
             scrollTrigger: {
-              trigger: '.connector-svg',
-              start: "top center",
+              trigger: card,
+              start: "top 85%",
             }
           }
         );
-      }
+      });
       
     }, sectionRef);
     
     return () => ctx.revert();
   }, []);
 
+  const differences = [
+    {
+      icon: <BookOpen className="w-5 h-5" />,
+      coaching: "Coaching teaches formats.",
+      mentorship: "Mentorship builds judgement.",
+      desc: "Instead of relying on standard templates, we help you develop the ability to make confident design decisions."
+    },
+    {
+      icon: <Target className="w-5 h-5" />,
+      coaching: "Coaching pushes repetition.",
+      mentorship: "Mentorship sharpens observation.",
+      desc: "Doing 100 similar sketches won't help if you aren't observing the world closely and thinking critically."
+    },
+    {
+      icon: <Lightbulb className="w-5 h-5" />,
+      coaching: "Expected questions.",
+      mentorship: "Unfamiliar challenges.",
+      desc: "We prepare you to tackle surprise prompts by building core problem-solving fundamentals."
+    },
+    {
+      icon: <Compass className="w-5 h-5" />,
+      coaching: "Ends with the exam.",
+      mentorship: "Continues into growth.",
+      desc: "Our support extends into portfolios, interviews, and real-world design maturity."
+    }
+  ];
+
   return (
-    <section ref={sectionRef} className="py-24 relative bg-dots overflow-hidden">
+    <section ref={sectionRef} className="py-24 relative bg-[#FAFAFA] border-y border-border">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
         
-        <div className="text-center mb-24">
-          <h2 className="text-3xl md:text-5xl font-heading font-bold mb-4 text-foreground">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-5xl font-heading font-bold mb-6 text-foreground">
             Why Designforge is built around mentorship
           </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Coaching often tries to standardise performance. Mentorship helps each student discover how they think, where they struggle, and how they can grow meaningfully.
+          <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+            Coaching standardises performance. Mentorship helps you discover how you think, where you struggle, and how to grow.
           </p>
         </div>
 
-        {/* Scattered layout reminiscent of the image's pain points section */}
-        <div className="relative min-h-[500px] w-full max-w-4xl mx-auto">
-          
-          <div className="md:absolute top-0 left-0 md:w-[45%] mb-8 md:mb-0 diff-card">
-            <div className="flex flex-col items-center md:items-start text-center md:text-left bg-white p-6 rounded-2xl shadow-[4px_4px_0_0_rgba(0,0,0,0.05)] border border-border">
-              <div className="icon-wrapper w-12 h-12 rounded-full bg-primary flex items-center justify-center mb-4 text-white">
-                <BookOpen strokeWidth={2} className="w-6 h-6" />
+        {/* Structured List instead of scattered items */}
+        <div className="struct-card p-2 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 divide-y divide-border">
+            {differences.map((diff, i) => (
+              <div key={i} className="diff-row grid md:grid-cols-12 gap-6 p-6 items-center hover:bg-muted/30 transition-colors">
+                <div className="md:col-span-1 flex justify-center md:justify-start">
+                   <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                     {diff.icon}
+                   </div>
+                </div>
+                <div className="md:col-span-4 text-center md:text-left">
+                  <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-1">Standard Coaching</p>
+                  <p className="font-heading font-bold text-foreground opacity-60 line-through decoration-1">{diff.coaching}</p>
+                </div>
+                <div className="md:col-span-7 text-center md:text-left">
+                  <p className="text-xs text-primary uppercase tracking-widest font-bold mb-1">Designforge Mentorship</p>
+                  <h3 className="text-xl font-heading font-bold text-foreground mb-2">{diff.mentorship}</h3>
+                  <p className="text-sm text-muted-foreground">{diff.desc}</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold mb-2">Coaching teaches formats</p>
-              <h3 className="text-xl font-heading font-bold text-foreground">Mentorship builds judgement.</h3>
-            </div>
+            ))}
           </div>
-
-          <div className="md:absolute top-12 right-0 md:w-[45%] mb-8 md:mb-0 diff-card">
-            <div className="flex flex-col items-center md:items-start text-center md:text-left bg-white p-6 rounded-2xl shadow-[4px_4px_0_0_rgba(0,0,0,0.05)] border border-border">
-              <div className="icon-wrapper w-12 h-12 rounded-full bg-secondary flex items-center justify-center mb-4 text-white">
-                <Target strokeWidth={2} className="w-6 h-6" />
-              </div>
-              <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold mb-2">Coaching pushes repetition</p>
-              <h3 className="text-xl font-heading font-bold text-foreground">Mentorship sharpens observation.</h3>
-            </div>
-          </div>
-
-          {/* Central doodle connecting them */}
-          <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 items-center justify-center opacity-40 connector-svg">
-            <svg viewBox="0 0 100 100" className="w-full h-full stroke-primary" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 8">
-               <path d="M20 20 Q 50 10 80 20" />
-               <path d="M80 80 Q 50 90 20 80" />
-               <path d="M20 20 Q 10 50 20 80" />
-               <path d="M80 20 Q 90 50 80 80" />
-            </svg>
-          </div>
-
-          <div className="md:absolute bottom-12 left-8 md:w-[45%] mb-8 md:mb-0 diff-card">
-            <div className="flex flex-col items-center md:items-start text-center md:text-left bg-white p-6 rounded-2xl shadow-[4px_4px_0_0_rgba(0,0,0,0.05)] border border-border">
-              <div className="icon-wrapper w-12 h-12 rounded-full bg-accent flex items-center justify-center mb-4 text-accent-foreground">
-                <Lightbulb strokeWidth={2} className="w-6 h-6" />
-              </div>
-              <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold mb-2">Expected vs Unfamiliar</p>
-              <h3 className="text-xl font-heading font-bold text-foreground">We prepare you for unfamiliar challenges.</h3>
-            </div>
-          </div>
-
-          <div className="md:absolute bottom-0 right-8 md:w-[45%] mb-8 md:mb-0 diff-card">
-            <div className="flex flex-col items-center md:items-start text-center md:text-left bg-white p-6 rounded-2xl shadow-[4px_4px_0_0_rgba(0,0,0,0.05)] border border-border">
-              <div className="icon-wrapper w-12 h-12 rounded-full bg-foreground flex items-center justify-center mb-4 text-white">
-                <Compass strokeWidth={2} className="w-6 h-6" />
-              </div>
-              <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold mb-2">Beyond the exam</p>
-              <h3 className="text-xl font-heading font-bold text-foreground">Mentorship continues into design growth.</h3>
-            </div>
-          </div>
-
         </div>
         
-        <div className="text-center mt-24 max-w-2xl mx-auto diff-card">
-          <p className="text-2xl font-heading font-bold text-primary italic">
+        <div className="text-center mt-12 max-w-2xl mx-auto">
+          <p className="text-lg font-heading font-bold text-secondary">
             "We don't want students to look prepared. We want them to become stronger thinkers and makers."
           </p>
         </div>

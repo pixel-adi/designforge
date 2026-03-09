@@ -30,42 +30,32 @@ export default function Home() {
         <EventsSection />
       </main>
       
-      <footer className="bg-secondary text-white py-20 relative overflow-hidden">
-        {/* Subtle doodle dots inside the dark footer */}
-        <div className="absolute inset-0 opacity-5">
-           <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-              <pattern id="footerDots" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
-                 <circle cx="10" cy="10" r="1.5" fill="currentColor" />
-                 <circle cx="40" cy="40" r="1" fill="currentColor" />
-                 <path d="M 50 10 L 53 13" stroke="currentColor" strokeWidth="1"/>
-              </pattern>
-              <rect x="0" y="0" width="100%" height="100%" fill="url(#footerDots)" />
-           </svg>
-        </div>
+      <footer className="bg-secondary text-white py-16 relative overflow-hidden">
+        <div className="absolute inset-0 bg-grid-white opacity-10"></div>
 
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           
-          <div className="max-w-4xl mx-auto text-center mb-24 bg-white/5 border border-white/10 rounded-3xl p-10 backdrop-blur-sm">
-            <h2 className="text-3xl md:text-5xl font-heading font-bold mb-6 tracking-tight">
-              Prepare for design with more clarity, confidence, and depth
+          <div className="max-w-4xl mx-auto text-center mb-20 bg-white/5 border border-white/10 rounded-2xl p-10 backdrop-blur-sm">
+            <h2 className="text-3xl md:text-4xl font-heading font-bold mb-4 tracking-tight">
+              Prepare for design with clarity.
             </h2>
-            <p className="text-white/70 text-lg mb-10 max-w-2xl mx-auto">
-              Join a mentoring ecosystem that helps you think better, create better, and move closer to your dream design college — and beyond.
+            <p className="text-white/70 text-lg mb-8 max-w-2xl mx-auto">
+              Join a mentoring ecosystem that helps you think better, create better, and move closer to your dream design college.
             </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-6">
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-white btn-orange rounded-xl px-8 h-14 uppercase tracking-wider text-sm font-bold shadow-[0_4px_14px_0_rgba(232,156,94,0.39)]">
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <Button className="bg-primary hover:bg-primary/90 text-white btn-orange rounded-lg px-8 h-12 uppercase tracking-wider text-xs font-bold shadow-sm">
                 Join WhatsApp Community
               </Button>
-              <Button size="lg" variant="outline" className="border-2 border-white text-white hover:bg-white/10 rounded-xl px-8 h-14 uppercase tracking-wider text-sm font-bold bg-transparent">
+              <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 rounded-lg px-8 h-12 uppercase tracking-wider text-xs font-bold bg-transparent">
                 Join Focus Batch
               </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12 border-b border-white/10 pb-12">
             <div className="col-span-1 md:col-span-2">
               <div className="font-heading font-bold text-2xl tracking-tight mb-4 flex items-center gap-2">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center border-2 border-white">
+                <div className="w-8 h-8 bg-primary rounded flex items-center justify-center">
                    <span className="text-white text-xs">D</span>
                 </div>
                 Designforge<span className="text-primary">.</span>
@@ -77,25 +67,25 @@ export default function Home() {
             
             <div>
               <h4 className="font-heading font-bold mb-6 uppercase tracking-widest text-xs text-primary">Explore</h4>
-              <ul className="space-y-4 text-white/80 text-sm">
-                <li><a href="#" className="hover:text-primary hover:translate-x-1 inline-block transition-all">Mentorship Tracks</a></li>
-                <li><a href="#" className="hover:text-primary hover:translate-x-1 inline-block transition-all">Student Results</a></li>
-                <li><a href="#" className="hover:text-primary hover:translate-x-1 inline-block transition-all">Community</a></li>
-                <li><a href="#" className="hover:text-primary hover:translate-x-1 inline-block transition-all">Live Events</a></li>
+              <ul className="space-y-3 text-white/80 text-sm">
+                <li><a href="#" className="hover:text-primary transition-colors">Mentorship Tracks</a></li>
+                <li><a href="#" className="hover:text-primary transition-colors">Student Results</a></li>
+                <li><a href="#" className="hover:text-primary transition-colors">Community</a></li>
+                <li><a href="#" className="hover:text-primary transition-colors">Live Events</a></li>
               </ul>
             </div>
             
             <div>
               <h4 className="font-heading font-bold mb-6 uppercase tracking-widest text-xs text-primary">Connect</h4>
-              <ul className="space-y-4 text-white/80 text-sm">
-                <li><a href="#" className="hover:text-primary hover:translate-x-1 inline-block transition-all">WhatsApp</a></li>
-                <li><a href="#" className="hover:text-primary hover:translate-x-1 inline-block transition-all">Instagram</a></li>
-                <li><a href="#" className="hover:text-primary hover:translate-x-1 inline-block transition-all">Contact Us</a></li>
+              <ul className="space-y-3 text-white/80 text-sm">
+                <li><a href="#" className="hover:text-primary transition-colors">WhatsApp</a></li>
+                <li><a href="#" className="hover:text-primary transition-colors">Instagram</a></li>
+                <li><a href="#" className="hover:text-primary transition-colors">Contact Us</a></li>
               </ul>
             </div>
           </div>
           
-          <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-white/40 text-xs">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-white/40 text-xs">
             <p>© {new Date().getFullYear()} Designforge. All rights reserved.</p>
             <div className="flex gap-6">
               <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
