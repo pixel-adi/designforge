@@ -40,72 +40,74 @@ export function CommunitySection() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="py-24 bg-[#FAFAFA] relative border-t border-border">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
+    <section ref={sectionRef} className="py-24 bg-grid bg-[#FFFDFB] relative border-b-2 border-foreground">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         
-        <div className="bg-container struct-card p-8 md:p-12 lg:p-16 flex flex-col lg:flex-row gap-12 items-center">
+        <div className="bg-container struct-card bg-pop-3/20 p-8 md:p-12 lg:p-16 flex flex-col lg:flex-row gap-12 items-center">
           
           <div className="flex-1">
-            <p className="text-primary font-bold text-xs uppercase tracking-widest mb-4">The Ecosystem</p>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-heading font-bold mb-6 text-foreground">
-              Start with the community.
+            <div className="inline-block bg-white border-2 border-foreground text-foreground font-bold uppercase tracking-widest text-xs px-4 py-1.5 rounded-full mb-6 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+              The Ecosystem
+            </div>
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading font-black mb-6 text-foreground">
+              Start with the <span className="text-pop-1 underline decoration-foreground underline-offset-8">community.</span>
             </h2>
-            <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-              Not every aspirant is ready to commit to a batch on day one. That's why Designforge's WhatsApp community is the best place to begin — a structured space for sessions, resources, and peer feedback.
+            <p className="text-xl text-foreground/80 font-medium mb-10 leading-relaxed">
+              Not every aspirant is ready to commit to a batch on day one. That's why Designforge's WhatsApp community is the best place to begin.
             </p>
             
-            <ul className="space-y-4 mb-10">
-              <li className="flex items-center gap-4 text-foreground font-medium text-sm">
-                <div className="w-8 h-8 rounded bg-muted border border-border flex items-center justify-center">
-                  <Bell className="w-4 h-4 text-primary" />
+            <ul className="space-y-5 mb-12">
+              <li className="flex items-center gap-4 text-foreground font-bold text-base">
+                <div className="w-10 h-10 rounded-lg bg-pop-1 border-2 border-foreground flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                  <Bell className="w-5 h-5 text-foreground" />
                 </div>
                 Updates and announcements
               </li>
-              <li className="flex items-center gap-4 text-foreground font-medium text-sm">
-                <div className="w-8 h-8 rounded bg-muted border border-border flex items-center justify-center">
-                  <Video className="w-4 h-4 text-secondary" />
+              <li className="flex items-center gap-4 text-foreground font-bold text-base">
+                <div className="w-10 h-10 rounded-lg bg-primary border-2 border-foreground flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                  <Video className="w-5 h-5 text-white" />
                 </div>
                 Structured session invites
               </li>
-              <li className="flex items-center gap-4 text-foreground font-medium text-sm">
-                <div className="w-8 h-8 rounded bg-muted border border-border flex items-center justify-center">
-                  <FileText className="w-4 h-4 text-primary" />
+              <li className="flex items-center gap-4 text-foreground font-bold text-base">
+                <div className="w-10 h-10 rounded-lg bg-pop-2 border-2 border-foreground flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                  <FileText className="w-5 h-5 text-white" />
                 </div>
                 Curated resources and prep support
               </li>
             </ul>
 
-            <Button size="lg" className="bg-primary hover:bg-primary/90 text-white btn-orange rounded-lg px-8 h-12 uppercase tracking-wider text-sm font-bold w-full sm:w-auto shadow-sm">
+            <Button size="lg" className="btn-bold btn-yellow-pop rounded-xl px-8 h-14 uppercase tracking-wider text-sm font-black w-full sm:w-auto">
               Join WhatsApp Community
             </Button>
           </div>
           
-          <div className="w-full lg:w-96 mockup-card">
-            <div className="struct-card p-6 relative bg-white shadow-lg border-border">
+          <div className="w-full lg:w-[400px] mockup-card">
+            <div className="struct-card p-6 relative bg-white h-[500px] flex flex-col">
                
-               <div className="flex items-center gap-4 border-b border-border pb-4 mb-6">
-                 <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                   <MessageCircle className="w-5 h-5 text-primary" />
+               <div className="flex items-center gap-4 border-b-2 border-foreground pb-4 mb-6">
+                 <div className="w-12 h-12 bg-primary rounded-full border-2 border-foreground flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                   <MessageCircle className="w-6 h-6 text-white" />
                  </div>
                  <div>
-                   <p className="font-heading font-bold text-foreground text-sm">Designforge Aspirants</p>
-                   <p className="text-xs text-muted-foreground">1,240 members</p>
+                   <p className="font-heading font-black text-foreground text-lg">Designforge Aspirants</p>
+                   <p className="text-xs text-muted-foreground font-bold">1,240 members</p>
                  </div>
                </div>
                
-               <div className="space-y-4">
-                 <div className="message-bubble bg-muted p-3 rounded-lg rounded-tl-sm text-sm text-foreground w-[85%] border border-border">
-                   <span className="font-bold text-xs text-primary mb-1 block">Siddhi (Mentor)</span>
+               <div className="space-y-5 flex-1 overflow-hidden">
+                 <div className="message-bubble bg-pop-3/20 p-4 rounded-xl border-2 border-foreground shadow-[2px_2px_0_0_rgba(0,0,0,1)] rounded-tl-sm text-sm text-foreground w-[85%]">
+                   <span className="font-black text-xs text-foreground mb-1 block">Siddhi (Mentor)</span>
                    Hi everyone! We are hosting a portfolio review session this Sunday.
                  </div>
                  
-                 <div className="message-bubble bg-secondary text-white p-3 rounded-lg rounded-tr-sm text-sm w-[80%] ml-auto border border-secondary">
-                   <span className="font-bold text-xs text-white/70 mb-1 block">Aman</span>
+                 <div className="message-bubble bg-pop-1 text-foreground font-medium p-4 rounded-xl border-2 border-foreground shadow-[2px_2px_0_0_rgba(0,0,0,1)] rounded-tr-sm text-sm w-[80%] ml-auto">
+                   <span className="font-black text-xs text-foreground/70 mb-1 block">Aman</span>
                    Will we cover UCEED specific approaches?
                  </div>
                  
-                 <div className="message-bubble bg-muted p-3 rounded-lg rounded-tl-sm text-sm text-foreground w-[85%] border border-border">
-                   <span className="font-bold text-xs text-primary mb-1 block">Aditya (Mentor)</span>
+                 <div className="message-bubble bg-pop-2/20 p-4 rounded-xl border-2 border-foreground shadow-[2px_2px_0_0_rgba(0,0,0,1)] rounded-tl-sm text-sm text-foreground w-[85%]">
+                   <span className="font-black text-xs text-foreground mb-1 block">Aditya (Mentor)</span>
                    Yes, both NID and UCEED problem framing will be discussed. See you there!
                  </div>
                </div>

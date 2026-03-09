@@ -44,23 +44,32 @@ export function PhilosophySection() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="py-24 bg-white relative">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl text-center relative z-10">
+    <section ref={sectionRef} className="py-24 bg-white relative border-b-2 border-foreground">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl text-center relative z-10">
         
-        <div className="phil-box struct-card bg-secondary text-white p-10 md:p-16">
-          <p className="anim-text text-primary font-bold mb-6 text-xs uppercase tracking-widest">Our Philosophy</p>
+        <div className="phil-box struct-card bg-foreground text-white p-12 md:p-20 relative overflow-hidden">
           
-          <h2 className="anim-text text-3xl md:text-5xl font-heading font-bold mb-8 leading-tight">
-            Build the designer, <br className="hidden md:block" /> not just the applicant.
-          </h2>
-          
-          <div className="space-y-6 text-lg text-white/80 leading-relaxed max-w-2xl mx-auto">
-            <p className="anim-text">
-              A strong design aspirant is not someone who only knows how to answer exam questions. A strong design aspirant notices more, thinks deeper, questions better, and expresses ideas more clearly.
-            </p>
-            <p className="anim-text">
-              At Designforge, we help students build the foundations that matter across exams, interviews, portfolios, and life as a designer.
-            </p>
+          {/* Abstract decor inside the box */}
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-pop-2 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
+          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-pop-1 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
+
+          <div className="relative z-10">
+            <div className="anim-text inline-block bg-pop-3 text-foreground font-black uppercase tracking-widest text-xs px-4 py-1.5 rounded-full mb-8 border-2 border-foreground">
+              Our Philosophy
+            </div>
+            
+            <h2 className="anim-text text-4xl md:text-6xl font-heading font-black mb-10 leading-tight">
+              Build the designer, <br className="hidden md:block" /> not just the applicant.
+            </h2>
+            
+            <div className="space-y-6 text-xl text-white/90 font-medium leading-relaxed max-w-3xl mx-auto">
+              <p className="anim-text">
+                A strong design aspirant is not someone who only knows how to answer exam questions. A strong design aspirant notices more, thinks deeper, questions better, and expresses ideas more clearly.
+              </p>
+              <p className="anim-text">
+                At Designforge, we help students build the foundations that matter across exams, interviews, portfolios, and life as a designer.
+              </p>
+            </div>
           </div>
         </div>
 

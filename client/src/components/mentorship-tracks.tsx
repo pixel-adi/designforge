@@ -10,6 +10,8 @@ const tracks = [
     description: "Build creativity, observation, visualisation, and confidence for prelims, studio tests, and interviews.",
     price: "Structured Prep",
     popular: false,
+    color: "bg-pop-3/10",
+    borderColor: "border-pop-3",
   },
   {
     title: "NID DAT MDes",
@@ -17,6 +19,8 @@ const tracks = [
     description: "Develop stronger problem framing, portfolio depth, articulation, and design maturity for advanced admissions.",
     price: "Deeper Critique",
     popular: true,
+    color: "bg-primary/10",
+    borderColor: "border-primary",
   },
   {
     title: "UCEED & CEED",
@@ -24,6 +28,8 @@ const tracks = [
     description: "Prepare with stronger basics, visual reasoning, sketching, analytical thinking, and concept communication.",
     price: "Systematic Guidance",
     popular: false,
+    color: "bg-pop-1/10",
+    borderColor: "border-pop-1",
   }
 ];
 
@@ -57,14 +63,14 @@ export function MentorshipTracks() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="py-24 bg-white relative">
+    <section ref={sectionRef} className="py-24 bg-white relative border-b-2 border-foreground">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl relative z-10">
         
         <div className="heading-content text-center max-w-2xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-5xl font-heading font-bold mb-4 text-foreground">
+          <h2 className="text-4xl md:text-5xl font-heading font-black mb-4 text-foreground">
             Mentorship for every pathway
           </h2>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-muted-foreground text-lg font-medium">
             Whether you are preparing for NID DAT, UCEED, CEED, portfolios, or interviews, we give you the structured environment to grow.
           </p>
         </div>
@@ -73,25 +79,25 @@ export function MentorshipTracks() {
           {tracks.map((track, i) => (
             <div 
               key={i} 
-              className={`track-card struct-card p-8 flex flex-col text-center ${track.popular ? 'border-primary ring-1 ring-primary shadow-md relative' : ''} hover:border-primary/50 transition-all`}
+              className={`track-card struct-card p-8 flex flex-col text-center ${track.color} border-2 border-foreground struct-card-hover relative`}
             >
               {track.popular && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-foreground text-pop-3 text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full border-2 border-foreground shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
                   Most Chosen
                 </div>
               )}
-              <p className="text-primary text-xs uppercase tracking-widest font-bold mb-3">{track.subtitle}</p>
-              <h3 className="text-2xl font-heading font-bold text-foreground mb-4 pb-4 border-b border-border/50">{track.title}</h3>
+              <p className="text-foreground text-xs uppercase tracking-widest font-black mb-3">{track.subtitle}</p>
+              <h3 className="text-2xl font-heading font-black text-foreground mb-4 pb-4 border-b-2 border-foreground/20">{track.title}</h3>
               
               <div className="mb-6">
-                 <p className="text-lg font-bold text-secondary">{track.price}</p>
+                 <p className="text-lg font-black text-foreground">{track.price}</p>
               </div>
 
-              <p className="text-muted-foreground text-sm leading-relaxed mb-8 flex-1">
+              <p className="text-foreground/80 text-sm font-medium leading-relaxed mb-8 flex-1">
                 {track.description}
               </p>
               
-              <Button className={`w-full ${track.popular ? 'btn-orange text-white' : 'bg-muted/50 border border-border text-foreground hover:bg-muted'} rounded-lg uppercase tracking-wider text-xs font-bold h-12 transition-all`}>
+              <Button className={`w-full ${track.popular ? 'btn-primary-pop btn-bold' : 'bg-white btn-bold text-foreground'} rounded-xl uppercase tracking-wider text-xs font-black h-14`}>
                 Explore Track
               </Button>
             </div>

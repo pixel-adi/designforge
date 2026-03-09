@@ -30,6 +30,10 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  --color-pop-1: var(--pop-1);
+  --color-pop-2: var(--pop-2);
+  --color-pop-3: var(--pop-3);
+
   --font-sans: 'Inter', sans-serif;
   --font-heading: 'Aktiv Grotesk', 'Inter', sans-serif;
   --font-body: 'Inter', sans-serif;
@@ -38,38 +42,43 @@
 :root {
   /* Minimal White background */
   --background: 0 0% 100%;
-  --foreground: 0 0% 15%;
+  --foreground: 0 0% 12%;
 
   /* White cards */
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 15%;
+  --card-foreground: 0 0% 12%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 15%;
+  --popover-foreground: 0 0% 12%;
 
-  /* Soft Orange */
-  --primary: 27 85% 60%;
+  /* Vibrant Orange */
+  --primary: 27 90% 55%;
   --primary-foreground: 0 0% 100%;
 
-  /* Dark Slate / Teal */
-  --secondary: 198 30% 30%;
+  /* Deep Slate/Teal */
+  --secondary: 198 35% 25%;
   --secondary-foreground: 0 0% 100%;
 
-  /* Muted off-white - slightly darker for better contrast */
-  --muted: 0 0% 96%;
+  /* Muted off-white */
+  --muted: 0 0% 95%;
   --muted-foreground: 0 0% 45%;
 
-  /* Light Orange Accent */
+  /* Soft Peach/Accent */
   --accent: 27 85% 95%;
   --accent-foreground: 27 85% 40%;
+
+  /* Pop Colors */
+  --pop-1: 180 80% 45%; /* Vibrant Cyan */
+  --pop-2: 340 85% 60%; /* Vibrant Pink */
+  --pop-3: 45 100% 55%; /* Vibrant Yellow */
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  /* Darker borders for structure */
-  --border: 0 0% 85%;
-  --input: 0 0% 85%;
-  --ring: 27 85% 60%;
+  /* Darker borders for a structured, slightly brutalist look */
+  --border: 0 0% 80%;
+  --input: 0 0% 80%;
+  --ring: 27 90% 55%;
 
   --radius: 0.5rem;
 }
@@ -94,31 +103,45 @@
     @apply border-border;
   }
   body {
-    @apply font-body antialiased bg-background text-foreground;
+    @apply font-body antialiased bg-background text-foreground overflow-x-hidden;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading tracking-tight;
   }
 }
 
-/* Minimalist Button shadow override mimicking the reference */
-.btn-orange {
-  background: linear-gradient(to bottom, hsl(27, 85%, 65%), hsl(27, 85%, 58%));
-  box-shadow: 0 2px 4px rgba(232, 156, 94, 0.4), inset 0 1px 0 rgba(255,255,255,0.3);
-  text-shadow: 0 1px 1px rgba(0,0,0,0.1);
+/* Bold Structural Button Override */
+.btn-bold {
+  border: 2px solid hsl(var(--foreground));
+  box-shadow: 4px 4px 0px 0px hsl(var(--foreground));
   transition: all 0.2s ease;
+  font-weight: 800 !important;
 }
-.btn-orange:hover {
-  filter: brightness(1.05);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(232, 156, 94, 0.5), inset 0 1px 0 rgba(255,255,255,0.4);
+.btn-bold:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px 0px hsl(var(--foreground));
 }
-.btn-orange:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 2px rgba(232, 156, 94, 0.3);
+.btn-bold:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0px 0px 0px 0px hsl(var(--foreground));
 }
 
-/* Structured background grid instead of messy dots */
+.btn-primary-pop {
+  background-color: hsl(var(--primary));
+  color: white;
+}
+
+.btn-cyan-pop {
+  background-color: hsl(var(--pop-1));
+  color: hsl(var(--foreground));
+}
+
+.btn-yellow-pop {
+  background-color: hsl(var(--pop-3));
+  color: hsl(var(--foreground));
+}
+
+/* Background structured grid */
 .bg-grid {
   position: relative;
 }
@@ -128,19 +151,26 @@
   inset: 0;
   pointer-events: none;
   background-image: 
-    linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+    linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
   z-index: 0;
 }
 
 .bg-grid-white::before {
   background-image: 
-    linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+    linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
 }
 
-/* Base card styling for structural consistency */
+/* Clearer card structure */
 .struct-card {
-  @apply bg-white border border-border shadow-sm rounded-xl overflow-hidden;
+  @apply bg-white border-2 border-foreground shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-xl overflow-hidden;
+}
+
+.struct-card-hover {
+  @apply transition-all duration-200 cursor-pointer;
+}
+.struct-card-hover:hover {
+  @apply shadow-[2px_2px_0_0_rgba(0,0,0,1)] translate-x-[2px] translate-y-[2px];
 }

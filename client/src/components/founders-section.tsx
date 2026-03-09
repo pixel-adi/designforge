@@ -32,36 +32,44 @@ export function FoundersSection() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="py-24 bg-[#FAFAFA] border-y border-border">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
+    <section ref={sectionRef} className="py-24 bg-grid bg-[#FFFDFB] border-b-2 border-foreground">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         
-        <div className="heading-content text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-heading font-bold mb-6 text-foreground">
+        <div className="heading-content text-center mb-20">
+          <h2 className="text-4xl md:text-5xl font-heading font-black mb-6 text-foreground">
             Meet the founders
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Together with NIDans, IITians, and designers from the community, they are shaping Designforge into a serious mentoring ecosystem for design growth.
+          <p className="text-xl font-medium text-foreground/80 max-w-2xl mx-auto">
+            Together with NIDans, IITians, and designers from the community, they are shaping Designforge into a serious mentoring ecosystem.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           
-          <div className="founder-card struct-card bg-white p-8 md:p-10 text-center hover:border-primary/50 transition-colors">
-            <div className="w-24 h-24 bg-muted rounded-full mx-auto mb-6 border border-border"></div>
+          <div className="founder-card struct-card bg-pop-1/10 p-10 text-center struct-card-hover flex flex-col items-center">
+            <div className="w-32 h-32 bg-white rounded-full mx-auto mb-8 border-4 border-foreground shadow-[4px_4px_0_0_rgba(0,0,0,1)] relative">
+               <div className="absolute -top-4 -right-4 w-10 h-10 bg-pop-3 rounded-full border-2 border-foreground flex items-center justify-center">
+                 <span className="text-foreground font-black text-xs">UX</span>
+               </div>
+            </div>
             
-            <h3 className="text-xl font-heading font-bold text-foreground mb-1">Aditya Sharma</h3>
-            <p className="text-primary text-xs uppercase tracking-widest font-bold mb-4">Principal UX Architect</p>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <h3 className="text-2xl font-heading font-black text-foreground mb-2">Aditya Sharma</h3>
+            <p className="text-foreground text-xs uppercase tracking-widest font-black mb-6 bg-white px-3 py-1 rounded-full border-2 border-foreground inline-block">Principal UX Architect</p>
+            <p className="text-base font-medium text-foreground/80 leading-relaxed">
               Mentor and design community builder focused on helping aspirants and young designers grow through thoughtful critique, structured guidance, and deeper design understanding.
             </p>
           </div>
 
-          <div className="founder-card struct-card bg-white p-8 md:p-10 text-center hover:border-primary/50 transition-colors">
-            <div className="w-24 h-24 bg-muted rounded-full mx-auto mb-6 border border-border"></div>
+          <div className="founder-card struct-card bg-pop-2/10 p-10 text-center struct-card-hover flex flex-col items-center">
+            <div className="w-32 h-32 bg-white rounded-full mx-auto mb-8 border-4 border-foreground shadow-[4px_4px_0_0_rgba(0,0,0,1)] relative">
+               <div className="absolute -top-4 -left-4 w-10 h-10 bg-primary rounded-full border-2 border-foreground flex items-center justify-center">
+                 <span className="text-white font-black text-xs">M</span>
+               </div>
+            </div>
             
-            <h3 className="text-xl font-heading font-bold text-foreground mb-1">Siddhi Patil</h3>
-            <p className="text-primary text-xs uppercase tracking-widest font-bold mb-4">Mentor & Co-founder</p>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <h3 className="text-2xl font-heading font-black text-foreground mb-2">Siddhi Patil</h3>
+            <p className="text-foreground text-xs uppercase tracking-widest font-black mb-6 bg-white px-3 py-1 rounded-full border-2 border-foreground inline-block">Mentor & Co-founder</p>
+            <p className="text-base font-medium text-foreground/80 leading-relaxed">
               Focused on helping students build clarity, confidence, creative growth, and a healthier preparation process rooted in empathy and consistency.
             </p>
           </div>

@@ -10,13 +10,14 @@ export function StatsSection() {
       const stats = sectionRef.current?.querySelectorAll('.stat-item');
       
       gsap.fromTo(stats,
-        { y: 20, opacity: 0 },
+        { scale: 0.9, opacity: 0, y: 20 },
         {
-          y: 0,
+          scale: 1,
           opacity: 1,
-          duration: 0.8,
+          y: 0,
+          duration: 0.6,
           stagger: 0.1,
-          ease: "power2.out",
+          ease: "back.out(1.5)",
           scrollTrigger: {
             trigger: sectionRef.current,
             start: "top 85%",
@@ -29,31 +30,31 @@ export function StatsSection() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="bg-secondary text-white py-20 relative overflow-hidden border-y border-secondary-foreground/20">
+    <section ref={sectionRef} className="bg-foreground text-white py-20 relative overflow-hidden border-b-2 border-foreground">
       {/* Structured subtle grid in the background */}
       <div className="absolute inset-0 bg-grid-white opacity-20"></div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4 text-center divide-x divide-white/20 max-w-5xl mx-auto">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 text-center max-w-6xl mx-auto">
           
-          <div className="stat-item px-4 flex flex-col items-center justify-center">
-            <p className="text-4xl md:text-5xl font-heading font-bold mb-2">1000+</p>
-            <p className="text-white/70 text-xs uppercase tracking-widest font-semibold">Community</p>
+          <div className="stat-item bg-white/5 border-2 border-white/20 p-8 rounded-2xl flex flex-col items-center justify-center shadow-[4px_4px_0_0_rgba(255,255,255,0.1)]">
+            <p className="text-4xl md:text-5xl font-heading font-black mb-2 text-pop-3">1000+</p>
+            <p className="text-white/90 text-sm uppercase tracking-widest font-bold">Community</p>
           </div>
           
-          <div className="stat-item px-4 flex flex-col items-center justify-center">
-            <p className="text-4xl md:text-5xl font-heading font-bold mb-2">350+</p>
-            <p className="text-white/70 text-xs uppercase tracking-widest font-semibold">Live Sessions</p>
+          <div className="stat-item bg-white/5 border-2 border-white/20 p-8 rounded-2xl flex flex-col items-center justify-center shadow-[4px_4px_0_0_rgba(255,255,255,0.1)]">
+            <p className="text-4xl md:text-5xl font-heading font-black mb-2 text-pop-1">350+</p>
+            <p className="text-white/90 text-sm uppercase tracking-widest font-bold">Live Sessions</p>
           </div>
           
-          <div className="stat-item px-4 flex flex-col items-center justify-center">
-            <p className="text-4xl md:text-5xl font-heading font-bold mb-2">500+</p>
-            <p className="text-white/70 text-xs uppercase tracking-widest font-semibold">Portfolios</p>
+          <div className="stat-item bg-white/5 border-2 border-white/20 p-8 rounded-2xl flex flex-col items-center justify-center shadow-[4px_4px_0_0_rgba(255,255,255,0.1)]">
+            <p className="text-4xl md:text-5xl font-heading font-black mb-2 text-primary">500+</p>
+            <p className="text-white/90 text-sm uppercase tracking-widest font-bold">Portfolios</p>
           </div>
           
-          <div className="stat-item px-4 flex flex-col items-center justify-center">
-            <p className="text-4xl md:text-5xl font-heading font-bold mb-2">100%</p>
-            <p className="text-white/70 text-xs uppercase tracking-widest font-semibold">Mentorship</p>
+          <div className="stat-item bg-white/5 border-2 border-white/20 p-8 rounded-2xl flex flex-col items-center justify-center shadow-[4px_4px_0_0_rgba(255,255,255,0.1)]">
+            <p className="text-4xl md:text-5xl font-heading font-black mb-2 text-pop-2">100%</p>
+            <p className="text-white/90 text-sm uppercase tracking-widest font-bold">Mentorship</p>
           </div>
           
         </div>
