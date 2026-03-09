@@ -1,92 +1,66 @@
 import { Button } from "@/components/ui/button";
-import { Play } from "lucide-react";
-import studentImg from "@/assets/images/student-hero.jpg";
-import abstractImg from "@/assets/images/abstract-art.jpg";
 
 export function Hero() {
   return (
-    <section className="relative pt-24 pb-32 overflow-hidden overflow-x-hidden">
-      {/* Decorative background elements */}
-      <div className="absolute top-0 right-0 -mr-32 -mt-32 w-96 h-96 rounded-full bg-primary/10 blur-3xl opacity-50 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 -ml-32 -mb-32 w-96 h-96 rounded-full bg-accent/20 blur-3xl opacity-50 pointer-events-none" />
-      
+    <section className="pt-32 pb-24 relative overflow-hidden bg-dots">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
+        <div className="grid lg:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
           
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-sm font-medium mb-8">
-              <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-              Not a coaching factory. A serious mentoring ecosystem.
-            </div>
+          <div className="max-w-xl">
+            <p className="text-muted-foreground font-medium mb-4 text-xs uppercase tracking-widest text-secondary">
+              Mentorship-led. Community-first.
+            </p>
             
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] mb-6">
-              Get <span className="text-primary relative inline-block">
-                mentored
-                <svg className="absolute w-full h-3 -bottom-1 left-0 text-accent opacity-70" viewBox="0 0 100 10" preserveAspectRatio="none">
-                  <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="4" fill="none" />
-                </svg>
-              </span>,<br />
-              not coached, for your dream design college.
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold leading-[1.1] mb-6 text-foreground">
+              Get mentored, not coached, for your dream <span className="text-primary">design college.</span>
             </h1>
             
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 leading-relaxed max-w-xl">
-              Designforge is a design aspirant-led community mentored by NIDans, IITians, and working designers. We help students prepare for NID DAT, UCEED, CEED, portfolios, and interviews through clarity, critique, and community.
+            <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+              Designforge is a design aspirant-led community mentored by NIDans, IITians, and working designers — built to help students prepare smarter for NID DAT, UCEED, CEED, portfolios, and interviews.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" className="rounded-full px-8 h-14 text-base bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20">
+              <Button className="rounded-md h-12 px-8 text-white btn-orange font-bold uppercase tracking-wide text-xs">
                 Join WhatsApp Community
               </Button>
-              <Button size="lg" variant="outline" className="rounded-full px-8 h-14 text-base border-border hover:bg-secondary/50">
-                Join Focus Batch Waitlist
-              </Button>
-            </div>
-            
-            <div className="mt-12 flex items-center gap-6 text-sm text-muted-foreground font-medium">
-              <div className="flex -space-x-3">
-                <div className="w-10 h-10 rounded-full border-2 border-background bg-secondary flex items-center justify-center text-xs font-bold text-secondary-foreground">A</div>
-                <div className="w-10 h-10 rounded-full border-2 border-background bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">S</div>
-                <div className="w-10 h-10 rounded-full border-2 border-background bg-accent/20 flex items-center justify-center text-xs font-bold text-accent">R</div>
-                <div className="w-10 h-10 rounded-full border-2 border-background bg-muted flex items-center justify-center text-xs font-bold">+1k</div>
-              </div>
-              <p>Join 1000+ serious design aspirants</p>
             </div>
           </div>
           
-          <div className="relative">
-            {/* Abstract composition reminiscent of the reference image */}
-            <div className="relative w-full aspect-square md:aspect-[4/3] max-w-[600px] mx-auto">
+          <div className="relative flex justify-center items-center py-10">
+            {/* Minimalist doodle-like illustration */}
+            <div className="relative w-full max-w-[450px] aspect-[4/3] flex items-center justify-center">
               
-              {/* Main image container */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[65%] h-[80%] rounded-[2rem] overflow-hidden shadow-2xl z-20 border-8 border-background">
-                <img src={studentImg} alt="Design student" className="w-full h-full object-cover" />
-              </div>
+              {/* Abstract decorative lines imitating the reference doodle */}
+              <svg className="absolute inset-0 w-full h-full text-foreground/80 stroke-current" viewBox="0 0 400 300" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                {/* Sunburst / explosion lines */}
+                <path d="M200 40 L200 20" />
+                <path d="M200 260 L200 280" />
+                <path d="M100 150 L80 150" />
+                <path d="M300 150 L320 150" />
+                <path d="M130 80 L115 65" />
+                <path d="M270 80 L285 65" />
+                <path d="M130 220 L115 235" />
+                <path d="M270 220 L285 235" />
+                
+                {/* Character doodle mock */}
+                <circle cx="200" cy="120" r="25" />
+                <path d="M200 145 L200 220" />
+                <path d="M200 170 L150 140" />
+                <path d="M200 170 L250 140" />
+                <path d="M200 220 L170 280" />
+                <path d="M200 220 L230 280" />
+                
+                {/* Glasses */}
+                <path d="M185 115 H195 M205 115 H215" strokeWidth="2" />
+                
+                {/* Book or portfolio */}
+                <rect x="120" y="110" width="30" height="40" rx="2" transform="rotate(-15 120 110)" />
+              </svg>
               
-              {/* Floating elements */}
-              <div className="absolute top-[10%] left-[5%] w-[30%] aspect-square rounded-[2rem] bg-accent p-6 text-white z-10 rotate-[-5deg] shadow-xl flex flex-col justify-between">
-                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                  <Play className="w-4 h-4 text-white fill-white" />
-                </div>
-                <div>
-                  <p className="font-bold text-lg leading-tight">Live<br/>Critiques</p>
-                  <p className="text-white/70 text-xs mt-1">Every weekend</p>
-                </div>
-              </div>
+              {/* Orange highlight blobs */}
+              <div className="absolute top-[30%] left-[25%] w-8 h-8 bg-primary/20 rounded-full blur-md" />
+              <div className="absolute bottom-[20%] right-[30%] w-12 h-12 bg-primary/30 rounded-full blur-lg" />
               
-              <div className="absolute bottom-[15%] right-[5%] w-[35%] aspect-[4/3] rounded-[1.5rem] overflow-hidden z-30 shadow-xl border-4 border-background rotate-[3deg]">
-                <img src={abstractImg} alt="Abstract 3D Art" className="w-full h-full object-cover" />
-              </div>
-              
-              <div className="absolute top-[20%] right-[10%] w-[25%] aspect-square rounded-full bg-primary z-0 shadow-lg" />
-              
-              <div className="absolute bottom-[5%] left-[15%] bg-white rounded-2xl p-4 shadow-xl z-40 border border-border/50 max-w-[200px]">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <p className="text-xs font-bold text-foreground">New Topic</p>
-                </div>
-                <p className="text-xs text-muted-foreground font-medium">Portfolio structuring for NID MDes</p>
-              </div>
-
             </div>
           </div>
           

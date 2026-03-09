@@ -4,12 +4,11 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.5rem;
-  --radius-2xl: 2rem;
-  --radius-full: 9999px;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -31,77 +30,47 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --font-sans: 'Plus Jakarta Sans', sans-serif;
-  --font-heading: 'Plus Jakarta Sans', sans-serif;
-  --font-body: 'DM Sans', sans-serif;
+  --font-sans: 'Inter', sans-serif;
+  --font-heading: 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
 }
 
 :root {
-  /* Off-white background */
-  --background: 30 20% 97%;
-  --foreground: 0 0% 10%;
+  /* Minimal White background */
+  --background: 0 0% 100%;
+  --foreground: 0 0% 20%;
 
   /* White cards */
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 10%;
+  --card-foreground: 0 0% 20%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 10%;
+  --popover-foreground: 0 0% 20%;
 
-  /* Vibrant Orange */
-  --primary: 11 93% 60%;
+  /* Soft Orange */
+  --primary: 27 75% 64%;
   --primary-foreground: 0 0% 100%;
 
-  /* Soft Lavender/Purple */
-  --secondary: 258 56% 90%;
-  --secondary-foreground: 259 84% 40%;
+  /* Dark Slate / Teal */
+  --secondary: 198 24% 35%;
+  --secondary-foreground: 0 0% 100%;
 
-  /* Muted grey */
-  --muted: 0 0% 92%;
-  --muted-foreground: 0 0% 40%;
+  /* Muted off-white */
+  --muted: 198 10% 96%;
+  --muted-foreground: 0 0% 50%;
 
-  /* Vibrant Purple */
-  --accent: 259 84% 70%;
-  --accent-foreground: 0 0% 100%;
+  /* Light Orange Accent */
+  --accent: 27 75% 95%;
+  --accent-foreground: 27 75% 40%;
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 0 0% 90%;
-  --input: 0 0% 90%;
-  --ring: 11 93% 60%;
+  --border: 0 0% 92%;
+  --input: 0 0% 92%;
+  --ring: 27 75% 64%;
 
-  --radius: 1rem;
-}
-
-.dark {
-  --background: 0 0% 10%;
-  --foreground: 0 0% 98%;
-
-  --card: 0 0% 12%;
-  --card-foreground: 0 0% 98%;
-
-  --popover: 0 0% 12%;
-  --popover-foreground: 0 0% 98%;
-
-  --primary: 11 93% 60%;
-  --primary-foreground: 0 0% 100%;
-
-  --secondary: 259 30% 20%;
-  --secondary-foreground: 258 56% 90%;
-
-  --muted: 0 0% 15%;
-  --muted-foreground: 0 0% 65%;
-
-  --accent: 259 84% 70%;
-  --accent-foreground: 0 0% 100%;
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-
-  --border: 0 0% 20%;
-  --input: 0 0% 20%;
-  --ring: 11 93% 60%;
+  --radius: 0.5rem;
 }
 
 @layer base {
@@ -112,6 +81,44 @@
     @apply font-body antialiased bg-background text-foreground;
   }
   h1, h2, h3, h4, h5, h6 {
-    @apply font-heading font-bold tracking-tight;
+    @apply font-heading tracking-tight;
   }
+}
+
+/* Minimalist Button shadow override mimicking the reference */
+.btn-orange {
+  background: linear-gradient(to bottom, hsl(27, 80%, 68%), hsl(27, 75%, 60%));
+  box-shadow: 0 2px 4px rgba(232, 156, 94, 0.3), inset 0 1px 0 rgba(255,255,255,0.3);
+  text-shadow: 0 1px 1px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+}
+.btn-orange:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(232, 156, 94, 0.4), inset 0 1px 0 rgba(255,255,255,0.4);
+}
+.btn-orange:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(232, 156, 94, 0.3);
+}
+
+/* Background scattered dots mimicking confetti */
+.bg-dots {
+  position: relative;
+}
+.bg-dots::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: 
+    radial-gradient(circle at 15% 25%, hsl(27, 75%, 64%) 2px, transparent 2px),
+    radial-gradient(circle at 85% 15%, hsl(198, 24%, 35%) 1.5px, transparent 1.5px),
+    radial-gradient(circle at 10% 75%, hsl(198, 24%, 35%) 2px, transparent 2px),
+    radial-gradient(circle at 80% 85%, hsl(27, 75%, 64%) 1.5px, transparent 1.5px),
+    radial-gradient(circle at 50% 10%, hsl(27, 75%, 64%) 1px, transparent 1px),
+    radial-gradient(circle at 40% 90%, hsl(198, 24%, 35%) 2px, transparent 2px);
+  background-size: 300px 300px;
+  opacity: 0.4;
+  z-index: 0;
 }

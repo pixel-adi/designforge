@@ -1,0 +1,752 @@
+PREMIUM LANDING PAGE COPY
+This is the actual polished copy direction that can go directly into Framer/Webflow.
+
+HERO COPY
+Primary headline
+Get mentored, not coached, for your dream design college.
+
+Alternate headline options
+A mentorship-led design community for aspirants who want more than coaching
+
+Prepare for NID, UCEED, and CEED through clarity, critique, and community
+
+Where design aspirants learn how to think, observe, and grow
+
+Subheadline
+Designforge is a design aspirant-led community mentored by NIDans, IITians, and working designers — built to help students prepare smarter for NID DAT, UCEED, CEED, studio tests, portfolios, interviews, and the design journey beyond.
+
+Supporting paragraph
+We believe design preparation is not about memorising templates or copying expected answers. It is about building observation, critical thinking, originality, visual communication, and confidence — the exact qualities top design colleges and design careers demand.
+
+CTA buttons
+Join WhatsApp Community
+
+Join Focus Batch Waitlist
+
+Small supporting line
+Mentorship-led. Community-first. Aspirant-focused.
+
+PAIN SECTION COPY
+Heading
+The hardest part of design preparation is often not effort — it’s direction.
+
+Paragraph
+Many aspirants are willing to work hard, but they are stuck between too many resources, too little feedback, and no clear sense of what actually improves their chances. Some get trapped in coaching templates. Others practice alone without critique. Many reach portfolio or interview rounds without knowing how to present themselves with confidence.
+
+Closing line
+Designforge exists to change that.
+
+DIFFERENCE SECTION COPY
+Heading
+Why Designforge is built around mentorship, not coaching
+
+Intro
+Coaching often tries to standardise performance. Mentorship helps each student discover how they think, where they struggle, and how they can grow meaningfully.
+
+Repeater blocks
+Coaching teaches formats.
+Mentorship builds judgement.
+
+Coaching pushes repetition.
+Mentorship sharpens observation and reasoning.
+
+Coaching prepares students for expected questions.
+Mentorship prepares them for unfamiliar challenges.
+
+Coaching often ends with the exam.
+Mentorship continues into portfolios, interviews, and design growth.
+
+Closing line
+We don’t want students to look prepared. We want them to become stronger thinkers and makers.
+
+ACHIEVERS SECTION COPY
+Heading
+Real journeys. Real ranks. Real growth.
+
+Intro
+Behind every rank is a process — uncertainty, effort, iteration, feedback, and breakthrough. We are proud not only of the results our students achieve, but of the confidence and clarity they build along the way.
+
+Card footers
+AIR ___ | NID BDes
+
+AIR ___ | NID MDes
+
+AIR ___ | UCEED
+
+AIR ___ | CEED
+
+Section CTA
+Explore student stories
+
+MENTORSHIP TRACKS COPY
+Heading
+Mentorship for every major design entrance pathway
+
+Intro
+Whether you are preparing for NID DAT BDes, NID DAT MDes, UCEED, CEED, portfolios, or interviews, Designforge gives you the environment and guidance to move with more clarity and confidence.
+
+NID DAT BDes
+Build creativity, observation, visualisation, and confidence for prelims, studio tests, and interviews.
+
+NID DAT MDes
+Develop stronger problem framing, portfolio depth, articulation, and design maturity for advanced admissions.
+
+UCEED
+Prepare with stronger basics, visual reasoning, sketching, creativity, and systematic guidance.
+
+CEED
+Build readiness across aptitude, sketching, analytical thinking, concept communication, and Part B-style design problem solving.
+
+Portfolio & Interview Support
+Refine how you present your work, story, intent, and capabilities for college and career opportunities.
+
+COMMUNITY SECTION COPY
+Heading
+Start with the community
+
+Paragraph
+Not every aspirant is ready to commit to a batch on day one. That’s why Designforge’s WhatsApp community is the best place to begin — a space to stay connected to sessions, resources, opportunities, discussions, and a serious peer ecosystem.
+
+Value bullets
+Updates and announcements
+
+Session invites
+
+Resources and prep support
+
+Event access
+
+Motivation through community
+
+CTA
+Join WhatsApp Community
+
+FOCUS BATCH COPY
+Heading
+The yearly Focus Batch for serious aspirants
+
+Paragraph
+For students who want long-term structure, deeper critique, consistent preparation, and a more serious environment, the Focus Batch offers a stronger mentoring journey with accountability, reviews, and sustained support.
+
+Short bullets
+structured prep
+
+regular review
+
+critique loops
+
+accountability
+
+peer learning
+
+limited seats for deeper feedback
+
+CTA
+Join Waitlist
+
+PHILOSOPHY SECTION COPY
+Heading
+Build the designer, not just the applicant
+
+Body
+A strong design aspirant is not someone who only knows how to answer exam questions. A strong design aspirant notices more, thinks deeper, questions better, and expresses ideas more clearly.
+
+At Designforge, we help students build the foundations that matter across exams, interviews, portfolios, and life as a designer — observation, critical thinking, originality, communication, and confidence.
+
+FOUNDERS SECTION COPY
+Heading
+Meet the founders
+
+Aditya Sharma
+Principal UX Architect, mentor, and design community builder focused on helping aspirants and young designers grow through thoughtful critique, structured guidance, and deeper design understanding.
+
+Siddhi Patil
+Mentor and co-founder focused on helping students build clarity, confidence, creative growth, and a healthier preparation process rooted in empathy and consistency.
+
+Supporting line
+Together with NIDans, IITians, and designers from the community, they are shaping Designforge into a serious mentoring ecosystem for design growth.
+
+EVENTS SECTION COPY
+Heading
+Talks, meetups, critiques, and community moments
+
+Paragraph
+Designforge is not just a prep destination — it is a living ecosystem where aspirants and young designers come together for conversations, review sessions, workshops, portfolio talks, interview guidance, and shared growth.
+
+CTA
+Explore Events
+
+FINAL CTA COPY
+Heading
+Prepare for design with more clarity, confidence, and depth
+
+Paragraph
+Join a mentoring ecosystem that helps you think better, create better, and move closer to your dream design college — and beyond.
+
+Buttons
+Join WhatsApp Community
+
+Join Focus Batch Waitlist
+
+PART 3 — COMPLETE WEBSITE SITEMAP + SECONDARY PAGE STRUCTURE
+This is the full site architecture beyond just the homepage.
+
+MAIN SITEMAP
+Primary pages
+Home
+
+Mentorship
+
+Results
+
+Community
+
+Events
+
+Portfolio & Interviews
+
+About
+
+Contact
+
+Optional future pages
+Resources / Blog
+
+FAQs
+
+Join Focus Batch
+
+Success Stories
+
+Mentor Network
+
+Workshops / Live Sessions
+
+Careers / Collaborations
+
+1. HOME PAGE
+Goal
+Introduce Designforge, build trust, convert community joins and waitlist signups.
+
+Includes
+hero
+
+pain points
+
+mentorship over coaching
+
+achievers
+
+mentorship tracks
+
+community join
+
+focus batch
+
+philosophy
+
+founders
+
+events
+
+final CTA
+
+2. MENTORSHIP PAGE
+Goal
+Deep-dive into all mentorship offerings.
+
+Suggested sections
+Hero: Mentorship, not mass prep
+
+Who this is for
+
+Tracks
+
+NID BDes
+
+NID MDes
+
+UCEED
+
+CEED
+
+Portfolio & interviews
+
+What mentorship includes
+
+Learning format
+
+Review / critique process
+
+Why this is different from coaching
+
+FAQs
+
+CTA to join community / waitlist
+
+CTA strategy
+Explore track
+
+Join community
+
+Apply / waitlist
+
+3. RESULTS PAGE
+Goal
+Show proof and build trust.
+
+Suggested sections
+Hero: Results that reflect real growth
+
+Filter by exam
+
+NID BDes
+
+NID MDes
+
+UCEED
+
+CEED
+
+Ranker cards
+
+Student journeys
+
+Before / after growth snippets
+
+Testimonials
+
+CTA
+
+Important
+Show real students, real ranks, real words. This page can become a strong conversion page.
+
+4. COMMUNITY PAGE
+Goal
+Sell the culture and belonging of Designforge.
+
+Suggested sections
+Hero: Start with the community
+
+What happens inside the community
+
+Who joins
+
+What members get access to
+
+Community values
+
+Event snapshots
+
+Join WhatsApp CTA
+
+FAQs
+
+Core angle
+This page should feel warm, welcoming, and alive.
+
+5. EVENTS PAGE
+Goal
+Show that Designforge is active and current.
+
+Suggested sections
+Hero: Talks, critiques, meetups, sessions
+
+Upcoming events
+
+Past events
+
+Event gallery
+
+Speaker highlights
+
+Community meetups
+
+CTA to join community
+
+Optional additions
+watch recordings
+
+event recap blog
+
+photo gallery
+
+6. PORTFOLIO & INTERVIEWS PAGE
+Goal
+Expand relevance beyond exam prep.
+
+Suggested sections
+Hero: Support for portfolios and interviews
+
+Who this is for
+
+What gets reviewed
+
+Job interview help
+
+College interview help
+
+Mock reviews / mock interviews
+
+Founder / mentor expertise
+
+Testimonials
+
+CTA
+
+This page helps position Designforge as a broader design growth platform.
+7. ABOUT PAGE
+Goal
+Build emotional trust.
+
+Suggested sections
+Hero: Why Designforge was built
+
+Story of Designforge
+
+Why mentoring over coaching
+
+Mission
+
+Philosophy
+
+Meet founders
+
+Mentor network
+
+Community values
+
+CTA to join
+
+Strong messaging
+This page should clearly say:
+Designforge was built because aspirants deserve better than confusion, generic coaching, and shallow guidance.
+
+8. CONTACT PAGE
+Goal
+Make the brand reachable and trustworthy.
+
+Sections
+Contact form
+
+Email
+
+WhatsApp link
+
+Social links
+
+Invite for talks / collaborations / mentoring / partnerships
+
+FAQ short block
+
+Contact form fields
+Name
+
+Email
+
+Phone / WhatsApp
+
+What are you preparing for?
+
+Message
+
+Interest
+
+Community
+
+Focus Batch
+
+Portfolio Review
+
+Interview Support
+
+Collaboration
+
+9. RESOURCES / BLOG PAGE
+Goal
+Organic growth + SEO + credibility
+
+Content ideas
+NID DAT prep insights
+
+CEED and UCEED strategy
+
+Studio test guidance
+
+Interview prep
+
+Portfolio tips
+
+design observation exercises
+
+career advice for young designers
+
+Why useful
+This page can bring search traffic and position Designforge as a serious voice in design prep.
+
+10. FAQ PAGE
+Goal
+Reduce hesitation and support conversion.
+
+Categories
+community
+
+mentorship
+
+focus batch
+
+portfolio help
+
+interview support
+
+eligibility
+
+level of student
+
+how to start
+
+11. FOCUS BATCH PAGE
+Goal
+Dedicated conversion page for serious aspirants.
+
+Sections
+Hero
+
+Why this batch exists
+
+Who it is for
+
+What is included
+
+Mentorship structure
+
+Reviews and checkpoints
+
+Batch philosophy
+
+Limited seat explanation
+
+Waitlist form
+
+FAQs
+
+12. SUCCESS STORIES PAGE
+Goal
+Long-form storytelling of student journeys
+
+Sections
+featured rankers
+
+transformation stories
+
+portfolio breakthroughs
+
+interview wins
+
+parent/student voices
+
+timeline of growth
+
+13. MENTOR NETWORK PAGE
+Goal
+Show depth of ecosystem
+
+Sections
+founder mentors
+
+guest mentors
+
+NIDans / IITians / working designers
+
+areas of expertise
+
+featured sessions by mentors
+
+PART 4 — RECOMMENDED CTA SYSTEM
+Use only 2 main CTAs throughout the whole website.
+
+Primary CTA
+Join WhatsApp Community
+
+Secondary CTA
+Join Focus Batch Waitlist
+
+Tertiary CTA
+Explore Mentorship
+
+This keeps the site clean and conversion-focused.
+
+PART 5 — DESIGN DIRECTION FOR THE LANDING PAGE
+Since you asked for a super impressive page, here’s the visual direction that should match the content.
+
+Visual feel
+premium but warm
+
+youthful but credible
+
+editorial + modern
+
+community energy
+
+not like a coaching center
+
+UI style
+clean grid
+
+bold headlines
+
+soft cards
+
+strong social proof
+
+image-driven moments
+
+modern typography
+
+subtle motion, not flashy
+
+Visual assets to use
+achiever portraits
+
+mentor portraits
+
+student work previews
+
+event photos
+
+workshop shots
+
+critique session screenshots
+
+WhatsApp community snapshots
+
+badges for NID / IIT / exams
+
+Suggested section visual moods
+hero: bold + aspirational
+
+results: bright + celebratory
+
+philosophy: editorial + calm
+
+community: warm + alive
+
+focus batch: premium + high commitment
+
+PART 6 — HIGH-CONVERSION MICROCOPY BANK
+Use these across buttons, badges, strips, captions, and cards.
+
+Taglines
+Mentorship over coaching
+
+Think deeper. Prepare better.
+
+Built for serious design aspirants
+
+Learn with community
+
+Grow with critique
+
+Prepare with clarity
+
+Beyond templates
+
+Build stronger design thinking
+
+For aspirants and young designers
+
+Not shortcuts. Stronger foundations.
+
+Buttons
+Join Community
+
+Join Waitlist
+
+Explore Mentorship
+
+See Results
+
+Meet Mentors
+
+Explore Events
+
+Start Your Journey
+
+Get Portfolio Support
+
+Trust labels
+Mentored by NIDans & IITians
+
+Community-led learning
+
+Critique-driven growth
+
+Built for long-term development
+
+Aspirant-first ecosystem
+
+PART 7 — FORM / LEAD CAPTURE CONTENT
+WhatsApp join module
+Heading
+Join the Designforge WhatsApp community
+
+Fields
+Name
+
+Phone number
+
+Exam preparing for
+
+Current stage
+
+CTA
+Join Now
+
+Focus batch waitlist form
+Heading
+Join the yearly Focus Batch waitlist
+
+Fields
+Full name
+
+Email
+
+Phone / WhatsApp
+
+Exam target
+
+Current preparation stage
+
+Why do you want to join?
+
+CTA
+Join Waitlist
+
+Portfolio / interview inquiry form
+Heading
+Get support for portfolios and interviews
+
+Fields
+Name
+
+Email
+
+Current course / role
+
+What do you need help with?
+
+Portfolio link
+
+Message
+
+PART 8 — FINAL BRAND POSITIONING STATEMENTS
+These are excellent for About, Hero, Meta description, or social bios.
+
+Brand statement 1
+Designforge is a mentorship-led design community helping aspirants prepare for NID, UCEED, CEED, portfolios, interviews, and design growth through critical thinking, observation, critique, and community.
+
+Brand statement 2
+More than coaching, Designforge offers a serious mentoring ecosystem for design aspirants and young designers who want clarity, confidence, and thoughtful growth.
+
+Brand statement 3
+Built by mentors, shaped by community, and focused on growth — Designforge helps students prepare not just for exams, but for design itself.
