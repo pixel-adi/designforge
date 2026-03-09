@@ -1,0 +1,405 @@
+PART 1 — HOMEPAGE WIREFRAME
+This is the ideal homepage structure in the order people should consume it.
+
+1. Announcement Bar
+Purpose
+Quickly communicate current activity and create urgency without sounding salesy.
+
+Content ideas
+Admissions / Focus Batch applications now open
+
+Join the WhatsApp community
+
+Upcoming portfolio / interview session
+
+Recent achievers announced
+
+Sample copy
+Now welcoming serious aspirants for NID, UCEED, CEED & portfolio mentorship
+CTA: Join Community
+
+2. Navigation Bar
+Left
+Designforge logo
+
+Center / Right menu
+Home
+
+Mentorship
+
+Results
+
+Events
+
+Community
+
+Portfolio & Interviews
+
+About
+
+Contact
+
+CTA buttons
+Primary: Join WhatsApp Community
+Secondary: Join Focus Batch Waitlist
+
+3. Hero / First Fold
+Layout
+Two-column layout
+
+Left side
+
+headline
+
+subheadline
+
+value points
+
+CTA buttons
+
+Right side
+
+mentor images / student collage / event collage / student result cards / WhatsApp mockup
+
+Content hierarchy
+Big emotional statement
+
+Clarify who this is for
+
+Clarify why it is different
+
+Strong CTA
+
+Recommended copy
+Headline
+Get mentored, not coached, for your dream design college.
+
+Subheadline
+Designforge is a design aspirant-led community mentored by NIDans, IITians, and working designers — helping students prepare for NID DAT, UCEED, CEED, portfolios, interviews, and beyond through clarity, critique, and community.
+
+Supporting points
+Mentorship over mass coaching
+
+Designed for NID, UCEED, CEED, studio tests, portfolios, and interviews
+
+Built to strengthen thinking, observation, expression, and confidence
+
+CTAs
+Join WhatsApp Community
+
+Join Focus Batch Waitlist
+
+Trust micro-line
+Not a coaching factory. A serious design mentoring ecosystem.
+
+4. Social Proof Strip
+Layout
+Horizontal strip with stats / trust tags
+
+Content ideas
+Mentored by NIDans & IITians
+
+Community-led learning
+
+Supports aspirants and early designers
+
+Talks, critiques, and live sessions
+
+Focused on long-term growth
+
+Optional metrics
+Use only real numbers:
+
+1000+ community members
+
+X achievers
+
+X live sessions
+
+X portfolio/interview reviews
+
+5. Problem / Pain Point Section
+Layout
+Intro copy + 4 or 5 pain cards
+
+Heading
+Most aspirants don’t lack talent. They lack the right guidance.
+
+Pain cards
+Too much information, no clear direction
+
+Coaching templates kill originality
+
+No one gives deep, honest critique
+
+Preparation feels lonely and overwhelming
+
+Portfolio and interviews require more than exam prep
+
+6. Why Designforge / Mentorship over Coaching
+Layout
+Split comparison section
+
+Heading
+Why mentorship works better than coaching for design preparation
+
+Format
+Left column: Coaching
+Right column: Designforge
+
+Comparison points
+Coaching: gives fixed formats
+Designforge: helps you build your own thinking
+
+Coaching: teaches expected answers
+Designforge: teaches problem framing and originality
+
+Coaching: focuses on syllabus completion
+Designforge: focuses on growth, review, and design maturity
+
+Coaching: exam-only mindset
+Designforge: exam + interview + portfolio + career direction
+
+7. Achievers / Rankers Section
+Layout
+Grid or carousel of achiever cards
+
+Heading
+The journeys that make us proud
+
+Each card should include
+photo
+
+name
+
+AIR / rank
+
+exam type
+
+converted college / discipline
+
+short testimonial
+
+Card labels
+NID BDes
+
+NID MDes
+
+UCEED
+
+CEED
+
+CTA
+See more success stories
+
+8. Testimonial Section
+Layout
+Carousel or 2-column masonry
+
+Heading
+What students remember most is not just the result — but the growth.
+
+Add categories
+confidence
+
+clarity
+
+critique
+
+portfolio
+
+interview help
+
+community energy
+
+9. Mentorship Tracks Section
+Layout
+4–5 feature cards
+
+Heading
+Mentorship built around your stage of the journey
+
+Cards
+NID DAT BDes Mentorship
+
+NID DAT MDes Mentorship
+
+UCEED Mentorship
+
+CEED Mentorship
+
+Portfolio & Interview Support
+
+Each card should have:
+
+who it is for
+
+key support areas
+
+CTA: Explore Track
+
+10. WhatsApp Community Section
+Layout
+Simple high-conversion block
+
+Heading
+Start with the community. Build momentum with the ecosystem.
+
+Content
+Explain this is the easiest entry point for aspirants who want updates, guidance, resources, and event access.
+
+CTA
+Join WhatsApp Community
+
+11. Focus Batch Section
+Layout
+Premium highlight section with stronger visual treatment
+
+Heading
+For serious aspirants: the yearly Focus Batch
+
+Include
+structured mentorship
+
+review checkpoints
+
+critique loops
+
+consistency
+
+accountability
+
+peer learning
+
+CTA
+Join Waitlist
+
+Microcopy
+Built for committed learners, not passive viewers.
+
+12. Philosophy Section
+Layout
+Editorial-style section with 3 pillars
+
+Heading
+Our philosophy: build the designer, not just the applicant
+
+Pillars
+Observe deeply
+
+Think critically
+
+Express clearly
+
+Supporting copy
+Explain that good design prep is not memorising answers but developing awareness, clarity, and communication.
+
+13. Mentor / Founder Section
+Layout
+Founder cards + mentor network strip
+
+Heading
+Meet the people behind Designforge
+
+Founder cards
+Aditya Sharma
+
+Siddhi Patil
+
+Add small tags
+Mentor
+
+Designer
+
+Community builder
+
+Portfolio reviewer
+
+Interview mentor
+
+Supporting line
+Supported by NIDans, IITians, design students, and practitioners through sessions, critiques, and mentoring.
+
+14. For Aspirants + For Job Interviews Section
+Layout
+Two-column section
+
+Heading
+Support that grows with you — from entrance prep to interviews
+
+Left side: Aspirants
+NID / UCEED / CEED prep
+
+Studio test support
+
+interview confidence
+
+portfolio guidance
+
+Right side: Young designers
+job interview prep
+
+portfolio storytelling
+
+mock reviews
+
+early career direction
+
+15. Events / Talks / Meetups Section
+Layout
+Event cards or slider
+
+Heading
+A living community, not just a prep platform
+
+Include
+recent meetups
+
+online talks
+
+portfolio jams
+
+Q&A sessions
+
+design critiques
+
+interview workshops
+
+CTA
+See events
+
+16. FAQ Section
+Heading
+Questions aspirants usually have
+
+Keep 5–7 FAQs.
+
+17. Final CTA Section
+Layout
+Big emotional close
+
+Heading
+Your design journey deserves more than generic coaching
+
+Subheading
+Join a community that helps you grow with clarity, critique, and confidence.
+
+CTA
+Join WhatsApp Community
+
+Join Focus Batch Waitlist
+
+18. Footer
+Columns
+Brand summary
+
+Mentorship
+
+Exams
+
+Community
+
+Socials
+
+Contact
+
