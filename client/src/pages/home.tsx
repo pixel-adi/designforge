@@ -11,6 +11,7 @@ import { PhilosophySection } from "@/components/philosophy-section";
 import { FoundersSection } from "@/components/founders-section";
 import { EventsSection } from "@/components/events-section";
 import { Button } from "@/components/ui/button";
+import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 
 export default function Home() {
   return (
@@ -55,11 +56,8 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-16 border-b-2 border-white/20 pb-16">
             <div className="md:col-span-4">
-              <div className="font-heading font-black text-3xl tracking-tight mb-6 flex items-center gap-3 text-white">
-                <div className="w-10 h-10 bg-pop-3 rounded-lg border-2 border-white flex items-center justify-center">
-                   <span className="text-foreground text-lg">D</span>
-                </div>
-                Designforge<span className="text-primary text-4xl leading-none">.</span>
+              <div className="mb-6 flex items-center bg-white p-3 rounded-xl border-2 border-foreground w-fit">
+                <img src={logoImg} alt="Designforge Logo" className="h-8 md:h-10 object-contain" />
               </div>
               <p className="text-white/70 text-base font-medium leading-relaxed max-w-sm">
                 A mentorship-led design community for aspirants who want more than coaching. Built to help students prepare smarter.

@@ -40,45 +40,45 @@
 }
 
 :root {
-  /* Minimal White background */
-  --background: 0 0% 100%;
-  --foreground: 0 0% 12%;
+  /* Cream background matching the logo's pencil wood */
+  --background: 36 60% 95%;
+  --foreground: 0 0% 10%;
 
   /* White cards */
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 12%;
+  --card-foreground: 0 0% 10%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 12%;
+  --popover-foreground: 0 0% 10%;
 
-  /* Vibrant Orange */
-  --primary: 27 90% 55%;
+  /* Coral Red from the logo */
+  --primary: 7 80% 56%;
   --primary-foreground: 0 0% 100%;
 
-  /* Deep Slate/Teal */
-  --secondary: 198 35% 25%;
+  /* Dark Charcoal */
+  --secondary: 0 0% 15%;
   --secondary-foreground: 0 0% 100%;
 
-  /* Muted off-white */
-  --muted: 0 0% 95%;
+  /* Muted cream */
+  --muted: 36 40% 85%;
   --muted-foreground: 0 0% 45%;
 
-  /* Soft Peach/Accent */
-  --accent: 27 85% 95%;
-  --accent-foreground: 27 85% 40%;
+  /* Soft Coral Accent */
+  --accent: 7 80% 90%;
+  --accent-foreground: 7 80% 40%;
 
-  /* Pop Colors */
-  --pop-1: 180 80% 45%; /* Vibrant Cyan */
-  --pop-2: 340 85% 60%; /* Vibrant Pink */
-  --pop-3: 45 100% 55%; /* Vibrant Yellow */
+  /* Pop Colors - Warm palette complementing the coral/cream */
+  --pop-1: 30 90% 55%; /* Warm Orange */
+  --pop-2: 340 70% 60%; /* Warm Pink */
+  --pop-3: 45 90% 55%; /* Warm Yellow */
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
   /* Darker borders for a structured, slightly brutalist look */
-  --border: 0 0% 80%;
-  --input: 0 0% 80%;
-  --ring: 27 90% 55%;
+  --border: 0 0% 70%;
+  --input: 0 0% 70%;
+  --ring: 7 80% 56%;
 
   --radius: 0.5rem;
 }

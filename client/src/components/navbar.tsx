@@ -1,15 +1,15 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 
 export function Navbar() {
   return (
-    <header className="w-full bg-white/95 backdrop-blur-md sticky top-0 z-50 border-b-2 border-foreground shadow-[0_2px_0_0_rgba(0,0,0,1)]">
+    <header className="w-full bg-background/95 backdrop-blur-md sticky top-0 z-50 border-b-2 border-foreground shadow-[0_2px_0_0_rgba(0,0,0,1)]">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Link href="/">
-            <a className="font-heading text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <div className="w-8 h-8 rounded bg-pop-3 border-2 border-foreground flex items-center justify-center text-foreground font-bold text-sm shadow-[2px_2px_0_0_rgba(0,0,0,1)]">D</div>
-              Designforge<span className="text-primary text-3xl leading-none">.</span>
+            <a className="flex items-center">
+              <img src={logoImg} alt="Designforge Logo" className="h-8 md:h-10 object-contain" />
             </a>
           </Link>
         </div>
