@@ -31,7 +31,7 @@
   --color-ring: var(--ring);
 
   --font-sans: 'Inter', sans-serif;
-  --font-heading: 'Inter', sans-serif;
+  --font-heading: 'Aktiv Grotesk', 'Inter', sans-serif;
   --font-body: 'Inter', sans-serif;
 }
 
@@ -74,6 +74,21 @@
 }
 
 @layer base {
+  @font-face {
+    font-family: 'Aktiv Grotesk';
+    src: url('https://use.typekit.net/af/cc29d7/00000000000000007735b501/30/l?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n7&v=3') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Aktiv Grotesk';
+    src: url('https://use.typekit.net/af/2e2392/00000000000000007735b4ff/30/l?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n4&v=3') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  
   * {
     @apply border-border;
   }
