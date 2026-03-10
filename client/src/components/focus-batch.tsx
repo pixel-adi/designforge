@@ -60,7 +60,7 @@ export function FocusBatch() {
                   <span className="text-pop-3 font-heading text-2xl">02</span>
                 </div>
                 <div>
-                  <h3 className="text-2xl font-heading text-foreground mb-3">Active Critique</h3>
+                  <h3 className="text-2xl font-heading mb-3 text-[#e94a35]">Active Critique</h3>
                   <p className="text-foreground/60 text-lg font-light leading-relaxed">Regular, unfiltered feedback loops with mentors to refine your problem-solving approach.</p>
                 </div>
              </div>
