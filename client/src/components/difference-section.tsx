@@ -85,7 +85,7 @@ export function DifferenceSection() {
           <div className="lg:w-5/12">
             <div className="sticky-side pt-10">
               <div className="w-20 h-1 bg-primary mb-8 rounded-full"></div>
-              <h2 className="text-5xl md:text-6xl font-heading mb-6 text-foreground leading-[1.1]">
+              <h2 className="text-5xl md:text-6xl font-heading mb-6 leading-[1.1] text-[#e94a35]">
                 Why Designforge revolves around <span className="text-primary italic">mentorship.</span>
               </h2>
               <p className="text-foreground/60 font-light text-xl md:text-2xl leading-relaxed">
