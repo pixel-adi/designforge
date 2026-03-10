@@ -50,7 +50,7 @@ export function FocusBatch() {
                   <span className="text-pop-1 font-heading text-2xl">01</span>
                 </div>
                 <div>
-                  <h3 className="text-2xl font-heading text-foreground mb-3">Observe & Analyze</h3>
+                  <h3 className="text-2xl font-heading mb-3 text-[#e94a35]">Observe & Analyze</h3>
                   <p className="text-foreground/60 text-lg font-light leading-relaxed">Move beyond copying templates to understanding core design principles from scratch.</p>
                 </div>
              </div>
