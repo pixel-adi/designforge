@@ -76,7 +76,7 @@ export function MentorshipTracks() {
               
               <div className={`w-3 h-12 rounded-full ${track.color} mb-8 opacity-60 group-hover:opacity-100 transition-opacity duration-300`}></div>
 
-              <p className="text-foreground/50 text-sm uppercase tracking-widest font-medium mb-3">{track.subtitle}</p>
+              <p className="text-sm uppercase tracking-widest font-medium mt-[6px] mb-[6px] bg-[#33181800] text-[#dc4846]">{track.subtitle}</p>
               <h3 className="text-3xl font-heading text-foreground mb-6">{track.title}</h3>
               
               <p className="text-foreground/70 text-base font-light leading-relaxed mb-10 flex-1">
