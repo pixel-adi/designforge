@@ -37,16 +37,14 @@ export function CommunitySection() {
 
   return (
     <section ref={sectionRef} className="py-32 bg-background relative overflow-hidden">
-      
       {/* Background organic shape */}
       <div className="comm-blob absolute top-1/2 right-0 -translate-y-1/2 w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] bg-white rounded-full blur-3xl opacity-60"></div>
-
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative z-10">
         
         <div className="flex flex-col lg:flex-row gap-16 items-center">
           
           <div className="flex-1 max-w-2xl">
-            <h2 className="comm-text text-5xl md:text-6xl font-heading mb-8 text-foreground leading-[1.1]">
+            <h2 className="comm-text text-5xl md:text-6xl font-heading mb-8 leading-[1.1] text-[#e94a35]">
               Start with the <span className="text-primary italic">community.</span>
             </h2>
             <p className="comm-text text-xl md:text-2xl text-foreground/60 font-light mb-12 leading-relaxed">
