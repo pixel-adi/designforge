@@ -70,7 +70,7 @@ export function FocusBatch() {
                   <span className="text-primary font-heading text-2xl">03</span>
                 </div>
                 <div>
-                  <h3 className="text-2xl font-heading text-foreground mb-3">Iterative Refinement</h3>
+                  <h3 className="text-2xl font-heading mb-3 text-[#e94a35]">Iterative Refinement</h3>
                   <p className="text-foreground/60 text-lg font-light leading-relaxed">Build a robust portfolio and unshakeable exam readiness through continuous iteration.</p>
                 </div>
              </div>
