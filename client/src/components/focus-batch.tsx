@@ -1,6 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import gsap from 'gsap';
 
 export function FocusBatch() {
@@ -85,11 +92,29 @@ export function FocusBatch() {
               </div>
               <div className="space-y-3">
                 <label className="text-sm text-foreground/60 uppercase tracking-widest font-medium">WhatsApp Number</label>
-                <Input placeholder="+91 98765 43210" className="h-14 rounded-2xl bg-black/[0.02] border-transparent focus-visible:bg-white focus-visible:border-primary focus-visible:ring-primary shadow-inner text-base px-5" />
+                <div className="relative flex items-center">
+                  <div className="absolute left-5 flex items-center gap-2 pointer-events-none">
+                    <span className="text-xl">🇮🇳</span>
+                    <span className="text-foreground/70 font-medium">+91</span>
+                  </div>
+                  <Input placeholder="98765 43210" className="h-14 rounded-2xl bg-black/[0.02] border-transparent focus-visible:bg-white focus-visible:border-primary focus-visible:ring-primary shadow-inner text-base pl-[5.5rem] pr-5 w-full" />
+                </div>
               </div>
               <div className="space-y-3">
                 <label className="text-sm text-foreground/60 uppercase tracking-widest font-medium">Goal</label>
-                <Input placeholder="e.g. NID MDes" className="h-14 rounded-2xl bg-black/[0.02] border-transparent focus-visible:bg-white focus-visible:border-primary focus-visible:ring-primary shadow-inner text-base px-5" />
+                <Select>
+                  <SelectTrigger className="h-14 rounded-2xl bg-black/[0.02] border-transparent focus:bg-white focus:border-primary focus:ring-primary shadow-inner text-base px-5 w-full">
+                    <SelectValue placeholder="Select your goal" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-black/5 shadow-lg bg-white z-50">
+                    <SelectItem value="nid-bdes" className="text-base py-3 cursor-pointer">NID BDES</SelectItem>
+                    <SelectItem value="nid-mdes" className="text-base py-3 cursor-pointer">NID MDES</SelectItem>
+                    <SelectItem value="uceed" className="text-base py-3 cursor-pointer">UCEED</SelectItem>
+                    <SelectItem value="ceed" className="text-base py-3 cursor-pointer">CEED</SelectItem>
+                    <SelectItem value="nift" className="text-base py-3 cursor-pointer">NIFT</SelectItem>
+                    <SelectItem value="abroad" className="text-base py-3 cursor-pointer">Abroad Universities</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               
               <Button className="w-full btn-bold btn-primary-pop h-16 mt-6 rounded-full text-base">
