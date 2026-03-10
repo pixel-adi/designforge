@@ -99,29 +99,28 @@ export function Hero() {
 
             {/* Foreground crisp elements */}
             <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10 w-full max-w-3xl">
-               <div className="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-xl border border-white flex flex-col items-center justify-center transform md:-rotate-6 hover:rotate-0 transition-transform duration-500 min-h-[200px]">
-                  <div className="w-16 h-16 rounded-full bg-pop-1/20 flex items-center justify-center mb-4">
-                     <div className="w-8 h-8 rounded-full bg-pop-1"></div>
+               <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-black/5 flex flex-col items-center justify-center transform md:-rotate-6 hover:rotate-0 transition-transform duration-500 min-h-[220px]">
+                  <div className="w-16 h-16 rounded-2xl bg-pop-1/10 flex items-center justify-center mb-6">
+                     <svg className="w-8 h-8 text-pop-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                   </div>
-                  <div className="w-20 h-2 bg-black/10 rounded-full mb-2"></div>
-                  <div className="w-12 h-2 bg-black/10 rounded-full"></div>
+                  <h3 className="font-heading text-xl text-foreground mb-2">Build Value</h3>
+                  <p className="text-sm text-foreground/60 text-center">Focus on creating real impact</p>
                </div>
                
-               <div className="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-xl border border-white flex flex-col items-center justify-center transform md:translate-y-8 md:scale-110 z-20 min-h-[200px]">
-                  <div className="w-20 h-20 rounded-2xl bg-primary/20 flex items-center justify-center mb-4 rotate-12">
-                     <div className="w-10 h-10 rounded-lg bg-primary -rotate-12"></div>
+               <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-black/5 flex flex-col items-center justify-center transform md:translate-y-8 md:scale-110 z-20 min-h-[220px]">
+                  <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center mb-6 rotate-12">
+                     <svg className="w-10 h-10 text-primary -rotate-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
                   </div>
-                  <div className="w-24 h-2.5 bg-black/10 rounded-full mb-3"></div>
-                  <div className="w-16 h-2.5 bg-black/10 rounded-full mb-2"></div>
-                  <div className="w-20 h-2.5 bg-black/10 rounded-full"></div>
+                  <h3 className="font-heading text-2xl text-foreground mb-2">Gain Clarity</h3>
+                  <p className="text-sm text-foreground/60 text-center">Mentorship over standard coaching</p>
                </div>
 
-               <div className="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-xl border border-white flex flex-col items-center justify-center transform md:rotate-6 hover:rotate-0 transition-transform duration-500 min-h-[200px]">
-                  <div className="w-16 h-16 rounded-full bg-pop-3/20 flex items-center justify-center mb-4">
-                     <svg className="w-8 h-8 text-pop-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+               <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-black/5 flex flex-col items-center justify-center transform md:rotate-6 hover:rotate-0 transition-transform duration-500 min-h-[220px]">
+                  <div className="w-16 h-16 rounded-2xl bg-pop-3/10 flex items-center justify-center mb-6">
+                     <svg className="w-8 h-8 text-pop-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                   </div>
-                  <div className="w-16 h-2 bg-black/10 rounded-full mb-2"></div>
-                  <div className="w-20 h-2 bg-black/10 rounded-full"></div>
+                  <h3 className="font-heading text-xl text-foreground mb-2">Grow Layers</h3>
+                  <p className="text-sm text-foreground/60 text-center">Depth beyond just the exams</p>
                </div>
             </div>
 
