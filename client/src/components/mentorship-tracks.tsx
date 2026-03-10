@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 const tracks = [
   {
@@ -10,8 +9,8 @@ const tracks = [
     description: "Build creativity, observation, visualisation, and confidence for prelims, studio tests, and interviews.",
     price: "Structured Prep",
     popular: false,
-    color: "bg-pop-3/10",
-    borderColor: "border-pop-3",
+    color: "bg-pop-3",
+    hoverColor: "hover:bg-pop-3/5"
   },
   {
     title: "NID DAT MDes",
@@ -19,8 +18,8 @@ const tracks = [
     description: "Develop stronger problem framing, portfolio depth, articulation, and design maturity for advanced admissions.",
     price: "Deeper Critique",
     popular: true,
-    color: "bg-primary/10",
-    borderColor: "border-primary",
+    color: "bg-primary",
+    hoverColor: "hover:bg-primary/5"
   },
   {
     title: "UCEED & CEED",
@@ -28,8 +27,8 @@ const tracks = [
     description: "Prepare with stronger basics, visual reasoning, sketching, analytical thinking, and concept communication.",
     price: "Systematic Guidance",
     popular: false,
-    color: "bg-pop-1/10",
-    borderColor: "border-pop-1",
+    color: "bg-pop-1",
+    hoverColor: "hover:bg-pop-1/5"
   }
 ];
 
@@ -38,23 +37,16 @@ export function MentorshipTracks() {
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      const heading = sectionRef.current?.querySelector('.heading-content');
-      const cards = sectionRef.current?.querySelectorAll('.track-card');
       
-      gsap.fromTo(heading,
-        { y: 20, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6, scrollTrigger: { trigger: heading, start: "top 80%" } }
-      );
-
-      gsap.fromTo(cards,
-        { y: 30, opacity: 0 },
+      gsap.fromTo(".track-card",
+        { y: 50, opacity: 0 },
         {
           y: 0,
           opacity: 1,
-          duration: 0.6,
-          stagger: 0.1,
-          ease: "power2.out",
-          scrollTrigger: { trigger: sectionRef.current?.querySelector('.cards-container'), start: "top 75%" }
+          duration: 1,
+          stagger: 0.15,
+          ease: "expo.out",
+          scrollTrigger: { trigger: ".cards-container", start: "top 75%" }
         }
       );
     }, sectionRef);
@@ -63,43 +55,47 @@ export function MentorshipTracks() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="py-24 bg-white relative border-b-2 border-foreground">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl relative z-10">
+    <section ref={sectionRef} className="py-32 bg-white relative">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         
-        <div className="heading-content text-center max-w-2xl mx-auto mb-16">
-          <h2 className="text-4xl md:text-5xl font-heading font-black mb-4 text-foreground">
+        <div className="text-center max-w-3xl mx-auto mb-20">
+          <h2 className="text-5xl md:text-6xl font-heading mb-6 text-foreground tracking-tight">
             Mentorship for every pathway
           </h2>
-          <p className="text-muted-foreground text-lg font-medium">
-            Whether you are preparing for NID DAT, UCEED, CEED, portfolios, or interviews, we give you the structured environment to grow.
+          <p className="text-foreground/60 text-xl font-light leading-relaxed">
+            Whether you are preparing for NID DAT, UCEED, CEED, portfolios, or interviews, we give you the structured environment to grow natively.
           </p>
         </div>
 
-        <div className="cards-container grid md:grid-cols-3 gap-6 lg:gap-8">
+        <div className="cards-container grid lg:grid-cols-3 gap-8">
           {tracks.map((track, i) => (
             <div 
               key={i} 
-              className={`track-card struct-card p-8 flex flex-col text-center ${track.color} border-2 border-foreground struct-card-hover relative`}
+              className={`track-card struct-card p-10 flex flex-col group ${track.hoverColor}`}
             >
               {track.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-foreground text-pop-3 text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full border-2 border-foreground shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                <div className="absolute top-6 right-6 bg-primary/10 text-primary text-xs font-medium uppercase tracking-wider px-4 py-1.5 rounded-full">
                   Most Chosen
                 </div>
               )}
-              <p className="text-foreground text-xs uppercase tracking-widest font-black mb-3">{track.subtitle}</p>
-              <h3 className="text-2xl font-heading font-black text-foreground mb-4 pb-4 border-b-2 border-foreground/20">{track.title}</h3>
               
-              <div className="mb-6">
-                 <p className="text-lg font-black text-foreground">{track.price}</p>
-              </div>
+              <div className={`w-3 h-12 rounded-full ${track.color} mb-8 opacity-60 group-hover:opacity-100 transition-opacity duration-300`}></div>
 
-              <p className="text-foreground/80 text-sm font-medium leading-relaxed mb-8 flex-1">
+              <p className="text-foreground/50 text-sm uppercase tracking-widest font-medium mb-3">{track.subtitle}</p>
+              <h3 className="text-3xl font-heading text-foreground mb-6">{track.title}</h3>
+              
+              <p className="text-foreground/70 text-base font-light leading-relaxed mb-10 flex-1">
                 {track.description}
               </p>
-              
-              <Button className={`w-full ${track.popular ? 'btn-primary-pop btn-bold' : 'bg-white btn-bold text-foreground'} rounded-xl uppercase tracking-wider text-xs font-black h-14`}>
-                Explore Track
-              </Button>
+
+              <div className="pt-8 border-t border-black/5 mt-auto flex items-center justify-between">
+                <span className="font-medium text-foreground">{track.price}</span>
+                <div className={`w-10 h-10 rounded-full bg-foreground flex items-center justify-center text-white transform group-hover:translate-x-2 transition-transform duration-300 ${track.popular ? 'bg-primary' : ''}`}>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </div>
+              </div>
             </div>
           ))}
         </div>

@@ -1,51 +1,46 @@
 import { useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 export function Hero() {
   const containerRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Setup elements to be animated
-      const heading = containerRef.current?.querySelector('h1');
-      const text = containerRef.current?.querySelector('p.text-lg');
-      const buttons = containerRef.current?.querySelectorAll('button');
-      const illustration = containerRef.current?.querySelector('.illustration-card');
-      const floaters = containerRef.current?.querySelectorAll('.float-anim');
+      // Intro animations
+      const tl = gsap.timeline({ defaults: { ease: "power4.out" }});
       
-      const tl = gsap.timeline({ defaults: { ease: "power3.out" }});
-      
-      tl.fromTo(heading, 
-        { y: 30, opacity: 0 }, 
-        { y: 0, opacity: 1, duration: 0.8, delay: 0.1 }
-      )
-      .fromTo(text,
-        { y: 20, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6 },
-        "-=0.4"
-      )
-      .fromTo(buttons,
-        { y: 20, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.5, stagger: 0.1 },
-        "-=0.3"
-      )
-      .fromTo(illustration,
-        { scale: 0.95, opacity: 0, y: 30 },
-        { scale: 1, opacity: 1, y: 0, duration: 0.8, ease: "back.out(1.2)" },
-        "-=0.6"
-      );
+      tl.fromTo(".hero-badge", { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 1, delay: 0.2 })
+        .fromTo(".hero-title", { y: 40, opacity: 0, rotateX: -10 }, { y: 0, opacity: 1, rotateX: 0, duration: 1.2 }, "-=0.8")
+        .fromTo(".hero-desc", { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 1 }, "-=1")
+        .fromTo(".hero-btn", { y: 20, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1, duration: 0.8, stagger: 0.1 }, "-=0.8")
+        .fromTo(".hero-image", { opacity: 0, scale: 0.8, y: 50 }, { opacity: 1, scale: 1, y: 0, duration: 1.5, ease: "expo.out" }, "-=1.2");
 
-      floaters?.forEach((el, index) => {
-        gsap.to(el, {
-          y: "random(-10, 10)",
-          rotation: "random(-5, 5)",
-          duration: "random(2, 4)",
-          repeat: -1,
-          yoyo: true,
-          ease: "sine.inOut",
-          delay: index * 0.2
-        });
+      // Continuous fluid animation for shapes
+      gsap.to(".shape-1", {
+        y: -30, x: 20, rotation: 10,
+        duration: 4, repeat: -1, yoyo: true, ease: "sine.inOut"
+      });
+      gsap.to(".shape-2", {
+        y: 40, x: -20, rotation: -15,
+        duration: 5, repeat: -1, yoyo: true, ease: "sine.inOut", delay: 1
+      });
+      gsap.to(".shape-3", {
+        scale: 1.1, rotation: 5,
+        duration: 3, repeat: -1, yoyo: true, ease: "sine.inOut", delay: 0.5
+      });
+
+      // Parallax effect on scroll
+      gsap.to(".hero-image-container", {
+        y: 100,
+        ease: "none",
+        scrollTrigger: {
+          trigger: containerRef.current,
+          start: "top top",
+          end: "bottom top",
+          scrub: true
+        }
       });
       
     }, containerRef);
@@ -54,74 +49,85 @@ export function Hero() {
   }, []);
 
   return (
-    <section ref={containerRef} className="pt-20 pb-28 relative bg-grid bg-[#FFFDFB] border-b-2 border-foreground overflow-hidden">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid lg:grid-cols-12 gap-12 items-center max-w-7xl mx-auto">
-          
-          <div className="lg:col-span-7 max-w-2xl relative z-20">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white border-2 border-foreground rounded-full text-xs font-bold uppercase tracking-widest text-foreground mb-8 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-              <span className="w-2.5 h-2.5 rounded-full bg-pop-1 animate-pulse border border-foreground"></span>
-              Mentorship-led. Community-first.
-            </div>
-            
-            <h1 className="text-4xl md:text-5xl lg:text-7xl font-heading font-black leading-[1.1] mb-6 text-foreground">
-              Get mentored, <br/>not coached, for your dream <span className="text-primary inline-block relative">
-                design college.
-                <svg className="absolute w-full h-4 -bottom-1 left-0 text-pop-3 -z-10" viewBox="0 0 100 10" preserveAspectRatio="none">
-                  <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" />
-                </svg>
-              </span>
-            </h1>
-            
-            <p className="text-lg md:text-xl text-muted-foreground mb-10 leading-relaxed max-w-xl font-medium">
-              Designforge is an aspirant-led community mentored by NIDans, IITians, and designers — built to help you prepare smarter for NID DAT, UCEED, CEED, portfolios, and interviews.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-5">
-              <Button className="rounded-xl h-14 px-8 btn-bold btn-primary-pop uppercase tracking-wider text-sm shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px]">
-                Join WhatsApp Community
-              </Button>
-              <Button className="rounded-xl h-14 px-8 btn-bold bg-white text-foreground uppercase tracking-wider text-sm shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px]">
-                Join Focus Batch
-              </Button>
-            </div>
+    <section ref={containerRef} className="pt-24 pb-32 relative bg-background overflow-hidden perspective-1000">
+      
+      {/* Soft abstract background blur */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-10%] right-[-5%] w-[40vw] h-[40vw] bg-pop-3/20 rounded-full blur-[100px]"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-primary/10 rounded-full blur-[120px]"></div>
+      </div>
+
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col items-center text-center">
+        
+        <div className="max-w-4xl mx-auto flex flex-col items-center">
+          <div className="hero-badge inline-flex items-center gap-2 px-5 py-2 bg-white/60 backdrop-blur-md border border-white/80 rounded-full text-sm font-medium text-foreground mb-10 shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+            A new era of design preparation
           </div>
           
-          <div className="lg:col-span-5 relative flex justify-center items-center py-10">
-            {/* Pop-Color Structured Illustration Card */}
-            <div className="illustration-card w-full max-w-[480px] aspect-[4/3] bg-pop-2 border-4 border-foreground rounded-2xl shadow-[8px_8px_0_0_rgba(0,0,0,1)] p-8 relative flex items-center justify-center overflow-hidden">
-              
-              <div className="absolute top-4 left-4 flex gap-2 z-20 bg-white px-3 py-1.5 border-2 border-foreground rounded-full shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                <div className="w-3 h-3 rounded-full bg-destructive border border-foreground"></div>
-                <div className="w-3 h-3 rounded-full bg-pop-3 border border-foreground"></div>
-                <div className="w-3 h-3 rounded-full bg-pop-1 border border-foreground"></div>
-              </div>
-
-              {/* Tidy Abstract Illustration inside the card */}
-              <div className="relative w-full h-full flex items-center justify-center mt-4">
-                
-                {/* Center abstract eye/target element */}
-                <div className="absolute w-36 h-36 border-4 border-foreground rounded-full flex items-center justify-center bg-white z-10 shadow-[4px_4px_0_0_rgba(0,0,0,1)] float-anim">
-                  <div className="w-16 h-16 bg-pop-1 border-4 border-foreground rounded-full flex items-center justify-center">
-                    <div className="w-6 h-6 bg-foreground rounded-full"></div>
-                  </div>
-                </div>
-
-                {/* Abstract shapes */}
-                <svg className="absolute inset-0 w-full h-full z-0" viewBox="0 0 200 200" fill="none">
-                  <path className="stroke-foreground float-anim" strokeWidth="4" strokeDasharray="8 8" d="M20 100 L180 100" />
-                  <path className="stroke-pop-3 float-anim" strokeWidth="8" strokeLinecap="round" d="M150 40 Q 180 60 150 90" />
-                  <rect className="fill-primary border-4 border-foreground float-anim" x="30" y="40" width="30" height="30" rx="6" />
-                  <polygon className="fill-white border-4 border-foreground float-anim" points="30,160 50,130 70,160" />
-                  <circle className="fill-pop-1 border-4 border-foreground float-anim" cx="160" cy="150" r="18" />
-                </svg>
-
-              </div>
-              
-            </div>
-          </div>
+          <h1 className="hero-title text-5xl md:text-7xl lg:text-[5.5rem] font-heading leading-[1.05] mb-8 text-foreground tracking-tight transform-style-3d">
+            Get mentored, not coached, for your <span className="text-primary relative inline-block">
+              dream college.
+              <svg className="absolute w-full h-3 -bottom-2 left-0 text-pop-3 -z-10 opacity-70" viewBox="0 0 100 10" preserveAspectRatio="none">
+                <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="6" strokeLinecap="round" fill="none" />
+              </svg>
+            </span>
+          </h1>
           
+          <p className="hero-desc text-xl md:text-2xl text-foreground/60 mb-12 leading-relaxed max-w-2xl font-light">
+            Designforge is an aspirant-led community mentored by NIDans and IITians — built to help you prepare smarter.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-center w-full">
+            <Button className="hero-btn rounded-full h-16 px-10 btn-bold btn-primary-pop text-base w-full sm:w-auto">
+              Join WhatsApp Community
+            </Button>
+            <Button className="hero-btn rounded-full h-16 px-10 btn-bold bg-white text-foreground border border-black/5 hover:border-black/10 text-base shadow-sm w-full sm:w-auto">
+              Explore Focus Batch
+            </Button>
+          </div>
         </div>
+        
+        {/* Creative Organic Illustration Area */}
+        <div className="hero-image-container w-full max-w-5xl mt-24 relative flex justify-center hero-image">
+          <div className="relative w-full aspect-[21/9] md:aspect-[21/8] bg-white/40 backdrop-blur-2xl rounded-[3rem] border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] overflow-hidden flex items-center justify-center p-8">
+            
+            {/* Abstract fluid shapes inside the glass container */}
+            <div className="shape-1 organic-blob absolute top-[10%] left-[20%] w-64 h-64 bg-pop-1/80 mix-blend-multiply filter blur-xl opacity-70"></div>
+            <div className="shape-2 organic-blob absolute bottom-[10%] right-[20%] w-72 h-72 bg-pop-2/60 mix-blend-multiply filter blur-xl opacity-70"></div>
+            <div className="shape-3 organic-blob absolute top-[30%] left-[40%] w-80 h-80 bg-pop-3/60 mix-blend-multiply filter blur-xl opacity-70"></div>
+
+            {/* Foreground crisp elements */}
+            <div className="relative z-10 grid grid-cols-3 gap-6 md:gap-10 w-full max-w-3xl">
+               <div className="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-xl border border-white flex flex-col items-center justify-center transform -rotate-6 hover:rotate-0 transition-transform duration-500">
+                  <div className="w-16 h-16 rounded-full bg-pop-1/20 flex items-center justify-center mb-4">
+                     <div className="w-8 h-8 rounded-full bg-pop-1"></div>
+                  </div>
+                  <div className="w-20 h-2 bg-black/10 rounded-full mb-2"></div>
+                  <div className="w-12 h-2 bg-black/10 rounded-full"></div>
+               </div>
+               
+               <div className="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-xl border border-white flex flex-col items-center justify-center transform translate-y-8 scale-110 z-20">
+                  <div className="w-20 h-20 rounded-2xl bg-primary/20 flex items-center justify-center mb-4 rotate-12">
+                     <div className="w-10 h-10 rounded-lg bg-primary -rotate-12"></div>
+                  </div>
+                  <div className="w-24 h-2.5 bg-black/10 rounded-full mb-3"></div>
+                  <div className="w-16 h-2.5 bg-black/10 rounded-full mb-2"></div>
+                  <div className="w-20 h-2.5 bg-black/10 rounded-full"></div>
+               </div>
+
+               <div className="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-xl border border-white flex flex-col items-center justify-center transform rotate-6 hover:rotate-0 transition-transform duration-500">
+                  <div className="w-16 h-16 rounded-full bg-pop-3/20 flex items-center justify-center mb-4">
+                     <svg className="w-8 h-8 text-pop-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                  </div>
+                  <div className="w-16 h-2 bg-black/10 rounded-full mb-2"></div>
+                  <div className="w-20 h-2 bg-black/10 rounded-full"></div>
+               </div>
+            </div>
+
+          </div>
+        </div>
+        
       </div>
     </section>
   );

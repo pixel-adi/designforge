@@ -2,37 +2,33 @@ import { useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Bell, Video, FileText } from "lucide-react";
 import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 export function CommunitySection() {
   const sectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      const container = sectionRef.current?.querySelector('.bg-container');
-      const listItems = sectionRef.current?.querySelectorAll('li');
-      const mockup = sectionRef.current?.querySelector('.mockup-card');
-      const messages = sectionRef.current?.querySelectorAll('.message-bubble');
       
-      gsap.fromTo(container,
-        { y: 30, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.8, scrollTrigger: { trigger: container, start: "top 80%" } }
-      );
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: "top 70%",
+        }
+      });
 
-      gsap.fromTo(listItems,
-        { x: -20, opacity: 0 },
-        { x: 0, opacity: 1, duration: 0.4, stagger: 0.1, scrollTrigger: { trigger: container, start: "top 70%" } }
-      );
+      tl.fromTo(".comm-blob", { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.5, ease: "power3.out" })
+        .fromTo(".comm-text", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 1, stagger: 0.2 }, "-=1")
+        .fromTo(".message-bubble", { y: 20, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1, duration: 0.6, stagger: 0.15, ease: "back.out(1.2)" }, "-=0.5");
 
-      gsap.fromTo(mockup,
-        { x: 30, opacity: 0 },
-        { x: 0, opacity: 1, duration: 0.6, ease: "power2.out", scrollTrigger: { trigger: mockup, start: "top 80%" } }
-      );
-
-      gsap.fromTo(messages,
-        { y: 10, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.4, stagger: 0.15, ease: "power2.out", scrollTrigger: { trigger: mockup, start: "top 60%" } }
-      );
+      // Continuous float for the phone container
+      gsap.to(".phone-container", {
+        y: 15,
+        rotation: 1,
+        duration: 3,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut"
+      });
 
     }, sectionRef);
 
@@ -40,75 +36,78 @@ export function CommunitySection() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="py-24 bg-grid bg-[#FFFDFB] relative border-b-2 border-foreground">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+    <section ref={sectionRef} className="py-32 bg-background relative overflow-hidden">
+      
+      {/* Background organic shape */}
+      <div className="comm-blob absolute top-1/2 right-0 -translate-y-1/2 w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] bg-white rounded-full blur-3xl opacity-60"></div>
+
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative z-10">
         
-        <div className="bg-container struct-card bg-pop-3/20 p-8 md:p-12 lg:p-16 flex flex-col lg:flex-row gap-12 items-center">
+        <div className="flex flex-col lg:flex-row gap-16 items-center">
           
-          <div className="flex-1">
-            <div className="inline-block bg-white border-2 border-foreground text-foreground font-bold uppercase tracking-widest text-xs px-4 py-1.5 rounded-full mb-6 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-              The Ecosystem
-            </div>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading font-black mb-6 text-foreground">
-              Start with the <span className="text-pop-1 underline decoration-foreground underline-offset-8">community.</span>
+          <div className="flex-1 max-w-2xl">
+            <h2 className="comm-text text-5xl md:text-6xl font-heading mb-8 text-foreground leading-[1.1]">
+              Start with the <span className="text-primary italic">community.</span>
             </h2>
-            <p className="text-xl text-foreground/80 font-medium mb-10 leading-relaxed">
-              Not every aspirant is ready to commit to a batch on day one. That's why Designforge's WhatsApp community is the best place to begin.
+            <p className="comm-text text-xl md:text-2xl text-foreground/60 font-light mb-12 leading-relaxed">
+              Not every aspirant is ready to commit to a batch on day one. That's why Designforge's WhatsApp community is a thriving space to simply begin observing and learning.
             </p>
             
-            <ul className="space-y-5 mb-12">
-              <li className="flex items-center gap-4 text-foreground font-bold text-base">
-                <div className="w-10 h-10 rounded-lg bg-pop-1 border-2 border-foreground flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                  <Bell className="w-5 h-5 text-foreground" />
+            <ul className="space-y-6 mb-12">
+              <li className="comm-text flex items-center gap-5 text-foreground font-medium text-lg">
+                <div className="w-12 h-12 rounded-full bg-pop-1/20 flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-pop-1" />
                 </div>
-                Updates and announcements
+                Important updates and prompt announcements
               </li>
-              <li className="flex items-center gap-4 text-foreground font-bold text-base">
-                <div className="w-10 h-10 rounded-lg bg-primary border-2 border-foreground flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                  <Video className="w-5 h-5 text-white" />
+              <li className="comm-text flex items-center gap-5 text-foreground font-medium text-lg">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Video className="w-5 h-5 text-primary" />
                 </div>
-                Structured session invites
+                Open structured session invites
               </li>
-              <li className="flex items-center gap-4 text-foreground font-bold text-base">
-                <div className="w-10 h-10 rounded-lg bg-pop-2 border-2 border-foreground flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                  <FileText className="w-5 h-5 text-white" />
+              <li className="comm-text flex items-center gap-5 text-foreground font-medium text-lg">
+                <div className="w-12 h-12 rounded-full bg-pop-3/20 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-pop-3" />
                 </div>
-                Curated resources and prep support
+                Curated resources and peer critique
               </li>
             </ul>
 
-            <Button size="lg" className="btn-bold btn-yellow-pop rounded-xl px-8 h-14 uppercase tracking-wider text-sm font-black w-full sm:w-auto">
-              Join WhatsApp Community
-            </Button>
+            <div className="comm-text">
+              <Button size="lg" className="btn-bold btn-primary-pop rounded-full px-10 h-16 text-base w-full sm:w-auto">
+                Join WhatsApp Community
+              </Button>
+            </div>
           </div>
           
-          <div className="w-full lg:w-[400px] mockup-card">
-            <div className="struct-card p-6 relative bg-white h-[500px] flex flex-col">
+          <div className="w-full lg:w-[450px] relative">
+            <div className="phone-container struct-card p-6 bg-white/80 backdrop-blur-xl border border-white h-[550px] flex flex-col shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)]">
                
-               <div className="flex items-center gap-4 border-b-2 border-foreground pb-4 mb-6">
-                 <div className="w-12 h-12 bg-primary rounded-full border-2 border-foreground flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+               <div className="flex items-center gap-4 pb-4 mb-6 border-b border-black/5">
+                 <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center shadow-inner">
                    <MessageCircle className="w-6 h-6 text-white" />
                  </div>
                  <div>
-                   <p className="font-heading font-black text-foreground text-lg">Designforge Aspirants</p>
-                   <p className="text-xs text-muted-foreground font-bold">1,240 members</p>
+                   <p className="font-heading text-xl text-foreground">Designforge Aspirants</p>
+                   <p className="text-xs text-foreground/50 font-medium">1,240 members online</p>
                  </div>
                </div>
                
-               <div className="space-y-5 flex-1 overflow-hidden">
-                 <div className="message-bubble bg-pop-3/20 p-4 rounded-xl border-2 border-foreground shadow-[2px_2px_0_0_rgba(0,0,0,1)] rounded-tl-sm text-sm text-foreground w-[85%]">
-                   <span className="font-black text-xs text-foreground mb-1 block">Siddhi (Mentor)</span>
-                   Hi everyone! We are hosting a portfolio review session this Sunday.
+               <div className="space-y-6 flex-1 overflow-hidden flex flex-col justify-end pb-4">
+                 <div className="message-bubble bg-background p-4 rounded-2xl rounded-tl-sm text-[15px] text-foreground w-[85%] border border-black/5 shadow-sm">
+                   <span className="font-medium text-xs text-primary mb-1 block">Siddhi (Mentor)</span>
+                   Hi everyone! We are hosting an open portfolio review session this Sunday. Drop your links!
                  </div>
                  
-                 <div className="message-bubble bg-pop-1 text-foreground font-medium p-4 rounded-xl border-2 border-foreground shadow-[2px_2px_0_0_rgba(0,0,0,1)] rounded-tr-sm text-sm w-[80%] ml-auto">
-                   <span className="font-black text-xs text-foreground/70 mb-1 block">Aman</span>
-                   Will we cover UCEED specific approaches?
+                 <div className="message-bubble bg-primary text-white p-4 rounded-2xl rounded-tr-sm text-[15px] w-[80%] ml-auto shadow-md">
+                   <span className="font-medium text-xs text-white/70 mb-1 block">Aman</span>
+                   Will we cover UCEED specific approaches in this one?
                  </div>
                  
-                 <div className="message-bubble bg-pop-2/20 p-4 rounded-xl border-2 border-foreground shadow-[2px_2px_0_0_rgba(0,0,0,1)] rounded-tl-sm text-sm text-foreground w-[85%]">
-                   <span className="font-black text-xs text-foreground mb-1 block">Aditya (Mentor)</span>
-                   Yes, both NID and UCEED problem framing will be discussed. See you there!
+                 <div className="message-bubble bg-background p-4 rounded-2xl rounded-tl-sm text-[15px] text-foreground w-[85%] border border-black/5 shadow-sm">
+                   <span className="font-medium text-xs text-pop-1 mb-1 block">Aditya (Mentor)</span>
+                   Yes, both NID narrative building and UCEED problem framing will be discussed. See you there! ✨
                  </div>
                </div>
 

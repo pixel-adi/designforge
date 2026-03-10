@@ -4,25 +4,25 @@ import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 
 export function Navbar() {
   return (
-    <header className="w-full bg-background/95 backdrop-blur-md sticky top-0 z-50 border-b-2 border-foreground shadow-[0_2px_0_0_rgba(0,0,0,1)]">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+    <header className="w-full bg-background/80 backdrop-blur-xl sticky top-0 z-50 border-b border-black/[0.03] transition-all duration-300">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-10 h-24 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Link href="/">
-            <a className="flex items-center">
-              <img src={logoImg} alt="Designforge Logo" className="h-8 md:h-10 object-contain" />
+            <a className="flex items-center group">
+              <img src={logoImg} alt="Designforge Logo" className="h-10 md:h-12 object-contain group-hover:scale-105 transition-transform duration-500" />
             </a>
           </Link>
         </div>
 
-        <nav className="hidden md:flex items-center gap-8">
-          <Link href="/mentorship"><a className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest">Mentorship</a></Link>
-          <Link href="/results"><a className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest">Results</a></Link>
-          <Link href="/community"><a className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest">Community</a></Link>
-          <Link href="/events"><a className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest">Events</a></Link>
+        <nav className="hidden md:flex items-center gap-10 bg-white/50 px-8 py-3 rounded-full border border-white/40 shadow-sm">
+          <Link href="/mentorship"><a className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide">Mentorship</a></Link>
+          <Link href="/results"><a className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide">Results</a></Link>
+          <Link href="/community"><a className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide">Community</a></Link>
+          <Link href="/events"><a className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide">Events</a></Link>
         </nav>
         
         <div className="flex items-center">
-          <Button className="hidden md:flex rounded-lg px-6 btn-bold btn-yellow-pop uppercase tracking-wider text-xs">
+          <Button className="hidden md:flex rounded-full px-8 btn-bold bg-foreground text-white hover:bg-primary transition-colors text-sm font-medium h-12">
             Join Waitlist
           </Button>
         </div>

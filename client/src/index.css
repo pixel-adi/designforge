@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import url('https://fonts.googleapis.com/css2?family=Questrial&display=swap');
 
 @custom-variant dark (&:is(.dark *));
 
@@ -35,36 +36,36 @@
   --color-pop-3: var(--pop-3);
 
   --font-sans: 'Inter', sans-serif;
-  --font-heading: 'Aktiv Grotesk', 'Inter', sans-serif;
+  --font-heading: 'Questrial', sans-serif;
   --font-body: 'Inter', sans-serif;
 }
 
 :root {
   /* Cream background matching the logo's pencil wood */
-  --background: 36 60% 95%;
-  --foreground: 0 0% 10%;
+  --background: 36 60% 98%;
+  --foreground: 0 0% 15%;
 
   /* White cards */
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 10%;
+  --card-foreground: 0 0% 15%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 10%;
+  --popover-foreground: 0 0% 15%;
 
   /* Coral Red from the logo */
   --primary: 7 80% 56%;
   --primary-foreground: 0 0% 100%;
 
   /* Dark Charcoal */
-  --secondary: 0 0% 15%;
+  --secondary: 0 0% 20%;
   --secondary-foreground: 0 0% 100%;
 
   /* Muted cream */
-  --muted: 36 40% 85%;
+  --muted: 36 40% 90%;
   --muted-foreground: 0 0% 45%;
 
   /* Soft Coral Accent */
-  --accent: 7 80% 90%;
+  --accent: 7 80% 95%;
   --accent-foreground: 7 80% 40%;
 
   /* Pop Colors - Warm palette complementing the coral/cream */
@@ -75,30 +76,14 @@
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  /* Darker borders for a structured, slightly brutalist look */
-  --border: 0 0% 70%;
-  --input: 0 0% 70%;
+  --border: 0 0% 90%;
+  --input: 0 0% 90%;
   --ring: 7 80% 56%;
 
-  --radius: 0.5rem;
+  --radius: 1rem;
 }
 
 @layer base {
-  @font-face {
-    font-family: 'Aktiv Grotesk';
-    src: url('https://use.typekit.net/af/cc29d7/00000000000000007735b501/30/l?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n7&v=3') format('woff2');
-    font-weight: 700;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: 'Aktiv Grotesk';
-    src: url('https://use.typekit.net/af/2e2392/00000000000000007735b4ff/30/l?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n4&v=3') format('woff2');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-  }
-  
   * {
     @apply border-border;
   }
@@ -106,34 +91,37 @@
     @apply font-body antialiased bg-background text-foreground overflow-x-hidden;
   }
   h1, h2, h3, h4, h5, h6 {
-    @apply font-heading tracking-tight;
+    @apply font-heading tracking-tight font-normal;
   }
 }
 
-/* Bold Structural Button Override */
+/* Fluid Organic Button */
 .btn-bold {
-  border: 2px solid hsl(var(--foreground));
-  box-shadow: 4px 4px 0px 0px hsl(var(--foreground));
-  transition: all 0.2s ease;
-  font-weight: 800 !important;
+  border-radius: 9999px;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  font-weight: 500 !important;
+  border: 1px solid transparent;
 }
 .btn-bold:hover {
-  transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0px 0px hsl(var(--foreground));
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
 }
 .btn-bold:active {
-  transform: translate(4px, 4px);
-  box-shadow: 0px 0px 0px 0px hsl(var(--foreground));
+  transform: translateY(1px) scale(0.98);
 }
 
 .btn-primary-pop {
   background-color: hsl(var(--primary));
   color: white;
+  box-shadow: 0 8px 20px -6px rgba(232, 78, 54, 0.5);
+}
+.btn-primary-pop:hover {
+  box-shadow: 0 12px 25px -6px rgba(232, 78, 54, 0.6);
 }
 
 .btn-cyan-pop {
   background-color: hsl(var(--pop-1));
-  color: hsl(var(--foreground));
+  color: white;
 }
 
 .btn-yellow-pop {
@@ -141,7 +129,7 @@
   color: hsl(var(--foreground));
 }
 
-/* Background structured grid */
+/* Background soft dots instead of grid */
 .bg-grid {
   position: relative;
 }
@@ -150,27 +138,36 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: 
-    linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px);
-  background-size: 32px 32px;
+  background-image: radial-gradient(rgba(0,0,0,0.06) 2px, transparent 2px);
+  background-size: 40px 40px;
   z-index: 0;
 }
 
 .bg-grid-white::before {
-  background-image: 
-    linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(255,255,255,0.1) 2px, transparent 2px);
 }
 
-/* Clearer card structure */
+/* Fluid Soft Cards */
 .struct-card {
-  @apply bg-white border-2 border-foreground shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-xl overflow-hidden;
+  @apply bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-black/[0.03] relative overflow-hidden;
+  backdrop-filter: blur(10px);
 }
 
 .struct-card-hover {
-  @apply transition-all duration-200 cursor-pointer;
+  @apply transition-all duration-500 cursor-pointer;
 }
 .struct-card-hover:hover {
-  @apply shadow-[2px_2px_0_0_rgba(0,0,0,1)] translate-x-[2px] translate-y-[2px];
+  @apply shadow-[0_20px_40px_rgb(0,0,0,0.08)] -translate-y-2;
+}
+
+/* Organic blobs for background decoration */
+.organic-blob {
+  border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+  animation: morph 8s ease-in-out infinite both alternate;
+}
+
+@keyframes morph {
+  0%, 100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
+  34% { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; }
+  67% { border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%; }
 }

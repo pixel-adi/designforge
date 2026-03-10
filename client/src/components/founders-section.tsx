@@ -7,70 +7,83 @@ export function FoundersSection() {
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      const heading = sectionRef.current?.querySelector('.heading-content');
-      const cards = sectionRef.current?.querySelectorAll('.founder-card');
       
-      gsap.fromTo(heading,
-        { y: 20, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6, scrollTrigger: { trigger: sectionRef.current, start: "top 80%" } }
+      const cards = gsap.utils.toArray('.founder-card');
+      
+      gsap.fromTo(".founder-title",
+        { y: 30, opacity: 0 },
+        { y: 0, opacity: 1, duration: 1, scrollTrigger: { trigger: sectionRef.current, start: "top 80%" } }
       );
 
-      gsap.fromTo(cards,
-        { y: 30, opacity: 0 },
-        { 
-          y: 0, 
-          opacity: 1, 
-          duration: 0.6, 
-          stagger: 0.15,
-          ease: "power2.out",
-          scrollTrigger: { trigger: sectionRef.current?.querySelector('.grid'), start: "top 75%" } 
-        }
-      );
+      cards.forEach((card: any, i) => {
+        gsap.fromTo(card,
+          { y: 50, opacity: 0, scale: 0.95 },
+          { 
+            y: 0, 
+            opacity: 1, 
+            scale: 1,
+            duration: 1, 
+            ease: "power3.out",
+            delay: i * 0.2,
+            scrollTrigger: { trigger: sectionRef.current?.querySelector('.grid'), start: "top 75%" } 
+          }
+        );
+      });
     }, sectionRef);
 
     return () => ctx.revert();
   }, []);
 
   return (
-    <section ref={sectionRef} className="py-24 bg-grid bg-[#FFFDFB] border-b-2 border-foreground">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
+    <section ref={sectionRef} className="py-32 bg-white relative overflow-hidden">
+      
+      {/* Background soft dots */}
+      <div className="absolute inset-0 bg-grid opacity-50"></div>
+
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative z-10">
         
-        <div className="heading-content text-center mb-20">
-          <h2 className="text-4xl md:text-5xl font-heading font-black mb-6 text-foreground">
+        <div className="text-center mb-24">
+          <h2 className="founder-title text-5xl md:text-6xl font-heading mb-6 text-foreground tracking-tight">
             Meet the founders
           </h2>
-          <p className="text-xl font-medium text-foreground/80 max-w-2xl mx-auto">
-            Together with NIDans, IITians, and designers from the community, they are shaping Designforge into a serious mentoring ecosystem.
+          <p className="founder-title text-xl font-light text-foreground/60 max-w-2xl mx-auto leading-relaxed">
+            Together with NIDans, IITians, and designers from the community, shaping Designforge into a serious mentoring ecosystem.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-12 max-w-5xl mx-auto">
           
-          <div className="founder-card struct-card bg-pop-1/10 p-10 text-center struct-card-hover flex flex-col items-center">
-            <div className="w-32 h-32 bg-white rounded-full mx-auto mb-8 border-4 border-foreground shadow-[4px_4px_0_0_rgba(0,0,0,1)] relative">
-               <div className="absolute -top-4 -right-4 w-10 h-10 bg-pop-3 rounded-full border-2 border-foreground flex items-center justify-center">
-                 <span className="text-foreground font-black text-xs">UX</span>
+          <div className="founder-card struct-card p-12 flex flex-col items-center text-center bg-gradient-to-br from-white to-pop-1/5 group">
+            <div className="w-40 h-40 rounded-full mx-auto mb-8 relative mb-8">
+               <div className="absolute inset-0 bg-pop-1/20 rounded-full blur-2xl group-hover:blur-3xl transition-all duration-500 scale-150 opacity-0 group-hover:opacity-100"></div>
+               <div className="w-full h-full bg-white rounded-full border border-black/5 shadow-md flex items-center justify-center relative z-10 overflow-hidden group-hover:scale-105 transition-transform duration-500">
+                  <div className="w-24 h-24 bg-pop-1/10 rounded-full flex items-center justify-center">
+                    <span className="text-pop-1 font-heading text-3xl">AS</span>
+                  </div>
                </div>
             </div>
             
-            <h3 className="text-2xl font-heading font-black text-foreground mb-2">Aditya Sharma</h3>
-            <p className="text-foreground text-xs uppercase tracking-widest font-black mb-6 bg-white px-3 py-1 rounded-full border-2 border-foreground inline-block">Principal UX Architect</p>
-            <p className="text-base font-medium text-foreground/80 leading-relaxed">
-              Mentor and design community builder focused on helping aspirants and young designers grow through thoughtful critique, structured guidance, and deeper design understanding.
+            <h3 className="text-3xl font-heading text-foreground mb-3">Aditya Sharma</h3>
+            <p className="text-primary text-sm uppercase tracking-widest font-medium mb-8">Principal UX Architect</p>
+            <p className="text-lg font-light text-foreground/70 leading-relaxed max-w-sm">
+              Mentor and design community builder focused on helping aspirants grow through thoughtful critique and structured guidance.
             </p>
           </div>
 
-          <div className="founder-card struct-card bg-pop-2/10 p-10 text-center struct-card-hover flex flex-col items-center">
-            <div className="w-32 h-32 bg-white rounded-full mx-auto mb-8 border-4 border-foreground shadow-[4px_4px_0_0_rgba(0,0,0,1)] relative">
-               <div className="absolute -top-4 -left-4 w-10 h-10 bg-primary rounded-full border-2 border-foreground flex items-center justify-center">
-                 <span className="text-white font-black text-xs">M</span>
+          <div className="founder-card struct-card p-12 flex flex-col items-center text-center bg-gradient-to-br from-white to-pop-2/5 group">
+            <div className="w-40 h-40 rounded-full mx-auto mb-8 relative mb-8">
+               <div className="absolute inset-0 bg-pop-2/20 rounded-full blur-2xl group-hover:blur-3xl transition-all duration-500 scale-150 opacity-0 group-hover:opacity-100"></div>
+               <div className="w-full h-full bg-white rounded-full border border-black/5 shadow-md flex items-center justify-center relative z-10 overflow-hidden group-hover:scale-105 transition-transform duration-500">
+                  <div className="w-24 h-24 bg-pop-2/10 rounded-full flex items-center justify-center">
+                    <span className="text-pop-2 font-heading text-3xl">SP</span>
+                  </div>
                </div>
             </div>
             
-            <h3 className="text-2xl font-heading font-black text-foreground mb-2">Siddhi Patil</h3>
-            <p className="text-foreground text-xs uppercase tracking-widest font-black mb-6 bg-white px-3 py-1 rounded-full border-2 border-foreground inline-block">Mentor & Co-founder</p>
-            <p className="text-base font-medium text-foreground/80 leading-relaxed">
-              Focused on helping students build clarity, confidence, creative growth, and a healthier preparation process rooted in empathy and consistency.
+            <h3 className="text-3xl font-heading text-foreground mb-3">Siddhi Patil</h3>
+            <p className="text-primary text-sm uppercase tracking-widest font-medium mb-8">Mentor & Co-founder</p>
+            <p className="text-lg font-light text-foreground/70 leading-relaxed max-w-sm">
+              Focused on helping students build clarity, confidence, creative growth, and a healthier preparation process.
             </p>
           </div>
 
