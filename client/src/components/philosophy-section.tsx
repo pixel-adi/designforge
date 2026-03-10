@@ -67,7 +67,7 @@ export function PhilosophySection() {
             
             <div ref={textRef} className="text-2xl md:text-4xl font-light leading-relaxed text-background/90 space-y-8">
               <p className="text-[24px] text-center">A strong design aspirant is not someone who only knows how to answer exam questions.</p>
-              <p className="text-background/70">A strong design aspirant notices more, thinks deeper, questions better, and expresses ideas more clearly.</p>
+              <p className="text-background/70 text-[24px]">A strong design aspirant notices more, thinks deeper, questions better, and expresses ideas more clearly.</p>
             </div>
           </div>
         </div>
