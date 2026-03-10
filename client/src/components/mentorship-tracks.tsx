@@ -73,11 +73,6 @@ export function MentorshipTracks() {
               key={i} 
               className={`track-card struct-card p-10 flex flex-col group ${track.hoverColor}`}
             >
-              {track.popular && (
-                <div className="absolute top-6 right-6 bg-primary/10 text-primary text-xs font-medium uppercase tracking-wider px-4 py-1.5 rounded-full">
-                  Most Chosen
-                </div>
-              )}
               
               <div className={`w-3 h-12 rounded-full ${track.color} mb-8 opacity-60 group-hover:opacity-100 transition-opacity duration-300`}></div>
 
