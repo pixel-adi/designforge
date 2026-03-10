@@ -97,7 +97,7 @@ export function DifferenceSection() {
           {/* Right scrolling cards */}
           <div className="lg:w-7/12 flex flex-col gap-6 pt-10 pb-20">
             {differences.map((diff, i) => (
-              <div key={i} className="diff-card struct-card p-8 md:p-10 flex flex-col md:flex-row gap-8 items-start hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 bg-white">
+              <div key={i} className="diff-card struct-card p-8 md:p-10 flex flex-col md:flex-row gap-8 items-start hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 bg-background">
                 
                 <div className={`w-16 h-16 rounded-2xl ${diff.color}/20 flex items-center justify-center shrink-0`}>
                   <div className={`text-${diff.color.replace('bg-', '')}`}>{diff.icon}</div>

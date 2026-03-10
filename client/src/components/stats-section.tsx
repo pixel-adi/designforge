@@ -30,7 +30,7 @@ export function StatsSection() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="bg-foreground text-white py-20 relative overflow-hidden border-b-2 border-foreground">
+    <section ref={sectionRef} className="bg-[#111111] text-background py-20 relative overflow-hidden border-b-2 border-foreground">
       {/* Structured subtle grid in the background */}
       <div className="absolute inset-0 bg-grid-white opacity-20"></div>
 
@@ -39,22 +39,22 @@ export function StatsSection() {
           
           <div className="stat-item bg-white/5 border-2 border-white/20 p-8 rounded-2xl flex flex-col items-center justify-center shadow-[4px_4px_0_0_rgba(255,255,255,0.1)]">
             <p className="text-4xl md:text-5xl font-heading font-black mb-2 text-pop-3">1000+</p>
-            <p className="text-white/90 text-sm uppercase tracking-widest font-bold">Community</p>
+            <p className="text-background/90 text-sm uppercase tracking-widest font-bold">Community</p>
           </div>
           
           <div className="stat-item bg-white/5 border-2 border-white/20 p-8 rounded-2xl flex flex-col items-center justify-center shadow-[4px_4px_0_0_rgba(255,255,255,0.1)]">
             <p className="text-4xl md:text-5xl font-heading font-black mb-2 text-pop-1">350+</p>
-            <p className="text-white/90 text-sm uppercase tracking-widest font-bold">Live Sessions</p>
+            <p className="text-background/90 text-sm uppercase tracking-widest font-bold">Live Sessions</p>
           </div>
           
           <div className="stat-item bg-white/5 border-2 border-white/20 p-8 rounded-2xl flex flex-col items-center justify-center shadow-[4px_4px_0_0_rgba(255,255,255,0.1)]">
             <p className="text-4xl md:text-5xl font-heading font-black mb-2 text-primary">500+</p>
-            <p className="text-white/90 text-sm uppercase tracking-widest font-bold">Portfolios</p>
+            <p className="text-background/90 text-sm uppercase tracking-widest font-bold">Portfolios</p>
           </div>
           
           <div className="stat-item bg-white/5 border-2 border-white/20 p-8 rounded-2xl flex flex-col items-center justify-center shadow-[4px_4px_0_0_rgba(255,255,255,0.1)]">
             <p className="text-4xl md:text-5xl font-heading font-black mb-2 text-pop-2">100%</p>
-            <p className="text-white/90 text-sm uppercase tracking-widest font-bold">Mentorship</p>
+            <p className="text-background/90 text-sm uppercase tracking-widest font-bold">Mentorship</p>
           </div>
           
         </div>

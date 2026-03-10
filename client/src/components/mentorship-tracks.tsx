@@ -85,7 +85,7 @@ export function MentorshipTracks() {
 
               <div className="pt-8 border-t border-black/5 mt-auto flex items-center justify-between">
                 <span className="font-medium text-foreground">{track.price}</span>
-                <div className={`w-10 h-10 rounded-full bg-foreground flex items-center justify-center text-white transform group-hover:translate-x-2 transition-transform duration-300 ${track.popular ? 'bg-primary' : ''}`}>
+                <div className={`w-10 h-10 rounded-full bg-foreground flex items-center justify-center text-background transform group-hover:translate-x-2 transition-transform duration-300 ${track.popular ? 'bg-primary text-white' : ''}`}>
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>

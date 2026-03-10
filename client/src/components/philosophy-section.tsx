@@ -52,7 +52,7 @@ export function PhilosophySection() {
     <section ref={sectionRef} className="py-32 bg-white relative px-4 sm:px-6 lg:px-8">
       <div className="container mx-auto max-w-6xl relative z-10">
         
-        <div className="phil-bg bg-foreground text-white p-12 md:p-24 relative overflow-hidden flex flex-col items-center text-center">
+        <div className="phil-bg bg-[#111111] text-background p-12 md:p-24 relative overflow-hidden flex flex-col items-center text-center">
           
           {/* Abstract glowing orbs */}
           <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-primary rounded-full blur-[150px] opacity-20 -translate-x-1/2 -translate-y-1/2"></div>
@@ -61,13 +61,13 @@ export function PhilosophySection() {
           <div className="relative z-10 max-w-4xl">
             <p className="text-primary font-medium tracking-widest uppercase mb-10">Our Philosophy</p>
             
-            <h2 className="text-4xl md:text-6xl lg:text-[5rem] font-heading mb-16 leading-[1.1] tracking-tight">
+            <h2 className="text-4xl md:text-6xl lg:text-[5rem] font-heading mb-16 leading-[1.1] tracking-tight text-background">
               Build the designer, <br className="hidden md:block" /> not just the applicant.
             </h2>
             
-            <div ref={textRef} className="text-2xl md:text-4xl font-light leading-relaxed text-white/90 space-y-8">
+            <div ref={textRef} className="text-2xl md:text-4xl font-light leading-relaxed text-background/90 space-y-8">
               <p>A strong design aspirant is not someone who only knows how to answer exam questions.</p>
-              <p className="text-white/70">A strong design aspirant notices more, thinks deeper, questions better, and expresses ideas more clearly.</p>
+              <p className="text-background/70">A strong design aspirant notices more, thinks deeper, questions better, and expresses ideas more clearly.</p>
             </div>
           </div>
         </div>

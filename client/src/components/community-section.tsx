@@ -84,7 +84,7 @@ export function CommunitySection() {
                
                <div className="flex items-center gap-4 pb-4 mb-6 border-b border-black/5">
                  <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center shadow-inner">
-                   <MessageCircle className="w-6 h-6 text-white" />
+                   <MessageCircle className="w-6 h-6 text-background" />
                  </div>
                  <div>
                    <p className="font-heading text-xl text-foreground">Designforge Aspirants</p>
@@ -98,8 +98,8 @@ export function CommunitySection() {
                    Hi everyone! We are hosting an open portfolio review session this Sunday. Drop your links!
                  </div>
                  
-                 <div className="message-bubble bg-primary text-white p-4 rounded-2xl rounded-tr-sm text-[15px] w-[80%] ml-auto shadow-md">
-                   <span className="font-medium text-xs text-white/70 mb-1 block">Aman</span>
+                 <div className="message-bubble bg-primary text-background p-4 rounded-2xl rounded-tr-sm text-[15px] w-[80%] ml-auto shadow-md">
+                   <span className="font-medium text-xs text-background/70 mb-1 block">Aman</span>
                    Will we cover UCEED specific approaches in this one?
                  </div>
                  

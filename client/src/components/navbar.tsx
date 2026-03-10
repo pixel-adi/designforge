@@ -20,7 +20,7 @@ export function Navbar() {
         </nav>
         
         <div className="flex items-center">
-          <Button className="hidden md:flex rounded-full px-8 btn-bold bg-foreground text-white hover:bg-primary transition-colors text-sm font-medium h-12">
+          <Button className="hidden md:flex rounded-full px-8 btn-bold bg-foreground text-background hover:bg-primary transition-colors text-sm font-medium h-12">
             Join Waitlist
           </Button>
         </div>

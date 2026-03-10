@@ -60,7 +60,7 @@ export function AchieversSection() {
             <div key={i} className="achiever-card flex flex-col items-center group cursor-pointer">
                <div className={`w-32 h-32 md:w-40 md:h-40 ${item.color}/10 rounded-full flex items-center justify-center mb-8 relative group-hover:scale-105 transition-transform duration-500`}>
                   <div className={`absolute inset-0 ${item.color}/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
-                  <div className={`w-20 h-20 md:w-24 md:h-24 ${item.color} rounded-full text-white flex items-center justify-center shadow-lg relative z-10`}>
+                  <div className={`w-20 h-20 md:w-24 md:h-24 ${item.color} rounded-full text-background flex items-center justify-center shadow-lg relative z-10`}>
                      <span className="font-heading text-2xl md:text-3xl">{item.rank.split(' ')[1]}</span>
                   </div>
                </div>
