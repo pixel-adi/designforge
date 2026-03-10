@@ -30,7 +30,7 @@ export function FocusBatch() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         
         <div className="focus-content text-center max-w-3xl mx-auto mb-20">
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-8">
+          <div className="inline-flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-full text-sm font-medium mb-8 text-[#e94a35]">
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
             Premium Mentorship
           </div>
