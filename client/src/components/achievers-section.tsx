@@ -39,14 +39,12 @@ export function AchieversSection() {
 
   return (
     <section ref={sectionRef} className="py-32 bg-background relative overflow-hidden">
-      
       {/* Abstract floating ring */}
       <div className="absolute top-1/4 left-1/4 w-[40vw] h-[40vw] border-[40px] border-primary/5 rounded-full blur-xl pointer-events-none -z-10"></div>
-
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative z-10">
         
         <div className="max-w-3xl mx-auto text-center mb-24">
-          <h2 className="achiever-title text-5xl md:text-6xl font-heading mb-6 text-foreground tracking-tight">
+          <h2 className="achiever-title text-5xl md:text-6xl font-heading mb-6 tracking-tight text-[#e94a35]">
             Real journeys. Real ranks. <span className="text-primary italic">Real growth.</span>
           </h2>
           <p className="achiever-title text-xl text-foreground/60 font-light max-w-2xl mx-auto leading-relaxed">
