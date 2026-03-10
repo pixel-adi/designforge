@@ -59,7 +59,7 @@ export function MentorshipTracks() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         
         <div className="text-center max-w-3xl mx-auto mb-20">
-          <h2 className="text-5xl md:text-6xl font-heading mb-6 text-foreground tracking-tight">
+          <h2 className="text-5xl md:text-6xl font-heading mb-6 tracking-tight text-[#e94a35]">
             Mentorship for every pathway
           </h2>
           <p className="text-foreground/60 text-xl font-light leading-relaxed">
