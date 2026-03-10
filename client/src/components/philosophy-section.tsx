@@ -61,7 +61,7 @@ export function PhilosophySection() {
           <div className="relative z-10 max-w-4xl">
             <p className="text-primary font-medium tracking-widest uppercase mb-10">Our Philosophy</p>
             
-            <h2 className="text-4xl md:text-6xl lg:text-[5rem] font-heading mb-16 leading-[1.1] tracking-tight text-background">
+            <h2 className="md:text-6xl lg:text-[5rem] font-heading mb-16 tracking-tight text-background font-extralight text-[64px]">
               Build the designer, <br className="hidden md:block" /> not just the applicant.
             </h2>
             
