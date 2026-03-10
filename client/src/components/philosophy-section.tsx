@@ -9,22 +9,20 @@ export function PhilosophySection() {
   useEffect(() => {
     const ctx = gsap.context(() => {
       
-      // Text reveal animation based on scroll (scrubbing)
-      const words = textRef.current?.querySelectorAll('.word');
+      const paragraphs = textRef.current?.querySelectorAll('p');
       
-      if (words) {
-        gsap.fromTo(words, 
-          { opacity: 0.1, y: 20 },
+      if (paragraphs && paragraphs.length > 0) {
+        gsap.fromTo(paragraphs, 
+          { opacity: 0, y: 30 },
           {
             opacity: 1,
             y: 0,
-            stagger: 0.05,
-            ease: "none",
+            stagger: 0.2,
+            duration: 1,
+            ease: "power3.out",
             scrollTrigger: {
               trigger: textRef.current,
               start: "top 80%",
-              end: "bottom 50%",
-              scrub: 1,
             }
           }
         );
@@ -50,8 +48,6 @@ export function PhilosophySection() {
     return () => ctx.revert();
   }, []);
 
-  const statement = "A strong design aspirant is not someone who only knows how to answer exam questions. A strong design aspirant notices more, thinks deeper, questions better, and expresses ideas more clearly.";
-
   return (
     <section ref={sectionRef} className="py-32 bg-white relative px-4 sm:px-6 lg:px-8">
       <div className="container mx-auto max-w-6xl relative z-10">
@@ -69,10 +65,9 @@ export function PhilosophySection() {
               Build the designer, <br className="hidden md:block" /> not just the applicant.
             </h2>
             
-            <div ref={textRef} className="text-2xl md:text-4xl font-light leading-relaxed text-white/90 flex flex-wrap justify-center gap-x-2">
-              {statement.split(' ').map((word, i) => (
-                <span key={i} className="word inline-block">{word}</span>
-              ))}
+            <div ref={textRef} className="text-2xl md:text-4xl font-light leading-relaxed text-white/90 space-y-8">
+              <p>A strong design aspirant is not someone who only knows how to answer exam questions.</p>
+              <p className="text-white/70">A strong design aspirant notices more, thinks deeper, questions better, and expresses ideas more clearly.</p>
             </div>
           </div>
         </div>
