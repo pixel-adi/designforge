@@ -89,17 +89,17 @@ export function Hero() {
         </div>
         
         {/* Creative Organic Illustration Area */}
-        <div className="hero-image-container w-full max-w-5xl mt-24 relative flex justify-center hero-image">
-          <div className="relative w-full aspect-[21/9] md:aspect-[21/8] bg-white/40 backdrop-blur-2xl rounded-[3rem] border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] overflow-hidden flex items-center justify-center p-8">
+        <div className="hero-image-container w-full max-w-5xl mt-24 relative flex justify-center z-20">
+          <div className="hero-image relative w-full min-h-[400px] md:min-h-[500px] bg-white/40 backdrop-blur-2xl rounded-[2rem] md:rounded-[3rem] border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] overflow-hidden flex items-center justify-center p-6 md:p-12">
             
             {/* Abstract fluid shapes inside the glass container */}
-            <div className="shape-1 organic-blob absolute top-[10%] left-[20%] w-64 h-64 bg-pop-1/80 mix-blend-multiply filter blur-xl opacity-70"></div>
-            <div className="shape-2 organic-blob absolute bottom-[10%] right-[20%] w-72 h-72 bg-pop-2/60 mix-blend-multiply filter blur-xl opacity-70"></div>
-            <div className="shape-3 organic-blob absolute top-[30%] left-[40%] w-80 h-80 bg-pop-3/60 mix-blend-multiply filter blur-xl opacity-70"></div>
+            <div className="shape-1 organic-blob absolute top-0 left-0 w-48 h-48 md:w-64 md:h-64 bg-pop-1/80 mix-blend-multiply filter blur-xl opacity-70"></div>
+            <div className="shape-2 organic-blob absolute bottom-0 right-0 w-56 h-56 md:w-72 md:h-72 bg-pop-2/60 mix-blend-multiply filter blur-xl opacity-70"></div>
+            <div className="shape-3 organic-blob absolute top-1/4 left-1/4 w-64 h-64 md:w-80 md:h-80 bg-pop-3/60 mix-blend-multiply filter blur-xl opacity-70"></div>
 
             {/* Foreground crisp elements */}
-            <div className="relative z-10 grid grid-cols-3 gap-6 md:gap-10 w-full max-w-3xl">
-               <div className="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-xl border border-white flex flex-col items-center justify-center transform -rotate-6 hover:rotate-0 transition-transform duration-500">
+            <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10 w-full max-w-3xl">
+               <div className="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-xl border border-white flex flex-col items-center justify-center transform md:-rotate-6 hover:rotate-0 transition-transform duration-500 min-h-[200px]">
                   <div className="w-16 h-16 rounded-full bg-pop-1/20 flex items-center justify-center mb-4">
                      <div className="w-8 h-8 rounded-full bg-pop-1"></div>
                   </div>
@@ -107,7 +107,7 @@ export function Hero() {
                   <div className="w-12 h-2 bg-black/10 rounded-full"></div>
                </div>
                
-               <div className="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-xl border border-white flex flex-col items-center justify-center transform translate-y-8 scale-110 z-20">
+               <div className="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-xl border border-white flex flex-col items-center justify-center transform md:translate-y-8 md:scale-110 z-20 min-h-[200px]">
                   <div className="w-20 h-20 rounded-2xl bg-primary/20 flex items-center justify-center mb-4 rotate-12">
                      <div className="w-10 h-10 rounded-lg bg-primary -rotate-12"></div>
                   </div>
@@ -116,7 +116,7 @@ export function Hero() {
                   <div className="w-20 h-2.5 bg-black/10 rounded-full"></div>
                </div>
 
-               <div className="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-xl border border-white flex flex-col items-center justify-center transform rotate-6 hover:rotate-0 transition-transform duration-500">
+               <div className="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-xl border border-white flex flex-col items-center justify-center transform md:rotate-6 hover:rotate-0 transition-transform duration-500 min-h-[200px]">
                   <div className="w-16 h-16 rounded-full bg-pop-3/20 flex items-center justify-center mb-4">
                      <svg className="w-8 h-8 text-pop-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                   </div>
