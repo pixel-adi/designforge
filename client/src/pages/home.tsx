@@ -11,6 +11,10 @@ import { FoundersSection } from "@/components/founders-section";
 import { EventsSection } from "@/components/events-section";
 import { Button } from "@/components/ui/button";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 export default function Home() {
   return (

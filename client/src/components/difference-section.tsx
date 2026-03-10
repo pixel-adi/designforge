@@ -3,6 +3,8 @@ import { Target, Compass, BookOpen, Lightbulb } from "lucide-react";
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
+gsap.registerPlugin(ScrollTrigger);
+
 export function DifferenceSection() {
   const sectionRef = useRef<HTMLDivElement>(null);
   

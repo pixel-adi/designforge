@@ -17,7 +17,7 @@ export function FocusBatch() {
       });
 
       tl.fromTo(".focus-content", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 1 })
-        .fromTo(".focus-list li", { x: -20, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6, stagger: 0.15 }, "-=0.5")
+        .fromTo(".focus-list > div", { x: -20, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6, stagger: 0.15 }, "-=0.5")
         .fromTo(".focus-form", { scale: 0.95, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, ease: "power2.out" }, "-=0.8");
 
     }, sectionRef);
