@@ -5,11 +5,19 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import Mentorship from "@/pages/mentorship";
+import Results from "@/pages/results";
+import Community from "@/pages/community";
+import Events from "@/pages/events";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home}/>
+      <Route path="/mentorship" component={Mentorship}/>
+      <Route path="/results" component={Results}/>
+      <Route path="/community" component={Community}/>
+      <Route path="/events" component={Events}/>
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
