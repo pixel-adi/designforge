@@ -117,7 +117,7 @@ export default function AboutPage() {
             
             <div className="hero-trust inline-flex items-center gap-3 px-6 py-3 bg-white/80 border border-black/5 rounded-2xl shadow-sm">
               <Users className="w-5 h-5 text-primary" />
-              <span className="font-medium">10000+ students and professionals supported since 2015</span>
+              <span className="font-medium">10k+ students and professionals supported since 2015</span>
             </div>
           </div>
         </section>
@@ -512,27 +512,22 @@ export default function AboutPage() {
           <div className="container mx-auto px-4 max-w-5xl">
             <div className="flex flex-col md:flex-row gap-12 items-center">
               <div className="md:w-1/2">
-                <div className="relative">
-                  {/* Decorative background blur */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-primary/5 rounded-full blur-3xl -z-10"></div>
-                  
-                  <div className="grid grid-cols-2 gap-4 md:gap-6 card-grid relative z-10">
-                    <div className="stagger-card bg-white/80 backdrop-blur-md p-8 rounded-[2rem] border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)]">
-                      <div className="text-4xl md:text-5xl font-heading text-primary mb-3">10000+</div>
-                      <div className="text-xs md:text-sm text-foreground/60 font-semibold uppercase tracking-widest">Learners Supported</div>
-                    </div>
-                    <div className="stagger-card bg-white/80 backdrop-blur-md p-8 rounded-[2rem] border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-center mt-8 md:mt-12 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)]">
-                      <div className="text-4xl md:text-5xl font-heading text-pop-1 mb-3">10+</div>
-                      <div className="text-xs md:text-sm text-foreground/60 font-semibold uppercase tracking-widest">Years of Legacy</div>
-                    </div>
-                    <div className="stagger-card bg-white/80 backdrop-blur-md p-8 rounded-[2rem] border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-center -mt-4 md:-mt-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)]">
-                      <div className="text-4xl md:text-5xl font-heading text-pop-2 mb-3">NID/IIT</div>
-                      <div className="text-xs md:text-sm text-foreground/60 font-semibold uppercase tracking-widest">Mentor Network</div>
-                    </div>
-                    <div className="stagger-card bg-white/80 backdrop-blur-md p-8 rounded-[2rem] border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-center mt-4 md:mt-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)]">
-                      <div className="text-4xl md:text-5xl font-heading text-pop-3 mb-3">100%</div>
-                      <div className="text-xs md:text-sm text-foreground/60 font-semibold uppercase tracking-widest">Community Driven</div>
-                    </div>
+                <div className="grid grid-cols-2 gap-4 md:gap-6 relative z-10 card-grid">
+                  <div className="stagger-card bg-white p-6 rounded-3xl border border-black/5 shadow-sm flex flex-col justify-center items-center text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-md aspect-[4/3] sm:aspect-square">
+                    <div className="text-3xl sm:text-4xl md:text-5xl font-heading text-primary mb-2">10k+</div>
+                    <div className="text-xs sm:text-sm text-foreground/70 font-medium">Learners Supported</div>
+                  </div>
+                  <div className="stagger-card bg-white p-6 rounded-3xl border border-black/5 shadow-sm flex flex-col justify-center items-center text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-md aspect-[4/3] sm:aspect-square">
+                    <div className="text-3xl sm:text-4xl md:text-5xl font-heading text-pop-1 mb-2">10+</div>
+                    <div className="text-xs sm:text-sm text-foreground/70 font-medium">Years of Legacy</div>
+                  </div>
+                  <div className="stagger-card bg-white p-6 rounded-3xl border border-black/5 shadow-sm flex flex-col justify-center items-center text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-md aspect-[4/3] sm:aspect-square">
+                    <div className="text-3xl sm:text-4xl md:text-5xl font-heading text-pop-2 mb-2">NID/IIT</div>
+                    <div className="text-xs sm:text-sm text-foreground/70 font-medium">Mentor Network</div>
+                  </div>
+                  <div className="stagger-card bg-white p-6 rounded-3xl border border-black/5 shadow-sm flex flex-col justify-center items-center text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-md aspect-[4/3] sm:aspect-square">
+                    <div className="text-3xl sm:text-4xl md:text-5xl font-heading text-pop-3 mb-2">100%</div>
+                    <div className="text-xs sm:text-sm text-foreground/70 font-medium">Community Driven</div>
                   </div>
                 </div>
               </div>
@@ -541,7 +536,7 @@ export default function AboutPage() {
                 <div className="w-16 h-1 bg-primary mb-8"></div>
                 
                 <p className="text-lg text-foreground/80 mb-6">
-                  Since our beginnings as Whitespace Design Foundation, and now as Designforge, we have supported 10000+ students and industry professionals through mentorship, learning programs, practice sessions, and design-focused initiatives.
+                  Since our beginnings as Whitespace Design Foundation, and now as Designforge, we have supported 10k+ students and industry professionals through mentorship, learning programs, practice sessions, and design-focused initiatives.
                 </p>
                 
                 <p className="font-medium text-foreground/90 mb-4">This journey has included helping learners:</p>
