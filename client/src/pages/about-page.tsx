@@ -400,7 +400,7 @@ export default function AboutPage() {
                       <MapPin className="w-3.5 h-3.5" /> Mentor Expertise: Problem Solving
                     </div>
                     <div className="flex items-center gap-2 text-xs text-foreground/60">
-                      <Building className="w-3.5 h-3.5" /> Ex-NID / Industry Professional
+                      <Building className="w-3.5 h-3.5" /> NID | Principal UX Architect - Aadhaar
                     </div>
                   </div>
                 </CardContent>
