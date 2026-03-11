@@ -23,7 +23,7 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   
   return (
-    <div className="sticky top-0 z-50 w-full flex flex-col">
+    <div className="sticky top-0 z-40 w-full flex flex-col">
       <div className="w-full bg-[#111111] text-white py-1.5 px-4 text-center text-xs sm:text-sm font-light flex items-center justify-center">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
           <div className="flex items-center justify-center">
