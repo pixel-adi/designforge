@@ -9,18 +9,20 @@ export function StatsSection() {
     const ctx = gsap.context(() => {
       const stats = sectionRef.current?.querySelectorAll('.stat-item');
       
+      if (!stats) return;
+      
       gsap.fromTo(stats,
-        { scale: 0.9, opacity: 0, y: 20 },
+        { scale: 0.95, opacity: 0, y: 15 },
         {
           scale: 1,
           opacity: 1,
           y: 0,
-          duration: 0.6,
+          duration: 0.5,
           stagger: 0.1,
-          ease: "back.out(1.5)",
+          ease: "back.out(1.2)",
           scrollTrigger: {
             trigger: sectionRef.current,
-            start: "top 85%",
+            start: "top 90%",
           }
         }
       );

@@ -17,12 +17,12 @@ export function PhilosophySection() {
           {
             opacity: 1,
             y: 0,
-            stagger: 0.2,
-            duration: 1,
-            ease: "power3.out",
+            stagger: 0.1,
+            duration: 0.6,
+            ease: "power2.out",
             scrollTrigger: {
               trigger: textRef.current,
-              start: "top 80%",
+              start: "top 85%",
             }
           }
         );

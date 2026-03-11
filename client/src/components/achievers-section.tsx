@@ -11,23 +11,23 @@ export function AchieversSection() {
       const cards = gsap.utils.toArray('.achiever-card');
       
       gsap.fromTo(".achiever-title", 
-        { y: 30, opacity: 0 },
-        { y: 0, opacity: 1, duration: 1, scrollTrigger: { trigger: sectionRef.current, start: "top 80%" }}
+        { y: 20, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.6, scrollTrigger: { trigger: sectionRef.current, start: "top 85%" }}
       );
 
       cards.forEach((card: any, i) => {
         gsap.fromTo(card,
-          { y: 50, opacity: 0, scale: 0.9 },
+          { y: 30, opacity: 0, scale: 0.95 },
           { 
             y: 0, 
             opacity: 1, 
             scale: 1,
-            duration: 0.8, 
+            duration: 0.6, 
             ease: "back.out(1.2)", 
-            delay: i * 0.1,
+            delay: i * 0.05,
             scrollTrigger: { 
               trigger: sectionRef.current?.querySelector('.grid'), 
-              start: "top 75%" 
+              start: "top 85%" 
             } 
           }
         );

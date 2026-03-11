@@ -9,13 +9,13 @@ export function Hero() {
   useEffect(() => {
     const ctx = gsap.context(() => {
       // Intro animations
-      const tl = gsap.timeline({ defaults: { ease: "power4.out" }});
+      const tl = gsap.timeline({ defaults: { ease: "power3.out" }});
       
-      tl.fromTo(".hero-badge", { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 1, delay: 0.2 })
-        .fromTo(".hero-title", { y: 40, opacity: 0, rotateX: -10 }, { y: 0, opacity: 1, rotateX: 0, duration: 1.2 }, "-=0.8")
-        .fromTo(".hero-desc", { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 1 }, "-=1")
-        .fromTo(".hero-btn", { y: 20, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1, duration: 0.8, stagger: 0.1 }, "-=0.8")
-        .fromTo(".hero-image", { opacity: 0, scale: 0.8, y: 50 }, { opacity: 1, scale: 1, y: 0, duration: 1.5, ease: "expo.out" }, "-=1.2");
+      tl.fromTo(".hero-badge", { y: 15, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, delay: 0.1 })
+        .fromTo(".hero-title", { y: 20, opacity: 0, rotateX: -5 }, { y: 0, opacity: 1, rotateX: 0, duration: 0.8 }, "-=0.4")
+        .fromTo(".hero-desc", { y: 15, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 }, "-=0.5")
+        .fromTo(".hero-btn", { y: 15, opacity: 0, scale: 0.95 }, { y: 0, opacity: 1, scale: 1, duration: 0.5, stagger: 0.1 }, "-=0.4")
+        .fromTo(".hero-image", { opacity: 0, scale: 0.95, y: 20 }, { opacity: 1, scale: 1, y: 0, duration: 1, ease: "power2.out" }, "-=0.6");
 
       // Continuous fluid animation for shapes
       gsap.to(".shape-1", {

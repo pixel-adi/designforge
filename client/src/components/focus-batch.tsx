@@ -19,13 +19,13 @@ export function FocusBatch() {
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.current,
-          start: "top 75%",
+          start: "top 85%",
         }
       });
 
-      tl.fromTo(".focus-content", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 1 })
-        .fromTo(".focus-list > div", { x: -20, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6, stagger: 0.15 }, "-=0.5")
-        .fromTo(".focus-form", { scale: 0.95, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, ease: "power2.out" }, "-=0.8");
+      tl.fromTo(".focus-content", { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 })
+        .fromTo(".focus-list > div", { x: -15, opacity: 0 }, { x: 0, opacity: 1, duration: 0.4, stagger: 0.1 }, "-=0.3")
+        .fromTo(".focus-form", { scale: 0.98, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "power2.out" }, "-=0.4");
 
     }, sectionRef);
 

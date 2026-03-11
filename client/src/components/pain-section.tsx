@@ -25,16 +25,16 @@ export function PainSection() {
       
       cards.forEach((card: any, i) => {
         gsap.fromTo(card,
-          { y: 100, opacity: 0, rotate: i % 2 === 0 ? -5 : 5 },
+          { y: 50, opacity: 0, rotate: i % 2 === 0 ? -2 : 2 },
           { 
             y: 0, 
             opacity: 1, 
             rotate: 0,
-            duration: 1.2, 
-            ease: "expo.out",
+            duration: 0.8, 
+            ease: "power2.out",
             scrollTrigger: {
               trigger: card,
-              start: "top 85%",
+              start: "top 90%",
             }
           }
         );

@@ -39,14 +39,14 @@ export function MentorshipTracks() {
     const ctx = gsap.context(() => {
       
       gsap.fromTo(".track-card",
-        { y: 50, opacity: 0 },
+        { y: 30, opacity: 0 },
         {
           y: 0,
           opacity: 1,
-          duration: 1,
-          stagger: 0.15,
-          ease: "expo.out",
-          scrollTrigger: { trigger: ".cards-container", start: "top 75%" }
+          duration: 0.6,
+          stagger: 0.1,
+          ease: "power2.out",
+          scrollTrigger: { trigger: ".cards-container", start: "top 85%" }
         }
       );
     }, sectionRef);

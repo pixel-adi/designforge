@@ -11,21 +11,21 @@ export function FoundersSection() {
       const cards = gsap.utils.toArray('.founder-card');
       
       gsap.fromTo(".founder-title",
-        { y: 30, opacity: 0 },
-        { y: 0, opacity: 1, duration: 1, scrollTrigger: { trigger: sectionRef.current, start: "top 80%" } }
+        { y: 20, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.6, scrollTrigger: { trigger: sectionRef.current, start: "top 85%" } }
       );
 
       cards.forEach((card: any, i) => {
         gsap.fromTo(card,
-          { y: 50, opacity: 0, scale: 0.95 },
+          { y: 30, opacity: 0, scale: 0.98 },
           { 
             y: 0, 
             opacity: 1, 
             scale: 1,
-            duration: 1, 
-            ease: "power3.out",
-            delay: i * 0.2,
-            scrollTrigger: { trigger: sectionRef.current?.querySelector('.grid'), start: "top 75%" } 
+            duration: 0.6, 
+            ease: "power2.out",
+            delay: i * 0.1,
+            scrollTrigger: { trigger: sectionRef.current?.querySelector('.grid'), start: "top 85%" } 
           }
         );
       });

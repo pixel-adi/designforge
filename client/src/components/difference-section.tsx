@@ -24,16 +24,16 @@ export function DifferenceSection() {
 
       cards.forEach((card: any, i) => {
         gsap.fromTo(card,
-          { opacity: 0, x: 50, scale: 0.95 },
+          { opacity: 0, x: 20, scale: 0.98 },
           { 
             opacity: 1, 
             x: 0, 
             scale: 1,
-            duration: 0.8, 
-            ease: "power3.out",
+            duration: 0.5, 
+            ease: "power2.out",
             scrollTrigger: {
               trigger: card,
-              start: "top 80%",
+              start: "top 90%",
             }
           }
         );

@@ -13,18 +13,18 @@ export function EventsSection() {
       
       gsap.fromTo(".events-title",
         { y: 30, opacity: 0 },
-        { y: 0, opacity: 1, duration: 1, scrollTrigger: { trigger: sectionRef.current, start: "top 80%" } }
+        { y: 0, opacity: 1, duration: 0.6, scrollTrigger: { trigger: sectionRef.current, start: "top 85%" } }
       );
 
       blocks.forEach((block: any, i) => {
         gsap.fromTo(block,
-          { x: i % 2 === 0 ? -50 : 50, opacity: 0 },
+          { x: i % 2 === 0 ? -30 : 30, opacity: 0 },
           { 
             x: 0, 
             opacity: 1, 
-            duration: 1, 
-            ease: "power3.out",
-            scrollTrigger: { trigger: block, start: "top 85%" } 
+            duration: 0.6, 
+            ease: "power2.out",
+            scrollTrigger: { trigger: block, start: "top 90%" } 
           }
         );
       });

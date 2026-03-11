@@ -12,13 +12,13 @@ export function CommunitySection() {
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.current,
-          start: "top 70%",
+          start: "top 80%",
         }
       });
 
-      tl.fromTo(".comm-blob", { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.5, ease: "power3.out" })
-        .fromTo(".comm-text", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 1, stagger: 0.2 }, "-=1")
-        .fromTo(".message-bubble", { y: 20, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1, duration: 0.6, stagger: 0.15, ease: "back.out(1.2)" }, "-=0.5");
+      tl.fromTo(".comm-blob", { scale: 0.9, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, ease: "power2.out" })
+        .fromTo(".comm-text", { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, stagger: 0.1 }, "-=0.5")
+        .fromTo(".message-bubble", { y: 15, opacity: 0, scale: 0.95 }, { y: 0, opacity: 1, scale: 1, duration: 0.5, stagger: 0.1, ease: "back.out(1.2)" }, "-=0.3");
 
       // Continuous float for the phone container
       gsap.to(".phone-container", {
