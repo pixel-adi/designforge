@@ -40,13 +40,7 @@ export default function FocusBatchPage() {
       <Navbar />
       
       {/* SECTION 1: TOP BAR */}
-      <div className="bg-[#111111] text-white py-3 px-4 text-center text-sm font-light z-50 relative mt-16 lg:mt-20">
-        <p className="flex items-center justify-center gap-2 flex-wrap">
-          <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full font-medium mr-2">OPEN</span>
-          Applications open for Designforge Focus Batch 2026 — 40-week mentored preparation.
-          <a href="#apply" className="font-medium underline underline-offset-4 ml-2 hover:text-primary transition-colors">Apply Now</a>
-        </p>
-      </div>
+      {/* Moved to navbar.tsx to act as a global banner */}
 
       <main className="flex-1 relative z-10">
         
