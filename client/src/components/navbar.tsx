@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -6,10 +6,22 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetClose
+} from "@/components/ui/sheet";
+import { ChevronDown, Menu } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
+import { useState } from "react";
 
 export function Navbar() {
+  const [location] = useLocation();
+  const [isOpen, setIsOpen] = useState(false);
+  
   return (
     <div className="sticky top-0 z-50 w-full flex flex-col">
       <div className="w-full bg-[#111111] text-white py-1.5 px-4 text-center sm:text-sm font-light flex items-center justify-center text-[12px]">
@@ -55,8 +67,45 @@ export function Navbar() {
             <Link href="/focus-batch" className="text-xs xl:text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Focus Batch</Link>
           </nav>
           
-          <div className="flex items-center">
+          <div className="flex items-center gap-4">
             <Button className="hidden md:flex rounded-full px-6 md:px-8 btn-bold bg-foreground text-background hover:bg-primary transition-colors text-xs md:text-sm font-medium h-10 md:h-12">Join Community</Button>
+            
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild className="lg:hidden">
+                <Button variant="ghost" size="icon" className="w-10 h-10 border-0 hover:bg-transparent">
+                  <Menu className="w-6 h-6 text-foreground" />
+                  <span className="sr-only">Toggle Menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] sm:w-[350px] bg-background border-l border-black/5 pt-12 flex flex-col">
+                <SheetHeader className="hidden">
+                  <SheetTitle>Navigation Menu</SheetTitle>
+                </SheetHeader>
+                <div className="flex flex-col gap-6 mt-8">
+                  <div className="flex flex-col gap-4">
+                    <Link href="/about" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${location === '/about' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>About</Link>
+                    <Link href="/apprenticeship" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${location === '/apprenticeship' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Apprenticeship</Link>
+                    <Link href="/mentorship" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${location === '/mentorship' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Mentorship</Link>
+                    
+                    <div className="flex flex-col gap-3 py-2 border-y border-black/5">
+                      <p className="text-sm font-semibold text-foreground/50 uppercase tracking-wider">Community</p>
+                      <Link href="/community" onClick={() => setIsOpen(false)} className="text-lg font-medium text-foreground hover:text-primary pl-2">Hub</Link>
+                      <Link href="/results" onClick={() => setIsOpen(false)} className="text-lg font-medium text-foreground hover:text-primary pl-2">Results</Link>
+                      <Link href="/events" onClick={() => setIsOpen(false)} className="text-lg font-medium text-foreground hover:text-primary pl-2">Events</Link>
+                      <Link href="/join-us" onClick={() => setIsOpen(false)} className="text-lg font-medium text-foreground hover:text-primary pl-2">Join Us</Link>
+                    </div>
+
+                    <Link href="/focus-batch" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${location === '/focus-batch' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Focus Batch</Link>
+                  </div>
+                  
+                  <div className="mt-auto pb-8 pt-6">
+                    <Button className="w-full rounded-full h-12 btn-bold bg-primary text-primary-foreground hover:bg-primary/90 text-base" onClick={() => setIsOpen(false)}>
+                      Join Community
+                    </Button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </header>
