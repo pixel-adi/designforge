@@ -561,41 +561,17 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* SECTION 10: MISSION & FINAL CTA */}
+        {/* SECTION 10: MISSION */}
         <section className="py-24 bg-foreground text-background text-center animate-section relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/50"></div>
           
           <div className="container mx-auto px-4 max-w-4xl relative z-10">
             {/* MISSION */}
-            <div className="mb-20">
+            <div>
               <div className="text-primary font-mono text-sm uppercase tracking-widest mb-4">Our Mission</div>
               <h2 className="text-3xl md:text-5xl font-heading leading-tight mb-8">
                 To democratise design by making design education, mentorship, and growth opportunities more accessible, affordable, and relevant for aspirants, students, and early professionals.
               </h2>
-            </div>
-            
-            <div className="w-full h-px bg-white/10 mb-20"></div>
-            
-            {/* FINAL CTA */}
-            
-            <p className="text-xl text-background/70 mb-8 leading-relaxed font-light">
-              From Whitespace Design Foundation to Designforge, the name has evolved, but the purpose has remained the same: to help people learn, think, and grow through design.
-            </p>
-            
-            <p className="text-lg text-background/60 mb-12 max-w-3xl mx-auto">
-              Designforge continues this journey by building a more inclusive, credible, and supportive design ecosystem — one where talent is not held back by lack of access, and where meaningful mentorship can truly shape creative futures.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full text-lg btn-bold">
-                Explore Programs
-              </Button>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 rounded-full text-lg bg-transparent border-white/20 text-white hover:bg-white hover:text-foreground">
-                Meet Our Mentors
-              </Button>
-              <Button size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 rounded-full text-lg text-white hover:bg-white/10 group">
-                Join the Community <ChevronRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Button>
             </div>
           </div>
         </section>
