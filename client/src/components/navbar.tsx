@@ -24,12 +24,14 @@ export function Navbar() {
   
   return (
     <div className="sticky top-0 z-50 w-full flex flex-col">
-      <div className="w-full bg-[#111111] text-white py-1.5 px-4 text-center sm:text-sm font-light flex items-center justify-center text-[12px]">
-        <p className="flex items-center justify-center gap-2 flex-wrap m-0 p-0">
-          <span className="bg-primary text-primary-foreground text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-medium mr-2">OPEN</span>
-          Applications open for Designforge Focus Batch 2026 — 40-week mentored preparation.
-          <Link href="/focus-batch" className="font-medium underline underline-offset-4 ml-2 hover:text-primary transition-colors">Apply Now</Link>
-        </p>
+      <div className="w-full bg-[#111111] text-white py-1.5 px-4 text-center text-xs sm:text-sm font-light flex items-center justify-center">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
+          <div className="flex items-center justify-center">
+            <span className="bg-primary text-primary-foreground text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-medium mr-2">OPEN</span>
+            <span>Applications open for Focus Batch 2026<span className="hidden md:inline"> — 40-week mentored preparation.</span></span>
+          </div>
+          <Link href="/focus-batch" className="font-medium underline underline-offset-4 hover:text-primary transition-colors whitespace-nowrap">Apply Now</Link>
+        </div>
       </div>
       <header className="w-full bg-background/95 backdrop-blur-xl border-b border-black/[0.03] transition-all duration-300">
         <div className="container mx-auto px-4 sm:px-6 lg:px-10 h-20 md:h-24 flex items-center justify-between">
