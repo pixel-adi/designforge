@@ -12,7 +12,7 @@ import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 export function Navbar() {
   return (
     <div className="sticky top-0 z-50 w-full flex flex-col">
-      <div className="w-full bg-[#111111] text-white py-1.5 px-4 text-center text-xs sm:text-sm font-light leading-tight flex items-center justify-center">
+      <div className="w-full bg-[#111111] text-white py-1.5 px-4 text-center sm:text-sm font-light flex items-center justify-center text-[12px]">
         <p className="flex items-center justify-center gap-2 flex-wrap m-0 p-0">
           <span className="bg-primary text-primary-foreground text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-medium mr-2">OPEN</span>
           Applications open for Designforge Focus Batch 2026 — 40-week mentored preparation.
