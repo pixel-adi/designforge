@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import sketchbookImg from '@assets/Gemini_Generated_Image_ofmjymofmjymofmj-removebg-preview_1773229141541.png';
 
 export function Hero() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -15,7 +16,8 @@ export function Hero() {
         .fromTo(".hero-title", { y: 20, opacity: 0, rotateX: -5 }, { y: 0, opacity: 1, rotateX: 0, duration: 0.8 }, "-=0.4")
         .fromTo(".hero-desc", { y: 15, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 }, "-=0.5")
         .fromTo(".hero-btn", { y: 15, opacity: 0, scale: 0.95 }, { y: 0, opacity: 1, scale: 1, duration: 0.5, stagger: 0.1 }, "-=0.4")
-        .fromTo(".hero-image", { opacity: 0, scale: 0.95, y: 20 }, { opacity: 1, scale: 1, y: 0, duration: 1, ease: "power2.out" }, "-=0.6");
+        .fromTo(".hero-image", { opacity: 0, scale: 0.95, y: 20 }, { opacity: 1, scale: 1, y: 0, duration: 1, ease: "power2.out" }, "-=0.6")
+        .fromTo(".hero-sketchbook", { x: 100, opacity: 0, rotation: 25 }, { x: 0, opacity: 0.7, rotation: 12, duration: 1.5, ease: "power2.out" }, "-=1");
 
       // Continuous fluid animation for shapes
       gsap.to(".shape-1", {
@@ -29,6 +31,11 @@ export function Hero() {
       gsap.to(".shape-3", {
         scale: 1.1, rotation: 5,
         duration: 3, repeat: -1, yoyo: true, ease: "sine.inOut", delay: 0.5
+      });
+      
+      gsap.to(".hero-sketchbook", {
+        y: 25, rotation: 15,
+        duration: 5, repeat: -1, yoyo: true, ease: "sine.inOut"
       });
 
       // Parallax effect on scroll
@@ -55,6 +62,11 @@ export function Hero() {
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] right-[-5%] w-[40vw] h-[40vw] bg-pop-3/20 rounded-full blur-[100px]"></div>
         <div className="absolute bottom-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-primary/10 rounded-full blur-[120px]"></div>
+      </div>
+
+      {/* Decorative Sketchbook */}
+      <div className="hero-sketchbook absolute top-0 -right-32 sm:-right-20 md:top-10 md:-right-32 lg:-right-10 w-[350px] md:w-[500px] lg:w-[650px] z-0 opacity-40 md:opacity-70 rotate-12 pointer-events-none">
+        <img src={sketchbookImg} alt="Design Sketchbook" className="w-full h-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.15)]" />
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col items-center text-center">
