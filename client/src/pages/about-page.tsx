@@ -117,7 +117,7 @@ export default function AboutPage() {
             
             <div className="hero-trust inline-flex items-center gap-3 px-6 py-3 bg-white/80 border border-black/5 rounded-2xl shadow-sm">
               <Users className="w-5 h-5 text-primary" />
-              <span className="font-medium">7000+ students and professionals supported since 2015</span>
+              <span className="font-medium">10000+ students and professionals supported since 2015</span>
             </div>
           </div>
         </section>
@@ -514,7 +514,7 @@ export default function AboutPage() {
               <div className="md:w-1/2">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-white p-6 rounded-2xl border border-border shadow-sm text-center">
-                    <div className="text-4xl font-heading text-primary mb-2">7000+</div>
+                    <div className="text-4xl font-heading text-primary mb-2">10000+</div>
                     <div className="text-sm text-foreground/60 font-medium">Learners Supported</div>
                   </div>
                   <div className="bg-white p-6 rounded-2xl border border-border shadow-sm text-center mt-8">
@@ -536,7 +536,7 @@ export default function AboutPage() {
                 <div className="w-16 h-1 bg-primary mb-8"></div>
                 
                 <p className="text-lg text-foreground/80 mb-6">
-                  Since our beginnings as Whitespace Design Foundation, and now as Designforge, we have supported 7000+ students and industry professionals through mentorship, learning programs, practice sessions, and design-focused initiatives.
+                  Since our beginnings as Whitespace Design Foundation, and now as Designforge, we have supported 10000+ students and industry professionals through mentorship, learning programs, practice sessions, and design-focused initiatives.
                 </p>
                 
                 <p className="font-medium text-foreground/90 mb-4">This journey has included helping learners:</p>
