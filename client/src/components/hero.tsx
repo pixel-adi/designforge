@@ -74,7 +74,7 @@ export function Hero() {
             </div>
           </div>
           
-          <h1 className="hero-title text-5xl md:text-7xl lg:text-[5.5rem] font-heading leading-[1.05] mb-8 text-foreground tracking-tight transform-style-3d">
+          <h1 className="hero-title md:text-7xl lg:text-[5.5rem] font-heading mb-8 text-foreground tracking-tight transform-style-3d text-[72px] font-medium">
             Get mentored, not coached, for your <span className="text-primary relative inline-block">
               dream college.
               <svg className="absolute w-full h-3 -bottom-2 left-0 text-pop-3 -z-10 opacity-70" viewBox="0 0 100 10" preserveAspectRatio="none">
