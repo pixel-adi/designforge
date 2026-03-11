@@ -535,10 +535,6 @@ export default function AboutPage() {
                 <h2 className="text-3xl md:text-4xl font-heading mb-6 text-[#262626]">The journey so far</h2>
                 <div className="w-16 h-1 bg-primary mb-8"></div>
                 
-                <p className="text-lg text-foreground/80 mb-6">
-                  Since our beginnings as Whitespace Design Foundation, and now as Designforge, we have supported 10k+ students and industry professionals through mentorship, learning programs, practice sessions, and design-focused initiatives.
-                </p>
-                
                 <p className="font-medium text-foreground/90 mb-4">This journey has included helping learners:</p>
                 <ul className="space-y-3 mb-8">
                   {[
