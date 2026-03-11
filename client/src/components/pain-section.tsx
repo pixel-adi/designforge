@@ -58,7 +58,7 @@ export function PainSection() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         
         <div className="text-center max-w-4xl mx-auto mb-24">
-          <h2 className="pain-title text-4xl md:text-5xl lg:text-6xl font-heading mb-8 text-transparent bg-clip-text bg-gradient-to-r from-foreground via-primary to-foreground bg-[length:200%_auto] leading-tight">
+          <h2 className="pain-title text-4xl md:text-5xl lg:text-6xl font-heading mb-8 text-[#262626] leading-tight">
             The hardest part of design preparation is direction.
           </h2>
           <p className="text-xl md:text-2xl text-foreground/60 font-light max-w-3xl mx-auto leading-relaxed">
