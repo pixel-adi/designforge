@@ -56,9 +56,7 @@ export function Navbar() {
           </nav>
           
           <div className="flex items-center">
-            <Button className="hidden md:flex rounded-full px-6 md:px-8 btn-bold bg-foreground text-background hover:bg-primary transition-colors text-xs md:text-sm font-medium h-10 md:h-12">
-              Join Batch
-            </Button>
+            <Button className="hidden md:flex rounded-full px-6 md:px-8 btn-bold bg-foreground text-background hover:bg-primary transition-colors text-xs md:text-sm font-medium h-10 md:h-12">Join Community</Button>
           </div>
         </div>
       </header>
