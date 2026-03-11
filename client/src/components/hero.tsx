@@ -51,7 +51,7 @@ export function Hero() {
   }, []);
 
   return (
-    <section ref={containerRef} className="pt-24 pb-32 relative bg-background overflow-hidden perspective-1000">
+    <section ref={containerRef} className="pt-4 pb-32 relative bg-background overflow-hidden perspective-1000">
       
       {/* Soft abstract background blur */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
