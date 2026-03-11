@@ -140,7 +140,7 @@ export default function FocusBatchPage() {
 
         {/* SECTION 6: 40-WEEK ROADMAP */}
         <section className="py-24 bg-[#111111] text-white animate-section">
-          <div className="container mx-auto px-4 max-w-4xl">
+          <div className="container mx-auto px-4 max-w-5xl">
             <div className="text-center mb-16">
               <h2 className="text-4xl md:text-5xl font-heading mb-4 text-white">Your 40-week preparation journey</h2>
               <div className="w-20 h-1 bg-primary mx-auto"></div>
@@ -148,29 +148,142 @@ export default function FocusBatchPage() {
             
             <div className="space-y-6">
               {[
-                { phase: "Phase 1: Foundation", weeks: "Weeks 1–8", items: ["Drawing fundamentals", "Perspective, light, shadow", "Composition and visual communication", "Observation sketching", "Design basics", "Early storytelling and ideation"] },
-                { phase: "Phase 2: Creativity + Exam Familiarity", weeks: "Weeks 9–16", items: ["Brainstorming and idea expansion", "Problem-solving and redesign exercises", "UCEED / CEED / NID question familiarity", "Past paper understanding", "Time-bound exercises"] },
-                { phase: "Phase 3: Intensive Practice", weeks: "Weeks 17–28", items: ["Weekly assignments", "Mock tests", "Critique rounds", "Speed and clarity improvement", "Accuracy and originality"] },
-                { phase: "Phase 4: Prelims Revision + Transition", weeks: "Weeks 29–32", items: ["Full mocks", "Feedback and score analysis", "Final prelims tuning", "Strategy for next stage"] },
-                { phase: "Phase 5: Mains, Portfolio, Interview Prep", weeks: "Weeks 33–40", items: ["Studio test thinking", "Material exploration", "Model making and prototyping", "Portfolio building and presentation", "Mock interviews", "Design articulation and confidence"] }
-              ].map((phase, i) => (
-                <div key={i} className="bg-white/5 border border-white/10 p-6 md:p-8 rounded-2xl flex flex-col md:flex-row gap-6">
-                  <div className="md:w-1/3">
-                    <div className="text-primary font-mono text-sm mb-2">{phase.weeks}</div>
-                    <h3 className="text-2xl font-heading">{phase.phase}</h3>
+                { 
+                  phase: "Phase 1: Design Foundation", 
+                  weeks: "Week 1 – Week 4", 
+                  goal: "Build strong fundamentals in drawing, observation and visual communication",
+                  items: ["Basics of lines, forms and perspective", "Light, shadow and object rendering", "Composition and layout techniques", "Elements and principles of design", "Observation-based sketching", "Introduction to visual storytelling", "Material exploration: textures, folds and shading", "Introduction to design process thinking"] 
+                },
+                { 
+                  phase: "Phase 2: Creativity & Idea Expansion", 
+                  weeks: "Week 5 – Week 8", 
+                  goal: "Strengthen ideation, creativity and design thinking",
+                  items: ["Brainstorming and lateral thinking tools (SCAMPER, mind mapping)", "Creative problem solving methods", "Enhancing visual imagination", "Thumbnail ideation techniques", "Understanding form, function and context", "Redesign challenges (product improvement exercises)", "Storyboarding and visual narratives", "Introduction to product design and visual communication"] 
+                },
+                { 
+                  phase: "Phase 3: Understanding the Exam Pattern", 
+                  weeks: "Week 9 – Week 12", 
+                  goal: "Familiarize students with actual exam formats and question styles",
+                  groups: [
+                    { title: "UCEED Preparation", items: ["Numerical aptitude", "Spatial reasoning", "Logical reasoning", "Language comprehension"] },
+                    { title: "NID DAT Preparation", items: ["Creative aptitude questions", "Drawing-based problem solving", "Design awareness and general knowledge"] },
+                    { title: "Additional Training", items: ["Past year paper analysis", "Understanding evaluation criteria", "Answer presentation techniques", "Time-bound exercises and practice"] }
+                  ]
+                },
+                { 
+                  phase: "Phase 4: Intensive Practice & Skill Development", 
+                  weeks: "Week 13 – Week 24", 
+                  goal: "Build speed, confidence and consistency",
+                  items: ["Full-length exam simulations", "Weekly assignments with critique", "Peer feedback and review sessions", "Topic-wise question solving", "Sketch speed improvement", "Creative ideation challenges", "Alternate problem-solving approaches", "Time management strategies"] 
+                },
+                { 
+                  phase: "Phase 5: Revision & Performance Tuning", 
+                  weeks: "Week 25 – Week 28", 
+                  goal: "Strengthen answer quality and visual communication",
+                  items: ["Revision of core concepts", "Improving sketch clarity and presentation", "Structuring answers effectively", "Handling unfamiliar or unexpected questions", "Practicing product and scenario-based questions", "Mental preparation for exam performance"] 
+                },
+                { 
+                  phase: "Phase 6: Full Mock Test Simulation", 
+                  weeks: "Week 29 – Week 32", 
+                  goal: "Simulate real exam conditions",
+                  items: ["Multiple full-length mock tests (NID + UCEED format)", "Detailed evaluation and feedback", "Score analysis and improvement strategy", "Final exam preparation guidance"] 
+                },
+                { 
+                  stageTitle: "Stage 2 — Mains Preparation", 
+                  stageSubtitle: "Week 33 – Week 40 | NID Studio Test • IIT Design Interviews • Portfolio Evaluation", 
+                  isStageDivider: true 
+                },
+                { 
+                  phase: "Phase 7: Studio Test Fundamentals", 
+                  weeks: "Week 33 – Week 34", 
+                  goal: "Understand studio test formats and expectations",
+                  items: ["Understanding NID and IIT studio test structures", "Interpreting open-ended design briefs", "Framing problems clearly", "Creative ideation under time constraints", "Structured thinking within constraints", "Common studio-test mistakes and solutions"] 
+                },
+                { 
+                  phase: "Phase 8: Material Exploration & Model Making", 
+                  weeks: "Week 35 – Week 36", 
+                  goal: "Translate ideas into physical models and prototypes",
+                  groups: [
+                    { title: "Material Exploration", items: ["Material exploration using paper, wire, thermocol, clay and found objects", "Understanding structure, balance and stability", "Innovation with limited materials", "Model-making techniques for speed and clarity", "Functional and conceptual prototyping", "Studio test simulations under timed conditions"] },
+                    { title: "Portfolio Learning", items: ["Documenting experiments and iterations", "Presenting failures and learning processes", "Building process-driven projects"] }
+                  ]
+                },
+                { 
+                  phase: "Phase 9: Portfolio Development", 
+                  weeks: "Week 37 – Week 38", 
+                  goal: "Build a clear and impactful design portfolio",
+                  items: ["What design colleges look for in portfolios", "Selecting and structuring projects", "Writing concept statements and project descriptions", "Visual storytelling through layout and hierarchy", "Documenting models and prototypes", "Customising portfolios for different institutes"] 
+                },
+                { 
+                  phase: "Phase 10: Studio Test Simulation & Interview Preparation", 
+                  weeks: "Week 39 – Week 40", 
+                  goal: "Final preparation for studio tests and interviews",
+                  items: ["Real studio test simulations", "Portfolio review sessions", "Mock interviews with expert feedback", "Communication and storytelling training", "Confidence building and presentation practice", "Final strategy for NID and IIT interviews"] 
+                }
+              ].map((item, i) => {
+                if (item.isStageDivider) {
+                  return (
+                    <div key={i} className="mt-16 mb-8 pt-16 border-t border-white/10 text-center relative">
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#111111] px-4 text-white/40">
+                        <CheckCircle2 className="w-8 h-8" />
+                      </div>
+                      <h3 className="text-3xl md:text-4xl font-heading text-white mb-3">{item.stageTitle}</h3>
+                      <p className="text-primary font-medium text-lg md:text-xl tracking-wide">{item.stageSubtitle}</p>
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div key={i} className="bg-white/5 border border-white/10 p-6 md:p-8 rounded-3xl flex flex-col lg:flex-row gap-6 md:gap-10 hover:bg-white/[0.07] transition-colors duration-300">
+                    <div className="lg:w-1/3 shrink-0">
+                      <div className="inline-block bg-primary/10 text-primary font-mono text-sm px-4 py-1.5 rounded-full mb-5 font-medium border border-primary/20">{item.weeks}</div>
+                      <h3 className="text-2xl font-heading mb-4 text-white/90 leading-tight">{item.phase}</h3>
+                      <div className="bg-background/20 rounded-xl p-4 border-l-2 border-primary/50">
+                        <p className="text-white/70 text-sm leading-relaxed italic">
+                          "{item.goal}"
+                        </p>
+                      </div>
+                    </div>
+                    <div className="lg:w-2/3">
+                      {item.items && (
+                        <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
+                          {item.items.map((listItem, j) => (
+                            <li key={j} className="flex items-start gap-3 text-white/80 text-sm group">
+                              <div className="w-5 h-5 rounded-full bg-white/5 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-primary/20 transition-colors">
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                              </div>
+                              <span className="leading-relaxed group-hover:text-white transition-colors">{listItem}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      
+                      {item.groups && (
+                        <div className="space-y-8">
+                          {item.groups.map((group, gIdx) => (
+                            <div key={gIdx} className="bg-white/5 rounded-2xl p-5 border border-white/5">
+                              <h4 className="text-white/90 font-medium mb-4 text-sm uppercase tracking-widest flex items-center gap-2">
+                                <span className="w-8 h-px bg-primary/50"></span>
+                                {group.title}
+                              </h4>
+                              <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
+                                {group.items.map((listItem, j) => (
+                                  <li key={j} className="flex items-start gap-3 text-white/70 text-sm group">
+                                    <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-white/30 group-hover:bg-primary transition-colors" />
+                                    </div>
+                                    <span className="leading-relaxed group-hover:text-white/90 transition-colors">{listItem}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="md:w-2/3">
-                    <ul className="grid sm:grid-cols-2 gap-3">
-                      {phase.items.map((item, j) => (
-                        <li key={j} className="flex items-start gap-2 text-white/70 text-sm">
-                          <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
