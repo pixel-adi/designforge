@@ -115,15 +115,15 @@ export function Hero() {
         <div className="hero-image-container w-full mt-24 relative flex justify-center z-20">
           <div className="hero-image relative w-full min-h-[400px] md:min-h-[500px] bg-white/40 backdrop-blur-2xl rounded-[2rem] md:rounded-[3rem] border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] overflow-hidden flex items-center justify-center p-6 md:p-12">
             
-            {/* Abstract fluid shapes inside the glass container - Enlarged for bigger gradients */}
-            <div className="shape-1 organic-blob absolute top-[-10%] left-[-5%] w-72 h-72 md:w-[35rem] md:h-[35rem] bg-pop-1/80 mix-blend-multiply filter blur-3xl opacity-70"></div>
-            <div className="shape-2 organic-blob absolute bottom-[-10%] right-[-5%] w-80 h-80 md:w-[40rem] md:h-[40rem] bg-pop-2/60 mix-blend-multiply filter blur-3xl opacity-70"></div>
-            <div className="shape-3 organic-blob absolute top-1/4 left-1/4 w-96 h-96 md:w-[45rem] md:h-[45rem] bg-pop-3/60 mix-blend-multiply filter blur-3xl opacity-70"></div>
+            {/* Abstract fluid shapes inside the glass container - Reduced scale and opacity */}
+            <div className="shape-1 organic-blob absolute top-[10%] left-[5%] w-20 h-20 md:w-[9rem] md:h-[9rem] bg-pop-1/30 mix-blend-multiply filter blur-xl opacity-[22%]"></div>
+            <div className="shape-2 organic-blob absolute bottom-[10%] right-[5%] w-24 h-24 md:w-[10rem] md:h-[10rem] bg-pop-2/20 mix-blend-multiply filter blur-xl opacity-[22%]"></div>
+            <div className="shape-3 organic-blob absolute top-1/4 left-1/4 w-28 h-28 md:w-[11rem] md:h-[11rem] bg-pop-3/20 mix-blend-multiply filter blur-xl opacity-[22%]"></div>
 
             {/* Foreground crisp elements */}
-            <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 md:gap-6 w-full">
+            <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 md:gap-6 w-full mt-4 md:mt-8">
                
-               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]">
+               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center transform md:translate-y-4 md:-rotate-12 hover:rotate-0 hover:translate-y-0 transition-all duration-500 min-h-[220px]">
                   <div className="w-14 h-14 rounded-2xl bg-pop-1/10 flex items-center justify-center mb-4">
                      <svg className="w-7 h-7 text-pop-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                   </div>
@@ -131,7 +131,7 @@ export function Hero() {
                   <p className="text-xs text-foreground/60 text-center">Focus on creating real impact</p>
                </div>
                
-               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center md:translate-y-6 min-h-[220px]">
+               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center transform md:-translate-y-12 md:rotate-6 hover:rotate-0 hover:-translate-y-16 transition-all duration-500 min-h-[220px]">
                   <div className="w-14 h-14 rounded-2xl bg-pop-2/10 flex items-center justify-center mb-4">
                      <svg className="w-7 h-7 text-pop-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
                   </div>
@@ -139,7 +139,7 @@ export function Hero() {
                   <p className="text-xs text-foreground/60 text-center">Break traditional patterns</p>
                </div>
                
-               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-black/5 flex flex-col items-center justify-center md:-translate-y-4 md:scale-105 z-20 min-h-[240px]">
+               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-black/5 flex flex-col items-center justify-center transform md:translate-y-8 md:scale-110 md:-rotate-3 z-20 hover:scale-[1.15] hover:-translate-y-4 hover:rotate-0 transition-all duration-500 min-h-[240px]">
                   <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center mb-5 rotate-6">
                      <svg className="w-8 h-8 text-primary -rotate-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
                   </div>
@@ -147,7 +147,7 @@ export function Hero() {
                   <p className="text-xs text-foreground/60 text-center">Mentorship over coaching</p>
                </div>
 
-               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center md:translate-y-6 min-h-[220px]">
+               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center transform md:-translate-y-16 md:rotate-12 hover:rotate-0 hover:-translate-y-20 transition-all duration-500 min-h-[220px]">
                   <div className="w-14 h-14 rounded-2xl bg-pop-3/10 flex items-center justify-center mb-4">
                      <svg className="w-7 h-7 text-pop-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                   </div>
@@ -155,7 +155,7 @@ export function Hero() {
                   <p className="text-xs text-foreground/60 text-center">Depth beyond just exams</p>
                </div>
 
-               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]">
+               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center transform md:translate-y-2 md:-rotate-8 hover:rotate-0 hover:-translate-y-2 transition-all duration-500 min-h-[220px]">
                   <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center mb-4">
                      <svg className="w-7 h-7 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                   </div>
