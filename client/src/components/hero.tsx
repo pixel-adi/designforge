@@ -17,7 +17,7 @@ export function Hero() {
         .fromTo(".hero-desc", { y: 15, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 }, "-=0.5")
         .fromTo(".hero-btn", { y: 15, opacity: 0, scale: 0.95 }, { y: 0, opacity: 1, scale: 1, duration: 0.5, stagger: 0.1 }, "-=0.4")
         .fromTo(".hero-image", { opacity: 0, scale: 0.95, y: 20 }, { opacity: 1, scale: 1, y: 0, duration: 1, ease: "power2.out" }, "-=0.6")
-        .fromTo(".hero-sketchbook", { x: 100, opacity: 0, rotation: 25 }, { x: 0, opacity: 0.7, rotation: 12, duration: 1.5, ease: "power2.out" }, "-=1");
+        .fromTo(".hero-sketchbook", { y: -20, opacity: 0, rotation: -10 }, { y: 0, opacity: 0.9, rotation: 12, duration: 1, ease: "back.out(1.5)" }, "-=0.8");
 
       // Continuous fluid animation for shapes
       gsap.to(".shape-1", {
@@ -31,11 +31,6 @@ export function Hero() {
       gsap.to(".shape-3", {
         scale: 1.1, rotation: 5,
         duration: 3, repeat: -1, yoyo: true, ease: "sine.inOut", delay: 0.5
-      });
-      
-      gsap.to(".hero-sketchbook", {
-        y: 25, rotation: 15,
-        duration: 5, repeat: -1, yoyo: true, ease: "sine.inOut"
       });
 
       // Parallax effect on scroll
@@ -64,17 +59,19 @@ export function Hero() {
         <div className="absolute bottom-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-primary/10 rounded-full blur-[120px]"></div>
       </div>
 
-      {/* Decorative Sketchbook */}
-      <div className="hero-sketchbook absolute top-0 -right-32 sm:-right-20 md:top-10 md:-right-32 lg:-right-10 w-[350px] md:w-[500px] lg:w-[650px] z-0 opacity-40 md:opacity-70 rotate-12 pointer-events-none">
-        <img src={sketchbookImg} alt="Design Sketchbook" className="w-full h-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.15)]" />
-      </div>
-
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col items-center text-center">
         
-        <div className="max-w-4xl mx-auto flex flex-col items-center">
-          <div className="hero-badge inline-flex items-center gap-2 px-5 py-2 bg-white/60 backdrop-blur-md border border-white/80 rounded-full text-sm font-medium text-foreground mb-10 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-            A new era of design preparation
+        <div className="max-w-4xl mx-auto flex flex-col items-center mt-8">
+          <div className="relative inline-block">
+            {/* Decorative Sketchbook */}
+            <div className="hero-sketchbook absolute -top-8 -right-8 w-16 md:w-20 z-30 opacity-100 rotate-12 pointer-events-none">
+              <img src={sketchbookImg} alt="Design Sketchbook" className="w-full h-auto drop-shadow-md" />
+            </div>
+            
+            <div className="hero-badge relative inline-flex items-center gap-2 px-5 py-2 bg-white/60 backdrop-blur-md border border-white/80 rounded-full text-sm font-medium text-foreground mb-10 shadow-sm z-20">
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+              A new era of design preparation
+            </div>
           </div>
           
           <h1 className="hero-title text-5xl md:text-7xl lg:text-[5.5rem] font-heading leading-[1.05] mb-8 text-foreground tracking-tight transform-style-3d">
