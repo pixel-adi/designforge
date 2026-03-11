@@ -562,10 +562,10 @@ export default function AboutPage() {
         </section>
 
         {/* SECTION 10: MISSION */}
-        <section className="py-24 bg-foreground text-background text-center animate-section relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/50"></div>
+        <section className="pt-24 pb-32 bg-[#111111] text-white text-center animate-section relative z-10">
+          <div className="absolute inset-0 bg-gradient-to-b from-foreground/50 to-[#111111]"></div>
           
-          <div className="container mx-auto px-4 max-w-4xl relative z-10">
+          <div className="container mx-auto px-4 max-w-4xl relative z-20">
             {/* MISSION */}
             <div>
               <div className="text-primary font-mono text-sm uppercase tracking-widest mb-4">Our Mission</div>
@@ -575,10 +575,11 @@ export default function AboutPage() {
             </div>
           </div>
         </section>
-
       </main>
       
-      <Footer />
+      <div className="bg-[#111111] relative z-20 -mt-10">
+        <Footer />
+      </div>
     </div>
   );
 }
