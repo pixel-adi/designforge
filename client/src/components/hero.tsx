@@ -18,7 +18,34 @@ export function Hero() {
         .fromTo(".hero-btn", { y: 15, opacity: 0, scale: 0.95 }, { y: 0, opacity: 1, scale: 1, duration: 0.5, stagger: 0.1 }, "-=0.4")
         .fromTo(".hero-image", { opacity: 0, scale: 0.95, y: 20 }, { opacity: 1, scale: 1, y: 0, duration: 1, ease: "power2.out" }, "-=0.6")
         .fromTo(".hero-sketchbook", { y: -20, opacity: 0 }, { y: 0, opacity: 1, duration: 1, ease: "back.out(1.5)" }, "-=0.8")
-        .fromTo(".hero-card", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, stagger: 0.1, ease: "back.out(1.2)" }, "-=0.6");
+        .fromTo(".hero-card", 
+          { y: 100, opacity: 0, scale: 0.5, rotation: (i, el) => parseFloat(el.dataset.rotate || '0') + (i % 2 === 0 ? -25 : 25) }, 
+          { 
+            y: (i, el) => parseFloat(el.dataset.y || '0'), 
+            opacity: 1, 
+            scale: (i, el) => parseFloat(el.dataset.scale || '1'), 
+            rotation: (i, el) => parseFloat(el.dataset.rotate || '0'), 
+            duration: 1.2, 
+            stagger: 0.1, 
+            ease: "back.out(1.5)" 
+          }, 
+          "-=0.6"
+        );
+
+      const cards = gsap.utils.toArray('.hero-card');
+      cards.forEach((card: any) => {
+        const targetY = parseFloat(card.dataset.y || '0');
+        const targetRotate = parseFloat(card.dataset.rotate || '0');
+        const targetScale = parseFloat(card.dataset.scale || '1');
+        
+        card.addEventListener('mouseenter', () => {
+          gsap.to(card, { rotation: 0, y: targetY - 15, scale: targetScale + 0.05, duration: 0.4, ease: "power2.out", overwrite: "auto" });
+        });
+        
+        card.addEventListener('mouseleave', () => {
+          gsap.to(card, { rotation: targetRotate, y: targetY, scale: targetScale, duration: 0.4, ease: "power2.out", overwrite: "auto" });
+        });
+      });
 
       // Continuous fluid animation for shapes
       gsap.to(".shape-1", {
@@ -35,12 +62,13 @@ export function Hero() {
       });
 
       // Gentle floating animation for cards
-      gsap.to(".hero-card", {
-        y: "-=12",
+      gsap.to(".hero-card-wrapper", {
+        y: "-=15",
         duration: 2.5,
         repeat: -1,
         yoyo: true,
         ease: "sine.inOut",
+        delay: 1.5,
         stagger: {
           each: 0.2,
           from: "random"
@@ -123,44 +151,54 @@ export function Hero() {
             {/* Foreground crisp elements */}
             <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 md:gap-6 w-full mt-4 md:mt-8">
                
-               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center transform md:translate-y-4 md:-rotate-12 hover:rotate-0 hover:translate-y-0 transition-all duration-500 min-h-[220px]">
-                  <div className="w-14 h-14 rounded-2xl bg-pop-1/10 flex items-center justify-center mb-4">
-                     <svg className="w-7 h-7 text-pop-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                  </div>
-                  <h3 className="font-heading text-lg text-foreground mb-2">Build Value</h3>
-                  <p className="text-xs text-foreground/60 text-center">Focus on creating real impact</p>
+               <div className="hero-card-wrapper z-10">
+                 <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]" data-rotate="-12" data-y="16" data-scale="1">
+                    <div className="w-14 h-14 rounded-2xl bg-pop-1/10 flex items-center justify-center mb-4">
+                       <svg className="w-7 h-7 text-pop-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    </div>
+                    <h3 className="font-heading text-lg text-foreground mb-2">Build Value</h3>
+                    <p className="text-xs text-foreground/60 text-center">Focus on creating real impact</p>
+                 </div>
                </div>
                
-               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center transform md:-translate-y-12 md:rotate-6 hover:rotate-0 hover:-translate-y-16 transition-all duration-500 min-h-[220px]">
-                  <div className="w-14 h-14 rounded-2xl bg-pop-2/10 flex items-center justify-center mb-4">
-                     <svg className="w-7 h-7 text-pop-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                  </div>
-                  <h3 className="font-heading text-lg text-foreground mb-2">Think Different</h3>
-                  <p className="text-xs text-foreground/60 text-center">Break traditional patterns</p>
+               <div className="hero-card-wrapper z-10">
+                 <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]" data-rotate="6" data-y="-48" data-scale="1">
+                    <div className="w-14 h-14 rounded-2xl bg-pop-2/10 flex items-center justify-center mb-4">
+                       <svg className="w-7 h-7 text-pop-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                    </div>
+                    <h3 className="font-heading text-lg text-foreground mb-2">Think Different</h3>
+                    <p className="text-xs text-foreground/60 text-center">Break traditional patterns</p>
+                 </div>
                </div>
                
-               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-black/5 flex flex-col items-center justify-center transform md:translate-y-8 md:scale-110 md:-rotate-3 z-20 hover:scale-[1.15] hover:-translate-y-4 hover:rotate-0 transition-all duration-500 min-h-[240px]">
-                  <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center mb-5 rotate-6">
-                     <svg className="w-8 h-8 text-primary -rotate-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
-                  </div>
-                  <h3 className="font-heading text-xl text-foreground mb-2">Gain Clarity</h3>
-                  <p className="text-xs text-foreground/60 text-center">Mentorship over coaching</p>
+               <div className="hero-card-wrapper z-20">
+                 <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[240px]" data-rotate="-3" data-y="32" data-scale="1.1">
+                    <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center mb-5 rotate-6">
+                       <svg className="w-8 h-8 text-primary -rotate-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                    </div>
+                    <h3 className="font-heading text-xl text-foreground mb-2">Gain Clarity</h3>
+                    <p className="text-xs text-foreground/60 text-center">Mentorship over coaching</p>
+                 </div>
                </div>
 
-               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center transform md:-translate-y-16 md:rotate-12 hover:rotate-0 hover:-translate-y-20 transition-all duration-500 min-h-[220px]">
-                  <div className="w-14 h-14 rounded-2xl bg-pop-3/10 flex items-center justify-center mb-4">
-                     <svg className="w-7 h-7 text-pop-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                  </div>
-                  <h3 className="font-heading text-lg text-foreground mb-2">Grow Layers</h3>
-                  <p className="text-xs text-foreground/60 text-center">Depth beyond just exams</p>
+               <div className="hero-card-wrapper z-10">
+                 <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]" data-rotate="12" data-y="-64" data-scale="1">
+                    <div className="w-14 h-14 rounded-2xl bg-pop-3/10 flex items-center justify-center mb-4">
+                       <svg className="w-7 h-7 text-pop-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                    </div>
+                    <h3 className="font-heading text-lg text-foreground mb-2">Grow Layers</h3>
+                    <p className="text-xs text-foreground/60 text-center">Depth beyond just exams</p>
+                 </div>
                </div>
 
-               <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center transform md:translate-y-2 md:-rotate-8 hover:rotate-0 hover:-translate-y-2 transition-all duration-500 min-h-[220px]">
-                  <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center mb-4">
-                     <svg className="w-7 h-7 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                  </div>
-                  <h3 className="font-heading text-lg text-foreground mb-2">Lead Future</h3>
-                  <p className="text-xs text-foreground/60 text-center">Become an industry leader</p>
+               <div className="hero-card-wrapper z-10">
+                 <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]" data-rotate="-8" data-y="8" data-scale="1">
+                    <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center mb-4">
+                       <svg className="w-7 h-7 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                    <h3 className="font-heading text-lg text-foreground mb-2">Lead Future</h3>
+                    <p className="text-xs text-foreground/60 text-center">Become an industry leader</p>
+                 </div>
                </div>
                
             </div>
