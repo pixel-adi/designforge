@@ -577,7 +577,6 @@ export default function AboutPage() {
             <div className="w-full h-px bg-white/10 mb-20"></div>
             
             {/* FINAL CTA */}
-            <h2 className="text-4xl md:text-5xl font-heading mb-6">From access to growth, the mission continues</h2>
             
             <p className="text-xl text-background/70 mb-8 leading-relaxed font-light">
               From Whitespace Design Foundation to Designforge, the name has evolved, but the purpose has remained the same: to help people learn, think, and grow through design.
