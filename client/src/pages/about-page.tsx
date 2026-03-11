@@ -323,12 +323,6 @@ export default function AboutPage() {
                     </li>
                   ))}
                 </ul>
-                
-                <div className="p-6 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-sm">
-                  <p className="text-white/80 leading-relaxed">
-                    Our programs are designed to be immersive, practical, and growth-oriented. We focus not only on helping learners clear exams or improve portfolios, but on helping them develop the mindset and confidence needed to grow as designers over time.
-                  </p>
-                </div>
               </div>
               
               <div className="lg:w-1/2 flex items-center justify-center">
