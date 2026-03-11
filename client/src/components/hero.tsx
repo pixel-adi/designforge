@@ -17,7 +17,7 @@ export function Hero() {
         .fromTo(".hero-desc", { y: 15, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6 }, "-=0.5")
         .fromTo(".hero-btn", { y: 15, opacity: 0, scale: 0.95 }, { y: 0, opacity: 1, scale: 1, duration: 0.5, stagger: 0.1 }, "-=0.4")
         .fromTo(".hero-image", { opacity: 0, scale: 0.95, y: 20 }, { opacity: 1, scale: 1, y: 0, duration: 1, ease: "power2.out" }, "-=0.6")
-        .fromTo(".hero-sketchbook", { y: -20, opacity: 0, rotation: -10 }, { y: 0, opacity: 0.9, rotation: 12, duration: 1, ease: "back.out(1.5)" }, "-=0.8");
+        .fromTo(".hero-sketchbook", { y: -20, opacity: 0 }, { y: 0, opacity: 1, duration: 1, ease: "back.out(1.5)" }, "-=0.8");
 
       // Continuous fluid animation for shapes
       gsap.to(".shape-1", {
@@ -61,14 +61,14 @@ export function Hero() {
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col items-center text-center">
         
-        <div className="max-w-4xl mx-auto flex flex-col items-center mt-8">
+        <div className="max-w-4xl mx-auto flex flex-col items-center mt-16">
           <div className="relative inline-block">
             {/* Decorative Sketchbook */}
-            <div className="hero-sketchbook absolute -top-8 -right-8 w-16 md:w-20 z-30 opacity-100 rotate-12 pointer-events-none">
+            <div className="hero-sketchbook absolute -top-16 left-1/2 -translate-x-1/2 w-24 md:w-28 z-30 opacity-100 pointer-events-none">
               <img src={sketchbookImg} alt="Design Sketchbook" className="w-full h-auto drop-shadow-md" />
             </div>
             
-            <div className="hero-badge relative inline-flex items-center gap-2 px-5 py-2 bg-white/60 backdrop-blur-md border border-white/80 rounded-full text-sm font-medium text-foreground mb-10 shadow-sm z-20">
+            <div className="hero-badge relative inline-flex items-center gap-2 px-5 py-2 bg-white/60 backdrop-blur-md border border-white/80 rounded-full text-sm font-medium text-foreground mb-10 shadow-sm z-20 mt-4">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
               A new era of design preparation
             </div>
