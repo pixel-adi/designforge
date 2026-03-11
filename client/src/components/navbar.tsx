@@ -1,5 +1,12 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 
 export function Navbar() {
@@ -20,14 +27,31 @@ export function Navbar() {
             </Link>
           </div>
 
-          <nav className="hidden xl:flex items-center gap-6 bg-white/50 px-6 py-3 rounded-full border border-white/40 shadow-sm">
+          <nav className="hidden xl:flex items-center gap-6 bg-white/50 px-6 py-3 rounded-full border border-white/40">
             <Link href="/about" className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">About</Link>
             <Link href="/apprenticeship" className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Apprenticeship</Link>
             <Link href="/mentorship" className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Mentorship</Link>
-            <Link href="/results" className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Results</Link>
-            <Link href="/community" className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Community</Link>
-            <Link href="/events" className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Events</Link>
-            <Link href="/join-us" className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Join Us</Link>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide flex items-center gap-1 outline-none">
+                Community <ChevronDown className="w-4 h-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem asChild>
+                  <Link href="/community" className="w-full cursor-pointer">Community Hub</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/results" className="w-full cursor-pointer">Results</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/events" className="w-full cursor-pointer">Events</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/join-us" className="w-full cursor-pointer">Join Us</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Link href="/focus-batch" className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Focus Batch</Link>
           </nav>
           
