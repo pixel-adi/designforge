@@ -1,0 +1,261 @@
+Build a premium, trustworthy, modern “About Us” page for the Designforge website.
+
+Brand context:
+Designforge is a mentorship-led design learning ecosystem helping aspirants, students, and early professionals grow through design education, mentorship, portfolio support, interview guidance, and community.
+
+Important brand history:
+Designforge was originally founded as “Whitespace Design Foundation” in 2015.
+It was renamed as “Designforge” in 2025 to extend the same mission and vision of democratising design with a clearer identity and broader community focus.
+
+Tone:
+- Trustworthy
+- Warm
+- Mission-led
+- Premium but approachable
+- Serious, not overhyped
+- Community-driven
+- Should not sound like a generic coaching institute
+
+Goal of page:
+- Build credibility and emotional trust
+- Clearly tell the story of the brand
+- Show legacy from Whitespace Design Foundation to Designforge
+- Highlight mission, learning philosophy, mentor ecosystem, and impact
+- Add mentor section
+- Add logo carousel section for institutions and companies associated with mentors/collaborators
+- Encourage users to explore programs or join community
+
+Visual direction:
+- Clean editorial layout
+- Spacious design
+- Premium typography
+- Soft sections/cards
+- Use image placeholders for mentors
+- Use a horizontal logo carousel for colleges/companies
+- Responsive across desktop/mobile
+- Add subtle animations if possible
+- Keep it elegant and high-trust
+
+Use this exact content structure:
+
+--------------------------------------------------
+SECTION 1: HERO
+--------------------------------------------------
+Eyebrow:
+About Designforge
+
+Heading:
+Built to make design more accessible, practical, and empowering
+
+Subheading:
+Designforge is a mentorship-led design learning ecosystem helping aspirants, students, and early professionals grow through design education, guidance, and community.
+
+Body:
+Founded in 2015 as Whitespace Design Foundation and renamed as Designforge in 2025, our journey has been driven by one core mission: to democratise design and make meaningful design learning more reachable, affordable, and relevant.
+
+Trust line:
+7000+ students and professionals supported since 2015
+
+--------------------------------------------------
+SECTION 2: OUR STORY
+--------------------------------------------------
+Heading:
+Where the journey began
+
+Text:
+Designforge began as Whitespace Design Foundation in 2015 with a simple but important belief: talented people exist everywhere, but access to quality design guidance often does not.
+
+At a time when exposure to design was limited across many engineering colleges and institutions, we started building pathways for students and professionals to discover design in a more practical, affordable, and approachable way. The focus was never just on teaching tools or theory, but on helping learners understand design thinking, creative problem-solving, and product innovation through real, hands-on learning.
+
+Over the years, that effort grew into a wider ecosystem of mentorship, training, and community support for people from different backgrounds entering the world of design.
+
+--------------------------------------------------
+SECTION 3: FROM WHITESPACE TO DESIGNFORGE
+--------------------------------------------------
+Heading:
+Why we became Designforge
+
+Text:
+In 2025, Whitespace Design Foundation evolved into Designforge.
+
+This was not a change in mission, but a clearer expression of it. The new identity was created to take the original vision further — from making design accessible, to building a stronger and more active ecosystem for mentoring the next generation of designers.
+
+The name Designforge reflects what we stand for: helping people shape their journey through practice, critique, mentorship, and community.
+
+What changed was the scale and clarity. What stayed the same was the intent.
+
+--------------------------------------------------
+SECTION 4: WHAT WE DO
+--------------------------------------------------
+Heading:
+What Designforge does
+
+Intro:
+Designforge supports learners across different stages of the design journey through focused, practical, and mentorship-led experiences.
+
+Use 4 cards:
+
+Card 1:
+Design Learning and Mentorship
+We create structured learning experiences that help students and early professionals build strong foundations in design thinking, creativity, visual communication, and problem-solving.
+
+Card 2:
+Entrance Preparation
+We mentor aspirants preparing for NID DAT, UCEED, and CEED through guided practice, critique, one-to-one feedback, and stronger creative confidence.
+
+Card 3:
+Portfolio and Interview Guidance
+We help learners improve how they present their work, articulate their thinking, and prepare for studio tests, portfolios, and interviews with greater clarity.
+
+Card 4:
+Community-Led Growth
+We are building a learning ecosystem where aspirants and young designers can access support, stay motivated, learn together, and grow in a more connected way.
+
+--------------------------------------------------
+SECTION 5: WHAT WE BELIEVE
+--------------------------------------------------
+Heading:
+What we believe
+
+Text:
+We believe design should not feel distant, expensive, or restricted to a few people with access.
+
+Today, the need for design thinking, innovation, product understanding, and user-centered problem-solving is stronger than ever. But for many students and professionals, the path into design still feels unclear or unaffordable.
+
+Designforge exists to reduce that gap by making design learning:
+- more accessible
+- more affordable
+- more practical
+- more mentorship-led
+- more rooted in real growth
+
+Closing line:
+Our goal is not just to help learners start, but to help them move forward with clarity and confidence.
+
+--------------------------------------------------
+SECTION 6: HOW WE MENTOR
+--------------------------------------------------
+Heading:
+How we mentor and teach
+
+Text:
+At Designforge, we believe meaningful design learning comes from a balance of:
+- strong fundamentals
+- hands-on practice
+- observation and critical thinking
+- honest feedback
+- reflection and iteration
+- real-world problem solving
+
+Our programs are designed to be immersive, practical, and growth-oriented. We focus not only on helping learners clear exams or improve portfolios, but on helping them develop the mindset and confidence needed to grow as designers over time.
+
+--------------------------------------------------
+SECTION 7: MENTOR SECTION
+--------------------------------------------------
+Heading:
+Mentored by people who understand both the journey and the profession
+
+Text:
+Designforge is shaped by mentors who bring together lived experience from design education, industry practice, and real student guidance.
+
+Our mentors include designers, NIDans, IITians, and professionals who support learners across:
+- design entrance preparation
+- portfolio building
+- interview readiness
+- design thinking and problem solving
+- early career growth
+
+Closing line:
+More than teaching, our mentors help students think deeper, improve through critique, and gain confidence through consistent guidance.
+
+Create mentor cards with image placeholders and content placeholders for:
+- Aditya Sharma — Founder / Mentor / Design Leader
+- Siddhi Patil — Co-founder / Mentor
+- Additional mentor cards
+
+Each mentor card should have:
+- photo placeholder
+- name
+- role/title
+- short bio
+- expertise tags
+- associated institution/company placeholder
+
+--------------------------------------------------
+SECTION 8: LOGO CAROUSEL
+--------------------------------------------------
+Heading:
+Connected to respected institutions and industry experience
+
+Text:
+Our broader mentor and collaborator network brings together experiences associated with leading design institutes, academic pathways, and industry practice. This helps learners benefit from both admission-focused mentorship and a wider understanding of design as a profession.
+
+Add a horizontal scrolling logo carousel with placeholders for:
+- prestigious colleges
+- design institutes
+- IITs
+- NID
+- relevant design-led companies/studios
+- mentor/company affiliations
+
+Important:
+Only verified associations should be shown.
+
+--------------------------------------------------
+SECTION 9: IMPACT
+--------------------------------------------------
+Heading:
+The journey so far
+
+Text:
+Since our beginnings as Whitespace Design Foundation, and now as Designforge, we have supported 7000+ students and industry professionals through mentorship, learning programs, practice sessions, and design-focused initiatives.
+
+This journey has included helping learners:
+- discover design as a serious path
+- strengthen creative thinking and problem-solving
+- prepare for institutes like NID and IITs
+- improve portfolios, interviews, and design confidence
+- access design learning in a more affordable and approachable way
+
+Closing line:
+For us, this impact is not just a number. It reflects trust, continuity, and the responsibility to keep making design more reachable.
+
+--------------------------------------------------
+SECTION 10: MISSION
+--------------------------------------------------
+Heading:
+Our mission
+
+Text:
+To democratise design by making design education, mentorship, and growth opportunities more accessible, affordable, and relevant for aspirants, students, and early professionals.
+
+--------------------------------------------------
+SECTION 11: FINAL CTA
+--------------------------------------------------
+Heading:
+From access to growth, the mission continues
+
+Text:
+From Whitespace Design Foundation to Designforge, the name has evolved, but the purpose has remained the same: to help people learn, think, and grow through design.
+
+Designforge continues this journey by building a more inclusive, credible, and supportive design ecosystem — one where talent is not held back by lack of access, and where meaningful mentorship can truly shape creative futures.
+
+Buttons:
+- Explore Programs
+- Meet Our Mentors
+- Join the Community
+
+--------------------------------------------------
+TECHNICAL / UI NOTES
+--------------------------------------------------
+- Build this as a premium About page
+- Sticky navigation if needed
+- Use soft section dividers
+- Add mentor card grid
+- Add logo carousel section
+- Add subtle motion on scroll
+- Use image placeholders for mentors
+- Use logo placeholders for institutions and companies
+- Ensure mobile responsiveness
+- Keep the page highly readable and not too text-heavy
+- Use strong hierarchy for headings and trust signals

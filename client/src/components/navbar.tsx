@@ -42,7 +42,7 @@ export function Navbar() {
           </div>
 
           <nav className="hidden lg:flex items-center gap-3 xl:gap-6 px-4 xl:px-6 py-2.5 bg-transparent border-none">
-            <Link href="/about" className="text-xs xl:text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">About</Link>
+            <Link href="/about" className={`text-xs xl:text-sm font-medium transition-colors tracking-wide whitespace-nowrap ${location === '/about' ? 'text-primary' : 'text-foreground/70 hover:text-primary'}`}>About</Link>
             <Link href="/apprenticeship" className="text-xs xl:text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Apprenticeship</Link>
             <Link href="/mentorship" className="text-xs xl:text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Mentorship</Link>
             

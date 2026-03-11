@@ -11,6 +11,7 @@ import Results from "@/pages/results";
 import Community from "@/pages/community";
 import Events from "@/pages/events";
 import FocusBatchPage from "@/pages/focus-batch-page";
+import AboutPage from "@/pages/about-page";
 
 function Router() {
   return (
@@ -18,7 +19,7 @@ function Router() {
       <ScrollToTop />
       <Switch>
         <Route path="/" component={Home}/>
-        <Route path="/about" component={Home}/>
+        <Route path="/about" component={AboutPage}/>
         <Route path="/apprenticeship" component={Home}/>
         <Route path="/join-us" component={Home}/>
         <Route path="/mentorship" component={Mentorship}/>
