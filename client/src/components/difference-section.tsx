@@ -13,13 +13,18 @@ export function DifferenceSection() {
       
       const cards = gsap.utils.toArray('.diff-card');
       
-      // Pinning the left side while scrolling through the cards on the right
-      ScrollTrigger.create({
-        trigger: sectionRef.current,
-        start: "top 100px",
-        end: "bottom bottom",
-        pin: ".sticky-side",
-        pinSpacing: false,
+      // Pinning the left side while scrolling through the cards on the right (Desktop only)
+      ScrollTrigger.matchMedia({
+        // Desktop
+        "(min-width: 1024px)": function() {
+          ScrollTrigger.create({
+            trigger: sectionRef.current,
+            start: "top 100px",
+            end: "bottom bottom",
+            pin: ".sticky-side",
+            pinSpacing: false,
+          });
+        }
       });
 
       cards.forEach((card: any, i) => {
