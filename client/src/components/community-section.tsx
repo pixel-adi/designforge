@@ -88,13 +88,13 @@ export function CommunitySection() {
                  </div>
                  <div>
                    <p className="font-heading text-xl text-foreground">Designforge Aspirants</p>
-                   <p className="text-xs text-foreground/50 font-medium">1,240 members online</p>
+                   <p className="text-xs text-foreground/50 font-medium">3,242 members online</p>
                  </div>
                </div>
                
                <div className="space-y-6 flex-1 overflow-hidden flex flex-col justify-end pb-4">
                  <div className="message-bubble bg-background p-4 rounded-2xl rounded-tl-sm text-[15px] text-foreground w-[85%] border border-black/5 shadow-sm">
-                   <span className="font-medium text-xs text-primary mb-1 block">Siddhi (Mentor)</span>
+                   <span className="font-medium text-xs text-primary mb-1 block">Mentor</span>
                    Hi everyone! We are hosting an open portfolio review session this Sunday. Drop your links!
                  </div>
                  
@@ -104,7 +104,7 @@ export function CommunitySection() {
                  </div>
                  
                  <div className="message-bubble bg-background p-4 rounded-2xl rounded-tl-sm text-[15px] text-foreground w-[85%] border border-black/5 shadow-sm">
-                   <span className="font-medium text-xs text-pop-1 mb-1 block">Aditya (Mentor)</span>
+                   <span className="font-medium text-xs text-pop-1 mb-1 block">Mentor</span>
                    Yes, both NID narrative building and UCEED problem framing will be discussed. See you there! ✨
                  </div>
                </div>
