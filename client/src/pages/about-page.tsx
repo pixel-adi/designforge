@@ -106,12 +106,12 @@ export default function AboutPage() {
             </h1>
             
             <p className="hero-desc text-xl md:text-2xl font-light text-foreground/70 leading-relaxed max-w-3xl mx-auto mb-10">
-              Designforge is a mentorship-led design learning ecosystem helping aspirants, students, and early professionals grow through design education, guidance, and community.
+              Designforge is a mentorship-led design learning ecosystem for aspirants, students, and early professionals.
             </p>
 
             <div className="hero-desc max-w-3xl mx-auto text-foreground/80 leading-relaxed mb-12">
               <p>
-                Founded in 2015 as Whitespace Design Foundation and renamed as Designforge in 2025, our journey has been driven by one core mission: to democratise design and make meaningful design learning more reachable, affordable, and relevant.
+                Founded in 2015 as Whitespace Design Foundation and renamed as Designforge in 2025, our mission has stayed the same: to democratise design and make meaningful design learning more reachable, affordable, and relevant.
               </p>
             </div>
             
@@ -132,13 +132,10 @@ export default function AboutPage() {
             
             <div className="prose prose-lg text-foreground/80 max-w-none">
               <p className="lead text-xl mb-6 font-medium text-foreground">
-                Designforge began as Whitespace Design Foundation in 2015 with a simple but important belief: talented people exist everywhere, but access to quality design guidance often does not.
+                Designforge began as Whitespace Design Foundation in 2015 with a simple belief: talent exists everywhere, but access to good design guidance often does not.
               </p>
               <p className="mb-6">
-                At a time when exposure to design was limited across many engineering colleges and institutions, we started building pathways for students and professionals to discover design in a more practical, affordable, and approachable way. The focus was never just on teaching tools or theory, but on helping learners understand design thinking, creative problem-solving, and product innovation through real, hands-on learning.
-              </p>
-              <p>
-                Over the years, that effort grew into a wider ecosystem of mentorship, training, and community support for people from different backgrounds entering the world of design.
+                We started by creating practical and affordable pathways for students and professionals to discover design thinking, creative problem-solving, and product innovation in a more approachable way.
               </p>
             </div>
           </div>
@@ -157,10 +154,7 @@ export default function AboutPage() {
                     In 2025, Whitespace Design Foundation evolved into Designforge.
                   </p>
                   <p>
-                    This was not a change in mission, but a clearer expression of it. The new identity was created to take the original vision further — from making design accessible, to building a stronger and more active ecosystem for mentoring the next generation of designers.
-                  </p>
-                  <p>
-                    The name <span className="font-semibold text-foreground">Designforge</span> reflects what we stand for: helping people shape their journey through practice, critique, mentorship, and community.
+                    The mission did not change — the identity became clearer. Designforge was created to take the same vision forward with stronger mentoring, a wider community, and a sharper focus on helping people build their design journey through practice, critique, and guidance.
                   </p>
                 </div>
               </div>
