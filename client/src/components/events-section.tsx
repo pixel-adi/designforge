@@ -34,7 +34,7 @@ export function EventsSection() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="py-32 bg-background relative overflow-hidden">
+    <section ref={sectionRef} className="pt-32 pb-16 bg-background relative overflow-hidden">
       
       {/* Background shape */}
       <div className="absolute top-0 right-0 w-[40vw] h-[100%] bg-white/50 rounded-l-full blur-3xl pointer-events-none"></div>
@@ -50,7 +50,7 @@ export function EventsSection() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-6 max-w-4xl mx-auto mb-20">
+        <div className="flex flex-col gap-6 max-w-4xl mx-auto mb-0">
           
           <div className="event-pill flex flex-col md:flex-row items-center gap-8 bg-white p-6 md:pr-10 rounded-[3rem] shadow-[0_10px_40px_rgba(0,0,0,0.03)] border border-black/5 hover:scale-[1.02] transition-transform duration-500">
             <div className="w-24 h-24 md:w-32 md:h-32 bg-pop-3/20 rounded-full flex items-center justify-center shrink-0">
@@ -82,12 +82,6 @@ export function EventsSection() {
             </div>
           </div>
 
-        </div>
-
-        <div className="text-center">
-          <Button className="btn-bold bg-white text-foreground border border-black/10 hover:border-black/20 hover:bg-black/5 rounded-full px-12 h-16 text-base shadow-sm">
-            Explore All Events
-          </Button>
         </div>
 
       </div>
