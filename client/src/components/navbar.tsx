@@ -13,6 +13,7 @@ export function Navbar() {
         </div>
 
         <nav className="hidden md:flex items-center gap-10 bg-white/50 px-8 py-3 rounded-full border border-white/40 shadow-sm">
+          <Link href="/focus-batch" className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide">Focus Batch</Link>
           <Link href="/mentorship" className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide">Mentorship</Link>
           <Link href="/results" className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide">Results</Link>
           <Link href="/community" className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide">Community</Link>

@@ -1,0 +1,437 @@
+Build a modern, premium, trust-worthy one-page landing page for “Designforge Focus Batch 2026”.
+
+Brand:
+Designforge is a mentorship-led design learning community for aspirants preparing for NID, UCEED, CEED, studio tests, portfolios, interviews, and early design growth.
+
+Goal of page:
+Convert visitors into:
+1. Focus Batch applicants
+2. Waitlist leads
+3. WhatsApp/contact inquiries
+
+Tone:
+Warm, aspirant-first, premium, trustworthy, mentor-led, not like a coaching institute.
+The page should strongly communicate “mentorship over coaching”.
+
+Visual direction:
+- Modern, clean, premium landing page
+- Strong typography
+- Warm but serious feel
+- Good spacing and card-based layout
+- Slight editorial feel
+- Use sections with icons, highlights, timelines/cards
+- Mobile responsive
+- Smooth scrolling
+- CTA buttons should stand out
+- Add subtle animations if possible
+- Use placeholders for mentor images, student photos, rankers, testimonials, and WhatsApp/contact links
+
+Primary CTA:
+Apply for Focus Batch
+
+Secondary CTA:
+Join Waitlist
+
+Tertiary CTA:
+Talk to Us
+
+Use this exact content structure:
+
+--------------------------------------------------
+SECTION 1: TOP BAR
+--------------------------------------------------
+Text:
+Applications open for Designforge Focus Batch 2026 — 40-week mentored preparation for NID, UCEED, CEED, Studio Tests, Portfolios, and Interviews.
+
+CTA:
+Apply Now
+
+--------------------------------------------------
+SECTION 2: HERO
+--------------------------------------------------
+Eyebrow:
+Designforge Focus Batch 2026
+
+Heading:
+Design your journey. Define your future.
+
+Subheading:
+A 40-week mentored program for serious design aspirants preparing for NID, UCEED, and CEED — covering Prelims, Mains, Studio Tests, Portfolios, and Interviews in one structured journey.
+
+Supporting text:
+Through guided sketching, ideation, observation practice, exam strategy, studio simulations, portfolio support, and mock interviews, Designforge helps students build the skills, confidence, and mindset needed to grow into stronger designers.
+
+Quick info strip:
+- Duration: 40 Weeks
+- Live Hours: 240 Hours
+- Schedule: 3 Days a Week · 2 Hours per Day
+- Tracks: B.Des + M.Des
+- Seats: Only 20 students per batch
+
+Buttons:
+- Apply for Focus Batch
+- Join Waitlist
+- Talk to Us
+
+Small trust line:
+Mentorship-led. Critique-driven. Built for serious aspirants.
+
+--------------------------------------------------
+SECTION 3: WHO THIS IS FOR
+--------------------------------------------------
+Heading:
+Who this batch is built for
+
+Cards:
+1. B.Des Aspirants
+For students preparing for NID DAT and UCEED who want stronger skills in sketching, creativity, observation, and visual communication.
+
+2. M.Des Aspirants
+For graduates preparing for NID M.Des and CEED with support across aptitude, problem-solving, portfolio direction, and interview prep.
+
+3. Mains Aspirants
+For students who need support for studio tests, portfolio evaluations, design articulation, and interviews.
+
+4. Serious Learners
+For students looking for structured mentorship, honest feedback, and long-term growth instead of coaching templates.
+
+--------------------------------------------------
+SECTION 4: WHAT THE PROGRAM COVERS
+--------------------------------------------------
+Heading:
+One program. Complete preparation.
+
+4 feature blocks:
+1. Prelims Preparation
+Drawing, observation, ideation, aptitude, time management, mock practice, and exam strategy.
+
+2. Mains Preparation
+Studio test thinking, material exploration, model making, presentation, and design articulation.
+
+3. Portfolio Development
+Project selection, storytelling, documentation, layout, and college-aligned portfolio refinement.
+
+4. Interview Readiness
+Mock interviews, self-presentation, defending design decisions, and confidence-building.
+
+Closing line:
+From first sketch to final interview, the journey is connected.
+
+--------------------------------------------------
+SECTION 5: WHY DESIGNFORGE
+--------------------------------------------------
+Heading:
+Why this program works
+
+Text:
+Most students work hard, but their preparation stays scattered. Designforge connects every stage of design admissions into one guided journey — from basics to exam readiness to studio tests, portfolio, and interviews.
+
+Use short highlight bullets:
+- Clear long-term roadmap
+- Strong fundamentals first
+- Regular critique and feedback
+- Mock tests and simulations
+- Studio test and material practice
+- Portfolio and interview support
+- Serious peer learning environment
+
+Highlight line:
+You do not just prepare for an exam here — you prepare for design admissions as a whole.
+
+--------------------------------------------------
+SECTION 6: 40-WEEK ROADMAP
+--------------------------------------------------
+Heading:
+Your 40-week preparation journey
+
+Show as 5 concise timeline cards instead of long text.
+
+Phase 1: Foundation (Weeks 1–8)
+- Drawing fundamentals
+- Perspective, light, shadow
+- Composition and visual communication
+- Observation sketching
+- Design basics
+- Early storytelling and ideation
+
+Phase 2: Creativity + Exam Familiarity (Weeks 9–16)
+- Brainstorming and idea expansion
+- Problem-solving and redesign exercises
+- UCEED / CEED / NID question familiarity
+- Past paper understanding
+- Time-bound exercises
+
+Phase 3: Intensive Practice (Weeks 17–28)
+- Weekly assignments
+- Mock tests
+- Critique rounds
+- Speed and clarity improvement
+- Accuracy and originality
+
+Phase 4: Prelims Revision + Transition (Weeks 29–32)
+- Full mocks
+- Feedback and score analysis
+- Final prelims tuning
+- Strategy for next stage
+
+Phase 5: Mains, Portfolio, Interview Prep (Weeks 33–40)
+- Studio test thinking
+- Material exploration
+- Model making and prototyping
+- Portfolio building and presentation
+- Mock interviews
+- Design articulation and confidence
+
+--------------------------------------------------
+SECTION 7: PROGRAM HIGHLIGHTS
+--------------------------------------------------
+Heading:
+What makes this batch more complete
+
+Use 4 cards:
+1. Integrated Portfolio Development
+Build and refine your portfolio alongside your preparation.
+
+2. Hands-On Material Practice
+Work with paper, wire, clay, thermocol, and found materials for studio test confidence.
+
+3. Interview Confidence
+Practice presenting your work, explaining your ideas, and speaking with clarity.
+
+4. Guidance Beyond Government Colleges
+Useful direction for private colleges and early portfolio growth as well.
+
+--------------------------------------------------
+SECTION 8: WHAT YOU GET
+--------------------------------------------------
+Heading:
+What you get inside the Focus Batch
+
+Checklist:
+- Personalized mentor guidance
+- Design thinking and ideation classes
+- Structured live sessions across 40 weeks
+- Peer and mentor critique circles
+- Weekly assignments
+- Mock tests with feedback
+- Study material + past year question support
+- Studio test simulations
+- Material exploration practice
+- Portfolio review support
+- Mock interviews
+- Exam strategy and time management sessions
+- Guest sessions with NID / IIT / design mentors
+
+Closing line:
+Everything is designed to reduce confusion and build meaningful progress.
+
+--------------------------------------------------
+SECTION 9: BATCH FORMAT
+--------------------------------------------------
+Heading:
+Batch format at a glance
+
+Use 4 stat cards:
+- Duration: 40 Weeks
+- Live Commitment: 240 Hours
+- Schedule: 3 Days a Week · 2 Hours per Day
+- Seats: Only 20 students per batch
+
+Small note:
+Limited batch size helps maintain stronger feedback quality and deeper mentorship.
+
+--------------------------------------------------
+SECTION 10: EXAMS COVERED
+--------------------------------------------------
+Heading:
+Built for top design admissions pathways
+
+Text:
+The program supports preparation for:
+- NID DAT
+- UCEED
+- CEED
+- NID and IIT admissions including mains stages
+- Relevant private design college processes
+
+Support line:
+Built for both B.Des and M.Des aspirants across Prelims, Mains, Studio Tests, Portfolios, and Interviews.
+
+--------------------------------------------------
+SECTION 11: PRICING
+--------------------------------------------------
+Heading:
+Fee Structure
+
+Subheading:
+For the complete 40-week Prelims + Mains program
+
+Pricing card 1:
+One-Time Payment
+₹20,000
+Save ₹2,000
+
+Text:
+The full fee is ₹22,000. Students choosing one-time payment receive a ₹2,000 discount.
+
+Button:
+Pay One Time
+
+Pricing card 2:
+Installment Plan
+₹22,000 total
+
+Breakup:
+- 1st Installment: ₹12,000 — Pay Now
+- 2nd Installment: ₹10,000 — Due after 3 months
+
+Button:
+Choose Installments
+
+Optional small note:
+Extra discount may be available for students who clear the Designforge screening process.
+
+--------------------------------------------------
+SECTION 12: WHY JOIN EARLY
+--------------------------------------------------
+Heading:
+Why joining early gives you an edge
+
+Text:
+A strong design journey needs time. Starting early gives you more room to build fundamentals, improve through feedback, gain mock exposure, strengthen your portfolio, and enter interviews with more confidence.
+
+Bullets:
+- More time for basics
+- More practice cycles
+- More review and correction
+- More mock exposure
+- Better studio test readiness
+- Less last-minute panic
+
+--------------------------------------------------
+SECTION 13: BEYOND THE EXAM
+--------------------------------------------------
+Heading:
+This program is not only about cracking an exam
+
+Text:
+Good preparation should help students grow beyond the paper. Designforge helps build observation, ideation, articulation, presentation, portfolio thinking, and confidence — skills that matter in college and beyond.
+
+Closing line:
+The goal is not just admission. The goal is becoming a stronger future designer.
+
+--------------------------------------------------
+SECTION 14: FAQ
+--------------------------------------------------
+Heading:
+Frequently asked questions
+
+FAQs:
+1. Who is this program for?
+For serious B.Des and M.Des aspirants preparing for NID, UCEED, and CEED, especially students who also want support for mains, portfolio, and interviews.
+
+2. Does this cover both Prelims and Mains?
+Yes. It is a complete 40-week program covering Prelims, Mains, Studio Tests, Portfolios, and Interviews.
+
+3. Is this coaching or mentorship?
+This is a mentorship-led program with structured teaching, critique, practice, and guided growth.
+
+4. How many students are admitted?
+Only 20 students per batch.
+
+5. What is the class schedule?
+3 live sessions per week, 2 hours each, over 40 weeks.
+
+6. Is studio test and material practice included?
+Yes. Studio simulations, material exploration, and model-making support are included.
+
+7. Do students get portfolio help?
+Yes. Portfolio support is integrated into the program.
+
+8. Is interview preparation included?
+Yes. Mock interviews and articulation guidance are included.
+
+9. Is installment payment available?
+Yes. ₹12,000 upfront and ₹10,000 after 3 months.
+
+10. Is there a one-time payment discount?
+Yes. One-time payment is ₹20,000 instead of ₹22,000.
+
+--------------------------------------------------
+SECTION 15: FINAL CTA
+--------------------------------------------------
+Heading:
+If you are serious about design, this is your time to begin
+
+Text:
+Join a focused, mentored, and high-intent 40-week program designed to help you prepare deeply, think clearly, present confidently, and perform strongly across NID, UCEED, CEED, studio tests, portfolios, and interviews.
+
+Buttons:
+- Apply for Focus Batch
+- Join Waitlist
+- Talk to Our Team
+
+Small line:
+Only 20 seats per batch · B.Des + M.Des · Prelims + Mains support
+
+--------------------------------------------------
+SECTION 16: CONTACT
+--------------------------------------------------
+Heading:
+Have questions? Reach out to us
+
+Text:
+Need help deciding or want to understand the batch better? We’re here to support you.
+
+Contact details:
+Phone: +91 7398580486
+Email: designforge05@gmail.com
+
+Support line:
+Got questions or doubts? Chat with us — we’re here to help.
+
+--------------------------------------------------
+SECTION 17: FOOTER
+--------------------------------------------------
+Brand:
+Designforge
+
+Footer text:
+A mentorship-led design learning ecosystem for aspirants preparing for NID, UCEED, CEED, studio tests, interviews, portfolios, and early design growth.
+
+Footer links:
+- Focus Batch
+- Mentorship
+- Results
+- Community
+- Events
+- Contact
+
+Footer line:
+Design your journey. Define your future.
+
+--------------------------------------------------
+TECHNICAL / UI NOTES
+--------------------------------------------------
+- Build as a single-page landing page
+- Sticky navbar with anchor links
+- Responsive across desktop, tablet, mobile
+- Add smooth section transitions
+- Use premium cards for roadmap, pricing, highlights, and FAQ
+- Use placeholders for student photos, mentor photos, and testimonials
+- Add WhatsApp/contact CTA floating button if possible
+- Make pricing and CTA sections visually strong
+- Add form for:
+  Name
+  Email
+  Phone
+  B.Des or M.Des
+  Exam target
+  Current preparation stage
+  Submit button
+
+Form heading:
+Apply for the Designforge Focus Batch
+
+Form note:
+We review applications carefully to maintain a serious and committed batch environment.
