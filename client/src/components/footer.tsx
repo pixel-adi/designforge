@@ -3,7 +3,7 @@ import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 
 export function Footer() {
   return (
-    <footer className="bg-[#111111] text-white pt-16 pb-8 relative overflow-hidden mt-12 md:mt-20 rounded-t-[1.5rem] z-30 shadow-[0_-20px_60px_-15px_rgba(0,0,0,0.1)]">
+    <footer className="bg-[#111111] text-white pt-16 pb-8 relative overflow-hidden rounded-t-[1.5rem] z-30 shadow-[0_-20px_60px_-15px_rgba(0,0,0,0.1)]">
       {/* Soft atmospheric glowing backgrounds */}
       <div className="absolute top-0 left-1/4 w-[40vw] h-[40vw] bg-primary/20 rounded-full blur-[100px] pointer-events-none -translate-y-1/2"></div>
 
