@@ -35,7 +35,7 @@ export function Navbar() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-10 h-20 md:h-24 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Link href="/" className="flex items-center group">
-              <img src={logoImg} alt="Designforge Logo" className="h-6 md:h-10 lg:h-12 object-contain group-hover:scale-105 transition-transform duration-500" />
+              <img src={logoImg} alt="Designforge Logo" className="h-9 md:h-10 lg:h-12 object-contain group-hover:scale-105 transition-transform duration-500" />
             </Link>
           </div>
 
