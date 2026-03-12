@@ -51,29 +51,27 @@ export default function ApprenticeshipPage() {
       <main className="flex-1 relative z-10 pt-20">
         
         {/* SECTION 1: HERO */}
-        <section className="relative pt-12 md:pt-24 pb-20 md:pb-32 overflow-hidden">
-          {/* Subtle bg decorations */}
-          <div className="absolute top-[-10%] right-[-5%] w-[50vw] h-[50vw] rounded-full bg-primary/5 blur-[120px] -z-10 pointer-events-none"></div>
-          <div className="absolute bottom-[-10%] left-[-10%] w-[40vw] h-[40vw] rounded-full bg-pop-1/5 blur-[100px] -z-10 pointer-events-none"></div>
-          
-          <div className="container mx-auto px-4 lg:px-8">
-            <div className="flex flex-col lg:flex-row gap-12 lg:gap-20 items-center">
-              {/* Left Text */}
-              <div className="w-full lg:w-1/2 flex flex-col justify-center animate-section z-10 relative">
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-border text-xs font-medium text-foreground/70 uppercase tracking-widest w-fit mb-6 shadow-sm">
-                  <span className="w-2 h-2 rounded-full bg-primary"></span>
-                  Apprenticeship at Designforge
-                </div>
-                
-                <h1 className="text-4xl md:text-5xl lg:text-7xl font-heading leading-[1.1] text-[#262626] mb-6">
-                  Learn with mentors. <br/>
-                  <span className="relative inline-block mt-2">
-                    Build with industry exposure.
-                    <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary/30 z-[-1]" viewBox="0 0 100 10" preserveAspectRatio="none">
-                      <path d="M0 5 Q 50 10 100 5" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
-                    </svg>
-                  </span>
-                </h1>
+        <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden bg-background pt-24 pb-12">
+          {/* Ambient Background Elements */}
+          <div className="absolute top-0 right-0 w-[40vw] h-[40vw] bg-primary/5 rounded-full blur-[100px] pointer-events-none -translate-y-1/2 translate-x-1/2"></div>
+          <div className="absolute bottom-0 left-0 w-[50vw] h-[50vw] bg-primary/5 rounded-full blur-[120px] pointer-events-none translate-y-1/3 -translate-x-1/4"></div>
+
+          <div className="container mx-auto px-4 relative z-10">
+            <div className="max-w-4xl mx-auto text-center">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/5 border border-black/10 text-xs font-medium text-foreground/80 uppercase tracking-widest mb-8">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                Apprenticeship
+              </div>
+              
+              <h1 className="text-4xl md:text-5xl lg:text-[72px] font-heading leading-[1.1] text-[#262626] mb-6">
+                Learn with mentors. <br/>
+                <span className="relative inline-block mt-2">
+                  Build with industry exposure.
+                  <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary/30 z-[-1]" viewBox="0 0 100 10" preserveAspectRatio="none">
+                    <path d="M0 5 Q 50 10 100 5" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
+                  </svg>
+                </span>
+              </h1>
                 
                 <p className="text-lg md:text-xl text-foreground/70 mb-8 max-w-xl leading-relaxed">
                   A practical learning initiative for students, aspirants, and early professionals looking to grow through workshops, industry-ready programs, internships, and guided mentorship.
@@ -590,8 +588,47 @@ export default function ApprenticeshipPage() {
           </div>
         </section>
 
-        {/* SECTION 11: FAQ */}
-        <section className="py-24 bg-background animate-section">
+
+        {/* SECTION 12: FINAL CTA */}
+        <section className="pt-24 pb-32 bg-background text-[#262626] text-center animate-section relative z-10 overflow-hidden border-t border-black/5">
+          {/* Subtle lighting */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vw] max-w-4xl max-h-4xl bg-primary/5 rounded-full blur-[120px] -z-10 pointer-events-none"></div>
+          
+          <div className="container mx-auto px-4 max-w-4xl relative z-20">
+            <h2 className="text-4xl md:text-6xl lg:text-7xl font-heading leading-[1.1] mb-8">
+              Learn with intent. <br/>
+              <span className="text-primary italic">Build with exposure.</span> <br/>
+              Grow with purpose.
+            </h2>
+            
+            <p className="text-lg md:text-xl text-foreground/70 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
+              Whether you want to explore design, gain practical exposure, or be part of a wider mission of design awareness and impact, the Designforge Apprenticeship is built to support that journey.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+              <Button size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full text-base btn-bold shadow-[0_0_40px_-10px_rgba(255,107,107,0.5)]">
+                Apply for Apprenticeship
+              </Button>
+              <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 rounded-full text-base bg-white border-black/10 hover:bg-foreground hover:text-white backdrop-blur-sm">
+                Join Upcoming Workshops
+              </Button>
+              <Button size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 rounded-full text-base text-foreground/70 hover:text-foreground hover:bg-black/5">
+                Partner With Us
+              </Button>
+            </div>
+            
+            <div className="flex flex-wrap items-center justify-center gap-y-2 gap-x-4 text-xs md:text-sm text-foreground/40 font-mono tracking-widest uppercase">
+              <span>Practical learning</span> 
+              <span className="w-1 h-1 rounded-full bg-black/20"></span> 
+              <span>Mentor-led growth</span> 
+              <span className="w-1 h-1 rounded-full bg-black/20"></span> 
+              <span>Design awareness</span>
+            </div>
+          </div>
+        </section>
+
+        {/* SECTION 12: FAQ (Moved to end) */}
+        <section className="py-24 bg-background animate-section border-t border-black/5">
           <div className="container mx-auto px-4 max-w-3xl">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-5xl font-heading text-[#262626] mb-4">Frequently asked questions</h2>
@@ -643,44 +680,6 @@ export default function ApprenticeshipPage() {
                 </AccordionItem>
               ))}
             </Accordion>
-          </div>
-        </section>
-
-        {/* SECTION 12: FINAL CTA */}
-        <section className="pt-24 pb-32 bg-background text-[#262626] text-center animate-section relative z-10 overflow-hidden border-t border-black/5">
-          {/* Subtle lighting */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vw] max-w-4xl max-h-4xl bg-primary/5 rounded-full blur-[120px] -z-10 pointer-events-none"></div>
-          
-          <div className="container mx-auto px-4 max-w-4xl relative z-20">
-            <h2 className="text-4xl md:text-6xl lg:text-7xl font-heading leading-[1.1] mb-8">
-              Learn with intent. <br/>
-              <span className="text-primary italic">Build with exposure.</span> <br/>
-              Grow with purpose.
-            </h2>
-            
-            <p className="text-lg md:text-xl text-foreground/70 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
-              Whether you want to explore design, gain practical exposure, or be part of a wider mission of design awareness and impact, the Designforge Apprenticeship is built to support that journey.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-              <Button size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full text-base btn-bold shadow-[0_0_40px_-10px_rgba(255,107,107,0.5)]">
-                Apply for Apprenticeship
-              </Button>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 rounded-full text-base bg-white border-black/10 hover:bg-foreground hover:text-white backdrop-blur-sm">
-                Join Upcoming Workshops
-              </Button>
-              <Button size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 rounded-full text-base text-foreground/70 hover:text-foreground hover:bg-black/5">
-                Partner With Us
-              </Button>
-            </div>
-            
-            <div className="flex flex-wrap items-center justify-center gap-y-2 gap-x-4 text-xs md:text-sm text-foreground/40 font-mono tracking-widest uppercase">
-              <span>Practical learning</span> 
-              <span className="w-1 h-1 rounded-full bg-black/20"></span> 
-              <span>Mentor-led growth</span> 
-              <span className="w-1 h-1 rounded-full bg-black/20"></span> 
-              <span>Design awareness</span>
-            </div>
           </div>
         </section>
 
