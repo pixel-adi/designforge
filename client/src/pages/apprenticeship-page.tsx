@@ -57,22 +57,24 @@ export default function ApprenticeshipPage() {
           <div className="absolute bottom-0 left-0 w-[50vw] h-[50vw] bg-primary/5 rounded-full blur-[120px] pointer-events-none translate-y-1/3 -translate-x-1/4"></div>
 
           <div className="container mx-auto px-4 relative z-10">
-            <div className="max-w-4xl mx-auto text-center">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/5 border border-black/10 text-xs font-medium text-foreground/80 uppercase tracking-widest mb-8">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-                Apprenticeship
-              </div>
-              
-              <h1 className="text-4xl md:text-5xl lg:text-[72px] font-heading leading-[1.1] text-[#262626] mb-6">
-                Learn with mentors. <br/>
-                <span className="relative inline-block mt-2">
-                  Build with industry exposure.
-                  <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary/30 z-[-1]" viewBox="0 0 100 10" preserveAspectRatio="none">
-                    <path d="M0 5 Q 50 10 100 5" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
-                  </svg>
-                </span>
-              </h1>
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-8">
+              {/* Left Content */}
+              <div className="w-full lg:w-1/2 text-left">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/5 border border-black/10 text-xs font-medium text-foreground/80 uppercase tracking-widest mb-8">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                  Apprenticeship
+                </div>
                 
+                <h1 className="text-4xl md:text-5xl lg:text-[72px] font-heading leading-[1.1] text-[#262626] mb-6">
+                  Learn with mentors. <br/>
+                  <span className="relative inline-block mt-2">
+                    Build with industry exposure.
+                    <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary/30 z-[-1]" viewBox="0 0 100 10" preserveAspectRatio="none">
+                      <path d="M0 5 Q 50 10 100 5" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
+                    </svg>
+                  </span>
+                </h1>
+                  
                 <p className="text-lg md:text-xl text-foreground/70 mb-8 max-w-xl leading-relaxed">
                   A practical learning initiative for students, aspirants, and early professionals looking to grow through workshops, industry-ready programs, internships, and guided mentorship.
                 </p>
@@ -95,7 +97,55 @@ export default function ApprenticeshipPage() {
                 </div>
               </div>
               
-              {/* Right Visual Collage Removed for Single Column Layout */}
+              {/* Right Visual Collage */}
+              <div className="w-full lg:w-1/2 relative h-[500px] lg:h-[600px] animate-section hidden lg:block">
+                {/* Decorative Elements */}
+                <div className="absolute inset-0 z-0">
+                  <div className="absolute top-10 right-10 w-72 h-72 bg-gradient-to-br from-pop-1/20 to-transparent rounded-full blur-3xl"></div>
+                  <div className="absolute bottom-10 left-10 w-64 h-64 bg-gradient-to-tr from-pop-2/20 to-transparent rounded-full blur-3xl"></div>
+                </div>
+                
+                <div className="relative z-10 w-full h-full flex items-center justify-center">
+                  {/* Collage composition */}
+                  <div className="absolute top-[10%] left-[5%] w-[55%] h-[50%] bg-white rounded-3xl p-2 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] border border-black/5 rotate-[-6deg] hover:rotate-[-2deg] transition-all duration-500 hover:z-20 origin-bottom-right group">
+                    <div className="w-full h-full bg-muted rounded-2xl overflow-hidden relative">
+                      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-80 mix-blend-multiply group-hover:opacity-100 transition-opacity duration-500"></div>
+                      <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <Users className="w-3 h-3 text-primary" /> Collaborative Workshops
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="absolute top-[40%] right-[5%] w-[45%] h-[45%] bg-white rounded-3xl p-2 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] border border-black/5 rotate-[8deg] hover:rotate-[2deg] transition-all duration-500 hover:z-20 origin-bottom-left group z-10">
+                    <div className="w-full h-full bg-muted rounded-2xl overflow-hidden relative">
+                      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-80 mix-blend-multiply group-hover:opacity-100 transition-opacity duration-500"></div>
+                      <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3 text-pop-1" /> Mentor Sessions
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="absolute bottom-[5%] left-[20%] w-[50%] h-[35%] bg-white rounded-3xl p-2 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] border border-black/5 rotate-[0deg] hover:-translate-y-2 transition-all duration-500 hover:z-20 group z-0">
+                    <div className="w-full h-full bg-muted rounded-2xl overflow-hidden relative">
+                      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-80 mix-blend-multiply group-hover:opacity-100 transition-opacity duration-500"></div>
+                      <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <TerminalSquare className="w-3 h-3 text-pop-2" /> Project Building
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Floating Elements */}
+                  <div className="absolute top-[25%] right-[40%] bg-white px-4 py-3 rounded-2xl shadow-lg border border-black/5 flex items-center gap-3 z-30 animate-[bounce_6s_ease-in-out_infinite]">
+                    <div className="w-8 h-8 rounded-full bg-pop-3/20 flex items-center justify-center">
+                      <Globe className="w-4 h-4 text-pop-3" />
+                    </div>
+                    <div>
+                      <div className="text-xs text-foreground/50 font-medium">Outcome</div>
+                      <div className="text-sm font-semibold">Industry Ready</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
         </section>
 
