@@ -147,6 +147,7 @@ export default function ApprenticeshipPage() {
                 </div>
               </div>
             </div>
+          </div>
         </section>
 
         {/* SECTION 2: INTRO STRIP */}
