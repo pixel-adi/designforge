@@ -414,24 +414,12 @@ export default function ApprenticeshipPage() {
                 </h2>
                 
                 <p className="text-white/70 text-lg mb-6 leading-relaxed font-light">
-                  Designforge believes design learning should not remain limited to cities or privileged spaces. 
-                </p>
-                <p className="text-white/70 text-lg mb-8 leading-relaxed font-light">
-                  As part of our wider mission, we actively explore community-led initiatives that bring design awareness, creativity, and problem-solving exposure to learners in tribal and remote areas.
+                  We explore community-led initiatives to bring design awareness and problem-solving exposure to tribal and remote areas.
                 </p>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
-                  {["Awareness sessions", "Introductory workshops", "Creativity-led learning", "Exposure to design as a path"].map((pt, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-pop-1 shrink-0"></div>
-                      <span className="text-white/80 text-sm font-medium">{pt}</span>
-                    </div>
-                  ))}
-                </div>
-                
-                <blockquote className="border-l-2 border-primary pl-6 py-2 bg-white/5 rounded-r-lg">
-                  <p className="text-xl font-heading text-white/90 leading-snug">
-                    "For us, design is not only about careers — it is also about access, awareness, and empowerment."
+                <blockquote className="border-l-2 border-primary pl-6 py-2 bg-white/5 rounded-r-lg mb-8">
+                  <p className="text-lg font-heading text-white/90 leading-snug">
+                    "Design is not only about careers — it is also about access and empowerment."
                   </p>
                 </blockquote>
               </div>
@@ -456,28 +444,26 @@ export default function ApprenticeshipPage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
               {/* Featured Session */}
               <div className="lg:col-span-5 flex flex-col h-full">
-                <div className="bg-foreground text-white rounded-[2rem] p-8 md:p-10 flex flex-col h-full relative overflow-hidden group shadow-lg min-h-[400px]">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 group-hover:bg-primary/30 transition-colors duration-500"></div>
-                  
-                  <div className="inline-flex px-3 py-1.5 rounded-full bg-white/10 text-xs font-medium w-fit mb-8 backdrop-blur-md border border-white/10 text-white/90">
+                <div className="bg-primary/5 border border-primary/20 text-[#262626] rounded-3xl p-8 md:p-10 flex flex-col h-full relative overflow-hidden group shadow-sm hover:shadow-md transition-all duration-300 min-h-[350px]">
+                  <div className="inline-flex px-3 py-1.5 rounded-full bg-primary/10 text-xs font-medium w-fit mb-8 text-primary border border-primary/20">
                     Featured Workshop
                   </div>
                   
-                  <h3 className="text-2xl md:text-4xl font-heading leading-tight mb-4 mt-auto z-10 relative">
+                  <h3 className="text-2xl md:text-3xl font-heading leading-tight mb-4 mt-auto">
                     Design Thinking for Real-World Problem Solving
                   </h3>
                   
-                  <p className="text-white/70 mb-10 font-light leading-relaxed z-10 relative text-base">
+                  <p className="text-foreground/70 mb-10 font-light leading-relaxed text-base">
                     Learn how to identify real problems, frame opportunities, and build better ideas through design thinking.
                   </p>
                   
-                  <div className="flex items-center justify-between border-t border-white/10 pt-6 mt-auto z-10 relative">
-                    <div className="flex items-center gap-2 text-sm text-white/60 font-medium">
+                  <div className="flex items-center justify-between border-t border-black/5 pt-6 mt-auto">
+                    <div className="flex items-center gap-2 text-sm text-foreground/60 font-medium">
                       <MapPin className="w-4 h-4" /> Virtual & Studio
                     </div>
-                    <Button variant="ghost" className="text-white hover:bg-white/20 rounded-full w-12 h-12 p-0 flex items-center justify-center bg-white/10 backdrop-blur-sm">
-                      <ArrowUpRight className="w-5 h-5" />
-                    </Button>
+                    <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-md">
+                      <ArrowRight className="w-4 h-4" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -488,32 +474,37 @@ export default function ApprenticeshipPage() {
                   {
                     title: "UX Foundations for Beginners",
                     desc: "Intro to users, flows, interfaces, and usability.",
-                    tag: "Fundamentals"
+                    tag: "Fundamentals",
+                    textColor: "text-pop-1"
                   },
                   {
                     title: "Critical Thinking for Creative Learners",
                     desc: "Build observation, reasoning, and stronger design decisions.",
-                    tag: "Thinking"
+                    tag: "Thinking",
+                    textColor: "text-pop-2"
                   },
                   {
                     title: "Visual Design Essentials",
                     desc: "Learn hierarchy, typography, layout, and communication.",
-                    tag: "Craft"
+                    tag: "Craft",
+                    textColor: "text-pop-3"
                   },
                   {
                     title: "IoT and Future Experiences",
                     desc: "Explore connected products and emerging interactions.",
-                    tag: "Emerging Tech"
+                    tag: "Emerging Tech",
+                    textColor: "text-secondary"
                   },
                   {
                     title: "Introduction to Game Design Thinking",
                     desc: "Understand systems, engagement, and storytelling.",
-                    tag: "Interactive"
+                    tag: "Interactive",
+                    textColor: "text-primary"
                   }
                 ].map((ws, i) => (
-                  <div key={i} className="bg-white p-5 md:p-6 rounded-2xl border border-black/5 hover:border-primary/20 transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group shadow-sm hover:shadow-md cursor-pointer">
+                  <div key={i} className="bg-white p-5 md:p-6 rounded-2xl border border-black/5 hover:border-black/15 transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group shadow-sm hover:shadow-md cursor-pointer">
                     <div>
-                      <div className="text-xs text-foreground/50 font-medium mb-1.5 uppercase tracking-wider">{ws.tag}</div>
+                      <div className={`text-xs font-medium mb-1.5 uppercase tracking-wider ${ws.textColor}`}>{ws.tag}</div>
                       <h4 className="text-lg md:text-xl font-heading text-[#262626] mb-1 group-hover:text-primary transition-colors">{ws.title}</h4>
                       <p className="text-sm text-foreground/60 leading-relaxed">{ws.desc}</p>
                     </div>
@@ -607,7 +598,7 @@ export default function ApprenticeshipPage() {
               <p className="text-foreground/60 text-lg">Everything you need to know about the apprenticeship.</p>
             </div>
             
-            <Accordion type="single" collapsible className="w-full bg-white rounded-[2rem] p-4 md:p-8 border border-black/5 shadow-sm">
+            <Accordion type="single" collapsible className="w-full">
               {[
                 {
                   q: "What is the Designforge Apprenticeship?",
@@ -642,7 +633,7 @@ export default function ApprenticeshipPage() {
                   a: "Through workshop announcements, apprenticeship applications, or community updates."
                 }
               ].map((faq, i) => (
-                <AccordionItem key={i} value={`item-${i}`} className="border-black/5 px-2">
+                <AccordionItem key={i} value={`item-${i}`} className="border-b border-black/5 px-2 last:border-0">
                   <AccordionTrigger className="text-left font-medium text-[#262626] hover:text-primary hover:no-underline transition-colors py-5 text-base md:text-lg">
                     {faq.q}
                   </AccordionTrigger>
@@ -656,9 +647,9 @@ export default function ApprenticeshipPage() {
         </section>
 
         {/* SECTION 12: FINAL CTA */}
-        <section className="pt-24 pb-48 -mb-24 bg-[#111111] text-white text-center animate-section relative z-10 overflow-hidden">
+        <section className="pt-24 pb-32 bg-background text-[#262626] text-center animate-section relative z-10 overflow-hidden border-t border-black/5">
           {/* Subtle lighting */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vw] max-w-4xl max-h-4xl bg-primary/10 rounded-full blur-[120px] -z-10 pointer-events-none"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vw] max-w-4xl max-h-4xl bg-primary/5 rounded-full blur-[120px] -z-10 pointer-events-none"></div>
           
           <div className="container mx-auto px-4 max-w-4xl relative z-20">
             <h2 className="text-4xl md:text-6xl lg:text-7xl font-heading leading-[1.1] mb-8">
@@ -667,7 +658,7 @@ export default function ApprenticeshipPage() {
               Grow with purpose.
             </h2>
             
-            <p className="text-lg md:text-xl text-white/70 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
+            <p className="text-lg md:text-xl text-foreground/70 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
               Whether you want to explore design, gain practical exposure, or be part of a wider mission of design awareness and impact, the Designforge Apprenticeship is built to support that journey.
             </p>
             
@@ -675,19 +666,19 @@ export default function ApprenticeshipPage() {
               <Button size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full text-base btn-bold shadow-[0_0_40px_-10px_rgba(255,107,107,0.5)]">
                 Apply for Apprenticeship
               </Button>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 rounded-full text-base bg-white/5 border-white/20 text-white hover:bg-white hover:text-foreground backdrop-blur-sm">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 rounded-full text-base bg-white border-black/10 hover:bg-foreground hover:text-white backdrop-blur-sm">
                 Join Upcoming Workshops
               </Button>
-              <Button size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 rounded-full text-base text-white/70 hover:text-white hover:bg-white/10">
+              <Button size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 rounded-full text-base text-foreground/70 hover:text-foreground hover:bg-black/5">
                 Partner With Us
               </Button>
             </div>
             
-            <div className="flex flex-wrap items-center justify-center gap-y-2 gap-x-4 text-xs md:text-sm text-white/40 font-mono tracking-widest uppercase">
+            <div className="flex flex-wrap items-center justify-center gap-y-2 gap-x-4 text-xs md:text-sm text-foreground/40 font-mono tracking-widest uppercase">
               <span>Practical learning</span> 
-              <span className="w-1 h-1 rounded-full bg-white/20"></span> 
+              <span className="w-1 h-1 rounded-full bg-black/20"></span> 
               <span>Mentor-led growth</span> 
-              <span className="w-1 h-1 rounded-full bg-white/20"></span> 
+              <span className="w-1 h-1 rounded-full bg-black/20"></span> 
               <span>Design awareness</span>
             </div>
           </div>
@@ -695,9 +686,7 @@ export default function ApprenticeshipPage() {
 
       </main>
       
-      <div className="relative z-20 bg-transparent">
-        <Footer />
-      </div>
+      <Footer />
     </div>
   );
 }
