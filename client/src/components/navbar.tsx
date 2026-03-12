@@ -44,6 +44,7 @@ export function Navbar() {
           <nav className="hidden lg:flex items-center gap-3 xl:gap-6 px-4 xl:px-6 py-2.5 bg-transparent border-none">
             <Link href="/about" className={`text-xs xl:text-sm font-medium transition-colors tracking-wide whitespace-nowrap ${location === '/about' ? 'text-primary' : 'text-foreground/70 hover:text-primary'}`}>About</Link>
             <Link href="/mentorship" className="text-xs xl:text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Mentorship</Link>
+            <Link href="/apprenticeship" className="text-xs xl:text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Apprenticeship</Link>
             <Link href="/focus-batch" className="text-xs xl:text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Focus Batch</Link>
             
             <DropdownMenu>
@@ -87,6 +88,7 @@ export function Navbar() {
                   <div className="flex flex-col gap-4">
                     <Link href="/about" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${location === '/about' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>About</Link>
                     <Link href="/mentorship" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${location === '/mentorship' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Mentorship</Link>
+                    <Link href="/apprenticeship" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${location === '/apprenticeship' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Apprenticeship</Link>
                     <Link href="/focus-batch" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${location === '/focus-batch' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Focus Batch</Link>
                     
                     <div className="flex flex-col gap-3 py-2 border-y border-black/5">
