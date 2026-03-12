@@ -13,6 +13,8 @@ import Events from "@/pages/events";
 import FocusBatchPage from "@/pages/focus-batch-page";
 import AboutPage from "@/pages/about-page";
 
+import ApprenticeshipPage from "@/pages/apprenticeship-page";
+
 function Router() {
   return (
     <>
@@ -20,7 +22,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Home}/>
         <Route path="/about" component={AboutPage}/>
-        <Route path="/apprenticeship" component={Home}/>
+        <Route path="/apprenticeship" component={ApprenticeshipPage}/>
         <Route path="/join-us" component={Home}/>
         <Route path="/mentorship" component={Mentorship}/>
         <Route path="/results" component={Results}/>
