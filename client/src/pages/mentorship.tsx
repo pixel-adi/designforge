@@ -43,10 +43,10 @@ export default function Mentorship() {
     <div className="min-h-screen bg-background font-sans selection:bg-primary/20 flex flex-col" ref={containerRef}>
       <Navbar />
       
-      <main className="flex-1 relative z-10 pt-20">
+      <main className="flex-1 relative z-10">
         
         {/* SECTION 1: HERO */}
-        <section className="relative min-h-[85vh] flex items-center pt-24 pb-16 overflow-hidden bg-background">
+        <section className="relative pt-12 pb-16 overflow-hidden bg-background">
           {/* Playful background blobs */}
           <div className="absolute top-0 right-0 w-[50vw] h-[50vw] bg-primary/10 rounded-full blur-[120px] pointer-events-none -translate-y-1/3 translate-x-1/3"></div>
           <div className="absolute bottom-10 left-0 w-[40vw] h-[40vw] bg-pop-3/15 rounded-full blur-[100px] pointer-events-none translate-y-1/4 -translate-x-1/4"></div>

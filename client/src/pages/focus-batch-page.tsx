@@ -45,7 +45,7 @@ export default function FocusBatchPage() {
       <main className="flex-1 relative z-10">
         
         {/* SECTION 2: HERO */}
-        <section className="pt-20 pb-24 md:pt-32 md:pb-32 px-4 bg-white relative overflow-hidden animate-section">
+        <section className="pb-24 md:pt-32 md:pb-32 px-4 bg-white relative overflow-hidden animate-section">
           <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
           
           <div className="container mx-auto max-w-5xl text-center relative z-10">

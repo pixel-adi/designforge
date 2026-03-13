@@ -48,7 +48,7 @@ export default function ApprenticeshipPage() {
     <div className="min-h-screen bg-background font-sans flex flex-col selection:bg-primary selection:text-white" ref={containerRef}>
       <Navbar />
       
-      <main className="flex-1 relative z-10 pt-20">
+      <main className="flex-1 relative z-10">
         
         {/* SECTION 1: HERO */}
         <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden bg-background pt-24 pb-12">

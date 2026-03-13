@@ -85,7 +85,7 @@ export default function AboutPage() {
     <div className="min-h-screen bg-background font-sans flex flex-col selection:bg-primary selection:text-white" ref={containerRef}>
       <Navbar />
       
-      <main className="flex-1 relative z-10 pt-20">
+      <main className="flex-1 relative z-10">
         
         {/* Soft abstract background blur */}
         <div className="absolute top-0 left-0 w-full h-[800px] overflow-hidden pointer-events-none z-0">

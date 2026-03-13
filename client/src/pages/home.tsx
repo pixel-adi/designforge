@@ -19,7 +19,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background font-sans selection:bg-primary/20 flex flex-col">
       <Navbar />
-      <main className="flex-1 relative z-10 pb-20">
+      <main className="flex-1 relative z-10">
         <Hero />
         <PainSection />
         <DifferenceSection />
