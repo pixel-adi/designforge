@@ -10,6 +10,8 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 export default function JoinUsPage() {
   const pageRef = useRef<HTMLDivElement>(null);
 
@@ -213,15 +215,19 @@ export default function JoinUsPage() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-[#262626] pl-2">How would you like to contribute?</label>
-                  <select className="flex h-12 w-full items-center justify-between rounded-full border-transparent bg-black/[0.03] px-5 py-2 text-sm focus:outline-none focus:bg-white focus:border-primary/30 focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 appearance-none transition-all cursor-pointer">
-                    <option value="" disabled selected>Select an option</option>
-                    <option value="mentor">As a Mentor</option>
-                    <option value="ambassador">As an Ambassador</option>
-                    <option value="promoter">As a Promoter / Supporter</option>
-                    <option value="collaborator">As a Collaborator</option>
-                    <option value="institution">As an Institution / Community</option>
-                    <option value="other">Other</option>
-                  </select>
+                  <Select>
+                    <SelectTrigger className="bg-black/[0.03] border-transparent focus:bg-white focus:border-primary/30 transition-all">
+                      <SelectValue placeholder="Select an option" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mentor">As a Mentor</SelectItem>
+                      <SelectItem value="ambassador">As an Ambassador</SelectItem>
+                      <SelectItem value="promoter">As a Promoter / Supporter</SelectItem>
+                      <SelectItem value="collaborator">As a Collaborator</SelectItem>
+                      <SelectItem value="institution">As an Institution / Community</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="space-y-2">
