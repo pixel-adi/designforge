@@ -1,0 +1,147 @@
+Build a clean, minimal, premium “Join Us” page for Designforge.
+
+Brand context:
+Designforge is a mentorship-led design learning ecosystem for aspirants, students, and early professionals. This page should invite people who want to be associated with Designforge through mentorship, community building, outreach, collaboration, and support.
+
+Important:
+Keep this page short.
+Do not make it text-heavy.
+The tone should feel warm, sincere, community-led, and purpose-driven.
+It should not sound corporate or transactional.
+
+Goal of the page:
+Help interested people understand how they can be associated with Designforge and encourage them to express interest.
+
+Tone:
+- warm
+- trustworthy
+- community-led
+- thoughtful
+- welcoming
+- minimal
+
+UI direction:
+- keep the page short and breathable
+- use mixed but simple layouts
+- avoid too many cards
+- strong typography
+- clean spacing
+- premium and human feel
+- mobile responsive
+
+Use this exact structure:
+
+--------------------------------------------------
+SECTION 1: HERO
+--------------------------------------------------
+UI Pattern:
+Simple centered hero
+
+Eyebrow:
+Join Designforge
+
+Heading:
+Be part of a growing design learning community
+
+Subheading:
+Designforge is built by people who care about design, mentorship, access, and growth. If you would like to contribute your time, perspective, energy, or experience, we would love to hear from you.
+
+Buttons:
+- Express Interest
+- Connect With Us
+
+--------------------------------------------------
+SECTION 2: WAYS TO BE ASSOCIATED
+--------------------------------------------------
+UI Pattern:
+Clean vertical list / simple split section
+
+Heading:
+Ways you can be associated
+
+Text:
+There are many ways to contribute to the Designforge ecosystem.
+
+List:
+- Mentors — guide learners through feedback, sessions, and conversations
+- Ambassadors — help build stronger student communities
+- Promoters and Community Supporters — help extend the reach of the mission
+- Collaborators — contribute through workshops, events, outreach, or knowledge-sharing
+- Institutions and Communities — partner with us to create learning opportunities
+
+--------------------------------------------------
+SECTION 3: WHY JOIN
+--------------------------------------------------
+UI Pattern:
+Statement section with short bullet list
+
+Heading:
+Why people choose to be part of Designforge
+
+Text:
+Because they believe in:
+- making design more accessible
+- supporting the next generation of learners
+- building meaningful communities
+- sharing knowledge with purpose
+- creating impact through design
+
+--------------------------------------------------
+SECTION 4: WHAT WE VALUE
+--------------------------------------------------
+UI Pattern:
+Short editorial block
+
+Heading:
+What we value
+
+Text:
+We value sincerity, mentorship, generosity, curiosity, and a genuine intent to help people grow.
+
+Closing line:
+Designforge is strongest when it is shaped by people who care deeply about learning and community.
+
+--------------------------------------------------
+SECTION 5: FINAL CTA
+--------------------------------------------------
+UI Pattern:
+Centered closing banner
+
+Heading:
+If this mission resonates with you, let’s connect
+
+Text:
+Whether you want to mentor, represent, collaborate, or contribute in your own way, there is space to be part of the journey.
+
+Buttons:
+- Join the Network
+- Reach Out
+
+--------------------------------------------------
+OPTIONAL FORM SECTION
+--------------------------------------------------
+Heading:
+Tell us how you’d like to be involved
+
+Fields:
+- Full Name
+- Email
+- Phone Number
+- City
+- How would you like to contribute?
+- Tell us a little about yourself
+- Submit
+
+Submit button:
+Express Interest
+
+--------------------------------------------------
+GENERAL DESIGN NOTES
+--------------------------------------------------
+- keep the page very concise
+- premium, warm, and inviting
+- avoid heavy card grids
+- use strong spacing and simple hierarchy
+- should feel aligned with the Designforge About / Apprenticeship / Mentorship pages
+- subtle motion only
+- clean responsive layout

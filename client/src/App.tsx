@@ -12,6 +12,7 @@ import Community from "@/pages/community";
 import Events from "@/pages/events";
 import FocusBatchPage from "@/pages/focus-batch-page";
 import AboutPage from "@/pages/about-page";
+import JoinUsPage from "@/pages/join-us-page";
 
 import ApprenticeshipPage from "@/pages/apprenticeship-page";
 
@@ -23,7 +24,7 @@ function Router() {
         <Route path="/" component={Home}/>
         <Route path="/about" component={AboutPage}/>
         <Route path="/apprenticeship" component={ApprenticeshipPage}/>
-        <Route path="/join-us" component={Home}/>
+        <Route path="/join-us" component={JoinUsPage}/>
         <Route path="/mentorship" component={Mentorship}/>
         <Route path="/results" component={Results}/>
         <Route path="/community" component={Community}/>
