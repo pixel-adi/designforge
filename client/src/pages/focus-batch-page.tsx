@@ -18,15 +18,15 @@ export default function FocusBatchPage() {
       // Basic fade-up animation for sections
       gsap.utils.toArray('.animate-section').forEach((section: any) => {
         gsap.fromTo(section, 
-          { opacity: 0, y: 50 },
+          { y: 40, opacity: 0 },
           { 
-            opacity: 1, 
             y: 0, 
+            opacity: 1, 
             duration: 0.8,
             ease: "power3.out",
             scrollTrigger: {
               trigger: section,
-              start: "top 80%",
+              start: "top 85%",
             }
           }
         );

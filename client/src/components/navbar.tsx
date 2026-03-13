@@ -43,31 +43,31 @@ export function Navbar() {
 
           <nav className="hidden lg:flex items-center gap-3 xl:gap-6 px-4 xl:px-6 py-2.5 bg-transparent border-none">
             <Link href="/about" className={`text-xs xl:text-sm font-medium transition-colors tracking-wide whitespace-nowrap ${location === '/about' ? 'text-primary' : 'text-foreground/70 hover:text-primary'}`}>About</Link>
-            <Link href="/mentorship" className="text-xs xl:text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Mentorship</Link>
-            <Link href="/apprenticeship" className="text-xs xl:text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Apprenticeship</Link>
-            <Link href="/focus-batch" className="text-xs xl:text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Focus Batch</Link>
+            <Link href="/mentorship" className={`text-xs xl:text-sm font-medium transition-colors tracking-wide whitespace-nowrap ${location === '/mentorship' ? 'text-primary' : 'text-foreground/70 hover:text-primary'}`}>Mentorship</Link>
+            <Link href="/apprenticeship" className={`text-xs xl:text-sm font-medium transition-colors tracking-wide whitespace-nowrap ${location === '/apprenticeship' ? 'text-primary' : 'text-foreground/70 hover:text-primary'}`}>Apprenticeship</Link>
+            <Link href="/focus-batch" className={`text-xs xl:text-sm font-medium transition-colors tracking-wide whitespace-nowrap ${location === '/focus-batch' ? 'text-primary' : 'text-foreground/70 hover:text-primary'}`}>Focus Batch</Link>
             
             <DropdownMenu>
-              <DropdownMenuTrigger className="text-xs xl:text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide flex items-center gap-1 outline-none">
+              <DropdownMenuTrigger className={`text-xs xl:text-sm font-medium transition-colors tracking-wide flex items-center gap-1 outline-none ${location.startsWith('/community') || location === '/results' || location === '/events' || location === '/join-us' ? 'text-primary' : 'text-foreground/70 hover:text-primary'}`}>
                 Community <ChevronDown className="w-3 h-3 lg:w-4 lg:h-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 bg-white/95 backdrop-blur-md border-white/40 shadow-sm rounded-xl">
                 <DropdownMenuItem asChild className="focus:bg-primary/5 focus:text-primary cursor-pointer py-2">
-                  <Link href="/community" className="w-full">Community Hub</Link>
+                  <Link href="/community" className={`w-full ${location === '/community' ? 'text-primary' : ''}`}>Community Hub</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="focus:bg-primary/5 focus:text-primary cursor-pointer py-2">
-                  <Link href="/results" className="w-full">Results</Link>
+                  <Link href="/results" className={`w-full ${location === '/results' ? 'text-primary' : ''}`}>Results</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="focus:bg-primary/5 focus:text-primary cursor-pointer py-2">
-                  <Link href="/events" className="w-full">Events</Link>
+                  <Link href="/events" className={`w-full ${location === '/events' ? 'text-primary' : ''}`}>Events</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="focus:bg-primary/5 focus:text-primary cursor-pointer py-2">
-                  <Link href="/join-us" className="w-full">Join Us</Link>
+                  <Link href="/join-us" className={`w-full ${location === '/join-us' ? 'text-primary' : ''}`}>Join Us</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Link href="/resources" className="text-xs xl:text-sm font-medium text-foreground/70 hover:text-primary transition-colors tracking-wide whitespace-nowrap">Resources</Link>
+            <Link href="/resources" className={`text-xs xl:text-sm font-medium transition-colors tracking-wide whitespace-nowrap ${location === '/resources' ? 'text-primary' : 'text-foreground/70 hover:text-primary'}`}>Resources</Link>
           </nav>
           
           <div className="flex items-center gap-4">
@@ -93,10 +93,10 @@ export function Navbar() {
                     
                     <div className="flex flex-col gap-3 py-2 border-y border-black/5">
                       <p className="text-sm font-semibold text-foreground/50 uppercase tracking-wider">Community</p>
-                      <Link href="/community" onClick={() => setIsOpen(false)} className="text-lg font-medium text-foreground hover:text-primary pl-2">Hub</Link>
-                      <Link href="/results" onClick={() => setIsOpen(false)} className="text-lg font-medium text-foreground hover:text-primary pl-2">Results</Link>
-                      <Link href="/events" onClick={() => setIsOpen(false)} className="text-lg font-medium text-foreground hover:text-primary pl-2">Events</Link>
-                      <Link href="/join-us" onClick={() => setIsOpen(false)} className="text-lg font-medium text-foreground hover:text-primary pl-2">Join Us</Link>
+                      <Link href="/community" onClick={() => setIsOpen(false)} className={`text-lg font-medium pl-2 transition-colors ${location === '/community' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Hub</Link>
+                      <Link href="/results" onClick={() => setIsOpen(false)} className={`text-lg font-medium pl-2 transition-colors ${location === '/results' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Results</Link>
+                      <Link href="/events" onClick={() => setIsOpen(false)} className={`text-lg font-medium pl-2 transition-colors ${location === '/events' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Events</Link>
+                      <Link href="/join-us" onClick={() => setIsOpen(false)} className={`text-lg font-medium pl-2 transition-colors ${location === '/join-us' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Join Us</Link>
                     </div>
 
                     <Link href="/resources" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${location === '/resources' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Resources</Link>

@@ -29,16 +29,15 @@ export default function AboutPage() {
       const sections = gsap.utils.toArray('.animate-section');
       sections.forEach((section: any) => {
         gsap.fromTo(section,
-          { y: 50, opacity: 0 },
+          { y: 40, opacity: 0 },
           {
             y: 0,
             opacity: 1,
             duration: 0.8,
-            ease: "power2.out",
+            ease: "power3.out",
             scrollTrigger: {
               trigger: section,
-              start: "top 80%",
-              toggleActions: "play none none none"
+              start: "top 85%",
             }
           }
         );
