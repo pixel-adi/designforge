@@ -117,7 +117,7 @@ export function FocusBatch() {
                 </Select>
               </div>
               
-              <Button className="w-full btn-bold btn-primary-pop h-16 mt-6 rounded-full text-base">
+              <Button className="w-full btn-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors h-16 mt-6 rounded-full text-base shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5">
                 Submit Interest
               </Button>
             </form>

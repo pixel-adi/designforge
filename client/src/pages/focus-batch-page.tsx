@@ -70,8 +70,8 @@ export default function FocusBatchPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-              <Button size="lg" className="w-full sm:w-auto text-lg px-8 h-14 rounded-full">Apply for Focus Batch</Button>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg px-8 h-14 rounded-full">Join Waitlist</Button>
+              <Button size="lg" className="w-full sm:w-auto text-lg px-8 h-14 rounded-full btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">Apply for Focus Batch</Button>
+              <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg px-8 h-14 rounded-full bg-white border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">Join Waitlist</Button>
             </div>
             
             <p className="text-sm font-mono text-foreground/50 uppercase tracking-wider">
@@ -350,7 +350,7 @@ export default function FocusBatchPage() {
                   <p className="text-foreground/70 mb-8">
                     The full fee is ₹22,000. Students choosing one-time payment receive a ₹2,000 discount.
                   </p>
-                  <Button className="w-full text-lg h-12 rounded-xl group">
+                  <Button className="w-full text-lg h-12 rounded-xl group btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
                     Pay One Time
                     <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
@@ -377,7 +377,7 @@ export default function FocusBatchPage() {
                       <span className="font-bold">₹10,000</span>
                     </div>
                   </div>
-                  <Button variant="outline" className="w-full text-lg h-12 rounded-xl border-2">
+                  <Button variant="outline" className="w-full text-lg h-12 rounded-xl bg-white border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                     Choose Installments
                   </Button>
                 </CardContent>
@@ -431,8 +431,8 @@ export default function FocusBatchPage() {
             </p>
             
             <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
-              <Button size="lg" variant="secondary" className="text-lg px-8 h-14 rounded-full text-primary hover:bg-white/90">Apply for Focus Batch</Button>
-              <Button size="lg" className="text-lg px-8 h-14 rounded-full border border-white/30 bg-transparent hover:bg-white/10 text-white">Join Waitlist</Button>
+              <Button size="lg" className="text-lg px-8 h-14 rounded-full btn-bold bg-white text-primary hover:bg-white/90 shadow-[0_4px_14px_0_rgba(255,255,255,0.39)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.23)] hover:-translate-y-0.5 transition-all">Apply for Focus Batch</Button>
+              <Button size="lg" className="text-lg px-8 h-14 rounded-full border border-white/30 bg-transparent hover:bg-white/10 text-white transition-all hover:-translate-y-0.5">Join Waitlist</Button>
             </div>
             
             <p className="text-sm font-mono text-primary-foreground/60 mb-16 uppercase tracking-wider">

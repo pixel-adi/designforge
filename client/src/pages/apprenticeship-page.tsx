@@ -80,10 +80,10 @@ export default function ApprenticeshipPage() {
                 </p>
                 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-10">
-                  <Button size="lg" className="h-14 px-8 rounded-full text-base btn-bold w-full sm:w-auto shadow-lg shadow-primary/20 hover:-translate-y-1 transition-transform">
+                  <Button size="lg" className="h-14 px-8 rounded-full text-base btn-bold w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
                     Explore Opportunities
                   </Button>
-                  <Button size="lg" variant="outline" className="h-14 px-8 rounded-full text-base bg-white w-full sm:w-auto hover:bg-foreground hover:text-white transition-colors">
+                  <Button size="lg" variant="outline" className="h-14 px-8 rounded-full text-base bg-white w-full sm:w-auto border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                     Join Upcoming Workshops
                   </Button>
                 </div>
@@ -436,7 +436,7 @@ export default function ApprenticeshipPage() {
                 <h2 className="text-3xl md:text-5xl font-heading text-[#262626] mb-4">Upcoming sessions & workshops</h2>
                 <p className="text-foreground/70 text-lg">A glimpse into the kinds of learning experiences being built through the apprenticeship ecosystem.</p>
               </div>
-              <Button variant="outline" className="hidden md:flex rounded-full px-6 h-12 bg-white hover:bg-foreground hover:text-white transition-colors">
+              <Button variant="outline" className="hidden md:flex rounded-full px-6 h-12 bg-white border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                 Join Upcoming Workshops <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
@@ -523,7 +523,7 @@ export default function ApprenticeshipPage() {
             </div>
             
             <div className="md:hidden mt-8 text-center">
-              <Button variant="outline" className="rounded-full px-6 h-14 text-base bg-white w-full shadow-sm">
+              <Button variant="outline" className="rounded-full px-6 h-14 text-base bg-white w-full border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                 Join Upcoming Workshops
               </Button>
             </div>
@@ -608,13 +608,13 @@ export default function ApprenticeshipPage() {
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-              <Button size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full text-base btn-bold shadow-[0_0_40px_-10px_rgba(255,107,107,0.5)]">
+              <Button size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full text-base btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
                 Apply for Apprenticeship
               </Button>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 rounded-full text-base bg-white border-black/10 hover:bg-foreground hover:text-white backdrop-blur-sm">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 rounded-full text-base bg-white border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                 Join Upcoming Workshops
               </Button>
-              <Button size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 rounded-full text-base text-foreground/70 hover:text-foreground hover:bg-black/5">
+              <Button size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 rounded-full text-base text-foreground/70 hover:text-foreground hover:bg-black/5 transition-colors">
                 Partner With Us
               </Button>
             </div>

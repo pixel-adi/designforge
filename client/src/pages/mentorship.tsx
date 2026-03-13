@@ -74,10 +74,10 @@ export default function Mentorship() {
                 </p>
                 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-10">
-                  <Button size="lg" className="h-14 px-8 rounded-full text-base btn-bold w-full sm:w-auto shadow-lg shadow-primary/20 hover:-translate-y-1 transition-transform" onClick={() => document.getElementById('admissions')?.scrollIntoView({ behavior: 'smooth' })}>
+                  <Button size="lg" className="h-14 px-8 rounded-full text-base btn-bold w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all" onClick={() => document.getElementById('admissions')?.scrollIntoView({ behavior: 'smooth' })}>
                     Explore Admissions Tracks
                   </Button>
-                  <Button size="lg" variant="outline" className="h-14 px-8 rounded-full text-base bg-white/50 backdrop-blur-sm border-primary/20 w-full sm:w-auto hover:bg-white hover:text-primary transition-colors shadow-sm" onClick={() => document.getElementById('job-prep')?.scrollIntoView({ behavior: 'smooth' })}>
+                  <Button size="lg" variant="outline" className="h-14 px-8 rounded-full text-base bg-white/50 backdrop-blur-sm border-black/10 w-full sm:w-auto hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all" onClick={() => document.getElementById('job-prep')?.scrollIntoView({ behavior: 'smooth' })}>
                     Explore Job Preparation
                   </Button>
                 </div>
@@ -506,13 +506,13 @@ export default function Mentorship() {
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 flex-wrap">
-              <Button size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full text-base btn-bold shadow-[0_10px_40px_-10px_rgba(255,107,107,0.4)] hover:-translate-y-1 transition-transform">
+              <Button size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full text-base btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
                 Explore Admissions Mentorship
               </Button>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 rounded-full text-base bg-white border-black/10 hover:bg-foreground hover:text-white backdrop-blur-sm shadow-sm hover:shadow-lg transition-all hover:-translate-y-1">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 rounded-full text-base bg-white border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                 Explore Job Preparation
               </Button>
-              <Button size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 rounded-full text-base text-foreground/70 hover:text-foreground hover:bg-black/5">
+              <Button size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 rounded-full text-base text-foreground/70 hover:text-foreground hover:bg-black/5 transition-colors">
                 Talk to Us
               </Button>
             </div>

@@ -14,10 +14,10 @@ export function Footer() {
             Prepare for design <br/><span className="text-primary italic">with absolute clarity.</span>
           </h2>
           <div className="flex flex-col sm:flex-row justify-center gap-4 w-full sm:w-auto">
-            <Button className="btn-bold btn-primary-pop rounded-full px-8 h-14 text-base w-full sm:w-auto text-white">
+            <Button className="btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all rounded-full px-8 h-14 text-base w-full sm:w-auto">
               Join WhatsApp Community
             </Button>
-            <Button className="btn-bold bg-white/10 text-white hover:bg-white/20 border border-white/20 rounded-full px-8 h-14 text-base w-full sm:w-auto backdrop-blur-sm">
+            <Button className="btn-bold bg-white/10 text-white hover:bg-white/20 border border-white/20 rounded-full px-8 h-14 text-base w-full sm:w-auto backdrop-blur-sm transition-all hover:-translate-y-0.5">
               Explore Focus Batch
             </Button>
           </div>

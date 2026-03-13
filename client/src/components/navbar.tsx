@@ -71,7 +71,7 @@ export function Navbar() {
           </nav>
           
           <div className="flex items-center gap-4">
-            <Button className="hidden md:flex rounded-full px-6 md:px-8 btn-bold bg-foreground text-background hover:bg-primary transition-colors text-xs md:text-sm font-medium h-10 md:h-12">Join Community</Button>
+            <Button className="hidden md:flex rounded-full px-6 md:px-8 btn-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-xs md:text-sm font-medium h-10 md:h-12 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5">Join Community</Button>
             
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild className="lg:hidden">

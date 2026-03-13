@@ -130,10 +130,10 @@ export function Hero() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-center w-full">
-            <Button className="hero-btn rounded-full h-16 px-10 btn-bold btn-primary-pop text-base w-full sm:w-auto">
+            <Button className="hero-btn rounded-full h-16 px-10 btn-bold bg-primary text-primary-foreground hover:bg-primary/90 text-base w-full sm:w-auto shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
               Join WhatsApp Community
             </Button>
-            <Button className="hero-btn rounded-full h-16 px-10 btn-bold bg-white text-foreground border border-black/5 hover:border-black/10 text-base shadow-sm w-full sm:w-auto">
+            <Button className="hero-btn rounded-full h-16 px-10 btn-bold bg-white text-foreground border border-black/10 hover:bg-black/5 text-base shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all w-full sm:w-auto">
               Explore Focus Batch
             </Button>
           </div>
