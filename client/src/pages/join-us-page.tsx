@@ -171,89 +171,64 @@ export default function JoinUsPage() {
 
         {/* SECTION 5: FORM & FINAL CTA */}
         <section className="py-24 bg-background animate-section border-t border-black/5" id="join-form">
-          <div className="container mx-auto px-4 max-w-6xl">
-            <div className="flex flex-col lg:flex-row gap-16 lg:gap-24">
-              
-              {/* Left Side: Form */}
-              <div className="lg:w-3/5">
-                <div className="bg-white p-8 md:p-12 rounded-[2rem] border border-black/5 shadow-sm">
-                  <h3 className="text-3xl font-heading text-[#262626] mb-2">Tell us how you'd like to be involved</h3>
-                  <p className="text-foreground/60 mb-8 font-light">Fill out this quick form and we'll get back to you soon.</p>
-                  
-                  <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-[#262626]">Full Name</label>
-                        <Input placeholder="Jane Doe" className="h-12 bg-background border-black/10 focus-visible:ring-primary/20" />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-[#262626]">Email</label>
-                        <Input type="email" placeholder="jane@example.com" className="h-12 bg-background border-black/10 focus-visible:ring-primary/20" />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-[#262626]">Phone Number</label>
-                        <Input type="tel" placeholder="+91 98765 43210" className="h-12 bg-background border-black/10 focus-visible:ring-primary/20" />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-[#262626]">City</label>
-                        <Input placeholder="Mumbai" className="h-12 bg-background border-black/10 focus-visible:ring-primary/20" />
-                      </div>
-                    </div>
+          <div className="container mx-auto px-4 max-w-3xl">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl md:text-5xl font-heading text-[#262626] mb-6 leading-[1.1]">
+                If this mission resonates, <br className="hidden md:block"/><span className="text-primary italic">let's talk.</span>
+              </h2>
+              <p className="text-lg text-foreground/70 font-light max-w-xl mx-auto">
+                Tell us how you'd like to be involved. Fill out this quick form or <a href="mailto:designforge05@gmail.com" className="text-primary hover:underline">email us directly</a>.
+              </p>
+            </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-[#262626]">How would you like to contribute?</label>
-                      <select className="flex h-12 w-full items-center justify-between rounded-md border border-black/10 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                        <option value="" disabled selected>Select an option</option>
-                        <option value="mentor">As a Mentor</option>
-                        <option value="ambassador">As an Ambassador</option>
-                        <option value="promoter">As a Promoter / Supporter</option>
-                        <option value="collaborator">As a Collaborator</option>
-                        <option value="institution">As an Institution / Community</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-[#262626]">Tell us a little about yourself</label>
-                      <Textarea placeholder="Share a bit about your background and why you'd like to join..." className="min-h-[120px] bg-background border-black/10 resize-y focus-visible:ring-primary/20" />
-                    </div>
-                    
-                    <Button type="submit" size="lg" className="w-full h-14 rounded-full text-base btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all mt-4">
-                      Express Interest
-                    </Button>
-                  </form>
+            <div className="bg-white p-8 md:p-12 rounded-[2.5rem] border border-black/5 shadow-none">
+              <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-[#262626] pl-2">Full Name</label>
+                    <Input placeholder="Jane Doe" className="bg-black/[0.03] border-transparent focus-visible:bg-white focus-visible:border-primary/30 transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-[#262626] pl-2">Email</label>
+                    <Input type="email" placeholder="jane@example.com" className="bg-black/[0.03] border-transparent focus-visible:bg-white focus-visible:border-primary/30 transition-all" />
+                  </div>
                 </div>
-              </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-[#262626] pl-2">Phone Number</label>
+                    <Input type="tel" placeholder="+91 98765 43210" className="bg-black/[0.03] border-transparent focus-visible:bg-white focus-visible:border-primary/30 transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-[#262626] pl-2">City</label>
+                    <Input placeholder="Mumbai" className="bg-black/[0.03] border-transparent focus-visible:bg-white focus-visible:border-primary/30 transition-all" />
+                  </div>
+                </div>
 
-              {/* Right Side: Final CTA block */}
-              <div className="lg:w-2/5 flex flex-col justify-center" id="contact">
-                <h2 className="text-4xl md:text-5xl font-heading text-[#262626] mb-6 leading-[1.1]">
-                  If this mission resonates with you, <br className="hidden lg:block"/><span className="text-primary italic">let's connect.</span>
-                </h2>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-[#262626] pl-2">How would you like to contribute?</label>
+                  <select className="flex h-12 w-full items-center justify-between rounded-full border-transparent bg-black/[0.03] px-5 py-2 text-sm focus:outline-none focus:bg-white focus:border-primary/30 focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 appearance-none transition-all cursor-pointer">
+                    <option value="" disabled selected>Select an option</option>
+                    <option value="mentor">As a Mentor</option>
+                    <option value="ambassador">As an Ambassador</option>
+                    <option value="promoter">As a Promoter / Supporter</option>
+                    <option value="collaborator">As a Collaborator</option>
+                    <option value="institution">As an Institution / Community</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
                 
-                <p className="text-lg text-foreground/70 mb-10 leading-relaxed font-light">
-                  Whether you want to mentor, represent, collaborate, or contribute in your own way, there is space to be part of the journey.
-                </p>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-[#262626] pl-2">Tell us a little about yourself</label>
+                  <Textarea placeholder="Share a bit about your background and why you'd like to join..." className="min-h-[140px] bg-black/[0.03] border-transparent focus-visible:bg-white focus-visible:border-primary/30 resize-y transition-all" />
+                </div>
                 
-                <div className="flex flex-col sm:flex-row lg:flex-col gap-4">
-                  <Button size="lg" className="w-full sm:w-auto lg:w-full h-14 px-8 rounded-full text-base btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all" onClick={() => document.getElementById('join-form')?.scrollIntoView({ behavior: 'smooth' })}>
-                    Join the Network
-                  </Button>
-                  <Button size="lg" variant="outline" className="w-full sm:w-auto lg:w-full h-14 px-8 rounded-full text-base bg-white border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all" onClick={() => window.location.href = 'mailto:designforge05@gmail.com'}>
-                    Reach Out directly
+                <div className="pt-4 flex justify-center">
+                  <Button type="submit" size="lg" className="w-full sm:w-auto h-14 px-12 rounded-full text-base btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
+                    Express Interest
                   </Button>
                 </div>
-                
-                <div className="mt-12 flex items-center gap-4 text-sm font-medium text-foreground/50 uppercase tracking-widest">
-                  <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> Based in India</span>
-                  <span className="w-1 h-1 rounded-full bg-black/20 mx-1"></span>
-                  <span className="flex items-center gap-1.5"><Globe className="w-4 h-4" /> Global</span>
-                </div>
-              </div>
-              
+              </form>
             </div>
           </div>
         </section>
