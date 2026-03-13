@@ -1,0 +1,263 @@
+Build a premium, visually clean “Mentorship Tracks” page for Designforge.
+
+Brand context:
+Designforge is a mentorship-led design learning ecosystem for aspirants, students, and early professionals.
+
+Important:
+This page should feel consistent with the other Designforge pages already created:
+- premium
+- warm
+- editorial
+- concise
+- mixed UI patterns
+- not card-heavy
+- easy to scan
+
+Page goal:
+Help users understand and choose between the two main mentorship directions:
+1. Admissions Mentorship
+2. Job Preparation
+
+Do not repeat too much content from the Focus Batch, About, or Apprenticeship pages.
+This page should work more like a clear pathway selection page.
+
+Tone:
+- mentorship-led
+- credible
+- concise
+- structured
+- aspirant-first
+- not like a generic coaching website
+
+Use these UI patterns:
+- split hero
+- statement strip
+- editorial 2-column section
+- 2-track split layout
+- tabbed or stacked admissions section
+- editorial job-prep section
+- 4-step process timeline
+- audience band/list
+- centered CTA banner
+
+Avoid:
+- too many repeated cards
+- long paragraphs
+- repeating broad brand story
+- repeating too much exam-prep detail already covered elsewhere
+
+--------------------------------------------------
+SECTION 1: HERO
+--------------------------------------------------
+UI pattern:
+Split layout
+
+Eyebrow:
+Mentorship Tracks
+
+Heading:
+Find the mentorship path that fits your next step
+
+Subheading:
+Focused guidance for design admissions, portfolios, interviews, and early career preparation — built for aspirants, students, and emerging designers.
+
+Buttons:
+- Explore Admissions Tracks
+- Explore Job Preparation
+
+Trust line:
+Admissions guidance · Portfolio support · Interview readiness
+
+--------------------------------------------------
+SECTION 2: INTRO STRIP
+--------------------------------------------------
+UI pattern:
+Full-width statement band
+
+Text:
+Different goals need different kinds of mentorship.
+
+Sub-line:
+Designforge Mentorship Tracks help you choose the support that matches where you are — and where you want to go next.
+
+--------------------------------------------------
+SECTION 3: WHAT THIS PAGE COVERS
+--------------------------------------------------
+UI pattern:
+Editorial 2-column section
+
+Left heading:
+Choose by outcome, not by confusion
+
+Right text:
+This page brings together Designforge’s core mentorship pathways across:
+- design admissions
+- private and international applications
+- portfolio and interview preparation
+- internship and job readiness
+
+Closing line:
+The idea is simple: help learners find the right kind of support without navigating scattered guidance.
+
+--------------------------------------------------
+SECTION 4: MAIN TRACK SPLIT
+--------------------------------------------------
+UI pattern:
+Two-column split
+
+Track 1:
+Admissions Mentorship
+
+Text:
+For students preparing for B.Des and M.Des admissions across top Indian, private, and international design pathways.
+
+Includes:
+- NID / IITs
+- B.Des / M.Des
+- Private design colleges
+- Abroad applications
+- Portfolio and interview support
+
+Button:
+Explore Admissions Mentorship
+
+Track 2:
+Job Preparation
+
+Text:
+For design students and early professionals preparing for internships, placements, interviews, and portfolio presentation.
+
+Includes:
+- Portfolio reviews
+- Case study refinement
+- Mock interviews
+- Communication support
+- Career direction
+
+Button:
+Explore Job Preparation
+
+--------------------------------------------------
+SECTION 5: ADMISSIONS MENTORSHIP
+--------------------------------------------------
+UI pattern:
+Tabbed or stacked content section
+
+Heading:
+Admissions pathways we support
+
+Item 1:
+NID / IITs — B.Des
+Preparation support for NID DAT, UCEED, studio tests, and interview rounds with focus on creativity, observation, and presentation.
+
+Item 2:
+NID / IITs — M.Des
+Mentorship for NID M.Des, CEED, portfolios, and interviews with stronger emphasis on articulation, process, and maturity.
+
+Item 3:
+Private Design Colleges
+Support for college-specific applications, creative tests, portfolios, and interviews across leading private design institutes.
+
+Item 4:
+Abroad Applications
+Guidance for design school applications abroad, including portfolio direction, statements, presentation, and interview readiness.
+
+Closing line:
+The goal is not just to apply widely — but to apply with more clarity and intent.
+
+--------------------------------------------------
+SECTION 6: JOB PREPARATION
+--------------------------------------------------
+UI pattern:
+Editorial list with side highlight
+
+Heading:
+Job preparation track
+
+Text:
+Built for learners who want to present themselves better and become more industry-ready.
+
+Areas covered:
+- Portfolio refinement
+- UX / product case study storytelling
+- Visual presentation
+- Mock interviews
+- Communication and self-introduction
+- Internship and job readiness
+
+Side highlight:
+This track is especially useful for students moving from learning to applying — and for early professionals looking to sharpen how they present their work.
+
+--------------------------------------------------
+SECTION 7: HOW MENTORSHIP WORKS
+--------------------------------------------------
+UI pattern:
+4-step process timeline
+
+Heading:
+How mentorship works
+
+Step 1:
+Understand
+We begin with your goal, stage, and direction.
+
+Step 2:
+Guide
+You get track-specific guidance and relevant feedback.
+
+Step 3:
+Improve
+You refine through critique, practice, and iteration.
+
+Step 4:
+Move Forward
+You prepare with more clarity, confidence, and structure.
+
+Closing line:
+Each track is designed to be focused, practical, and easier to act on.
+
+--------------------------------------------------
+SECTION 8: WHO CAN JOIN
+--------------------------------------------------
+UI pattern:
+Audience band / 2-column list
+
+Heading:
+Who can join
+
+Text:
+These mentorship tracks are designed for:
+- design aspirants preparing for B.Des or M.Des
+- students applying to private or international design colleges
+- learners building portfolios and interview confidence
+- design students preparing for internships or jobs
+- early professionals seeking direction and stronger presentation
+
+--------------------------------------------------
+SECTION 9: FINAL CTA
+--------------------------------------------------
+UI pattern:
+Centered CTA banner
+
+Heading:
+Choose the mentorship that matches your next move
+
+Text:
+Whether you are preparing for admissions or stepping toward internships and jobs, Designforge Mentorship Tracks are built to help you move forward with stronger direction and confidence.
+
+Buttons:
+- Explore Admissions Mentorship
+- Explore Job Preparation
+- Talk to Us
+
+--------------------------------------------------
+GENERAL DESIGN NOTES
+--------------------------------------------------
+- keep the page concise
+- maintain consistency with the About and Apprenticeship pages
+- use mixed UI patterns, not repeated card grids
+- strong spacing and hierarchy
+- premium but warm design language
+- mobile responsive
+- subtle motion only
+- keep it readable and trust-worthy
