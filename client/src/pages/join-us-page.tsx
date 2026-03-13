@@ -197,7 +197,13 @@ export default function JoinUsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-[#262626] pl-2">Phone Number</label>
-                    <Input type="tel" placeholder="+91 98765 43210" className="bg-black/[0.03] border-transparent focus-visible:bg-white focus-visible:border-primary/30 transition-all" />
+                    <div className="relative flex items-center">
+                      <div className="absolute left-4 flex items-center gap-2 pointer-events-none text-base">
+                        <span>🇮🇳</span>
+                        <span className="text-foreground/50 font-medium">+91</span>
+                      </div>
+                      <Input type="tel" placeholder="98765 43210" className="pl-[5.5rem] bg-black/[0.03] border-transparent focus-visible:bg-white focus-visible:border-primary/30 transition-all" />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-[#262626] pl-2">City</label>
