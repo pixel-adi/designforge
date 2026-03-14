@@ -7,9 +7,7 @@ import { ScrollToTop } from "@/components/scroll-to-top";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Mentorship from "@/pages/mentorship";
-import Results from "@/pages/results";
 import Community from "@/pages/community";
-import Events from "@/pages/events";
 import FocusBatchPage from "@/pages/focus-batch-page";
 import AboutPage from "@/pages/about-page";
 import JoinUsPage from "@/pages/join-us-page";
@@ -26,9 +24,7 @@ function Router() {
         <Route path="/apprenticeship" component={ApprenticeshipPage}/>
         <Route path="/join-us" component={JoinUsPage}/>
         <Route path="/mentorship" component={Mentorship}/>
-        <Route path="/results" component={Results}/>
         <Route path="/community" component={Community}/>
-        <Route path="/events" component={Events}/>
         <Route path="/focus-batch" component={FocusBatchPage}/>
         {/* Fallback to 404 */}
         <Route component={NotFound} />

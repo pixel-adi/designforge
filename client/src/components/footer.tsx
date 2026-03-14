@@ -37,7 +37,6 @@ export function Footer() {
             <h4 className="font-heading text-base mb-4 text-white">Explore</h4>
             <ul className="space-y-3 text-white/80 font-light text-sm">
               <li><a href="#" className="hover:text-primary transition-colors">Mentorship Tracks</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">Student Results</a></li>
             </ul>
           </div>
           
