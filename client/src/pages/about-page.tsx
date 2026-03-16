@@ -6,6 +6,8 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import gsap from "gsap";
 import ScrollTrigger from "gsap/dist/ScrollTrigger";
+import adityaImg from "@/assets/aditya.png";
+import siddhiImg from "@/assets/siddhi.jpg";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -380,9 +382,9 @@ export default function AboutPage() {
               {/* Mentor 1 */}
               <Card className="stagger-card overflow-hidden bg-white border-none shadow-sm hover:shadow-lg transition-all group duration-300 flex flex-col h-full">
                 <div className="h-64 bg-background border-b border-border/50 relative overflow-hidden flex items-center justify-center shrink-0">
-                  {/* Image Placeholder */}
-                  <div className="w-32 h-32 rounded-full bg-border/50 border-4 border-white shadow-sm flex items-center justify-center">
-                    <Users className="w-10 h-10 text-foreground/20" />
+                  {/* Image */}
+                  <div className="w-32 h-32 rounded-full overflow-hidden bg-border/50 border-4 border-white shadow-sm flex items-center justify-center z-10">
+                    <img src={adityaImg} alt="Aditya Sharma" className="w-full h-full object-cover" />
                   </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent"></div>
                 </div>
@@ -405,9 +407,9 @@ export default function AboutPage() {
               {/* Mentor 2 */}
               <Card className="stagger-card overflow-hidden bg-white border-none shadow-sm hover:shadow-lg transition-all group duration-300 flex flex-col h-full">
                 <div className="h-64 bg-background border-b border-border/50 relative overflow-hidden flex items-center justify-center shrink-0">
-                  {/* Image Placeholder */}
-                  <div className="w-32 h-32 rounded-full bg-border/50 border-4 border-white shadow-sm flex items-center justify-center">
-                    <Users className="w-10 h-10 text-foreground/20" />
+                  {/* Image */}
+                  <div className="w-32 h-32 rounded-full overflow-hidden bg-border/50 border-4 border-white shadow-sm flex items-center justify-center z-10">
+                    <img src={siddhiImg} alt="Siddhi Patil" className="w-full h-full object-cover" />
                   </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent"></div>
                 </div>

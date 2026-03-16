@@ -73,8 +73,10 @@ export function CommunitySection() {
             </ul>
 
             <div className="comm-text">
-              <Button size="lg" className="btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all rounded-full px-10 h-16 text-base w-full sm:w-auto">
-                Join WhatsApp Community
+              <Button asChild size="lg" className="btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all rounded-full px-10 h-16 text-base w-full sm:w-auto">
+                <a href="https://chat.whatsapp.com/FJGc9od7fbz7iRXsFnzYU0" target="_blank" rel="noopener noreferrer">
+                  Join WhatsApp Community
+                </a>
               </Button>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 
 export function Footer() {
@@ -14,11 +15,15 @@ export function Footer() {
             Prepare for design <br/><span className="text-primary italic">with absolute clarity.</span>
           </h2>
           <div className="flex flex-col sm:flex-row justify-center gap-4 w-full sm:w-auto">
-            <Button className="btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all rounded-full px-8 h-14 text-base w-full sm:w-auto">
-              Join WhatsApp Community
+            <Button asChild className="btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all rounded-full px-8 h-14 text-base w-full sm:w-auto">
+              <a href="https://chat.whatsapp.com/FJGc9od7fbz7iRXsFnzYU0" target="_blank" rel="noopener noreferrer">
+                Join WhatsApp Community
+              </a>
             </Button>
-            <Button className="btn-bold bg-white/10 text-white hover:bg-white/20 border border-white/20 rounded-full px-8 h-14 text-base w-full sm:w-auto backdrop-blur-sm transition-all hover:-translate-y-0.5">
-              Explore Focus Batch
+            <Button asChild className="btn-bold bg-white/10 text-white hover:bg-white/20 border border-white/20 rounded-full px-8 h-14 text-base w-full sm:w-auto backdrop-blur-sm transition-all hover:-translate-y-0.5">
+              <Link href="/focus-batch">
+                Explore Focus Batch
+              </Link>
             </Button>
           </div>
         </div>
@@ -36,24 +41,24 @@ export function Footer() {
           <div className="md:col-span-3 lg:col-span-2">
             <h4 className="font-heading text-base mb-4 text-white">Explore</h4>
             <ul className="space-y-3 text-white/80 font-light text-sm">
-              <li><a href="#" className="hover:text-primary transition-colors">Mentorship Tracks</a></li>
+              <li><Link href="/mentorship" className="hover:text-primary transition-colors cursor-pointer">Mentorship Tracks</Link></li>
             </ul>
           </div>
           
           <div className="md:col-span-3 lg:col-span-2">
             <h4 className="font-heading text-base mb-4 text-white">Connect</h4>
             <ul className="space-y-3 text-white/80 font-light text-sm">
-              <li><a href="#" className="hover:text-primary transition-colors">WhatsApp</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">Instagram</a></li>
+              <li><a href="https://chat.whatsapp.com/FJGc9od7fbz7iRXsFnzYU0" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">WhatsApp</a></li>
+              <li><a href="https://www.instagram.com/designforge_official?igsh=c3hlcjV2ZHp2dnhv&utm_source=qr" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Instagram</a></li>
             </ul>
           </div>
         </div>
         
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-white/50 text-xs font-light border-t border-white/20 pt-6">
           <p>© {new Date().getFullYear()} Designforge. All rights reserved.</p>
-          <div className="flex gap-6">
-            <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
+          <div className="flex gap-6 relative z-50">
+            <Link href="/privacy-policy" className="hover:text-primary transition-colors cursor-pointer block pb-2 md:pb-0">Privacy Policy</Link>
+            <Link href="/terms-of-service" className="hover:text-primary transition-colors cursor-pointer block pb-2 md:pb-0">Terms of Service</Link>
           </div>
           <p>Designed with purpose.</p>
         </div>

@@ -3,7 +3,7 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { CheckCircle2, Clock, CalendarDays, Users, BookOpen, PenTool, LayoutDashboard, ArrowRight, Target } from "lucide-react";
+import { CheckCircle2, Clock, CalendarDays, Users, BookOpen, PenTool, LayoutDashboard, ArrowRight, Target, MessageCircle, Mail } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useEffect, useRef, useState } from "react";
@@ -13,6 +13,7 @@ gsap.registerPlugin(ScrollTrigger);
 
 export default function FocusBatchPage() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const arcsContainerRef = useRef<HTMLDivElement>(null);
   const [isRegOpen, setIsRegOpen] = useState(false);
 
   useEffect(() => {
@@ -33,6 +34,57 @@ export default function FocusBatchPage() {
           }
         );
       });
+
+      // Special animation for What You Get Section Arcs and Floating Chips
+      if (arcsContainerRef.current) {
+        const arcs = arcsContainerRef.current.querySelectorAll('.arc-line');
+        const chips = arcsContainerRef.current.querySelectorAll('.floating-chip');
+
+        // Gently draw in the arcs
+        gsap.fromTo(arcs, 
+          { opacity: 0, scale: 0.95 }, 
+          { 
+            opacity: 1, 
+            scale: 1, 
+            duration: 1.2, 
+            stagger: 0.2, 
+            ease: "power2.out",
+            scrollTrigger: {
+              trigger: arcsContainerRef.current,
+              start: "top 75%",
+            }
+          }
+        );
+
+        // Pop in the chips with a slight staggered delay
+        gsap.fromTo(chips,
+          { y: 20, opacity: 0, scale: 0.9 },
+          {
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            duration: 0.8,
+            stagger: 0.1,
+            ease: "back.out(1.5)",
+            scrollTrigger: {
+              trigger: arcsContainerRef.current,
+              start: "top 75%",
+            }
+          }
+        );
+
+        // Continuous gentle floating motion for chips
+        gsap.to(chips, {
+          y: "-=8",
+          duration: 2.5,
+          yoyo: true,
+          repeat: -1,
+          ease: "sine.inOut",
+          stagger: 0.2,
+          delay: 1.5 // Start floating after entrance animation
+        });
+      }
+
     }, containerRef);
     return () => ctx.revert();
   }, []);
@@ -241,9 +293,10 @@ export default function FocusBatchPage() {
                     <div className="lg:w-1/3 shrink-0">
                       <div className="inline-block bg-primary/10 text-primary font-mono text-sm px-4 py-1.5 rounded-full mb-5 font-medium border border-primary/20">{item.weeks}</div>
                       <h3 className="text-2xl font-heading mb-4 text-white/90 leading-tight">{item.phase}</h3>
-                      <div className="bg-background/20 rounded-xl p-4 border-l-2 border-primary/50">
-                        <p className="text-white/70 text-sm leading-relaxed italic">
-                          "{item.goal}"
+                      <div className="flex items-start gap-3 mt-2">
+                        <Target className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                        <p className="text-white/80 text-sm leading-relaxed font-medium">
+                          {item.goal}
                         </p>
                       </div>
                     </div>
@@ -271,11 +324,11 @@ export default function FocusBatchPage() {
                               </h4>
                               <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
                                 {group.items.map((listItem, j) => (
-                                  <li key={j} className="flex items-start gap-3 text-white/70 text-sm group">
-                                    <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                                      <div className="w-1.5 h-1.5 rounded-full bg-white/30 group-hover:bg-primary transition-colors" />
+                                  <li key={j} className="flex items-start gap-3 text-white/80 text-sm group">
+                                    <div className="w-5 h-5 rounded-full bg-white/5 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-primary/20 transition-colors">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                                     </div>
-                                    <span className="leading-relaxed group-hover:text-white/90 transition-colors">{listItem}</span>
+                                    <span className="leading-relaxed group-hover:text-white transition-colors">{listItem}</span>
                                   </li>
                                 ))}
                               </ul>
@@ -292,42 +345,117 @@ export default function FocusBatchPage() {
         </section>
 
         {/* SECTION 8: WHAT YOU GET */}
-        <section className="py-24 bg-white animate-section">
-          <div className="container mx-auto px-4 max-w-5xl">
-            <div className="flex flex-col md:flex-row gap-16 items-center">
-              <div className="md:w-1/2">
-                <h2 className="text-4xl md:text-5xl font-heading mb-6">What you get inside the Focus Batch</h2>
-                <p className="text-lg text-foreground/60 mb-8 leading-relaxed">
-                  Everything is designed to reduce confusion and build meaningful progress.
-                </p>
-                <div className="space-y-4">
-                  {[
-                    "Personalized mentor guidance",
-                    "Design thinking and ideation classes",
-                    "Structured live sessions across 40 weeks",
-                    "Peer and mentor critique circles",
-                    "Weekly assignments & Mock tests with feedback",
-                    "Study material + past year question support",
-                    "Studio test simulations & Material practice",
-                    "Portfolio review & Mock interviews",
-                    "Guest sessions with NID / IIT / design mentors"
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-background border border-border/50">
-                      <CheckCircle2 className="w-5 h-5 text-primary" />
-                      <span className="font-medium text-foreground/80">{item}</span>
-                    </div>
-                  ))}
+        <section className="pt-24 pb-0 bg-white animate-section overflow-hidden border-t border-black/5">
+          <div className="container mx-auto px-4 max-w-6xl">
+            <div className="text-center mb-16 md:mb-20">
+              <h2 className="text-4xl md:text-5xl font-heading mb-6 text-[#262626]">What you get inside the Focus Batch</h2>
+              <p className="text-xl font-light text-foreground/60 max-w-2xl mx-auto leading-relaxed">
+                Everything is designed to reduce confusion and build meaningful progress.
+              </p>
+            </div>
+
+            {/* Arcs and Floating Elements Concept */}
+            <div ref={arcsContainerRef} className="relative w-full h-[600px] md:h-[700px] max-w-5xl mx-auto flex flex-col items-center justify-center font-sans mb-12">
+              
+              {/* Semi-circles (Arcs) now Full Circles centered */}
+              {/* Outer Arc */}
+              <div className="arc-line absolute top-1/2 left-1/2 w-[900px] h-[900px] rounded-full border border-black/10 -translate-x-1/2 -translate-y-1/2 hidden md:block z-0"></div>
+              <div className="arc-line absolute top-1/2 left-1/2 w-[500px] h-[500px] rounded-full border border-black/10 -translate-x-1/2 -translate-y-1/2 md:hidden z-0"></div>
+
+              {/* Middle Arc */}
+              <div className="arc-line absolute top-1/2 left-1/2 w-[650px] h-[650px] rounded-full border border-black/10 -translate-x-1/2 -translate-y-1/2 hidden md:block z-0"></div>
+              <div className="arc-line absolute top-1/2 left-1/2 w-[350px] h-[350px] rounded-full border border-black/10 -translate-x-1/2 -translate-y-1/2 md:hidden z-0"></div>
+              
+              {/* Inner Arc */}
+              <div className="arc-line absolute top-1/2 left-1/2 w-[350px] h-[350px] rounded-full border border-black/10 border-dashed -translate-x-1/2 -translate-y-1/2 hidden md:block z-0"></div>
+              <div className="arc-line absolute top-1/2 left-1/2 w-[220px] h-[220px] rounded-full border border-black/10 border-dashed -translate-x-1/2 -translate-y-1/2 md:hidden z-0"></div>
+
+              {/* Floating Items */}
+              
+              {/* Top Level Items */}
+              {/* Top Center */}
+              <div className="floating-chip absolute top-[5%] md:top-[8%] left-1/2 -translate-x-1/2 bg-white px-4 md:px-5 py-2 md:py-3 rounded-[2rem] shadow-xl shadow-black/[0.04] border border-black/5 flex items-center gap-3 md:hover:border-primary/30 transition-colors z-20">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <BookOpen className="w-4 h-4 text-primary" />
                 </div>
+                <span className="text-xs md:text-sm font-medium text-foreground whitespace-nowrap">Portfolio & Interviews</span>
               </div>
-              <div className="md:w-1/2">
-                <div className="aspect-square rounded-3xl bg-background border border-border p-8 flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-                  <div className="text-center relative z-10">
-                    <div className="text-6xl font-heading text-primary mb-4">240+</div>
-                    <div className="text-xl font-medium text-foreground/70 uppercase tracking-widest">Hours of Live Mentorship</div>
-                  </div>
+
+              {/* Upper Left */}
+              <div className="floating-chip absolute top-[18%] md:top-[20%] left-[5%] md:left-[15%] bg-white px-4 md:px-5 py-2 md:py-3 rounded-[2rem] shadow-xl shadow-black/[0.04] border border-black/5 flex items-center gap-3 md:hover:border-primary/30 transition-colors z-20">
+                <div className="w-8 h-8 rounded-full bg-pop-1/10 flex items-center justify-center shrink-0">
+                  <Users className="w-4 h-4 text-pop-1" />
                 </div>
+                <span className="text-xs md:text-sm font-medium text-foreground whitespace-nowrap">Guest Sessions</span>
               </div>
+
+              {/* Upper Right */}
+              <div className="floating-chip absolute top-[18%] md:top-[20%] right-[5%] md:right-[15%] bg-white px-4 md:px-5 py-2 md:py-3 rounded-[2rem] shadow-xl shadow-black/[0.04] border border-black/5 flex items-center gap-3 md:hover:border-primary/30 transition-colors z-20">
+                <div className="w-8 h-8 rounded-full bg-pop-2/10 flex items-center justify-center shrink-0">
+                  <PenTool className="w-4 h-4 text-pop-2" />
+                </div>
+                <span className="text-xs md:text-sm font-medium text-foreground whitespace-nowrap">Studio Practice</span>
+              </div>
+
+              {/* Mid Level Items */}
+              {/* Mid Left */}
+              <div className="floating-chip absolute top-[38%] md:top-[42%] left-[2%] md:left-[8%] bg-white px-4 md:px-5 py-2 md:py-3 rounded-[2rem] shadow-lg shadow-black/[0.04] border border-black/5 flex items-center gap-2 md:gap-3 md:hover:border-primary/30 transition-colors z-20">
+                <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                </div>
+                <span className="text-xs md:text-sm font-medium text-foreground whitespace-nowrap">Weekly Assignments</span>
+              </div>
+
+              {/* Mid Right */}
+              <div className="floating-chip absolute top-[38%] md:top-[42%] right-[2%] md:right-[8%] bg-white px-4 md:px-5 py-2 md:py-3 rounded-[2rem] shadow-lg shadow-black/[0.04] border border-black/5 flex items-center gap-2 md:gap-3 md:hover:border-primary/30 transition-colors z-20">
+                <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center shrink-0">
+                  <BookOpen className="w-4 h-4 text-orange-600" />
+                </div>
+                <span className="text-xs md:text-sm font-medium text-foreground whitespace-nowrap">PYQs & Material</span>
+              </div>
+
+              {/* Lower Level Items */}
+              {/* Lower Left Inner */}
+              <div className="floating-chip absolute top-[55%] md:top-[60%] left-[20%] md:left-[28%] bg-white px-4 md:px-5 py-2 md:py-3 rounded-[2rem] shadow-md border border-black/5 flex items-center gap-2 md:gap-3 md:hover:border-primary/30 transition-colors z-20">
+                <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                  <Target className="w-4 h-4 text-blue-600" />
+                </div>
+                <span className="text-xs md:text-sm font-medium text-foreground whitespace-nowrap">1-on-1 Guidance</span>
+              </div>
+
+              {/* Lower Right Inner */}
+              <div className="floating-chip absolute top-[55%] md:top-[60%] right-[20%] md:right-[28%] bg-white px-4 md:px-5 py-2 md:py-3 rounded-[2rem] shadow-md border border-black/5 flex items-center gap-2 md:gap-3 md:hover:border-primary/30 transition-colors z-20">
+                <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center shrink-0">
+                  <Users className="w-4 h-4 text-purple-600" />
+                </div>
+                <span className="text-xs md:text-sm font-medium text-foreground whitespace-nowrap">Critique Circles</span>
+              </div>
+
+              {/* Center Stats Bubbles */}
+              
+              {/* Bottom Left Core Bubble */}
+              <div className="absolute top-[50%] left-[50%] -translate-x-[110%] md:-translate-x-[120%] -translate-y-1/2 bg-white w-28 h-28 md:w-36 md:h-36 rounded-full shadow-2xl border border-black/5 flex flex-col items-center justify-center z-30 transition-transform hover:scale-105">
+                <div className="text-3xl md:text-4xl font-heading text-primary drop-shadow-sm mb-1">40</div>
+                <div className="text-[9px] md:text-[10px] font-bold text-foreground/70 uppercase tracking-widest text-center px-2">Week Path</div>
+              </div>
+
+              {/* Top Center Core Bubble */}
+              <div className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-[120%] bg-white w-32 h-32 md:w-44 md:h-44 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.08)] border border-black/5 flex flex-col items-center justify-center z-40 transition-transform hover:scale-105">
+                <div className="text-4xl md:text-6xl font-heading text-primary drop-shadow-sm leading-none mb-1 md:mb-2">240<span className="text-2xl md:text-3xl">+</span></div>
+                <div className="text-[10px] md:text-xs font-bold text-foreground/70 uppercase tracking-widest text-center px-4">Mentorship Hours</div>
+              </div>
+
+              {/* Bottom Right Core Bubble */}
+              <div className="absolute top-[50%] left-[50%] translate-x-[10%] md:translate-x-[20%] -translate-y-1/2 bg-white w-28 h-28 md:w-36 md:h-36 rounded-full shadow-2xl border border-black/5 flex flex-col items-center justify-center z-30 transition-transform hover:scale-105">
+                <div className="text-3xl md:text-4xl font-heading text-primary drop-shadow-sm mb-1">1:1</div>
+                <div className="text-[9px] md:text-[10px] font-bold text-foreground/70 uppercase tracking-widest text-center px-2">Critique Sessions</div>
+              </div>
+
+              {/* Central connection aesthetic */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-border/40 z-10"></div>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[180px] md:w-[260px] h-px bg-border/30 -rotate-45 z-10"></div>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[180px] md:w-[260px] h-px bg-border/30 rotate-45 z-10"></div>
+
             </div>
           </div>
         </section>
@@ -340,7 +468,7 @@ export default function FocusBatchPage() {
 
             <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto text-left">
               {/* Card 1 */}
-              <Card className="relative overflow-hidden border-2 border-primary/20 hover:border-primary transition-colors">
+              <Card className="relative overflow-hidden border-2 border-primary/20 hover:border-primary transition-colors flex flex-col h-full">
                 <div className="absolute top-0 right-0 bg-primary text-white text-xs font-bold px-3 py-1 rounded-bl-lg">RECOMMENDED</div>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-2xl font-medium">One-Time Payment</CardTitle>
@@ -349,11 +477,11 @@ export default function FocusBatchPage() {
                   </div>
                   <p className="text-sm text-green-600 font-medium mt-2">Save ₹2,000</p>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex flex-col flex-1">
                   <p className="text-foreground/70 mb-8">
                     The full fee is ₹22,000. Students choosing one-time payment receive a ₹2,000 discount.
                   </p>
-                  <Button className="w-full text-lg h-12 rounded-xl group btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
+                  <Button className="w-full mt-auto text-lg h-12 rounded-xl group btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
                     Pay One Time
                     <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
@@ -361,7 +489,7 @@ export default function FocusBatchPage() {
               </Card>
 
               {/* Card 2 */}
-              <Card className="border border-border hover:border-foreground/20 transition-colors">
+              <Card className="border border-border hover:border-foreground/20 transition-colors flex flex-col h-full">
                 <CardHeader className="pb-4">
                   <CardTitle className="text-2xl font-medium">Installment Plan</CardTitle>
                   <div className="mt-4 flex items-baseline gap-2">
@@ -369,7 +497,7 @@ export default function FocusBatchPage() {
                     <span className="text-foreground/50">total</span>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex flex-col flex-1">
                   <div className="space-y-4 mb-8">
                     <div className="flex justify-between items-center py-2 border-b border-border">
                       <span className="text-foreground/70">1st Installment (Pay Now)</span>
@@ -380,7 +508,7 @@ export default function FocusBatchPage() {
                       <span className="font-bold">₹10,000</span>
                     </div>
                   </div>
-                  <Button variant="outline" className="w-full text-lg h-12 rounded-xl bg-white border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+                  <Button variant="outline" className="w-full mt-auto text-lg h-12 rounded-xl bg-white border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                     Choose Installments
                   </Button>
                 </CardContent>
@@ -424,33 +552,72 @@ export default function FocusBatchPage() {
         </section>
 
         {/* SECTION 15 & 16: FINAL CTA & CONTACT */}
-        <section className="py-24 bg-primary text-primary-foreground animate-section">
-          <div className="container mx-auto px-4 max-w-4xl text-center">
-            <h2 className="text-4xl md:text-6xl font-heading mb-6 leading-tight text-white">
-              If you are serious about design, this is your time to begin
-            </h2>
-            <p className="text-xl text-primary-foreground/80 mb-12 max-w-2xl mx-auto leading-relaxed">
-              Join a focused, mentored, and high-intent 40-week program designed to help you prepare deeply, think clearly, present confidently, and perform strongly.
-            </p>
+        <section className="py-24 bg-background animate-section border-t border-border/50">
+          <div className="container mx-auto px-4 max-w-5xl">
 
-            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
-              <Button size="lg" onClick={() => setIsRegOpen(true)} className="text-lg px-8 h-14 rounded-full btn-bold bg-white text-primary hover:bg-white/90 shadow-[0_4px_14px_0_rgba(255,255,255,0.39)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.23)] hover:-translate-y-0.5 transition-all">Apply for Focus Batch</Button>
-              <Button size="lg" className="text-lg px-8 h-14 rounded-full border border-white/30 bg-transparent hover:bg-white/10 text-white transition-all hover:-translate-y-0.5">Join Waitlist</Button>
-            </div>
+            {/* Subscription Card Format */}
+            <div className="bg-white rounded-3xl p-10 md:p-16 border border-black/5 shadow-xl relative overflow-hidden mb-20 group">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:scale-150 transition-transform duration-1000"></div>
+              
+              <div className="relative z-10 max-w-2xl">
+                <div className="inline-block bg-primary/10 text-primary font-mono text-sm px-4 py-1.5 rounded-full mb-6 font-medium border border-primary/20">
+                  Join the Waitlist
+                </div>
+                <h2 className="text-4xl md:text-5xl font-heading mb-6 leading-tight text-foreground">
+                  If you are serious about design, <span className="text-primary italic">this is your time to begin.</span>
+                </h2>
+                <p className="text-lg text-foreground/70 mb-10 leading-relaxed">
+                  Join a focused, mentored, and high-intent 40-week program designed to help you prepare deeply, think clearly, present confidently, and perform strongly.
+                </p>
 
-            <p className="text-sm font-mono text-primary-foreground/60 mb-16 uppercase tracking-wider">
-              Only 20 seats per batch · B.Des + M.Des · Prelims + Mains support
-            </p>
-
-            <div className="border-t border-white/20 pt-12 mt-12">
-              <h3 className="text-2xl font-heading mb-4 text-white">Have questions? Reach out to us</h3>
-              <p className="text-primary-foreground/80 mb-6">Got questions or doubts? Chat with us — we're here to help.</p>
-              <div className="flex justify-center gap-6 text-lg">
-                <a href="tel:+917398580486" className="font-medium hover:underline text-white">+91 7398580486</a>
-                <span className="text-white/40">|</span>
-                <a href="mailto:designforge05@gmail.com" className="font-medium hover:underline text-white">designforge05@gmail.com</a>
+                <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                  <div className="flex-1 relative">
+                    <input 
+                      type="email" 
+                      placeholder="Enter your email for updates" 
+                      className="w-full h-14 pl-6 pr-4 rounded-full border border-black/10 bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium placeholder:text-foreground/40"
+                    />
+                  </div>
+                  <Button size="lg" className="h-14 px-8 rounded-full btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
+                    Subscribe
+                  </Button>
+                </div>
+                
+                <p className="text-sm text-foreground/50 font-medium ml-2">Or <button onClick={() => setIsRegOpen(true)} className="text-primary underline hover:text-primary/80">apply directly</button> for the upcoming Focus Batch.</p>
               </div>
             </div>
+
+            {/* Help & Contact Layout Redo */}
+            <div className="flex flex-col md:flex-row gap-12 items-center justify-between px-4 max-w-4xl mx-auto">
+              <div className="md:w-1/2">
+                <h3 className="text-3xl font-heading mb-4 text-foreground">Have questions? Reach out to us</h3>
+                <p className="text-foreground/60 leading-relaxed">
+                  Got questions or doubts? Whether you are confused about the roadmap, or just want to know if this batch is right for you — chat with us, we're here to help.
+                </p>
+              </div>
+              <div className="md:w-1/2 flex flex-col gap-4 w-full">
+                 <div className="flex items-center gap-4 p-5 rounded-2xl bg-white border border-black/5 shadow-sm group hover:shadow-md transition-all">
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                      <MessageCircle className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-foreground/50 uppercase tracking-widest mb-1">WhatsApp Us</p>
+                      <a href="https://wa.me/917398580486" target="_blank" rel="noopener noreferrer" className="text-lg font-bold text-foreground hover:text-primary transition-colors">+91 7398580486</a>
+                    </div>
+                 </div>
+                 
+                 <div className="flex items-center gap-4 p-5 rounded-2xl bg-white border border-black/5 shadow-sm group hover:shadow-md transition-all">
+                    <div className="w-12 h-12 rounded-full bg-pop-1/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                      <Mail className="w-5 h-5 text-pop-1" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-foreground/50 uppercase tracking-widest mb-1">Email Us</p>
+                      <a href="mailto:designforge05@gmail.com" className="text-lg font-bold text-foreground hover:text-pop-1 transition-colors">designforge05@gmail.com</a>
+                    </div>
+                 </div>
+              </div>
+            </div>
+
           </div>
         </section>
 

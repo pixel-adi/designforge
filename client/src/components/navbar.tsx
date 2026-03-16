@@ -66,7 +66,11 @@ export function Navbar() {
           </nav>
 
           <div className="flex items-center gap-4">
-            <Button className="hidden md:flex rounded-full px-6 md:px-8 btn-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-xs md:text-sm font-medium h-10 md:h-12 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5">Join Community</Button>
+            <Button asChild className="hidden md:flex rounded-full px-6 md:px-8 btn-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-xs md:text-sm font-medium h-10 md:h-12 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5">
+              <a href="https://chat.whatsapp.com/FJGc9od7fbz7iRXsFnzYU0" target="_blank" rel="noopener noreferrer">
+                Join Community
+              </a>
+            </Button>
 
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild className="lg:hidden">
@@ -94,8 +98,10 @@ export function Navbar() {
                   </div>
 
                   <div className="mt-auto pb-8 pt-6">
-                    <Button className="w-full rounded-full h-12 btn-bold bg-primary text-primary-foreground hover:bg-primary/90 text-base" onClick={() => setIsOpen(false)}>
-                      Join Community
+                    <Button asChild className="w-full rounded-full h-12 btn-bold bg-primary text-primary-foreground hover:bg-primary/90 text-base" onClick={() => setIsOpen(false)}>
+                      <a href="https://chat.whatsapp.com/FJGc9od7fbz7iRXsFnzYU0" target="_blank" rel="noopener noreferrer">
+                        Join Community
+                      </a>
                     </Button>
                   </div>
                 </div>

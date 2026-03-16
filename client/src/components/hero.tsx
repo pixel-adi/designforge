@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { Link } from 'wouter';
 import sketchbookImg from '@assets/Gemini_Generated_Image_ofmjymofmjymofmj-removebg-preview_1773229141541.png';
 
 export function Hero() {
@@ -130,11 +131,15 @@ export function Hero() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-center w-full">
-            <Button className="hero-btn rounded-full h-16 px-10 btn-bold bg-primary text-primary-foreground hover:bg-primary/90 text-base w-full sm:w-auto shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
-              Join WhatsApp Community
+            <Button asChild className="hero-btn rounded-full h-16 px-10 btn-bold bg-primary text-primary-foreground hover:bg-primary/90 text-base w-full sm:w-auto shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
+              <a href="https://chat.whatsapp.com/FJGc9od7fbz7iRXsFnzYU0" target="_blank" rel="noopener noreferrer">
+                Join WhatsApp Community
+              </a>
             </Button>
-            <Button className="hero-btn rounded-full h-16 px-10 btn-bold bg-white text-foreground border border-black/10 hover:bg-black/5 text-base shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all w-full sm:w-auto">
-              Explore Focus Batch
+            <Button asChild className="hero-btn rounded-full h-16 px-10 btn-bold bg-white text-foreground border border-black/10 hover:bg-black/5 text-base shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all w-full sm:w-auto">
+              <Link href="/focus-batch">
+                Explore Focus Batch
+              </Link>
             </Button>
           </div>
         </div>

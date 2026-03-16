@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import adityaImg from '@/assets/aditya.png';
+import siddhiImg from '@/assets/siddhi.jpg';
 
 export function FoundersSection() {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -57,9 +59,7 @@ export function FoundersSection() {
             <div className="w-40 h-40 rounded-full mx-auto mb-8 relative mb-8">
                <div className="absolute inset-0 bg-pop-1/20 rounded-full blur-2xl group-hover:blur-3xl transition-all duration-500 scale-150 opacity-0 group-hover:opacity-100"></div>
                <div className="w-full h-full bg-white rounded-full border border-black/5 shadow-md flex items-center justify-center relative z-10 overflow-hidden group-hover:scale-105 transition-transform duration-500">
-                  <div className="w-24 h-24 bg-pop-1/10 rounded-full flex items-center justify-center">
-                    <span className="text-pop-1 font-heading text-3xl">AS</span>
-                  </div>
+                  <img src={adityaImg} alt="Aditya Sharma" className="w-full h-full object-cover" />
                </div>
             </div>
             
@@ -74,9 +74,7 @@ export function FoundersSection() {
             <div className="w-40 h-40 rounded-full mx-auto mb-8 relative mb-8">
                <div className="absolute inset-0 bg-pop-2/20 rounded-full blur-2xl group-hover:blur-3xl transition-all duration-500 scale-150 opacity-0 group-hover:opacity-100"></div>
                <div className="w-full h-full bg-white rounded-full border border-black/5 shadow-md flex items-center justify-center relative z-10 overflow-hidden group-hover:scale-105 transition-transform duration-500">
-                  <div className="w-24 h-24 bg-pop-2/10 rounded-full flex items-center justify-center">
-                    <span className="text-pop-2 font-heading text-3xl">SP</span>
-                  </div>
+                  <img src={siddhiImg} alt="Siddhi Patil" className="w-full h-full object-cover" />
                </div>
             </div>
             

@@ -11,6 +11,8 @@ import Community from "@/pages/community";
 import FocusBatchPage from "@/pages/focus-batch-page";
 import AboutPage from "@/pages/about-page";
 import JoinUsPage from "@/pages/join-us-page";
+import PrivacyPolicy from "@/pages/privacy-policy";
+import TermsOfService from "@/pages/terms-of-service";
 
 import ApprenticeshipPage from "@/pages/apprenticeship-page";
 
@@ -26,6 +28,8 @@ function Router() {
         <Route path="/mentorship" component={Mentorship} />
         <Route path="/community" component={Community} />
         <Route path="/focus-batch" component={FocusBatchPage} />
+        <Route path="/privacy-policy" component={PrivacyPolicy} />
+        <Route path="/terms-of-service" component={TermsOfService} />
         {/* Fallback to 404 */}
         <Route component={NotFound} />
       </Switch>
