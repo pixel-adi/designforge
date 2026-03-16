@@ -19,13 +19,13 @@ function Router() {
     <>
       <ScrollToTop />
       <Switch>
-        <Route path="/" component={Home}/>
-        <Route path="/about" component={AboutPage}/>
-        <Route path="/apprenticeship" component={ApprenticeshipPage}/>
-        <Route path="/join-us" component={JoinUsPage}/>
-        <Route path="/mentorship" component={Mentorship}/>
-        <Route path="/community" component={Community}/>
-        <Route path="/focus-batch" component={FocusBatchPage}/>
+        <Route path="/" component={Home} />
+        <Route path="/about" component={AboutPage} />
+        <Route path="/apprenticeship" component={ApprenticeshipPage} />
+        <Route path="/join-us" component={JoinUsPage} />
+        <Route path="/mentorship" component={Mentorship} />
+        <Route path="/community" component={Community} />
+        <Route path="/focus-batch" component={FocusBatchPage} />
         {/* Fallback to 404 */}
         <Route component={NotFound} />
       </Switch>

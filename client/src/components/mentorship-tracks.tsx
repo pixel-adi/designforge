@@ -4,8 +4,8 @@ import gsap from 'gsap';
 
 const tracks = [
   {
-    title: "NID DAT BDes",
-    subtitle: "Observation & Creativity",
+    title: "Observation & Creativity",
+    subtitle: "",
     description: "Build creativity, observation, visualisation, and confidence for prelims, studio tests, and interviews.",
     price: "Structured Prep",
     popular: false,
@@ -13,8 +13,8 @@ const tracks = [
     hoverColor: "hover:bg-pop-3/5"
   },
   {
-    title: "NID DAT MDes",
-    subtitle: "Advanced Portfolios",
+    title: "Advanced Portfolios",
+    subtitle: "",
     description: "Develop stronger problem framing, portfolio depth, articulation, and design maturity for advanced admissions.",
     price: "Deeper Critique",
     popular: true,
@@ -22,8 +22,8 @@ const tracks = [
     hoverColor: "hover:bg-primary/5"
   },
   {
-    title: "UCEED & CEED",
-    subtitle: "Analytical Design",
+    title: "Analytical Design",
+    subtitle: "",
     description: "Prepare with stronger basics, visual reasoning, sketching, analytical thinking, and concept communication.",
     price: "Systematic Guidance",
     popular: false,
@@ -37,7 +37,7 @@ export function MentorshipTracks() {
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      
+
       gsap.fromTo(".track-card",
         { y: 30, opacity: 0 },
         {
@@ -57,7 +57,7 @@ export function MentorshipTracks() {
   return (
     <section ref={sectionRef} className="py-32 bg-white relative">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-        
+
         <div className="text-center max-w-3xl mx-auto mb-20">
           <h2 className="text-5xl md:text-6xl font-heading mb-6 tracking-tight text-[#e94a35]">
             Mentorship for every pathway
@@ -69,16 +69,16 @@ export function MentorshipTracks() {
 
         <div className="cards-container grid lg:grid-cols-3 gap-8">
           {tracks.map((track, i) => (
-            <div 
-              key={i} 
+            <div
+              key={i}
               className={`track-card struct-card p-10 flex flex-col group ${track.hoverColor}`}
             >
-              
+
               <div className={`w-3 h-12 rounded-full ${track.color} mb-8 opacity-60 group-hover:opacity-100 transition-opacity duration-300`}></div>
 
               <p className="text-sm uppercase tracking-widest font-medium mt-[6px] mb-[6px] bg-[#33181800] text-[#dc4846]">{track.subtitle}</p>
               <h3 className="text-3xl font-heading text-foreground mb-6">{track.title}</h3>
-              
+
               <p className="text-foreground/70 text-base font-light leading-relaxed mb-10 flex-1">
                 {track.description}
               </p>
@@ -94,7 +94,7 @@ export function MentorshipTracks() {
             </div>
           ))}
         </div>
-        
+
       </div>
     </section>
   );
