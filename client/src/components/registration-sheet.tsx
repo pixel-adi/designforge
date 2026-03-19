@@ -9,7 +9,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { supabase } from "@/lib/supabaseClient";
-import { load as loadCashfree } from "@cashfreepayments/cashfree-js";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").regex(/^[a-zA-Z\s]*$/, "Name can only contain letters and spaces"),
@@ -42,7 +41,7 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [paymentStep, setPaymentStep] = useState<'saving' | 'creating' | 'redirecting' | null>(null);
-  
+
   const { register, formState: { errors }, setValue, watch, trigger, reset } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     mode: "onChange",
@@ -116,6 +115,7 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
 
       // Step 3: Open Cashfree checkout
       setPaymentStep('redirecting');
+      const { load: loadCashfree } = await import("@cashfreepayments/cashfree-js");
       const cashfree = await loadCashfree({ mode: "production" });
 
       const checkoutOptions = {
@@ -168,7 +168,7 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="w-full sm:w-[750px] bg-background border-l border-black/5 flex flex-col p-0 sm:max-w-[750px] z-[100]">
         <div className="flex-1 overflow-y-auto w-full px-8 py-10 md:px-12 md:py-14">
-          
+
           {step !== 3 && (
             <div className="mb-8">
               <div className="flex justify-between items-center mb-3">
@@ -202,10 +202,10 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
               </>
             )}
             {step === 3 && (
-               <>
-                 <SheetTitle className="sr-only">Payment Success</SheetTitle>
-                 <SheetDescription className="sr-only">Your payment has been completed successfully.</SheetDescription>
-               </>
+              <>
+                <SheetTitle className="sr-only">Payment Success</SheetTitle>
+                <SheetDescription className="sr-only">Your payment has been completed successfully.</SheetDescription>
+              </>
             )}
           </SheetHeader>
 
@@ -218,8 +218,8 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
               <p className="text-foreground/70 mb-10 text-lg max-w-[320px] leading-relaxed">
                 Thank you for enrolling in <strong>{watch('program')}</strong>. We will send you a confirmation email with next steps shortly.
               </p>
-              <Button 
-                onClick={() => handleOpenChange(false)} 
+              <Button
+                onClick={() => handleOpenChange(false)}
                 className="w-full h-14 rounded-xl text-lg btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all"
               >
                 Close Window
@@ -230,43 +230,43 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
               <div className="space-y-6">
                 <div className="space-y-3">
                   <Label htmlFor="name" className="text-sm font-medium text-foreground/80">Full Name <span className="text-primary">*</span></Label>
-                  <Input 
-                    id="name" 
-                    placeholder="Aditya Sharma" 
+                  <Input
+                    id="name"
+                    placeholder="Aditya Sharma"
                     className={`h-14 px-4 bg-white/60 focus-visible:ring-primary/20 focus-visible:border-primary transition-all text-base ${errors.name ? 'border-red-500 focus-visible:ring-red-500/20' : ''}`}
-                    {...register("name")} 
+                    {...register("name")}
                   />
                   {errors.name && <p className="text-sm text-red-500 font-medium mt-1">{errors.name.message}</p>}
                 </div>
 
                 <div className="space-y-3">
                   <Label htmlFor="email" className="text-sm font-medium text-foreground/80">Email Address <span className="text-primary">*</span></Label>
-                  <Input 
-                    id="email" 
+                  <Input
+                    id="email"
                     type="email"
-                    placeholder="you@example.com" 
+                    placeholder="you@example.com"
                     className={`h-14 px-4 bg-white/60 focus-visible:ring-primary/20 focus-visible:border-primary transition-all text-base ${errors.email ? 'border-red-500 focus-visible:ring-red-500/20' : ''}`}
-                    {...register("email")} 
+                    {...register("email")}
                   />
                   {errors.email && <p className="text-sm text-red-500 font-medium mt-1">{errors.email.message}</p>}
                 </div>
 
                 <div className="space-y-3">
                   <Label htmlFor="phone" className="text-sm font-medium text-foreground/80">Phone Number <span className="text-primary">*</span></Label>
-                  <Input 
-                    id="phone" 
+                  <Input
+                    id="phone"
                     type="tel"
-                    placeholder="+91 98765 43210" 
+                    placeholder="+91 98765 43210"
                     className={`h-14 px-4 bg-white/60 focus-visible:ring-primary/20 focus-visible:border-primary transition-all text-base ${errors.phone ? 'border-red-500 focus-visible:ring-red-500/20' : ''}`}
-                    {...register("phone")} 
+                    {...register("phone")}
                   />
                   {errors.phone && <p className="text-sm text-red-500 font-medium mt-1">{errors.phone.message}</p>}
                 </div>
 
                 <div className="space-y-3">
                   <Label htmlFor="program" className="text-sm font-medium text-foreground/80">Mentorship Track <span className="text-primary">*</span></Label>
-                  <Select 
-                    onValueChange={(value) => setValue("program", value, { shouldValidate: true })} 
+                  <Select
+                    onValueChange={(value) => setValue("program", value, { shouldValidate: true })}
                     defaultValue={watch("program")}
                   >
                     <SelectTrigger className={`h-14 px-4 bg-white/60 focus:ring-primary/20 focus:border-primary transition-all text-left text-base ${errors.program ? 'border-red-500 focus:ring-red-500/20' : ''}`}>
@@ -286,7 +286,7 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
 
                 <div className="space-y-3">
                   <Label htmlFor="stage" className="text-sm font-medium text-foreground/80">Current Stage <span className="text-primary">*</span></Label>
-                  <Select 
+                  <Select
                     onValueChange={(value) => setValue("stage", value, { shouldValidate: true })}
                     defaultValue={watch("stage")}
                   >
@@ -307,8 +307,8 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
               </div>
 
               <div className="pt-6">
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   onClick={onNextStep}
                   className="w-full text-lg h-14 rounded-xl group btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                 >
@@ -349,8 +349,8 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
 
               {/* Payment CTA */}
               <div className="pt-2">
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   onClick={initiatePayment}
                   disabled={isProcessing}
                   className="w-full text-lg h-14 rounded-xl group btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 relative overflow-hidden"
