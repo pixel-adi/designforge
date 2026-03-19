@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2, ArrowRight, ArrowLeft, QrCode } from "lucide-react";
+import { CheckCircle2, ArrowRight, ArrowLeft, CreditCard, AlertCircle, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { supabase } from "@/lib/supabaseClient";
+import { load as loadCashfree } from "@cashfreepayments/cashfree-js";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").regex(/^[a-zA-Z\s]*$/, "Name can only contain letters and spaces"),
@@ -19,6 +21,16 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+// Program pricing (in INR)
+const programPricing: Record<string, number> = {
+  "NID B.Des": 29999,
+  "NID M.Des": 29999,
+  "CEED": 24999,
+  "UCEED": 24999,
+  "Private Colleges": 19999,
+  "Abroad Colleges": 34999,
+};
+
 interface RegistrationSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -27,10 +39,11 @@ interface RegistrationSheetProps {
 
 export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus Batch" }: RegistrationSheetProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [formData, setFormData] = useState<Partial<FormValues>>({});
   const [isProcessing, setIsProcessing] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [paymentStep, setPaymentStep] = useState<'saving' | 'creating' | 'redirecting' | null>(null);
   
-  const { register, handleSubmit, formState: { errors, isValid }, setValue, watch, trigger, reset } = useForm<FormValues>({
+  const { register, formState: { errors }, setValue, watch, trigger, reset } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     mode: "onChange",
     defaultValues: {
@@ -45,29 +58,111 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
     }
   };
 
-  const onFinalSubmit = async () => {
+  const initiatePayment = async () => {
     setIsProcessing(true);
-    // In a real application, submit to backend here
-    const finalData = { ...watch() };
-    console.log("Registration Data Confirmed:", finalData);
-    
-    // Simulate API call delay for payment processing
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsProcessing(false);
-    setStep(3);
+    setSubmitError(null);
+    const formData = { ...watch() };
+    const amount = programPricing[formData.program] || 29999;
+
+    try {
+      // Step 1: Save registration to Supabase
+      setPaymentStep('saving');
+      // Generate ID client-side to avoid needing a SELECT policy for anon users
+      const registrationId = crypto.randomUUID();
+      const { error: regError } = await supabase
+        .from('registrations')
+        .insert({
+          id: registrationId,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          program: formData.program,
+          stage: formData.stage,
+          payment_status: 'pending',
+        });
+
+      if (regError) {
+        console.error('Registration insert error:', regError);
+        setSubmitError('Could not save your registration. Please try again.');
+        setIsProcessing(false);
+        setPaymentStep(null);
+        return;
+      }
+
+      // Step 2: Create Cashfree order via Edge Function
+      setPaymentStep('creating');
+      const { data: rawResponse, error: fnError } = await supabase.functions.invoke('create-order', {
+        body: {
+          registration_id: registrationId,
+          amount,
+          customer_name: formData.name,
+          customer_email: formData.email,
+          customer_phone: formData.phone.replace(/^\+/, ''),
+        },
+      });
+
+      console.log('Edge Function response:', { rawResponse, fnError });
+
+      // supabase.functions.invoke may return data as-is or wrapped
+      const orderResponse = typeof rawResponse === 'string' ? JSON.parse(rawResponse) : rawResponse;
+
+      if (fnError || !orderResponse?.payment_session_id) {
+        console.error('Order creation error:', fnError, orderResponse);
+        setSubmitError('Could not initiate payment. Please try again or contact us.');
+        setIsProcessing(false);
+        setPaymentStep(null);
+        return;
+      }
+
+      // Step 3: Open Cashfree checkout
+      setPaymentStep('redirecting');
+      const cashfree = await loadCashfree({ mode: "production" });
+
+      const checkoutOptions = {
+        paymentSessionId: orderResponse.payment_session_id,
+        redirectTarget: "_modal" as const,
+      };
+
+      const result = await cashfree.checkout(checkoutOptions);
+
+      if (result.error) {
+        console.error('Cashfree checkout error:', result.error);
+        setSubmitError('Payment was not completed. You can try again.');
+        setIsProcessing(false);
+        setPaymentStep(null);
+        return;
+      }
+
+      if (result.paymentDetails) {
+        // Payment completed successfully
+        setStep(3);
+      }
+
+      setIsProcessing(false);
+      setPaymentStep(null);
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setSubmitError('Something went wrong. Please try again or contact us directly.');
+      setIsProcessing(false);
+      setPaymentStep(null);
+    }
   };
 
   const handleOpenChange = (newOpen: boolean) => {
     onOpenChange(newOpen);
     if (!newOpen) {
-      // Reset form slightly after close animation
       setTimeout(() => {
         setStep(1);
         setIsProcessing(false);
+        setSubmitError(null);
+        setPaymentStep(null);
         reset({ program: defaultProgram });
       }, 300);
     }
   };
+
+  const selectedProgram = watch('program');
+  const displayAmount = selectedProgram ? programPricing[selectedProgram] : null;
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
@@ -97,19 +192,19 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
             )}
             {step === 2 && (
               <>
-                <Button variant="ghost" className="mb-4 -ml-4 h-8 px-4 text-foreground/60 hover:text-foreground hover:bg-transparent" onClick={() => setStep(1)}>
+                <Button variant="ghost" className="mb-4 -ml-4 h-8 px-4 text-foreground/60 hover:text-foreground hover:bg-transparent" onClick={() => { setStep(1); setSubmitError(null); }}>
                   <ArrowLeft className="w-4 h-4 mr-2" /> Back to details
                 </Button>
-                <SheetTitle className="text-4xl font-heading tracking-tight text-[#262626]">Complete Registration</SheetTitle>
+                <SheetTitle className="text-4xl font-heading tracking-tight text-[#262626]">Complete Payment</SheetTitle>
                 <SheetDescription className="text-base text-foreground/70 mt-3 leading-relaxed">
-                  You are registering for <span className="text-foreground font-medium">{watch('program')}</span>. Please complete this mock UPI payment to proceed.
+                  You are registering for <span className="text-foreground font-medium">{watch('program')}</span>. Complete payment to secure your spot.
                 </SheetDescription>
               </>
             )}
             {step === 3 && (
                <>
-                 <SheetTitle className="sr-only">Application Success</SheetTitle>
-                 <SheetDescription className="sr-only">Your application has been received successfully.</SheetDescription>
+                 <SheetTitle className="sr-only">Payment Success</SheetTitle>
+                 <SheetDescription className="sr-only">Your payment has been completed successfully.</SheetDescription>
                </>
             )}
           </SheetHeader>
@@ -119,9 +214,9 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
               <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-8">
                 <CheckCircle2 className="w-10 h-10 text-primary" />
               </div>
-              <h3 className="text-3xl font-heading mb-4">Application Received</h3>
+              <h3 className="text-3xl font-heading mb-4">Payment Successful!</h3>
               <p className="text-foreground/70 mb-10 text-lg max-w-[320px] leading-relaxed">
-                Thank you for applying to <strong>{watch('program')}</strong>. We will review your details and reach out within 24-48 hours.
+                Thank you for enrolling in <strong>{watch('program')}</strong>. We will send you a confirmation email with next steps shortly.
               </p>
               <Button 
                 onClick={() => handleOpenChange(false)} 
@@ -227,34 +322,62 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
             </form>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="bg-white rounded-2xl p-8 border border-border shadow-sm text-center">
-                <div className="w-48 h-48 mx-auto bg-black/5 rounded-xl border-2 border-dashed border-black/10 flex flex-col items-center justify-center mb-6 text-foreground/40">
-                  <QrCode className="w-16 h-16 mb-2 opacity-50" />
-                  <span className="text-sm font-medium">Mock QR Code</span>
-                </div>
-                
-                <h4 className="text-xl font-heading mb-2">Scan to Pay</h4>
-                <p className="text-foreground/60 text-sm mb-6">Use any UPI app (GPay, PhonePe, Paytm)</p>
-                
-                <div className="bg-primary/5 rounded-xl p-4 inline-block text-left w-full max-w-[280px]">
-                  <p className="text-sm text-foreground/60 mb-1">UPI ID</p>
-                  <p className="font-mono font-medium text-foreground tracking-wide">designforge@okicici</p>
+              {/* Order Summary Card */}
+              <div className="bg-white rounded-2xl p-8 border border-border shadow-sm">
+                <h4 className="text-xl font-heading mb-6">Order Summary</h4>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center pb-4 border-b border-border">
+                    <span className="text-foreground/60">Program</span>
+                    <span className="font-medium text-foreground">{watch('program')}</span>
+                  </div>
+                  <div className="flex justify-between items-center pb-4 border-b border-border">
+                    <span className="text-foreground/60">Name</span>
+                    <span className="font-medium text-foreground">{watch('name')}</span>
+                  </div>
+                  <div className="flex justify-between items-center pb-4 border-b border-border">
+                    <span className="text-foreground/60">Email</span>
+                    <span className="font-medium text-foreground text-sm">{watch('email')}</span>
+                  </div>
+                  {displayAmount && (
+                    <div className="flex justify-between items-center pt-2">
+                      <span className="text-lg font-medium text-foreground">Total</span>
+                      <span className="text-2xl font-heading text-primary">₹{displayAmount.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
                 </div>
               </div>
-              
+
+              {/* Payment CTA */}
               <div className="pt-2">
                 <Button 
                   type="button" 
-                  onClick={onFinalSubmit}
+                  onClick={initiatePayment}
                   disabled={isProcessing}
-                  className="w-full text-lg h-14 rounded-xl group btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 relative overflow-hidden"
+                  className="w-full text-lg h-14 rounded-xl group btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 relative overflow-hidden"
                 >
-                  <div className={`absolute inset-0 bg-white/20 transition-transform duration-500 ease-out translate-x-[-100%] ${isProcessing ? 'translate-x-[100%]' : 'group-hover:translate-x-[100%]'}`} />
-                  {isProcessing ? "Verifying Payment..." : "I have completed the payment"}
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      {paymentStep === 'saving' && 'Saving details...'}
+                      {paymentStep === 'creating' && 'Preparing payment...'}
+                      {paymentStep === 'redirecting' && 'Opening checkout...'}
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-5 h-5" />
+                      Pay ₹{displayAmount?.toLocaleString('en-IN') || '—'}
+                    </>
+                  )}
                 </Button>
                 <p className="text-center text-sm text-foreground/50 mt-6 leading-relaxed">
-                  Payment verification is a mock process for this demo. Just click the button to proceed.
+                  Secure payment powered by Cashfree. UPI, cards, and netbanking accepted.
                 </p>
+                {submitError && (
+                  <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-700">{submitError}</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

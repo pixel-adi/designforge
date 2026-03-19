@@ -8,6 +8,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useEffect, useRef, useState } from "react";
 import { RegistrationSheet } from "@/components/registration-sheet";
+import { supabase } from "@/lib/supabaseClient";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -15,6 +16,29 @@ export default function FocusBatchPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const arcsContainerRef = useRef<HTMLDivElement>(null);
   const [isRegOpen, setIsRegOpen] = useState(false);
+  const [subEmail, setSubEmail] = useState('');
+  const [subStatus, setSubStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  const handleSubscribe = async () => {
+    if (!subEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(subEmail)) return;
+    setSubStatus('loading');
+    try {
+      const { error } = await supabase.from('subscribers').insert({ email: subEmail });
+      if (error) {
+        // Duplicate email returns a unique constraint error
+        if (error.code === '23505') {
+          setSubStatus('success'); // Already subscribed is fine
+        } else {
+          setSubStatus('error');
+        }
+      } else {
+        setSubStatus('success');
+        setSubEmail('');
+      }
+    } catch {
+      setSubStatus('error');
+    }
+  };
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -573,15 +597,25 @@ export default function FocusBatchPage() {
                 <div className="flex flex-col sm:flex-row gap-4 mb-4">
                   <div className="flex-1 relative">
                     <input 
-                      type="email" 
+                      type="email"
+                      value={subEmail}
+                      onChange={(e) => { setSubEmail(e.target.value); setSubStatus('idle'); }}
                       placeholder="Enter your email for updates" 
                       className="w-full h-14 pl-6 pr-4 rounded-full border border-black/10 bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium placeholder:text-foreground/40"
                     />
                   </div>
-                  <Button size="lg" className="h-14 px-8 rounded-full btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
-                    Subscribe
+                  <Button 
+                    size="lg" 
+                    onClick={handleSubscribe}
+                    disabled={subStatus === 'loading' || subStatus === 'success'}
+                    className="h-14 px-8 rounded-full btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all"
+                  >
+                    {subStatus === 'loading' ? 'Subscribing...' : subStatus === 'success' ? '✓ Subscribed!' : 'Subscribe'}
                   </Button>
                 </div>
+                {subStatus === 'error' && (
+                  <p className="text-sm text-red-500 font-medium ml-2 mb-2">Could not subscribe. Please try again.</p>
+                )}
                 
                 <p className="text-sm text-foreground/50 font-medium ml-2">Or <button onClick={() => setIsRegOpen(true)} className="text-primary underline hover:text-primary/80">apply directly</button> for the upcoming Focus Batch.</p>
               </div>

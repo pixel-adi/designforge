@@ -3,8 +3,15 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import useEmblaCarousel from 'embla-carousel-react';
 import Autoplay from 'embla-carousel-autoplay';
+import { supabase } from '@/lib/supabaseClient';
 
-const achieversData = [
+interface RankItem {
+  rank: string;
+  exam: string;
+  color: string;
+}
+
+const fallbackData: RankItem[] = [
   { rank: "AIR 12", exam: "NID BDes", color: "bg-pop-3" },
   { rank: "AIR 4", exam: "NID MDes", color: "bg-primary" },
   { rank: "AIR 28", exam: "UCEED", color: "bg-pop-1" },
@@ -17,11 +24,35 @@ const achieversData = [
 
 export function AchieversSection() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  const [ranksData, setRanksData] = useState<RankItem[]>(fallbackData);
   
   const [emblaRef, emblaApi] = useEmblaCarousel(
     { loop: true, align: 'start', skipSnaps: false },
     [Autoplay({ delay: 3000, stopOnInteraction: true })]
   );
+
+  // Fetch ranks from Supabase
+  useEffect(() => {
+    async function fetchRanks() {
+      try {
+        const { data, error } = await supabase
+          .from('ranks')
+          .select('rank_label, exam, color')
+          .order('display_order', { ascending: true });
+
+        if (!error && data && data.length > 0) {
+          setRanksData(data.map((r: any) => ({
+            rank: r.rank_label,
+            exam: r.exam,
+            color: r.color,
+          })));
+        }
+      } catch (err) {
+        console.warn('Could not fetch ranks from Supabase, using fallback data.');
+      }
+    }
+    fetchRanks();
+  }, []);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -54,7 +85,7 @@ export function AchieversSection() {
 
         <div className="embla overflow-hidden -mx-4 px-4" ref={emblaRef}>
           <div className="embla__container flex touch-pan-y pt-8 pb-12">
-            {achieversData.map((item, i) => (
+            {ranksData.map((item: RankItem, i: number) => (
               <div key={i} className="embla__slide flex-[0_0_50%] sm:flex-[0_0_33.33%] md:flex-[0_0_25%] min-w-0 pl-4">
                 <div className="achiever-card flex flex-col items-center group cursor-pointer h-full">
                    <div className={`w-32 h-32 md:w-40 md:h-40 ${item.color}/10 rounded-full flex items-center justify-center mb-8 relative group-hover:scale-105 transition-transform duration-500`}>
