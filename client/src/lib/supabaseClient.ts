@@ -1,13 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Fallback to hardcoded values — these are public/publishable keys, safe to expose
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'REDACTED';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'REDACTED';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase credentials not found. Backend features will be unavailable.');
-}
-
-export const supabase = createClient(
-  supabaseUrl || '',
-  supabaseAnonKey || ''
-);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
