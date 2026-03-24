@@ -19,6 +19,16 @@ const PrivacyPolicy = lazy(() => import("@/pages/privacy-policy"));
 const TermsOfService = lazy(() => import("@/pages/terms-of-service"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
+// Admin pages
+const AdminLogin = lazy(() => import("@/pages/admin/admin-login"));
+const AdminLayout = lazy(() => import("@/pages/admin/admin-layout"));
+const AdminDashboard = lazy(() => import("@/pages/admin/admin-dashboard"));
+const AdminRanks = lazy(() => import("@/pages/admin/admin-ranks"));
+const AdminWorkshops = lazy(() => import("@/pages/admin/admin-workshops"));
+const AdminPrograms = lazy(() => import("@/pages/admin/admin-programs"));
+const AdminRegistrations = lazy(() => import("@/pages/admin/admin-registrations"));
+const AdminSubscribers = lazy(() => import("@/pages/admin/admin-subscribers"));
+
 function Router() {
   return (
     <>
@@ -38,6 +48,28 @@ function Router() {
           <Route path="/focus-batch" component={FocusBatchPage} />
           <Route path="/privacy-policy" component={PrivacyPolicy} />
           <Route path="/terms-of-service" component={TermsOfService} />
+          
+          {/* Admin Routes */}
+          <Route path="/admin" component={AdminLogin} />
+          <Route path="/admin/dashboard">
+            {() => <AdminLayout><AdminDashboard /></AdminLayout>}
+          </Route>
+          <Route path="/admin/ranks">
+            {() => <AdminLayout><AdminRanks /></AdminLayout>}
+          </Route>
+          <Route path="/admin/workshops">
+            {() => <AdminLayout><AdminWorkshops /></AdminLayout>}
+          </Route>
+          <Route path="/admin/programs">
+            {() => <AdminLayout><AdminPrograms /></AdminLayout>}
+          </Route>
+          <Route path="/admin/registrations">
+            {() => <AdminLayout><AdminRegistrations /></AdminLayout>}
+          </Route>
+          <Route path="/admin/subscribers">
+            {() => <AdminLayout><AdminSubscribers /></AdminLayout>}
+          </Route>
+
           {/* Fallback to 404 */}
           <Route component={NotFound} />
         </Switch>
