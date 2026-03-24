@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import adityaImg from '@/assets/aditya.png';
+import adityaImg from '@/assets/aditya.jpg';
 import siddhiImg from '@/assets/siddhi.jpg';
 
 export function FoundersSection() {

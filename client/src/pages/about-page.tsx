@@ -6,7 +6,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import gsap from "gsap";
 import ScrollTrigger from "gsap/dist/ScrollTrigger";
-import adityaImg from "@/assets/aditya.png";
+import adityaImg from "@/assets/aditya.jpg";
 import siddhiImg from "@/assets/siddhi.jpg";
 
 gsap.registerPlugin(ScrollTrigger);
