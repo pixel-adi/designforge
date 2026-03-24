@@ -9,6 +9,8 @@ interface RankItem {
   rank: string;
   exam: string;
   color: string;
+  student_name?: string;
+  stream?: string;
 }
 
 const fallbackData: RankItem[] = [
@@ -37,7 +39,7 @@ export function AchieversSection() {
       try {
         const { data, error } = await supabase
           .from('ranks')
-          .select('rank_label, exam, color')
+          .select('rank_label, exam, color, student_name, stream')
           .order('display_order', { ascending: true });
 
         if (!error && data && data.length > 0) {
@@ -45,6 +47,8 @@ export function AchieversSection() {
             rank: r.rank_label,
             exam: r.exam,
             color: r.color,
+            student_name: r.student_name,
+            stream: r.stream
           })));
         }
       } catch (err) {
@@ -86,16 +90,23 @@ export function AchieversSection() {
         <div className="embla overflow-hidden -mx-4 px-4" ref={emblaRef}>
           <div className="embla__container flex touch-pan-y pt-8 pb-12">
             {ranksData.map((item: RankItem, i: number) => (
-              <div key={i} className="embla__slide flex-[0_0_50%] sm:flex-[0_0_33.33%] md:flex-[0_0_25%] min-w-0 pl-4">
-                <div className="achiever-card flex flex-col items-center group cursor-pointer h-full">
-                   <div className={`w-32 h-32 md:w-40 md:h-40 ${item.color}/10 rounded-full flex items-center justify-center mb-8 relative group-hover:scale-105 transition-transform duration-500`}>
+              <div key={i} className="embla__slide flex-[0_0_50%] sm:flex-[0_0_33.33%] md:flex-[0_0_25%] min-w-0 pl-4 h-[auto]">
+                <div className="achiever-card flex flex-col items-center group cursor-pointer h-full justify-start mt-4">
+                   <div className={`w-32 h-32 md:w-40 md:h-40 ${item.color}/10 rounded-full flex items-center justify-center mb-6 relative group-hover:scale-105 transition-transform duration-500`}>
                       <div className={`absolute inset-0 ${item.color}/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
                       <div className={`w-20 h-20 md:w-24 md:h-24 ${item.color} rounded-full text-background flex items-center justify-center shadow-lg relative z-10`}>
-                         <span className="font-heading text-2xl md:text-3xl">{item.rank.split(' ')[1]}</span>
+                         <span className="font-heading text-2xl md:text-3xl">{item.rank.split(' ')[1] || item.rank}</span>
                       </div>
                    </div>
-                   <p className="font-heading text-2xl text-foreground mb-2">{item.rank}</p>
-                   <p className="text-sm text-foreground/50 uppercase tracking-widest font-medium text-center">{item.exam}</p>
+                   <p className="font-heading text-2xl text-foreground mb-1">{item.rank}</p>
+                   <p className="text-sm text-foreground/50 uppercase tracking-widest font-medium text-center mb-3">{item.exam}</p>
+                   
+                   {(item.student_name || item.stream) && (
+                     <div className="flex flex-col items-center text-center mt-auto pt-4 border-t border-black/5 w-3/4">
+                       {item.student_name && <span className="font-medium text-[#262626]">{item.student_name}</span>}
+                       {item.stream && <span className="text-xs text-foreground/60 mt-0.5 max-w-full truncate">{item.stream}</span>}
+                     </div>
+                   )}
                 </div>
               </div>
             ))}

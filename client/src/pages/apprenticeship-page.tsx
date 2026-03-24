@@ -1,16 +1,30 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ArrowRight, ArrowUpRight, CheckCircle2, CircleDashed, Globe, HeartHandshake, Layers, Lightbulb, MapPin, MonitorPlay, MousePointerClick, Puzzle, Sparkles, TerminalSquare, Users } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CheckCircle2, CircleDashed, Globe, HeartHandshake, Layers, Lightbulb, MapPin, MonitorPlay, MousePointerClick, Puzzle, Sparkles, TerminalSquare, Users, Calendar } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { supabase } from "@/lib/supabaseClient";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export default function ApprenticeshipPage() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [workshops, setWorkshops] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function fetchWorkshops() {
+      const { data } = await supabase
+        .from('workshops')
+        .select('*')
+        .eq('is_visible', true)
+        .order('display_order', { ascending: true });
+      if (data) setWorkshops(data);
+    }
+    fetchWorkshops();
+  }, []);
 
   useEffect(() => {
     // Basic GSAP animations for sections
@@ -442,84 +456,71 @@ export default function ApprenticeshipPage() {
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-              {/* Featured Session */}
-              <div className="lg:col-span-5 flex flex-col h-full">
-                <div className="bg-primary/5 border border-primary/20 text-[#262626] rounded-3xl p-8 md:p-10 flex flex-col h-full relative overflow-hidden group shadow-sm hover:shadow-md transition-all duration-300 min-h-[350px]">
-                  <div className="inline-flex px-3 py-1.5 rounded-full bg-primary/10 text-xs font-medium w-fit mb-8 text-primary border border-primary/20">
-                    Featured Workshop
+              {workshops.length > 0 ? (
+                <>
+                  {/* Featured Session (First one) */}
+                  <div className="lg:col-span-5 flex flex-col h-full">
+                    <div className="bg-primary/5 border border-primary/20 text-[#262626] rounded-3xl p-8 md:p-10 flex flex-col h-full relative overflow-hidden group shadow-sm hover:shadow-md transition-all duration-300 min-h-[350px]">
+                      <div className="inline-flex px-3 py-1.5 rounded-full bg-primary/10 text-xs font-medium w-fit mb-8 text-primary border border-primary/20">
+                        Featured Workshop
+                      </div>
+                      
+                      <h3 className="text-2xl md:text-3xl font-heading leading-tight mb-4 mt-auto">
+                        {workshops[0].title}
+                      </h3>
+                      
+                      <p className="text-foreground/70 mb-10 font-light leading-relaxed text-base">
+                        {workshops[0].description}
+                      </p>
+                      
+                      <div className="flex items-center justify-between border-t border-black/5 pt-6 mt-auto">
+                        <div className="flex items-center gap-2 text-sm text-foreground/60 font-medium">
+                          <Calendar className="w-4 h-4" /> 
+                          {workshops[0].date ? new Date(workshops[0].date).toLocaleDateString() : 'TBA'}
+                        </div>
+                        <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-md">
+                          <ArrowRight className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   
-                  <h3 className="text-2xl md:text-3xl font-heading leading-tight mb-4 mt-auto">
-                    Design Thinking for Real-World Problem Solving
-                  </h3>
-                  
-                  <p className="text-foreground/70 mb-10 font-light leading-relaxed text-base">
-                    Learn how to identify real problems, frame opportunities, and build better ideas through design thinking.
-                  </p>
-                  
-                  <div className="flex items-center justify-between border-t border-black/5 pt-6 mt-auto">
-                    <div className="flex items-center gap-2 text-sm text-foreground/60 font-medium">
-                      <MapPin className="w-4 h-4" /> Virtual & Studio
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-md">
-                      <ArrowRight className="w-4 h-4" />
+                  {/* List (Remaining) */}
+                  <div className="lg:col-span-7 flex flex-col gap-4">
+                    {workshops.slice(1).map((ws, i) => {
+                       const colors = ["text-pop-1", "text-pop-2", "text-pop-3", "text-secondary", "text-primary"];
+                       const textColor = colors[i % colors.length];
+                       return (
+                        <div key={ws.id} className="bg-white p-5 md:p-6 rounded-2xl border border-black/5 hover:border-black/15 transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group shadow-sm hover:shadow-md cursor-pointer">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1.5">
+                              {ws.tag && <div className={`text-xs font-medium uppercase tracking-wider ${textColor}`}>{ws.tag}</div>}
+                              {ws.date && <div className="text-xs text-foreground/40 font-mono flex items-center gap-1"><Calendar className="w-3 h-3"/>{new Date(ws.date).toLocaleDateString()}</div>}
+                            </div>
+                            <h4 className="text-lg md:text-xl font-heading text-[#262626] mb-1 group-hover:text-primary transition-colors">{ws.title}</h4>
+                            <p className="text-sm text-foreground/60 leading-relaxed">{ws.description}</p>
+                          </div>
+                          <div className="w-10 h-10 rounded-full bg-background border border-border flex items-center justify-center shrink-0 group-hover:bg-primary/10 group-hover:border-primary/20 group-hover:text-primary transition-colors">
+                             <ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        </div>
+                       );
+                    })}
+                    
+                    <div className="mt-4 flex flex-col sm:flex-row items-center justify-between bg-white p-6 rounded-2xl border border-dashed border-black/15">
+                      <p className="text-sm text-foreground/60 italic mb-4 sm:mb-0 text-center sm:text-left">
+                        More workshops, mentor sessions, and collaborative learning opportunities will be announced soon.
+                      </p>
                     </div>
                   </div>
+                </>
+              ) : (
+                <div className="col-span-12 flex flex-col items-center justify-center bg-white p-12 rounded-3xl border border-dashed border-black/15 text-center">
+                   <Lightbulb className="w-12 h-12 text-primary mb-4 opacity-20" />
+                   <h3 className="text-2xl font-heading text-[#262626] mb-2">New sessions mapping soon</h3>
+                   <p className="text-foreground/60">We are currently planning our next batch of workshops. Check back shortly!</p>
                 </div>
-              </div>
-              
-              {/* List */}
-              <div className="lg:col-span-7 flex flex-col gap-4">
-                {[
-                  {
-                    title: "UX Foundations for Beginners",
-                    desc: "Intro to users, flows, interfaces, and usability.",
-                    tag: "Fundamentals",
-                    textColor: "text-pop-1"
-                  },
-                  {
-                    title: "Critical Thinking for Creative Learners",
-                    desc: "Build observation, reasoning, and stronger design decisions.",
-                    tag: "Thinking",
-                    textColor: "text-pop-2"
-                  },
-                  {
-                    title: "Visual Design Essentials",
-                    desc: "Learn hierarchy, typography, layout, and communication.",
-                    tag: "Craft",
-                    textColor: "text-pop-3"
-                  },
-                  {
-                    title: "IoT and Future Experiences",
-                    desc: "Explore connected products and emerging interactions.",
-                    tag: "Emerging Tech",
-                    textColor: "text-secondary"
-                  },
-                  {
-                    title: "Introduction to Game Design Thinking",
-                    desc: "Understand systems, engagement, and storytelling.",
-                    tag: "Interactive",
-                    textColor: "text-primary"
-                  }
-                ].map((ws, i) => (
-                  <div key={i} className="bg-white p-5 md:p-6 rounded-2xl border border-black/5 hover:border-black/15 transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group shadow-sm hover:shadow-md cursor-pointer">
-                    <div>
-                      <div className={`text-xs font-medium mb-1.5 uppercase tracking-wider ${ws.textColor}`}>{ws.tag}</div>
-                      <h4 className="text-lg md:text-xl font-heading text-[#262626] mb-1 group-hover:text-primary transition-colors">{ws.title}</h4>
-                      <p className="text-sm text-foreground/60 leading-relaxed">{ws.desc}</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-background border border-border flex items-center justify-center shrink-0 group-hover:bg-primary/10 group-hover:border-primary/20 group-hover:text-primary transition-colors">
-                       <ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </div>
-                ))}
-                
-                <div className="mt-4 flex flex-col sm:flex-row items-center justify-between bg-white p-6 rounded-2xl border border-dashed border-black/15">
-                  <p className="text-sm text-foreground/60 italic mb-4 sm:mb-0 text-center sm:text-left">
-                    More workshops, mentor sessions, and collaborative learning opportunities will be announced soon.
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
             
             <div className="md:hidden mt-8 text-center">
