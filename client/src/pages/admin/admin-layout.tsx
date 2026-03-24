@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabaseClient";
 import { LayoutDashboard, Trophy, Calendar, BookOpen, Users, Mail, LogOut, Loader2, Menu, X } from "lucide-react";
-import logoImg from "@/assets/DF_BLACK_RED_1773094379878.png";
+import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 
 const navItems = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
