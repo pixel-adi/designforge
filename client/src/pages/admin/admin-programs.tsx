@@ -57,14 +57,14 @@ export default function AdminPrograms() {
     setSaving(true);
     const { id, ...data } = editing;
     const { error } = await supabase.from("programs").upsert({ id, ...data });
-    
+
     if (error) {
       console.error("Supabase Save Error:", error);
       alert("Failed to save program: " + error.message + "\n\nMake sure you've run the SQL script in your Supabase dashboard to create this table and enable access!");
       setSaving(false);
       return;
     }
-    
+
     await fetchPrograms();
     setEditing(null);
     setSaving(false);
