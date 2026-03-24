@@ -57,7 +57,7 @@ export function FoundersSection() {
           
           <div className="founder-card struct-card p-12 flex flex-col items-center text-center bg-gradient-to-br from-white to-pop-1/5 group">
             <div className="w-40 h-40 rounded-full mx-auto mb-8 relative mb-8">
-               <div className="absolute inset-0 bg-pop-1/20 rounded-full blur-2xl group-hover:blur-3xl transition-all duration-500 scale-150 opacity-0 group-hover:opacity-100"></div>
+               <div className="absolute inset-0 rounded-full transition-all duration-500 scale-150 opacity-0 group-hover:opacity-100" style={{ background: 'radial-gradient(circle, rgba(235,171,44,0.15) 0%, rgba(235,171,44,0) 70%)' }}></div>
                <div className="w-full h-full bg-white rounded-full border border-black/5 shadow-md flex items-center justify-center relative z-10 overflow-hidden group-hover:scale-105 transition-transform duration-500">
                   <img src={adityaImg} alt="Aditya Sharma" className="w-full h-full object-cover" />
                </div>
@@ -72,7 +72,7 @@ export function FoundersSection() {
 
           <div className="founder-card struct-card p-12 flex flex-col items-center text-center bg-gradient-to-br from-white to-pop-2/5 group">
             <div className="w-40 h-40 rounded-full mx-auto mb-8 relative mb-8">
-               <div className="absolute inset-0 bg-pop-2/20 rounded-full blur-2xl group-hover:blur-3xl transition-all duration-500 scale-150 opacity-0 group-hover:opacity-100"></div>
+               <div className="absolute inset-0 rounded-full transition-all duration-500 scale-150 opacity-0 group-hover:opacity-100" style={{ background: 'radial-gradient(circle, rgba(229,57,53,0.15) 0%, rgba(229,57,53,0) 70%)' }}></div>
                <div className="w-full h-full bg-white rounded-full border border-black/5 shadow-md flex items-center justify-center relative z-10 overflow-hidden group-hover:scale-105 transition-transform duration-500">
                   <img src={siddhiImg} alt="Siddhi Patil" className="w-full h-full object-cover" />
                </div>

@@ -150,7 +150,7 @@
 /* Fluid Soft Cards */
 .struct-card {
   @apply bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-black/[0.03] relative overflow-hidden;
-  backdrop-filter: blur(10px);
+  /* backdrop-filter: blur(10px); Removed for scroll performance */
 }
 
 .struct-card-hover {

@@ -83,7 +83,7 @@ export function FocusBatch() {
              </div>
           </div>
 
-          <div className="focus-form struct-card p-10 md:p-12 bg-white/80 backdrop-blur-xl border border-white shadow-[0_30px_60px_-15px_rgba(0,0,0,0.05)]">
+          <div className="focus-form struct-card p-10 md:p-12 bg-white/80 border border-white shadow-[0_30px_60px_-15px_rgba(0,0,0,0.05)]">
             <h3 className="font-heading text-3xl mb-8 text-foreground">Join the Waitlist</h3>
             <form className="space-y-6">
               <div className="space-y-3">

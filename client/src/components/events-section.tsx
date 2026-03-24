@@ -37,7 +37,7 @@ export function EventsSection() {
     <section ref={sectionRef} className="pt-32 pb-16 bg-background relative overflow-hidden">
       
       {/* Background shape */}
-      <div className="absolute top-0 right-0 w-[40vw] h-[100%] bg-white/50 rounded-l-full blur-3xl pointer-events-none"></div>
+      <div className="absolute top-0 right-0 w-[40vw] h-[100%] rounded-l-full pointer-events-none" style={{ background: 'radial-gradient(circle at right, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 70%)' }}></div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative z-10">
         

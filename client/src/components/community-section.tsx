@@ -38,7 +38,7 @@ export function CommunitySection() {
   return (
     <section ref={sectionRef} className="py-32 bg-background relative overflow-hidden">
       {/* Background organic shape */}
-      <div className="comm-blob absolute top-1/2 right-0 -translate-y-1/2 w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] bg-white rounded-full blur-3xl opacity-60"></div>
+      <div className="comm-blob absolute top-1/2 right-0 -translate-y-1/2 w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] rounded-full opacity-60 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0) 70%)' }}></div>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative z-10">
         
         <div className="flex flex-col lg:flex-row gap-16 items-center">
@@ -82,7 +82,7 @@ export function CommunitySection() {
           </div>
           
           <div className="w-full lg:w-[450px] relative">
-            <div className="phone-container struct-card p-6 bg-white/80 backdrop-blur-xl border border-white h-[550px] flex flex-col shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)]">
+            <div className="phone-container struct-card p-6 bg-white/80 border border-white h-[550px] flex flex-col shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)]">
                
                <div className="flex items-center gap-4 pb-4 mb-6 border-b border-black/5">
                  <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center shadow-inner">

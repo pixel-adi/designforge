@@ -96,10 +96,10 @@ export function Hero() {
   return (
     <section ref={containerRef} className="pt-16 pb-32 relative bg-background overflow-hidden perspective-1000">
 
-      {/* Soft abstract background blur */}
+      {/* Soft abstract background using radial gradients (0 paint cost vs blur) */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] right-[-5%] w-[50vw] h-[50vw] bg-pop-3/20 rounded-full blur-[120px]"></div>
-        <div className="absolute bottom-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-primary/10 rounded-full blur-[150px]"></div>
+        <div className="absolute top-[-10%] right-[-5%] w-[50vw] h-[50vw] rounded-full" style={{ background: 'radial-gradient(circle, rgba(235,171,44,0.1) 0%, rgba(235,171,44,0) 70%)' }}></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[60vw] h-[60vw] rounded-full" style={{ background: 'radial-gradient(circle, rgba(229,57,53,0.06) 0%, rgba(229,57,53,0) 70%)' }}></div>
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col items-center text-center">
@@ -111,7 +111,7 @@ export function Hero() {
               <img src={sketchbookImg} alt="Design Sketchbook" className="w-full h-auto drop-shadow-md" />
             </div>
 
-            <div className="hero-badge relative inline-flex items-center gap-2 px-5 py-2 bg-white/60 backdrop-blur-md border border-white/80 rounded-full text-sm font-medium text-foreground mb-10 shadow-sm z-20 mt-4">
+            <div className="hero-badge relative inline-flex items-center gap-2 px-5 py-2 bg-white/90 border border-white/80 rounded-full text-sm font-medium text-foreground mb-10 shadow-sm z-20 mt-4">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
               A new era of design preparation
             </div>
@@ -146,7 +146,7 @@ export function Hero() {
 
         {/* Creative Organic Illustration Area */}
         <div className="hero-image-container w-full mt-24 relative flex justify-center z-20">
-          <div className="hero-image relative w-full min-h-[400px] md:min-h-[500px] bg-white/40 backdrop-blur-2xl rounded-[2rem] md:rounded-[3rem] border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] overflow-hidden flex items-center justify-center p-6 md:p-12">
+          <div className="hero-image relative w-full min-h-[400px] md:min-h-[500px] bg-[#faf8f5]/80 rounded-[2rem] md:rounded-[3rem] border border-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] overflow-hidden flex items-center justify-center p-6 md:p-12">
 
             {/* Abstract fluid shapes inside the glass container - Reduced scale and opacity */}
             <div className="shape-1 organic-blob absolute top-[10%] left-[5%] w-20 h-20 md:w-[9rem] md:h-[9rem] bg-pop-1/30 mix-blend-multiply filter blur-xl opacity-[22%]"></div>
@@ -157,7 +157,7 @@ export function Hero() {
             <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 md:gap-6 w-full mt-4 md:mt-8">
 
               <div className="hero-card-wrapper z-10">
-                <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]" data-rotate="-12" data-y="16" data-scale="1">
+                <div className="hero-card bg-white rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]" data-rotate="-12" data-y="16" data-scale="1">
                   <div className="w-14 h-14 rounded-2xl bg-pop-1/10 flex items-center justify-center mb-4">
                     <svg className="w-7 h-7 text-pop-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
                   </div>
@@ -167,7 +167,7 @@ export function Hero() {
               </div>
 
               <div className="hero-card-wrapper z-10">
-                <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]" data-rotate="6" data-y="-48" data-scale="1">
+                <div className="hero-card bg-white rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]" data-rotate="6" data-y="-48" data-scale="1">
                   <div className="w-14 h-14 rounded-2xl bg-pop-2/10 flex items-center justify-center mb-4">
                     <svg className="w-7 h-7 text-pop-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
                   </div>
@@ -177,7 +177,7 @@ export function Hero() {
               </div>
 
               <div className="hero-card-wrapper z-20">
-                <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[240px]" data-rotate="-3" data-y="32" data-scale="1.1">
+                <div className="hero-card bg-white rounded-3xl p-8 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[240px]" data-rotate="-3" data-y="32" data-scale="1.1">
                   <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center mb-5 rotate-6">
                     <svg className="w-8 h-8 text-primary -rotate-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" /></svg>
                   </div>
@@ -187,7 +187,7 @@ export function Hero() {
               </div>
 
               <div className="hero-card-wrapper z-10">
-                <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]" data-rotate="12" data-y="-64" data-scale="1">
+                <div className="hero-card bg-white rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]" data-rotate="12" data-y="-64" data-scale="1">
                   <div className="w-14 h-14 rounded-2xl bg-pop-3/10 flex items-center justify-center mb-4">
                     <svg className="w-7 h-7 text-pop-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
                   </div>
@@ -197,7 +197,7 @@ export function Hero() {
               </div>
 
               <div className="hero-card-wrapper z-10">
-                <div className="hero-card bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]" data-rotate="-8" data-y="8" data-scale="1">
+                <div className="hero-card bg-white rounded-3xl p-6 shadow-xl border border-black/5 flex flex-col items-center justify-center min-h-[220px]" data-rotate="-8" data-y="8" data-scale="1">
                   <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center mb-4">
                     <svg className="w-7 h-7 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
                   </div>

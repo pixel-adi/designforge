@@ -54,9 +54,9 @@ export function PhilosophySection() {
         
         <div className="phil-bg bg-[#111111] text-background p-12 md:p-24 relative overflow-hidden flex flex-col items-center text-center">
           
-          {/* Abstract glowing orbs */}
-          <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-primary rounded-full blur-[150px] opacity-20 -translate-x-1/2 -translate-y-1/2"></div>
-          <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-pop-3 rounded-full blur-[120px] opacity-10 translate-x-1/3 translate-y-1/3"></div>
+          {/* Abstract glowing orbs using zero-cost radial gradients instead of massive GPU blurs */}
+          <div className="absolute top-0 left-0 w-[500px] h-[500px] rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(229,57,53,0.15) 0%, rgba(229,57,53,0) 70%)' }}></div>
+          <div className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full translate-x-1/3 translate-y-1/3 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(235,171,44,0.08) 0%, rgba(235,171,44,0) 70%)' }}></div>
 
           <div className="relative z-10 max-w-4xl">
             <p className="text-primary font-medium tracking-widest uppercase mb-10">Our Philosophy</p>
