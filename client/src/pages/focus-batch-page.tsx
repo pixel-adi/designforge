@@ -20,17 +20,19 @@ export default function FocusBatchPage() {
   const [subEmail, setSubEmail] = useState('');
   const [subStatus, setSubStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [programs, setPrograms] = useState<any[]>([]);
+  const [workshops, setWorkshops] = useState<any[]>([]);
 
   useEffect(() => {
-    async function fetchPrograms() {
-      const { data } = await supabase
-        .from('programs')
-        .select('*')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
-      if (data) setPrograms(data);
+    async function fetchData() {
+      const [programsRes, workshopsRes] = await Promise.all([
+        supabase.from('programs').select('*').eq('is_active', true).order('display_order', { ascending: true }),
+        supabase.from('workshops').select('*').eq('is_visible', true).order('display_order', { ascending: true })
+      ]);
+      
+      if (programsRes.data) setPrograms(programsRes.data);
+      if (workshopsRes.data) setWorkshops(workshopsRes.data);
     }
-    fetchPrograms();
+    fetchData();
   }, []);
 
   const handleSubscribe = async () => {
@@ -498,72 +500,159 @@ export default function FocusBatchPage() {
           </div>
         </section>
 
-        {/* SECTION 11: PROGRAMS & PRICING */}
+        {/* SECTION 11: FEE STRUCTURE (Restored) */}
         <section className="py-24 bg-background animate-section" id="apply">
           <div className="container mx-auto px-4 max-w-5xl text-center">
-            <h2 className="text-4xl md:text-5xl font-heading mb-4">Available Programs</h2>
-            <p className="text-xl text-foreground/60 mb-16">Enroll in our mentorship and preparation programs.</p>
+            <div className="inline-block bg-primary/10 text-primary font-mono text-sm px-4 py-1.5 rounded-full mb-6 font-medium border border-primary/20">
+              Focus Batch 26-27
+            </div>
+            <h2 className="text-4xl md:text-5xl font-heading mb-4">Fee Structure</h2>
+            <p className="text-xl text-foreground/60 mb-16">For the complete 40-week Prelims + Mains program</p>
 
-            <div className={`grid gap-8 max-w-5xl mx-auto text-left ${programs.length === 1 ? 'md:grid-cols-1 max-w-xl' : programs.length === 2 ? 'md:grid-cols-2 max-w-4xl' : 'md:grid-cols-3'}`}>
-              
-              {programs.length > 0 ? programs.map((prog, i) => (
-                <Card key={prog.id} className={`relative overflow-hidden transition-colors flex flex-col h-full bg-white ${i === 0 ? 'border-2 border-primary/20 hover:border-primary shadow-lg' : 'border border-border hover:border-foreground/20'}`}>
-                  {i === 0 && <div className="absolute top-0 right-0 bg-primary text-white text-xs font-bold px-3 py-1 rounded-bl-lg">FLAGSHIP</div>}
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-2xl font-medium">{prog.name}</CardTitle>
-                    <div className="mt-4 flex items-baseline gap-2">
-                      <span className="text-5xl font-heading font-bold">₹{prog.price.toLocaleString('en-IN')}</span>
+            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto text-left">
+              {/* Card 1 */}
+              <Card className="relative overflow-hidden border-2 border-primary/20 hover:border-primary transition-colors flex flex-col h-full bg-white shadow-sm hover:shadow-md">
+                <div className="absolute top-0 right-0 bg-primary text-white text-xs font-bold px-3 py-1 rounded-bl-lg">RECOMMENDED</div>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-2xl font-medium text-foreground">One-Time Payment</CardTitle>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="text-5xl font-heading font-bold text-foreground">₹20,000</span>
+                  </div>
+                  <p className="text-sm text-green-600 font-medium mt-2 bg-green-50 w-fit px-2 py-1 rounded">Save ₹2,000</p>
+                </CardHeader>
+                <CardContent className="flex flex-col flex-1">
+                  <p className="text-foreground/70 mb-8 leading-relaxed">
+                    The full fee is ₹22,000. Students choosing one-time payment receive a ₹2,000 discount.
+                  </p>
+                  <Button onClick={() => { setSelectedProgram("Focus Batch"); setIsRegOpen(true); }} className="w-full mt-auto text-lg h-14 rounded-xl group btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
+                    Pay One Time
+                    <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Card 2 */}
+              <Card className="border border-border hover:border-foreground/20 transition-colors flex flex-col h-full bg-white shadow-sm hover:shadow-md">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-2xl font-medium text-foreground">Installment Plan</CardTitle>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="text-5xl font-heading font-bold text-foreground">₹22,000</span>
+                    <span className="text-foreground/50">total</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-col flex-1">
+                  <div className="space-y-4 mb-8">
+                    <div className="flex justify-between items-center py-3 border-b border-black/5">
+                      <span className="text-foreground/70 font-medium">1st Installment (Pay Now)</span>
+                      <span className="font-bold text-lg text-foreground">₹12,000</span>
                     </div>
-                    {prog.duration && (
-                       <p className="text-sm text-foreground/50 font-medium mt-2 flex items-center gap-1">
-                         <Clock className="w-4 h-4" /> {prog.duration}
-                       </p>
-                    )}
-                  </CardHeader>
-                  <CardContent className="flex flex-col flex-1">
-                    <p className="text-foreground/70 mb-8 leading-relaxed">
-                      {prog.description}
-                    </p>
-                    
-                    {prog.start_date && (
-                      <div className="mb-6 p-3 rounded-xl bg-orange-50 border border-orange-100 flex items-start gap-3">
-                        <Sparkles className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium text-orange-900">Next batch starts</p>
-                          <p className="text-sm text-orange-700">{new Date(prog.start_date).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <Button 
-                      onClick={() => {
-                        setSelectedProgram(prog.name);
-                        setIsRegOpen(true);
-                      }}
-                      className={`w-full mt-auto text-lg h-12 rounded-xl group btn-bold transition-all ${
-                        i === 0 
-                          ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5' 
-                          : 'bg-white text-foreground border border-black/10 hover:bg-black/5'
-                      }`}
-                    >
-                      Apply Now
-                      {i === 0 && <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />}
-                    </Button>
-                  </CardContent>
-                </Card>
-              )) : (
-                <div className="col-span-full border-2 border-dashed border-border rounded-3xl p-12 text-center text-foreground/50">
-                   No programs are currently open for registration.
-                </div>
-              )}
-
+                    <div className="flex justify-between items-center py-3 border-b border-black/5">
+                      <span className="text-foreground/70 font-medium">2nd Installment (After 3 mos)</span>
+                      <span className="font-bold text-lg text-foreground">₹10,000</span>
+                    </div>
+                  </div>
+                  <Button onClick={() => { setSelectedProgram("Focus Batch"); setIsRegOpen(true); }} variant="outline" className="w-full mt-auto text-lg h-14 rounded-xl bg-white text-foreground border border-black/10 hover:bg-black/5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+                    Choose Installments
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
 
             <p className="mt-8 text-sm text-foreground/50 italic">
-              * Installment options available at checkout. Extra discount may be available for students who clear the screening.
+              * Extra discount may be available for students who clear the Designforge screening process.
             </p>
           </div>
         </section>
+
+        {/* SECTION 12: OTHER PROGRAMS */}
+        {programs.length > 0 && (
+          <section className="py-24 bg-white animate-section border-t border-black/5">
+            <div className="container mx-auto px-4 max-w-5xl text-center">
+              <h2 className="text-4xl md:text-5xl font-heading mb-4 text-[#262626]">Other Programs</h2>
+              <p className="text-xl text-foreground/60 mb-16">Additional courses, mentorship, and short-term programs.</p>
+
+              <div className={`grid gap-8 max-w-5xl mx-auto text-left ${programs.length === 1 ? 'md:grid-cols-1 max-w-xl' : programs.length === 2 ? 'md:grid-cols-2 max-w-4xl' : 'md:grid-cols-3'}`}>
+                {programs.map((prog, i) => (
+                  <Card key={prog.id} className="relative overflow-hidden transition-colors flex flex-col h-full bg-white border border-border hover:border-foreground/20 shadow-sm hover:shadow-md">
+                    <CardHeader className="pb-4 relative z-10">
+                      <CardTitle className="text-2xl font-medium text-foreground">{prog.name}</CardTitle>
+                      <div className="mt-4 flex items-baseline gap-2">
+                        <span className="text-4xl font-heading font-bold text-foreground">₹{prog.price.toLocaleString('en-IN')}</span>
+                      </div>
+                      {prog.duration && (
+                         <p className="text-sm text-foreground/50 font-medium mt-2 flex items-center gap-1">
+                           <Clock className="w-4 h-4" /> {prog.duration}
+                         </p>
+                      )}
+                    </CardHeader>
+                    <CardContent className="flex flex-col flex-1 relative z-10">
+                      <p className="text-foreground/70 mb-8 leading-relaxed">
+                        {prog.description}
+                      </p>
+                      
+                      {prog.start_date && (
+                        <div className="mb-6 p-3 rounded-xl bg-orange-50 border border-orange-100 flex items-start gap-3">
+                          <Sparkles className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-orange-900">Starts on</p>
+                            <p className="text-sm font-bold text-orange-700">{new Date(prog.start_date).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <Button 
+                        onClick={() => {
+                          setSelectedProgram(prog.name);
+                          setIsRegOpen(true);
+                        }}
+                        className="w-full mt-auto text-lg h-12 rounded-xl group btn-bold transition-all bg-white text-foreground border border-black/10 hover:bg-black/5"
+                      >
+                        Apply Now
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* SECTION 13: UPCOMING WORKSHOPS */}
+        {workshops.length > 0 && (
+          <section className="py-24 bg-background animate-section border-t border-black/5">
+            <div className="container mx-auto px-4 max-w-5xl">
+              <div className="text-center mb-16">
+                <h2 className="text-4xl md:text-5xl font-heading mb-4 text-[#262626]">Upcoming Workshops</h2>
+                <p className="text-xl text-foreground/60">Short masterclasses and interactive sessions.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                {workshops.map((ws, i) => {
+                   const colors = ["text-pop-1", "text-pop-2", "text-pop-3", "text-secondary", "text-primary"];
+                   const textColor = colors[i % colors.length];
+                   return (
+                    <div key={ws.id} className="bg-white p-6 rounded-2xl border border-black/5 hover:border-black/15 transition-all duration-300 flex flex-col justify-between gap-4 group shadow-sm hover:shadow-md cursor-pointer">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                          {ws.tag && <div className={`text-xs font-medium uppercase tracking-wider ${textColor}`}>{ws.tag}</div>}
+                          {ws.date && <div className="text-xs text-foreground/40 font-mono flex items-center gap-1"><CalendarDays className="w-3 h-3"/>{new Date(ws.date).toLocaleDateString()}</div>}
+                        </div>
+                        <h4 className="text-xl md:text-2xl font-heading text-[#262626] mb-2 group-hover:text-primary transition-colors">{ws.title}</h4>
+                        <p className="text-sm md:text-base text-foreground/60 leading-relaxed">{ws.description}</p>
+                      </div>
+                      <div className="mt-4 flex items-center justify-between border-t border-black/5 pt-4">
+                        <span className="text-sm font-medium text-foreground hover:text-primary transition-colors">Learn More</span>
+                        <div className="w-10 h-10 rounded-full bg-background border border-border flex items-center justify-center shrink-0 group-hover:bg-primary/10 group-hover:border-primary/20 group-hover:text-primary transition-colors">
+                           <ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </div>
+                    </div>
+                   );
+                })}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* SECTION 14: FAQ */}
         <section className="py-24 bg-white animate-section">
