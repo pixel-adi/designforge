@@ -20,15 +20,11 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-// Program pricing (in INR)
-const programPricing: Record<string, number> = {
-  "NID B.Des": 29999,
-  "NID M.Des": 29999,
-  "CEED": 24999,
-  "UCEED": 24999,
-  "Private Colleges": 19999,
-  "Abroad Colleges": 34999,
-};
+// Flat pricing for all programs (in INR)
+const ORIGINAL_PRICE = 22000;
+const ONE_TIME_PRICE = 20000;
+const INSTALLMENT_FIRST = 12000;
+const INSTALLMENT_SECOND = 10000;
 
 interface RegistrationSheetProps {
   open: boolean;
@@ -41,6 +37,7 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [paymentStep, setPaymentStep] = useState<'saving' | 'creating' | 'redirecting' | null>(null);
+  const [paymentType, setPaymentType] = useState<'full' | 'installment'>('full');
 
   const { register, formState: { errors }, setValue, watch, trigger, reset } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -61,7 +58,7 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
     setIsProcessing(true);
     setSubmitError(null);
     const formData = { ...watch() };
-    const amount = programPricing[formData.program] || 29999;
+    const amount = paymentType === 'full' ? ONE_TIME_PRICE : INSTALLMENT_FIRST;
 
     try {
       // Step 1: Save registration to Supabase
@@ -156,13 +153,13 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
         setIsProcessing(false);
         setSubmitError(null);
         setPaymentStep(null);
+        setPaymentType('full');
         reset({ program: defaultProgram });
       }, 300);
     }
   };
 
-  const selectedProgram = watch('program');
-  const displayAmount = selectedProgram ? programPricing[selectedProgram] : null;
+  const currentAmount = paymentType === 'full' ? ONE_TIME_PRICE : INSTALLMENT_FIRST;
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
@@ -232,7 +229,7 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
                   <Label htmlFor="name" className="text-sm font-medium text-foreground/80">Full Name <span className="text-primary">*</span></Label>
                   <Input
                     id="name"
-                    placeholder="Aditya Sharma"
+                    placeholder="Ex: Tanisha Mahajan"
                     className={`h-14 px-4 bg-white/60 focus-visible:ring-primary/20 focus-visible:border-primary transition-all text-base ${errors.name ? 'border-red-500 focus-visible:ring-red-500/20' : ''}`}
                     {...register("name")}
                   />
@@ -338,12 +335,37 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
                     <span className="text-foreground/60">Email</span>
                     <span className="font-medium text-foreground text-sm">{watch('email')}</span>
                   </div>
-                  {displayAmount && (
-                    <div className="flex justify-between items-center pt-2">
-                      <span className="text-lg font-medium text-foreground">Total</span>
-                      <span className="text-2xl font-heading text-primary">₹{displayAmount.toLocaleString('en-IN')}</span>
-                    </div>
-                  )}
+                </div>
+              </div>
+
+              {/* Payment Type Selection */}
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-foreground/80">Choose payment option</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentType('full')}
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${paymentType === 'full'
+                        ? 'border-primary bg-primary/5 shadow-sm'
+                        : 'border-border hover:border-primary/30'
+                      }`}
+                  >
+                    <p className="text-sm font-medium text-foreground/60 mb-1">One-time Payment</p>
+                    <p className="text-xl font-heading text-foreground">₹{ONE_TIME_PRICE.toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-foreground/50 mt-1"><span className="line-through">₹{ORIGINAL_PRICE.toLocaleString('en-IN')}</span> — Save ₹{(ORIGINAL_PRICE - ONE_TIME_PRICE).toLocaleString('en-IN')}</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentType('installment')}
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${paymentType === 'installment'
+                        ? 'border-primary bg-primary/5 shadow-sm'
+                        : 'border-border hover:border-primary/30'
+                      }`}
+                  >
+                    <p className="text-sm font-medium text-foreground/60 mb-1">EMI / Installments</p>
+                    <p className="text-xl font-heading text-foreground">₹{INSTALLMENT_FIRST.toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-foreground/50 mt-1">+ ₹{INSTALLMENT_SECOND.toLocaleString('en-IN')} due later</p>
+                  </button>
                 </div>
               </div>
 
@@ -365,7 +387,7 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
                   ) : (
                     <>
                       <CreditCard className="w-5 h-5" />
-                      Pay ₹{displayAmount?.toLocaleString('en-IN') || '—'}
+                      Pay ₹{currentAmount.toLocaleString('en-IN')}
                     </>
                   )}
                 </Button>
