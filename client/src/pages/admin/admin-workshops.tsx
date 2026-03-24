@@ -60,7 +60,15 @@ export default function AdminWorkshops() {
     if (!editing) return;
     setSaving(true);
     const { id, ...data } = editing;
-    await supabase.from("workshops").upsert({ id, ...data });
+    const { error } = await supabase.from("workshops").upsert({ id, ...data });
+    
+    if (error) {
+      console.error("Supabase Save Error:", error);
+      alert("Failed to save workshop: " + error.message + "\n\nMake sure you've run the SQL script in your Supabase dashboard to create this table and enable access!");
+      setSaving(false);
+      return;
+    }
+    
     await fetchWorkshops();
     setEditing(null);
     setSaving(false);
