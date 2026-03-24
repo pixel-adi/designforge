@@ -94,7 +94,7 @@ export default function AdminPrograms() {
               </div>
               {!prog.is_active && <span title="Hidden from website"><EyeOff className="w-5 h-5 text-foreground/20 shrink-0 ml-4" /></span>}
             </div>
-            
+
             <div className="flex flex-wrap gap-2 text-xs">
               <span className="px-3 py-1.5 rounded-lg bg-green-50 text-green-700 font-bold tracking-wide border border-green-100">
                 ₹{prog.price.toLocaleString("en-IN")}
@@ -129,33 +129,33 @@ export default function AdminPrograms() {
                 Start adding your paid programs, mentorship batches, or masterclasses. They will automatically appear on the website's enrollment sections.
               </p>
             </div>
-            
-            <div className="mt-8">
-               <h4 className="text-sm font-semibold text-foreground/40 uppercase tracking-widest mb-4 ml-1">Example Template</h4>
-               <div className="bg-white/50 relative overflow-hidden rounded-2xl border border-primary/20 p-6 space-y-4 shadow-sm opacity-80 hover:opacity-100 transition-opacity before:absolute before:inset-0 before:bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.3)_50%,transparent_75%,transparent_100%)] before:bg-[length:250px_250px] before:animate-[shimmer_3s_infinite]">
-                 <div className="absolute top-0 right-0 bg-primary/10 text-primary text-xs font-bold px-3 py-1 rounded-bl-lg">SAMPLE PREVIEW</div>
-                 <div className="flex items-start justify-between relative z-10">
-                   <div>
-                     <h3 className="font-heading text-xl text-foreground flex items-center gap-2">
-                       <LayoutDashboard className="w-5 h-5 text-primary" />
-                       Focus Batch 2026-27
-                     </h3>
-                     <p className="text-sm text-foreground/60 mt-2 leading-relaxed">A 40-week mentored program for serious design aspirants preparing for NID, UCEED, and CEED — covering Prelims, Mains, Portfolios, and Interviews...</p>
-                   </div>
-                 </div>
-                 
-                 <div className="flex flex-wrap gap-2 text-xs relative z-10">
-                   <span className="px-3 py-1.5 rounded-lg bg-green-50 text-green-700 font-bold tracking-wide border border-green-100">₹20,000</span>
-                   <span className="px-3 py-1.5 rounded-lg bg-background border border-black/5 text-foreground/70 font-medium">40 Weeks</span>
-                   <span className="px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 font-medium border border-orange-100">Starts: Oct 15, 2025</span>
-                 </div>
 
-                 <div className="pt-4 border-t border-black/5 mt-auto relative z-10">
-                   <Button onClick={openTemplate} variant="outline" className="w-full text-sm border-primary/30 text-primary hover:bg-primary/5 rounded-xl">
-                     Use This Template
-                   </Button>
-                 </div>
-               </div>
+            <div className="mt-8">
+              <h4 className="text-sm font-semibold text-foreground/40 uppercase tracking-widest mb-4 ml-1">Example Template</h4>
+              <div className="bg-white/50 relative overflow-hidden rounded-2xl border border-primary/20 p-6 space-y-4 shadow-sm opacity-80 hover:opacity-100 transition-opacity before:absolute before:inset-0 before:bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.3)_50%,transparent_75%,transparent_100%)] before:bg-[length:250px_250px] before:animate-[shimmer_3s_infinite]">
+                <div className="absolute top-0 right-0 bg-primary/10 text-primary text-xs font-bold px-3 py-1 rounded-bl-lg">SAMPLE PREVIEW</div>
+                <div className="flex items-start justify-between relative z-10">
+                  <div>
+                    <h3 className="font-heading text-xl text-foreground flex items-center gap-2">
+                      <LayoutDashboard className="w-5 h-5 text-primary" />
+                      Focus Batch 2026-27
+                    </h3>
+                    <p className="text-sm text-foreground/60 mt-2 leading-relaxed">A 40-week mentored program for serious design aspirants preparing for NID, UCEED, and CEED — covering Prelims, Mains, Portfolios, and Interviews...</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 text-xs relative z-10">
+                  <span className="px-3 py-1.5 rounded-lg bg-green-50 text-green-700 font-bold tracking-wide border border-green-100">₹20,000</span>
+                  <span className="px-3 py-1.5 rounded-lg bg-background border border-black/5 text-foreground/70 font-medium">40 Weeks</span>
+                  <span className="px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 font-medium border border-orange-100">Starts: Oct 15, 2025</span>
+                </div>
+
+                <div className="pt-4 border-t border-black/5 mt-auto relative z-10">
+                  <Button onClick={openTemplate} variant="outline" className="w-full text-sm border-primary/30 text-primary hover:bg-primary/5 rounded-xl">
+                    Use This Template
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}
