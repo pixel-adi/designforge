@@ -364,7 +364,7 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
                   >
                     <p className="text-sm font-medium text-foreground/60 mb-1">EMI / Installments</p>
                     <p className="text-xl font-heading text-foreground">₹{INSTALLMENT_FIRST.toLocaleString('en-IN')}</p>
-                    <p className="text-xs text-foreground/50 mt-1">+ ₹{INSTALLMENT_SECOND.toLocaleString('en-IN')} due later</p>
+                    <p className="text-xs text-foreground/50 mt-1">+ ₹{INSTALLMENT_SECOND.toLocaleString('en-IN')} due after 1 month</p>
                   </button>
                 </div>
               </div>

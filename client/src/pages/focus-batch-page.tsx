@@ -547,7 +547,7 @@ export default function FocusBatchPage() {
                       <span className="font-bold text-lg text-foreground">₹12,000</span>
                     </div>
                     <div className="flex justify-between items-center py-3 border-b border-black/5">
-                      <span className="text-foreground/70 font-medium">2nd Installment (After 3 mos)</span>
+                      <span className="text-foreground/70 font-medium">2nd Installment (After 1 month)</span>
                       <span className="font-bold text-lg text-foreground">₹10,000</span>
                     </div>
                   </div>
