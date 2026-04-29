@@ -31,6 +31,10 @@ const AdminSubscribers = lazy(() => import("@/pages/admin/admin-subscribers"));
 const AdminExamQuestions = lazy(() => import("@/pages/admin/admin-exam-questions"));
 const AdminExamTests = lazy(() => import("@/pages/admin/admin-exam-tests"));
 
+// Candidate Portal
+const PortalLogin = lazy(() => import("@/pages/portal/login"));
+const PortalDashboard = lazy(() => import("@/pages/portal/dashboard"));
+
 function Router() {
   return (
     <>
@@ -50,6 +54,10 @@ function Router() {
           <Route path="/focus-batch" component={FocusBatchPage} />
           <Route path="/privacy-policy" component={PrivacyPolicy} />
           <Route path="/terms-of-service" component={TermsOfService} />
+          
+          {/* Candidate Portal */}
+          <Route path="/portal/login" component={PortalLogin} />
+          <Route path="/portal/dashboard" component={PortalDashboard} />
           
           {/* Admin Routes */}
           <Route path="/admin" component={AdminLogin} />
