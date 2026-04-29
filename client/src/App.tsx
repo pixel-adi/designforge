@@ -28,6 +28,8 @@ const AdminWorkshops = lazy(() => import("@/pages/admin/admin-workshops"));
 const AdminPrograms = lazy(() => import("@/pages/admin/admin-programs"));
 const AdminRegistrations = lazy(() => import("@/pages/admin/admin-registrations"));
 const AdminSubscribers = lazy(() => import("@/pages/admin/admin-subscribers"));
+const AdminExamQuestions = lazy(() => import("@/pages/admin/admin-exam-questions"));
+const AdminExamTests = lazy(() => import("@/pages/admin/admin-exam-tests"));
 
 function Router() {
   return (
@@ -68,6 +70,12 @@ function Router() {
           </Route>
           <Route path="/admin/subscribers">
             {() => <AdminLayout><AdminSubscribers /></AdminLayout>}
+          </Route>
+          <Route path="/admin/exam-questions">
+            {() => <AdminLayout><AdminExamQuestions /></AdminLayout>}
+          </Route>
+          <Route path="/admin/exam-tests">
+            {() => <AdminLayout><AdminExamTests /></AdminLayout>}
           </Route>
 
           {/* Fallback to 404 */}

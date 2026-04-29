@@ -28,7 +28,7 @@ export default function FocusBatchPage() {
         supabase.from('programs').select('*').eq('is_active', true).order('display_order', { ascending: true }),
         supabase.from('workshops').select('*').eq('is_visible', true).order('display_order', { ascending: true })
       ]);
-      
+
       if (programsRes.data) setPrograms(programsRes.data);
       if (workshopsRes.data) setWorkshops(workshopsRes.data);
     }
@@ -81,13 +81,13 @@ export default function FocusBatchPage() {
         const chips = arcsContainerRef.current.querySelectorAll('.floating-chip');
 
         // Gently draw in the arcs
-        gsap.fromTo(arcs, 
-          { opacity: 0, scale: 0.95 }, 
-          { 
-            opacity: 1, 
-            scale: 1, 
-            duration: 1.2, 
-            stagger: 0.2, 
+        gsap.fromTo(arcs,
+          { opacity: 0, scale: 0.95 },
+          {
+            opacity: 1,
+            scale: 1,
+            duration: 1.2,
+            stagger: 0.2,
             ease: "power2.out",
             scrollTrigger: {
               trigger: arcsContainerRef.current,
@@ -396,7 +396,7 @@ export default function FocusBatchPage() {
 
             {/* Arcs and Floating Elements Concept */}
             <div ref={arcsContainerRef} className="relative w-full h-[600px] md:h-[700px] max-w-5xl mx-auto flex flex-col items-center justify-center font-sans mb-12">
-              
+
               {/* Semi-circles (Arcs) now Full Circles centered */}
               {/* Outer Arc */}
               <div className="arc-line absolute top-1/2 left-1/2 w-[900px] h-[900px] rounded-full border border-black/10 -translate-x-1/2 -translate-y-1/2 hidden md:block z-0"></div>
@@ -405,13 +405,13 @@ export default function FocusBatchPage() {
               {/* Middle Arc */}
               <div className="arc-line absolute top-1/2 left-1/2 w-[650px] h-[650px] rounded-full border border-black/10 -translate-x-1/2 -translate-y-1/2 hidden md:block z-0"></div>
               <div className="arc-line absolute top-1/2 left-1/2 w-[350px] h-[350px] rounded-full border border-black/10 -translate-x-1/2 -translate-y-1/2 md:hidden z-0"></div>
-              
+
               {/* Inner Arc */}
               <div className="arc-line absolute top-1/2 left-1/2 w-[350px] h-[350px] rounded-full border border-black/10 border-dashed -translate-x-1/2 -translate-y-1/2 hidden md:block z-0"></div>
               <div className="arc-line absolute top-1/2 left-1/2 w-[220px] h-[220px] rounded-full border border-black/10 border-dashed -translate-x-1/2 -translate-y-1/2 md:hidden z-0"></div>
 
               {/* Floating Items */}
-              
+
               {/* Top Level Items */}
               {/* Top Center */}
               <div className="floating-chip absolute top-[5%] md:top-[8%] left-1/2 -translate-x-1/2 bg-white px-4 md:px-5 py-2 md:py-3 rounded-[2rem] shadow-xl shadow-black/[0.04] border border-black/5 flex items-center gap-3 md:hover:border-primary/30 transition-colors z-20">
@@ -472,7 +472,7 @@ export default function FocusBatchPage() {
               </div>
 
               {/* Center Stats Bubbles */}
-              
+
               {/* Bottom Left Core Bubble */}
               <div className="absolute top-[50%] left-[50%] -translate-x-[110%] md:-translate-x-[120%] -translate-y-1/2 bg-white w-28 h-28 md:w-36 md:h-36 rounded-full shadow-2xl border border-black/5 flex flex-col items-center justify-center z-30 transition-transform hover:scale-105">
                 <div className="text-3xl md:text-4xl font-heading text-primary drop-shadow-sm mb-1">40</div>
@@ -580,16 +580,16 @@ export default function FocusBatchPage() {
                         <span className="text-4xl font-heading font-bold text-foreground">₹{prog.price.toLocaleString('en-IN')}</span>
                       </div>
                       {prog.duration && (
-                         <p className="text-sm text-foreground/50 font-medium mt-2 flex items-center gap-1">
-                           <Clock className="w-4 h-4" /> {prog.duration}
-                         </p>
+                        <p className="text-sm text-foreground/50 font-medium mt-2 flex items-center gap-1">
+                          <Clock className="w-4 h-4" /> {prog.duration}
+                        </p>
                       )}
                     </CardHeader>
                     <CardContent className="flex flex-col flex-1 relative z-10">
                       <p className="text-foreground/70 mb-8 leading-relaxed">
                         {prog.description}
                       </p>
-                      
+
                       {prog.start_date && (
                         <div className="mb-6 p-3 rounded-xl bg-orange-50 border border-orange-100 flex items-start gap-3">
                           <Sparkles className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
@@ -599,8 +599,8 @@ export default function FocusBatchPage() {
                           </div>
                         </div>
                       )}
-                      
-                      <Button 
+
+                      <Button
                         onClick={() => {
                           setSelectedProgram(prog.name);
                           setIsRegOpen(true);
@@ -628,14 +628,14 @@ export default function FocusBatchPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
                 {workshops.map((ws, i) => {
-                   const colors = ["text-pop-1", "text-pop-2", "text-pop-3", "text-secondary", "text-primary"];
-                   const textColor = colors[i % colors.length];
-                   return (
+                  const colors = ["text-pop-1", "text-pop-2", "text-pop-3", "text-secondary", "text-primary"];
+                  const textColor = colors[i % colors.length];
+                  return (
                     <div key={ws.id} className="bg-white p-6 rounded-2xl border border-black/5 hover:border-black/15 transition-all duration-300 flex flex-col justify-between gap-4 group shadow-sm hover:shadow-md cursor-pointer">
                       <div>
                         <div className="flex flex-wrap items-center gap-2 mb-3">
                           {ws.tag && <div className={`text-xs font-medium uppercase tracking-wider ${textColor}`}>{ws.tag}</div>}
-                          {ws.date && <div className="text-xs text-foreground/40 font-mono flex items-center gap-1"><CalendarDays className="w-3 h-3"/>{new Date(ws.date).toLocaleDateString()}</div>}
+                          {ws.date && <div className="text-xs text-foreground/40 font-mono flex items-center gap-1"><CalendarDays className="w-3 h-3" />{new Date(ws.date).toLocaleDateString()}</div>}
                         </div>
                         <h4 className="text-xl md:text-2xl font-heading text-[#262626] mb-2 group-hover:text-primary transition-colors">{ws.title}</h4>
                         <p className="text-sm md:text-base text-foreground/60 leading-relaxed">{ws.description}</p>
@@ -643,11 +643,11 @@ export default function FocusBatchPage() {
                       <div className="mt-4 flex items-center justify-between border-t border-black/5 pt-4">
                         <span className="text-sm font-medium text-foreground hover:text-primary transition-colors">Learn More</span>
                         <div className="w-10 h-10 rounded-full bg-background border border-border flex items-center justify-center shrink-0 group-hover:bg-primary/10 group-hover:border-primary/20 group-hover:text-primary transition-colors">
-                           <ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
+                          <ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
                         </div>
                       </div>
                     </div>
-                   );
+                  );
                 })}
               </div>
             </div>
@@ -691,7 +691,7 @@ export default function FocusBatchPage() {
             {/* Subscription Card Format */}
             <div className="bg-white rounded-3xl p-10 md:p-16 border border-black/5 shadow-xl relative overflow-hidden mb-20 group">
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:scale-150 transition-transform duration-1000"></div>
-              
+
               <div className="relative z-10 max-w-2xl">
                 <div className="inline-block bg-primary/10 text-primary font-mono text-sm px-4 py-1.5 rounded-full mb-6 font-medium border border-primary/20">
                   Join the Waitlist
@@ -705,16 +705,16 @@ export default function FocusBatchPage() {
 
                 <div className="flex flex-col sm:flex-row gap-4 mb-4">
                   <div className="flex-1 relative">
-                    <input 
+                    <input
                       type="email"
                       value={subEmail}
                       onChange={(e) => { setSubEmail(e.target.value); setSubStatus('idle'); }}
-                      placeholder="Enter your email for updates" 
+                      placeholder="Enter your email for updates"
                       className="w-full h-14 pl-6 pr-4 rounded-full border border-black/10 bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium placeholder:text-foreground/40"
                     />
                   </div>
-                  <Button 
-                    size="lg" 
+                  <Button
+                    size="lg"
                     onClick={handleSubscribe}
                     disabled={subStatus === 'loading' || subStatus === 'success'}
                     className="h-14 px-8 rounded-full btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all"
@@ -725,7 +725,7 @@ export default function FocusBatchPage() {
                 {subStatus === 'error' && (
                   <p className="text-sm text-red-500 font-medium ml-2 mb-2">Could not subscribe. Please try again.</p>
                 )}
-                
+
                 <p className="text-sm text-foreground/50 font-medium ml-2">Or <button onClick={() => setIsRegOpen(true)} className="text-primary underline hover:text-primary/80">apply directly</button> for the upcoming Focus Batch.</p>
               </div>
             </div>
@@ -739,25 +739,25 @@ export default function FocusBatchPage() {
                 </p>
               </div>
               <div className="md:w-1/2 flex flex-col gap-4 w-full">
-                 <div className="flex items-center gap-4 p-5 rounded-2xl bg-white border border-black/5 shadow-sm group hover:shadow-md transition-all">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                      <MessageCircle className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-foreground/50 uppercase tracking-widest mb-1">WhatsApp Us</p>
-                      <a href="https://wa.me/917398580486" target="_blank" rel="noopener noreferrer" className="text-lg font-bold text-foreground hover:text-primary transition-colors">+91 7398580486</a>
-                    </div>
-                 </div>
-                 
-                 <div className="flex items-center gap-4 p-5 rounded-2xl bg-white border border-black/5 shadow-sm group hover:shadow-md transition-all">
-                    <div className="w-12 h-12 rounded-full bg-pop-1/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                      <Mail className="w-5 h-5 text-pop-1" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-foreground/50 uppercase tracking-widest mb-1">Email Us</p>
-                      <a href="mailto:designforge05@gmail.com" className="text-lg font-bold text-foreground hover:text-pop-1 transition-colors">designforge05@gmail.com</a>
-                    </div>
-                 </div>
+                <div className="flex items-center gap-4 p-5 rounded-2xl bg-white border border-black/5 shadow-sm group hover:shadow-md transition-all">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <MessageCircle className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-foreground/50 uppercase tracking-widest mb-1">WhatsApp Us</p>
+                    <a href="https://wa.me/917398580486" target="_blank" rel="noopener noreferrer" className="text-lg font-bold text-foreground hover:text-primary transition-colors">+91 7398580486</a>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 p-5 rounded-2xl bg-white border border-black/5 shadow-sm group hover:shadow-md transition-all">
+                  <div className="w-12 h-12 rounded-full bg-pop-1/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Mail className="w-5 h-5 text-pop-1" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-foreground/50 uppercase tracking-widest mb-1">Email Us</p>
+                    <a href="mailto:designforge05@gmail.com" className="text-lg font-bold text-foreground hover:text-pop-1 transition-colors">designforge05@gmail.com</a>
+                  </div>
+                </div>
               </div>
             </div>
 
