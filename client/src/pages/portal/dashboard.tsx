@@ -85,7 +85,6 @@ export default function PortalDashboard() {
         .from('exam_tests')
         .select(`*, exam_test_sections(part, duration_minutes)`)
         .eq('status', 'published')
-        .in('program_id', programIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -279,11 +278,12 @@ export default function PortalDashboard() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(activeTests.length > 0 ? activeTests : [
-                      { id: "demo-1", title: "NID B.Des Full Mock Test 4", exam_test_sections: [{ duration_minutes: 60 }, { duration_minutes: 120 }] },
-                      { id: "demo-2", title: "CEED Aptitude & Sketching Mastery", exam_test_sections: [{ duration_minutes: 180 }] },
-                      { id: "demo-3", title: "UCEED Spatial & Mechanical Reasoning", exam_test_sections: [{ duration_minutes: 150 }] }
-                    ]).map((test: any) => (
+                    {activeTests.length === 0 ? (
+                      <div className="col-span-full p-8 text-center bg-white border border-black/5 rounded-2xl">
+                        <FileText className="w-12 h-12 text-foreground/20 mx-auto mb-3" />
+                        <p className="text-foreground/50 font-medium">No active tests available for your program at the moment.</p>
+                      </div>
+                    ) : activeTests.map((test: any) => (
                       <div key={test.id} className="bg-white border border-black/5 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
                         <div>
                           <div className="flex justify-between items-start mb-4">
