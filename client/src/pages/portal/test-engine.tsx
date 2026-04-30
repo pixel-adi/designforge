@@ -55,6 +55,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   const [showPartBLockedModal, setShowPartBLockedModal] = useState(false);
   const [partBWaitMins, setPartBWaitMins] = useState(0);
 
+  // Attempt & Auto-Save State
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
   useEffect(() => {
     if (id) fetchTestEngineData();
     else {
@@ -191,7 +195,61 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     }
   };
 
-  const startTest = () => {
+  // ---------- TASK 1: Create Attempt in DB ----------
+  const createAttempt = async (): Promise<string | null> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Get candidate record
+      const { data: candidate } = await supabase
+        .from('exam_candidates')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+      if (!candidate) throw new Error('Candidate profile not found');
+
+      // Upsert attempt (handles page refresh - same candidate+test = same row)
+      const { data: attempt, error } = await supabase
+        .from('exam_attempts')
+        .upsert(
+          { candidate_id: candidate.id, test_id: id, start_time: new Date().toISOString(), status: 'in_progress' },
+          { onConflict: 'candidate_id,test_id', ignoreDuplicates: false }
+        )
+        .select('id')
+        .single();
+      if (error) throw error;
+      return attempt.id;
+    } catch (err: any) {
+      console.error('Failed to create attempt:', err.message);
+      return null;
+    }
+  };
+
+  // ---------- TASK 2: Debounced Background Auto-Save ----------
+  const syncResponseToDb = (currentAttemptId: string, qId: string, response: ResponseData) => {
+    // Clear any existing timer for this question
+    if (debounceTimers.current[qId]) clearTimeout(debounceTimers.current[qId]);
+
+    debounceTimers.current[qId] = setTimeout(async () => {
+      try {
+        await supabase.from('exam_responses').upsert({
+          attempt_id: currentAttemptId,
+          question_id: qId,
+          status: response.status,
+          selected_options: response.selectedOptions,
+          answer_text: response.answerText || null,
+          file_url: response.fileUrl || null,
+        }, { onConflict: 'attempt_id,question_id' });
+      } catch (err) {
+        console.error('Auto-save failed for question', qId, err);
+      }
+    }, 800);
+  };
+
+  const startTest = async () => {
+    const newAttemptId = await createAttempt();
+    setAttemptId(newAttemptId);
     setTestStep('test');
     setTimerRunning(true);
     
@@ -214,7 +272,21 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     }
   };
 
+  // ---------- Finalize Attempt in DB on Submit ----------
+  const finalizeAttempt = async () => {
+    if (!attemptId) return;
+    try {
+      await supabase.from('exam_attempts').update({
+        completed_at: new Date().toISOString(),
+        status: 'completed'
+      }).eq('id', attemptId);
+    } catch (err) {
+      console.error('Failed to finalize attempt:', err);
+    }
+  };
+
   const handleAutoSubmit = (reason: string) => {
+    finalizeAttempt();
     setShowSubmitModal(false);
     setTimerRunning(false);
     setTestStep('submitted');
@@ -222,6 +294,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   };
 
   const confirmSubmit = () => {
+    finalizeAttempt();
     setShowSubmitModal(false);
     setTimerRunning(false);
     setTestStep('submitted');
@@ -277,6 +350,11 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       const current = prev[qId];
       const newResponse = { ...current, ...updates };
       
+      // Trigger background auto-save if we have an attempt ID
+      if (attemptId) {
+        syncResponseToDb(attemptId, qId, newResponse);
+      }
+
       // Determine new status if they interacted
       if (newResponse.selectedOptions.length > 0 || newResponse.answerText.trim() !== '' || newResponse.fileUrl !== '') {
         if (newResponse.status !== 'marked') {

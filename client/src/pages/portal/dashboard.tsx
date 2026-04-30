@@ -88,28 +88,25 @@ export default function PortalDashboard() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
+
+      // Fetch all programs to resolve UUIDs to names
+      const { data: allPrograms } = await supabase.from('exam_programs').select('id, name');
+      const programsMap: Record<string, string> = {};
+      (allPrograms || []).forEach(p => { programsMap[p.id] = p.name; });
+
+      // Resolve candidate's program names from their program_ids
+      const candProgramNames = programIds.map(pid => programsMap[pid] || '').filter(Boolean);
+      const candIsBdes = candProgramNames.some(name => name.toLowerCase().includes('b.des') || name.toLowerCase().includes('bdes') || name.toLowerCase().includes('uceed'));
+      const candIsMdes = candProgramNames.some(name => name.toLowerCase().includes('m.des') || name.toLowerCase().includes('mdes') || name.toLowerCase().includes('ceed'));
+
       const filteredTests = (tests || []).filter(test => {
-        const progName = test.exam_programs?.name || '';
         const testTitle = test.title.toLowerCase();
-        
-        const isBdesTest = testTitle.includes('b.des') || testTitle.includes('bdes') || testTitle.includes('uceed') || progName.includes('B.Des');
-        const isMdesTest = testTitle.includes('m.des') || testTitle.includes('mdes') || testTitle.includes('ceed') || progName.includes('M.Des');
-        
-        // Candidate programs (we have programIds which are the selected program UUIDs)
-        // Let's resolve UUIDs to names from the global `programs` state.
-        // Wait, `programs` is available in the component scope? Let's check... it should be.
-        const candProgramNames = programs.filter(p => programIds.includes(p.id)).map(p => p.name);
-        
-        const candIsBdes = candProgramNames.some(name => name.includes('B.Des') || name.includes('UCEED'));
-        const candIsMdes = candProgramNames.some(name => name.includes('M.Des') || name.includes('CEED'));
+        const isBdesTest = testTitle.includes('b.des') || testTitle.includes('bdes') || testTitle.includes('uceed') || testTitle.includes('nid b');
+        const isMdesTest = testTitle.includes('m.des') || testTitle.includes('mdes') || testTitle.includes('ceed') || testTitle.includes('nid m');
 
         if (isBdesTest && candIsBdes) return true;
         if (isMdesTest && candIsMdes) return true;
-        
-        // If the test isn't explicitly branded, let them see it just in case
-        if (!isBdesTest && !isMdesTest) return true;
-        
+        if (!isBdesTest && !isMdesTest) return true; // unbranded tests visible to all
         return false;
       });
 
