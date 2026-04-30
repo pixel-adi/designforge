@@ -461,7 +461,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const maxSizeMB = 10;
+    const maxSizeMB = 5;
     if (file.size > maxSizeMB * 1024 * 1024) {
       toast({ title: "File too large", description: `Maximum file size is ${maxSizeMB}MB.`, variant: "destructive" });
       return;
