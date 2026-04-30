@@ -76,16 +76,9 @@ export default function PortalLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Left Column - Form */}
-      <div className="w-full lg:w-[480px] p-8 sm:p-12 xl:p-16 flex flex-col justify-center relative bg-white shadow-[10px_0_40px_rgba(0,0,0,0.03)] z-10 border-r border-black/5">
-        <button 
-          onClick={() => setLocation('/')} 
-          className="absolute top-8 left-8 sm:top-12 sm:left-12 flex items-center gap-2 text-sm font-medium text-foreground/50 hover:text-foreground transition-colors group"
-        >
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          Back to home
-        </button>
+    <div className="min-h-screen bg-background flex flex-col lg:flex-row-reverse">
+      {/* Right Column - Form */}
+      <div className="w-full lg:w-[30%] lg:min-w-[400px] max-w-xl mx-auto lg:mx-0 p-8 sm:p-12 xl:p-16 flex flex-col justify-center relative bg-white shadow-[-10px_0_40px_rgba(0,0,0,0.05)] z-10 border-l border-black/5">
 
         <div className="w-full max-w-sm mx-auto mt-16 sm:mt-0">
           <img src={logoImg} alt="Designforge" className="h-10 mb-12" />
@@ -164,14 +157,21 @@ export default function PortalLogin() {
         </div>
       </div>
 
-      {/* Right Column - Motivation */}
-      <div className="hidden lg:flex flex-1 relative bg-[#111111] overflow-hidden items-center justify-center p-16 xl:p-24">
-        {/* Abstract background blobs */}
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-pop-1/10 rounded-full blur-[100px] translate-y-1/3 -translate-x-1/3" />
+      {/* Left Column - Motivation */}
+      <div className="hidden lg:flex lg:w-[70%] relative bg-gradient-to-br from-primary via-rose-500 to-orange-500 overflow-hidden items-center justify-center p-16 xl:p-24">
+        <button 
+          onClick={() => setLocation('/')} 
+          className="absolute top-8 left-8 sm:top-12 sm:left-12 flex items-center gap-2 text-sm font-medium text-white/70 hover:text-white transition-colors group z-20"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          Back to home
+        </button>
+        {/* Abstract background blobs (Optimized with lightweight radial gradients instead of GPU-heavy backdrop blur) */}
+        <div className="absolute top-0 right-0 w-[800px] h-[800px] -translate-y-1/2 translate-x-1/3 opacity-40" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%)' }} />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] translate-y-1/3 -translate-x-1/3 opacity-30" style={{ background: 'radial-gradient(circle, rgba(255,220,100,0.4) 0%, transparent 70%)' }} />
         
         <div className="relative z-10 max-w-2xl">
-          <div className="w-16 h-1 bg-primary mb-8 rounded-full" />
+          <div className="w-16 h-1 bg-white/60 mb-8 rounded-full shadow-sm" />
           <h2 className="text-4xl xl:text-5xl font-bold text-white leading-[1.1] tracking-tight mb-8">
             "Design is not just what it looks like and feels like. Design is how it works."
           </h2>

@@ -15,11 +15,11 @@ export default function PortalDashboard() {
   const [loading, setLoading] = useState(true);
   const [authUser, setAuthUser] = useState<any>(null);
   const [candidate, setCandidate] = useState<any>(null);
-  
+
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [programs, setPrograms] = useState<any[]>([]);
-  const [onboardingData, setOnboardingData] = useState<{name: string, phone: string, program_ids: string[], avatar_url: string}>({ name: "", phone: "", program_ids: [], avatar_url: "" });
+  const [onboardingData, setOnboardingData] = useState<{ name: string, phone: string, program_ids: string[], avatar_url: string }>({ name: "", phone: "", program_ids: [], avatar_url: "" });
   const [savingOnboarding, setSavingOnboarding] = useState(false);
 
   // Dashboard Data
@@ -39,19 +39,19 @@ export default function PortalDashboard() {
       }
       setAuthUser(user);
 
-      // Check candidate profile
-      const { data: candidateData, error: candErr } = await supabase
-        .from('exam_candidates')
-        .select(`*`)
-        .eq('auth_user_id', user.id)
-        .maybeSingle();
+      // Fetch candidate profile and programs concurrently
+      const [candRes, progRes] = await Promise.all([
+        supabase.from('exam_candidates').select(`*`).eq('auth_user_id', user.id).maybeSingle(),
+        supabase.from('exam_programs').select('*').order('name')
+      ]);
 
-      if (candErr) throw candErr;
+      if (candRes.error) throw candRes.error;
+      if (progRes.data) setPrograms(progRes.data);
+
+      const candidateData = candRes.data;
 
       if (!candidateData) {
         // Needs onboarding
-        const { data: progData } = await supabase.from('exam_programs').select('*').order('name');
-        if (progData) setPrograms(progData);
         setShowOnboarding(true);
         // Default name if Google provided it
         if (user.user_metadata?.full_name) {
@@ -59,17 +59,14 @@ export default function PortalDashboard() {
         }
       } else {
         setCandidate(candidateData);
-        // Also fetch programs to display names
-        const { data: progData } = await supabase.from('exam_programs').select('*').order('name');
-        if (progData) setPrograms(progData);
-        
+
         setOnboardingData({
           name: candidateData.name || user.user_metadata?.full_name || "",
           phone: candidateData.phone || "",
           program_ids: candidateData.program_ids || [],
           avatar_url: candidateData.avatar_url || ""
         });
-        
+
         fetchDashboardData(candidateData.program_ids || []);
       }
     } catch (err: any) {
@@ -90,7 +87,7 @@ export default function PortalDashboard() {
         .eq('status', 'published')
         .in('program_id', programIds)
         .order('created_at', { ascending: false });
-        
+
       if (error) throw error;
       setActiveTests(tests || []);
     } catch (err) {
@@ -128,7 +125,7 @@ export default function PortalDashboard() {
       }
 
       if (result.error) throw result.error;
-      
+
       setCandidate(result.data);
       setShowOnboarding(false);
       toast({ title: "Success!", description: "Your profile has been saved." });
@@ -162,18 +159,18 @@ export default function PortalDashboard() {
         const ctx = canvas.getContext('2d');
         canvas.width = 200;
         canvas.height = 200;
-        
+
         // Calculate crop to center
         const size = Math.min(img.width, img.height);
         const startX = (img.width - size) / 2;
         const startY = (img.height - size) / 2;
-        
+
         ctx?.drawImage(img, startX, startY, size, size, 0, 0, 200, 200);
-        
+
         // Compress until under 40kb
         let quality = 0.9;
         let dataUrl = canvas.toDataURL('image/jpeg', quality);
-        
+
         while (dataUrl.length > 40 * 1024 && quality > 0.1) {
           quality -= 0.1;
           dataUrl = canvas.toDataURL('image/jpeg', quality);
@@ -197,17 +194,17 @@ export default function PortalDashboard() {
         <div className="p-6 border-b border-black/5">
           <img src={logoImg} alt="Designforge" className="h-8" />
         </div>
-        
+
         <div className="p-4">
           <p className="px-4 text-xs font-semibold uppercase tracking-wider text-foreground/40 mb-2">Menu</p>
           <div className="space-y-1">
-            <button 
+            <button
               onClick={() => setActiveTab('overview')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'overview' ? 'bg-primary/10 text-primary' : 'text-foreground/70 hover:bg-black/5 hover:text-foreground'}`}
             >
               <LayoutDashboard className="w-4 h-4" /> Overview
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('progress')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'progress' ? 'bg-primary/10 text-primary' : 'text-foreground/70 hover:bg-black/5 hover:text-foreground'}`}
             >
@@ -218,10 +215,10 @@ export default function PortalDashboard() {
 
         <div className="mt-auto p-4 border-t border-black/5">
           {candidate && (
-            <button 
+            <button
               onClick={() => {
                 if (programs.length === 0) {
-                  supabase.from('exam_programs').select('*').order('name').then(({data}) => {
+                  supabase.from('exam_programs').select('*').order('name').then(({ data }) => {
                     if (data) setPrograms(data);
                   });
                 }
@@ -251,7 +248,7 @@ export default function PortalDashboard() {
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
         <div className="max-w-5xl mx-auto p-6 md:p-10 lg:p-12">
-          
+
           <div className="mb-10">
             <h1 className="text-2xl sm:text-3xl font-bold text-[#262626] tracking-tight">
               {activeTab === 'overview' ? 'Dashboard Overview' : activeTab === 'progress' ? 'Progress & History' : 'Profile Settings'}
@@ -280,55 +277,123 @@ export default function PortalDashboard() {
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-[#262626]">Active Mock Tests</h2>
                   </div>
-                  
-                  {activeTests.length === 0 ? (
-                    <div className="bg-white rounded-2xl border border-dashed border-black/10 p-12 text-center">
-                      <FileText className="w-12 h-12 text-foreground/20 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-[#262626]">No active tests</h3>
-                      <p className="text-foreground/50 mt-1">There are currently no mock tests assigned to your program.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {activeTests.map(test => (
-                        <div key={test.id} className="bg-white border border-black/5 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
-                          <div>
-                            <div className="flex justify-between items-start mb-4">
-                              <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
-                                <FileText className="w-5 h-5" />
-                              </div>
-                              <span className="bg-green-100 text-green-700 text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full">New</span>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(activeTests.length > 0 ? activeTests : [
+                      { id: "demo-1", title: "NID B.Des Full Mock Test 4", exam_test_sections: [{ duration_minutes: 60 }, { duration_minutes: 120 }] },
+                      { id: "demo-2", title: "CEED Aptitude & Sketching Mastery", exam_test_sections: [{ duration_minutes: 180 }] },
+                      { id: "demo-3", title: "UCEED Spatial & Mechanical Reasoning", exam_test_sections: [{ duration_minutes: 150 }] }
+                    ]).map((test: any) => (
+                      <div key={test.id} className="bg-white border border-black/5 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
+                        <div>
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
+                              <FileText className="w-5 h-5" />
                             </div>
-                            <h3 className="font-bold text-lg text-[#262626] mb-2">{test.title}</h3>
-                            
-                            <div className="flex items-center gap-4 text-xs font-medium text-foreground/50 mb-6">
-                              <div className="flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5" />
-                                {test.exam_test_sections?.reduce((acc: number, curr: any) => acc + curr.duration_minutes, 0)} Mins
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <LayoutDashboard className="w-3.5 h-3.5" />
-                                {test.exam_test_sections?.length} Sections
-                              </div>
+                            <span className="bg-green-100 text-green-700 text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full">New</span>
+                          </div>
+                          <h3 className="font-bold text-lg text-[#262626] mb-2">{test.title}</h3>
+
+                          <div className="flex items-center gap-4 text-xs font-medium text-foreground/50 mb-6">
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5" />
+                              {test.exam_test_sections?.reduce((acc: number, curr: any) => acc + curr.duration_minutes, 0)} Mins
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <LayoutDashboard className="w-3.5 h-3.5" />
+                              {test.exam_test_sections?.length} Sections
                             </div>
                           </div>
-                          
-                          <Button className="w-full bg-primary hover:bg-primary/90 text-white gap-2 group-hover:shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] transition-all">
-                            Start Test <ChevronRight className="w-4 h-4" />
-                          </Button>
                         </div>
-                      ))}
-                    </div>
-                  )}
+
+                        <Button
+                          onClick={() => setLocation(`/portal/test/${test.id}`)}
+                          className="w-full bg-primary hover:bg-primary/90 text-white gap-2 group-hover:shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] transition-all"
+                        >
+                          Start Test <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </section>
               )}
             </div>
           )}
 
           {activeTab === 'progress' && (
-            <div className="bg-white rounded-2xl border border-black/5 p-12 text-center shadow-sm">
-              <Clock className="w-12 h-12 text-primary/40 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-[#262626]">No History Yet</h3>
-              <p className="text-foreground/50 mt-2 max-w-md mx-auto">You haven't attempted any mock tests yet. Once you complete a test, your detailed performance analytics and scores will appear here.</p>
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {/* Dummy Top Stats */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm">
+                  <div className="text-sm font-semibold text-foreground/50 mb-2">Total Tests Attempted</div>
+                  <div className="text-3xl font-bold text-[#262626]">3</div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm">
+                  <div className="text-sm font-semibold text-foreground/50 mb-2">Average Score</div>
+                  <div className="text-3xl font-bold text-green-600">72%</div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm">
+                  <div className="text-sm font-semibold text-foreground/50 mb-2">Highest Score</div>
+                  <div className="text-3xl font-bold text-primary">85/100</div>
+                </div>
+              </div>
+
+              {/* Dummy Recent History */}
+              <div>
+                <h3 className="text-lg font-semibold text-[#262626] mb-4">Recent Test History</h3>
+                <div className="space-y-4">
+                  {/* Dummy Card 1 */}
+                  <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center font-bold text-lg border border-green-100">
+                        85
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-[#262626]">NID B.Des Full Mock Test 1</h4>
+                        <div className="flex items-center gap-4 text-xs text-foreground/50 mt-1 font-medium">
+                          <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Completed in 2h 45m</span>
+                          <span>April 26, 2026</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button variant="outline" className="w-full md:w-auto shrink-0">View Analytics Report</Button>
+                  </div>
+
+                  {/* Dummy Card 2 */}
+                  <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-lg border border-orange-100">
+                        68
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-[#262626]">CEED Design Aptitude Test</h4>
+                        <div className="flex items-center gap-4 text-xs text-foreground/50 mt-1 font-medium">
+                          <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Completed in 3h 00m</span>
+                          <span>April 18, 2026</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button variant="outline" className="w-full md:w-auto shrink-0">View Analytics Report</Button>
+                  </div>
+
+                  {/* Dummy Card 3 */}
+                  <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg border border-blue-100">
+                        75
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-[#262626]">NID B.Des Sectional Test - Spatial</h4>
+                        <div className="flex items-center gap-4 text-xs text-foreground/50 mt-1 font-medium">
+                          <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Completed in 45m</span>
+                          <span>April 10, 2026</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button variant="outline" className="w-full md:w-auto shrink-0">View Analytics Report</Button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -366,20 +431,20 @@ export default function PortalDashboard() {
                 <div className="grid sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="prof-name">Full Name *</Label>
-                    <Input 
-                      id="prof-name" 
-                      value={onboardingData.name} 
-                      onChange={e => setOnboardingData({...onboardingData, name: e.target.value})} 
-                      required 
+                    <Input
+                      id="prof-name"
+                      value={onboardingData.name}
+                      onChange={e => setOnboardingData({ ...onboardingData, name: e.target.value })}
+                      required
                       className="bg-background/50 border-black/10 focus:bg-white"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="prof-phone">Phone Number</Label>
-                    <Input 
-                      id="prof-phone" 
-                      value={onboardingData.phone} 
-                      onChange={e => setOnboardingData({...onboardingData, phone: e.target.value})} 
+                    <Input
+                      id="prof-phone"
+                      value={onboardingData.phone}
+                      onChange={e => setOnboardingData({ ...onboardingData, phone: e.target.value })}
                       className="bg-background/50 border-black/10 focus:bg-white"
                     />
                   </div>
@@ -391,15 +456,15 @@ export default function PortalDashboard() {
                       const isSelected = onboardingData.program_ids?.includes(p.id);
                       return (
                         <label key={p.id} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'border-black/10 hover:bg-black/5'}`}>
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             className="w-4 h-4 text-primary focus:ring-primary accent-primary"
                             checked={isSelected}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setOnboardingData(prev => ({...prev, program_ids: [...(prev.program_ids || []), p.id]}));
+                                setOnboardingData(prev => ({ ...prev, program_ids: [...(prev.program_ids || []), p.id] }));
                               } else {
-                                setOnboardingData(prev => ({...prev, program_ids: (prev.program_ids || []).filter(id => id !== p.id)}));
+                                setOnboardingData(prev => ({ ...prev, program_ids: (prev.program_ids || []).filter(id => id !== p.id) }));
                               }
                             }}
                           />
@@ -409,9 +474,9 @@ export default function PortalDashboard() {
                     })}
                   </div>
                 </div>
-              <Button type="submit" disabled={savingOnboarding} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white gap-2">
-                {savingOnboarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Save Changes
-              </Button>
+                <Button type="submit" disabled={savingOnboarding} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white gap-2">
+                  {savingOnboarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Save Changes
+                </Button>
               </form>
             </div>
           )}
@@ -431,20 +496,20 @@ export default function PortalDashboard() {
           <form onSubmit={handleOnboardingSubmit} className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name *</Label>
-              <Input 
-                id="name" 
-                value={onboardingData.name} 
-                onChange={e => setOnboardingData({...onboardingData, name: e.target.value})} 
-                required 
+              <Input
+                id="name"
+                value={onboardingData.name}
+                onChange={e => setOnboardingData({ ...onboardingData, name: e.target.value })}
+                required
                 className="bg-background/50 border-black/10 focus:bg-white"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number (Optional)</Label>
-              <Input 
-                id="phone" 
-                value={onboardingData.phone} 
-                onChange={e => setOnboardingData({...onboardingData, phone: e.target.value})} 
+              <Input
+                id="phone"
+                value={onboardingData.phone}
+                onChange={e => setOnboardingData({ ...onboardingData, phone: e.target.value })}
                 className="bg-background/50 border-black/10 focus:bg-white"
               />
             </div>
@@ -455,15 +520,15 @@ export default function PortalDashboard() {
                   const isSelected = onboardingData.program_ids?.includes(p.id);
                   return (
                     <label key={p.id} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'border-black/10 hover:bg-black/5'}`}>
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         className="w-4 h-4 text-primary focus:ring-primary accent-primary"
                         checked={isSelected}
                         onChange={(e) => {
                           if (e.target.checked) {
-                            setOnboardingData(prev => ({...prev, program_ids: [...(prev.program_ids || []), p.id]}));
+                            setOnboardingData(prev => ({ ...prev, program_ids: [...(prev.program_ids || []), p.id] }));
                           } else {
-                            setOnboardingData(prev => ({...prev, program_ids: (prev.program_ids || []).filter(id => id !== p.id)}));
+                            setOnboardingData(prev => ({ ...prev, program_ids: (prev.program_ids || []).filter(id => id !== p.id) }));
                           }
                         }}
                       />

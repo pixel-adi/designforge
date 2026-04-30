@@ -79,6 +79,8 @@ export default function AdminExamQuestions() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [bulkQuestions, setBulkQuestions] = useState<any[]>([]);
   const [isUploadingBulk, setIsUploadingBulk] = useState(false);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<string[]>([]);
+  const [bulkFilterType, setBulkFilterType] = useState<string>("ALL");
 
   useEffect(() => { fetchQuestions(); }, []);
 
@@ -302,7 +304,7 @@ export default function AdminExamQuestions() {
             _tempId: `bulk-${index}`,
             part: row['Part'] || 'A',
             type: row['Type'] || 'MCQ',
-            difficulty: row['Difficulty'] || 'Medium',
+            difficulty: row['Difficulty'] ? row['Difficulty'].toLowerCase() : 'medium',
             content_text: row['Content Text'] || '',
             topics: row['Topics (comma separated)'] ? row['Topics (comma separated)'].split(',').map((t:string) => t.trim()) : [],
             pyq_tag: row['PYQ Tag'] || '',
@@ -320,6 +322,17 @@ export default function AdminExamQuestions() {
   const toggleBulkStatus = (id: string, newStatus: 'approved' | 'rejected') => {
     setBulkQuestions(bulkQuestions.map(q => q._tempId === id ? { ...q, status: newStatus } : q));
   };
+
+  const toggleBulkSelection = (id: string) => {
+    setBulkSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const handleBulkAction = (action: 'approved' | 'rejected') => {
+    setBulkQuestions(bq => bq.map(q => bulkSelectedIds.includes(q._tempId) ? { ...q, status: action } : q));
+    setBulkSelectedIds([]); // clear selection after action
+  };
+
+  const filteredBulkQuestions = bulkQuestions.filter(q => bulkFilterType === "ALL" || q.type === bulkFilterType);
 
   const saveApprovedBulkQuestions = async () => {
     setIsUploadingBulk(true);
@@ -769,26 +782,65 @@ export default function AdminExamQuestions() {
         <DialogContent className="max-w-[75vw] w-[75vw] max-h-[75vh] overflow-y-auto shadow-2xl rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Upload className="w-5 h-5 text-primary" /> Bulk Upload Preview</DialogTitle>
-            <DialogDescription>Review the parsed questions. Approve the ones you want to save.</DialogDescription>
+            <DialogDescription>Review the parsed questions. Select questions to approve or reject them.</DialogDescription>
           </DialogHeader>
           
+          {/* Filters & Bulk Actions */}
+          <div className="flex flex-col md:flex-row justify-between gap-4 border-b border-black/5 pb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-foreground/50 mr-2">Filter:</span>
+              {['ALL', 'MCQ', 'MSQ', 'NAT', 'SUBJECTIVE'].map(type => (
+                <button
+                  key={type}
+                  onClick={() => setBulkFilterType(type)}
+                  className={`px-3 py-1 text-xs font-bold rounded-full border transition-colors ${bulkFilterType === type ? 'bg-primary text-white border-primary' : 'bg-white border-black/10 text-foreground/70 hover:bg-black/5'}`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-foreground/50 mr-2">{bulkSelectedIds.length} selected</span>
+              <Button size="sm" variant="outline" onClick={() => setBulkSelectedIds(bulkSelectedIds.length === filteredBulkQuestions.length ? [] : filteredBulkQuestions.map(q => q._tempId))}>
+                {bulkSelectedIds.length === filteredBulkQuestions.length ? 'Deselect All' : 'Select All'}
+              </Button>
+              <Button size="sm" onClick={() => handleBulkAction('approved')} disabled={bulkSelectedIds.length === 0} className="bg-green-600 hover:bg-green-700 text-white">
+                Approve Selected
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => handleBulkAction('rejected')} disabled={bulkSelectedIds.length === 0}>
+                Reject Selected
+              </Button>
+            </div>
+          </div>
+
           <div className="py-4 space-y-4">
-            {bulkQuestions.map((bq, idx) => (
-              <div key={bq._tempId} className={`p-4 rounded-xl border ${bq.status === 'approved' ? 'border-green-400 bg-green-50/50' : bq.status === 'rejected' ? 'border-red-200 bg-red-50/50 opacity-60' : 'border-black/10 bg-white'}`}>
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex gap-2">
-                    <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-1 rounded">Part {bq.part}</span>
-                    <span className="text-xs font-bold bg-black/5 text-foreground/70 px-2 py-1 rounded">{bq.type}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant={bq.status === 'approved' ? 'default' : 'outline'} className={bq.status === 'approved' ? 'bg-green-600 hover:bg-green-700' : ''} onClick={() => toggleBulkStatus(bq._tempId, 'approved')}>
-                      Approve
-                    </Button>
-                    <Button size="sm" variant={bq.status === 'rejected' ? 'destructive' : 'outline'} onClick={() => toggleBulkStatus(bq._tempId, 'rejected')}>
-                      Reject
-                    </Button>
-                  </div>
+            {filteredBulkQuestions.map((bq, idx) => (
+              <div key={bq._tempId} className={`p-4 rounded-xl border flex gap-4 ${bq.status === 'approved' ? 'border-green-400 bg-green-50/50' : bq.status === 'rejected' ? 'border-red-200 bg-red-50/50 opacity-60' : 'border-black/10 bg-white'}`}>
+                <div className="pt-1">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-primary rounded border-black/20 focus:ring-primary accent-primary cursor-pointer"
+                    checked={bulkSelectedIds.includes(bq._tempId)}
+                    onChange={() => toggleBulkSelection(bq._tempId)}
+                  />
                 </div>
+                <div className="flex-1">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex gap-2">
+                      <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-1 rounded">Part {bq.part}</span>
+                      <span className="text-xs font-bold bg-black/5 text-foreground/70 px-2 py-1 rounded">{bq.type}</span>
+                      <span className="text-xs font-bold bg-black/5 text-foreground/70 px-2 py-1 rounded capitalize">{bq.difficulty}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant={bq.status === 'approved' ? 'default' : 'outline'} className={bq.status === 'approved' ? 'bg-green-600 hover:bg-green-700' : ''} onClick={() => toggleBulkStatus(bq._tempId, 'approved')}>
+                        Approve
+                      </Button>
+                      <Button size="sm" variant={bq.status === 'rejected' ? 'destructive' : 'outline'} onClick={() => toggleBulkStatus(bq._tempId, 'rejected')}>
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
                 <p className="text-sm text-foreground/80 font-medium">{bq.content_text}</p>
                 
                 {bq.options && bq.options.length > 0 && (
@@ -801,6 +853,7 @@ export default function AdminExamQuestions() {
                     ))}
                   </div>
                 )}
+                </div>
               </div>
             ))}
           </div>

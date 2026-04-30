@@ -34,6 +34,7 @@ const AdminExamTests = lazy(() => import("@/pages/admin/admin-exam-tests"));
 // Candidate Portal
 const PortalLogin = lazy(() => import("@/pages/portal/login"));
 const PortalDashboard = lazy(() => import("@/pages/portal/dashboard"));
+const PortalTestEngine = lazy(() => import("@/pages/portal/test-engine"));
 
 function Router() {
   return (
@@ -58,6 +59,7 @@ function Router() {
           {/* Candidate Portal */}
           <Route path="/portal/login" component={PortalLogin} />
           <Route path="/portal/dashboard" component={PortalDashboard} />
+          <Route path="/portal/test/:id" component={PortalTestEngine} />
           
           {/* Admin Routes */}
           <Route path="/admin" component={AdminLogin} />
