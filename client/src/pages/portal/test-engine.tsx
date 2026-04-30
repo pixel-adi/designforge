@@ -49,6 +49,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   // Modal State
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [modalType, setModalType] = useState<'submit' | 'exit'>('submit');
+  
+  // Part B Lock Modal State
+  const [showPartBLockedModal, setShowPartBLockedModal] = useState(false);
+  const [partBWaitMins, setPartBWaitMins] = useState(0);
 
   useEffect(() => {
     if (id) fetchTestEngineData();
@@ -216,11 +220,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     // Part Locking Logic: Cannot access Part B if Part A time is still running
     if (q.part === 'B' && timeLeft > engineData!.partA_TimeThreshold) {
       const minsLeftForA = Math.ceil((timeLeft - engineData!.partA_TimeThreshold) / 60);
-      toast({
-        title: "Section Locked 🔒",
-        description: `You must wait for Part A time to finish before accessing Part B. Remaining wait: ${minsLeftForA} minutes.`,
-        variant: "destructive"
-      });
+      setPartBWaitMins(minsLeftForA);
+      setShowPartBLockedModal(true);
       return;
     }
 
@@ -574,7 +575,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         )}
 
         {/* Right Side: Navigation Palette */}
-        <div className="w-64 bg-white rounded-2xl border border-black/5 shadow-sm p-5 flex flex-col shrink-0">
+        <div className="w-[340px] bg-white rounded-2xl border border-black/5 shadow-sm p-5 flex flex-col shrink-0">
           <h3 className="font-bold text-[#262626] mb-4 text-center">Question Palette</h3>
           
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
@@ -621,6 +622,31 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             )}
             <Button onClick={confirmSubmit} className="w-full font-bold bg-primary text-white hover:bg-primary/90">
               {modalType === 'submit' ? 'Yes, Submit' : 'Submit & Exit'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Part B Locked Modal */}
+      <Dialog open={showPartBLockedModal} onOpenChange={setShowPartBLockedModal}>
+        <DialogContent className="sm:max-w-md border-orange-200">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-[#262626] flex items-center gap-2">
+              <span className="text-2xl">🔒</span> Section Locked
+            </DialogTitle>
+            <DialogDescription className="text-foreground/70 font-medium pt-2 text-base">
+              You cannot access Part B (Subjective) questions until the mandatory time for Part A has elapsed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-center gap-3 my-2">
+            <Clock className="w-6 h-6 text-orange-600 shrink-0" />
+            <div className="text-sm font-bold text-orange-800">
+              Please wait {partBWaitMins} more minutes before this section unlocks.
+            </div>
+          </div>
+          <DialogFooter className="mt-2">
+            <Button onClick={() => setShowPartBLockedModal(false)} className="w-full font-bold bg-orange-600 text-white hover:bg-orange-700">
+              Understood
             </Button>
           </DialogFooter>
         </DialogContent>

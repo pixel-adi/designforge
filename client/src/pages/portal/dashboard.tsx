@@ -88,7 +88,32 @@ export default function PortalDashboard() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setActiveTests(tests || []);
+      
+      const filteredTests = (tests || []).filter(test => {
+        const progName = test.exam_programs?.name || '';
+        const testTitle = test.title.toLowerCase();
+        
+        const isBdesTest = testTitle.includes('b.des') || testTitle.includes('bdes') || testTitle.includes('uceed') || progName.includes('B.Des');
+        const isMdesTest = testTitle.includes('m.des') || testTitle.includes('mdes') || testTitle.includes('ceed') || progName.includes('M.Des');
+        
+        // Candidate programs (we have programIds which are the selected program UUIDs)
+        // Let's resolve UUIDs to names from the global `programs` state.
+        // Wait, `programs` is available in the component scope? Let's check... it should be.
+        const candProgramNames = programs.filter(p => programIds.includes(p.id)).map(p => p.name);
+        
+        const candIsBdes = candProgramNames.some(name => name.includes('B.Des') || name.includes('UCEED'));
+        const candIsMdes = candProgramNames.some(name => name.includes('M.Des') || name.includes('CEED'));
+
+        if (isBdesTest && candIsBdes) return true;
+        if (isMdesTest && candIsMdes) return true;
+        
+        // If the test isn't explicitly branded, let them see it just in case
+        if (!isBdesTest && !isMdesTest) return true;
+        
+        return false;
+      });
+
+      setActiveTests(filteredTests);
     } catch (err) {
       console.error(err);
     }
