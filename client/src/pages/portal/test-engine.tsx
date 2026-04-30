@@ -11,6 +11,7 @@ interface EngineState {
   sections: any[];
   questions: any[];
   options: Record<string, any[]>;
+  partA_TimeThreshold: number; 
 }
 
 type TestStep = 'instructions' | 'test' | 'submitted';
@@ -124,8 +125,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         const { data: qData } = await supabase.from('exam_questions').select('*').in('id', questionIds);
         questionsData = qData || [];
 
-        // Sort questions by part
-        questionsData.sort((a, b) => a.part.localeCompare(b.part));
+        // Sort questions by Part, then strictly NAT -> MSQ -> MCQ -> SUBJECTIVE
+        const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3, 'SUBJECTIVE': 4 };
+        questionsData.sort((a, b) => {
+          if (a.part !== b.part) return a.part.localeCompare(b.part);
+          return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
+        });
 
         // Fetch Options securely
         const { data: optData } = await supabase.from('exam_options')
@@ -151,12 +156,15 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       }
 
       const totalMins = sectionsData?.reduce((acc: number, sec: any) => acc + sec.duration_minutes, 0) || 180;
+      const partAMins = sectionsData?.find((s: any) => s.part === 'A')?.duration_minutes || 0;
+      const partA_TimeThreshold = (totalMins * 60) - (partAMins * 60);
 
       setEngineData({
         test: testData,
         sections: sectionsData || [],
         questions: questionsData,
-        options: optionsMap
+        options: optionsMap,
+        partA_TimeThreshold
       });
       setResponses(initialResponses);
       setTimeLeft(totalMins * 60);
@@ -203,8 +211,21 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   };
 
   const handleNavigateQuestion = (idx: number) => {
+    const q = engineData!.questions[idx];
+    
+    // Part Locking Logic: Cannot access Part B if Part A time is still running
+    if (q.part === 'B' && timeLeft > engineData!.partA_TimeThreshold) {
+      const minsLeftForA = Math.ceil((timeLeft - engineData!.partA_TimeThreshold) / 60);
+      toast({
+        title: "Section Locked 🔒",
+        description: `You must wait for Part A time to finish before accessing Part B. Remaining wait: ${minsLeftForA} minutes.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     setActiveQuestionIndex(idx);
-    const qId = engineData!.questions[idx].id;
+    const qId = q.id;
     setResponses(prev => ({
       ...prev,
       [qId]: { ...prev[qId], status: prev[qId].status === 'unseen' ? 'visited' : prev[qId].status }
@@ -237,6 +258,11 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       ...prev,
       [qId]: { ...prev[qId], status: 'marked' }
     }));
+    
+    // Auto-advance
+    if (activeQuestionIndex < engineData!.questions.length - 1) {
+      handleNavigateQuestion(activeQuestionIndex + 1);
+    }
   };
 
   const handleSaveAndNext = () => {
@@ -273,6 +299,46 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     const s = (seconds % 60).toString().padStart(2, '0');
     return `${h}:${m}:${s}`;
   };
+
+  // Build palette groups
+  const renderPaletteGroups = () => {
+    if (!engineData) return null;
+    
+    const groups: { [key: string]: { q: any, idx: number }[] } = {};
+    engineData.questions.forEach((q, idx) => {
+      let groupKey = `Part ${q.part} - ${q.type}`;
+      if (!groups[groupKey]) groups[groupKey] = [];
+      groups[groupKey].push({ q, idx });
+    });
+
+    return Object.keys(groups).map(groupName => (
+      <div key={groupName} className="mb-5 border-b border-black/5 pb-4 last:border-0">
+        <div className="text-[10px] font-bold text-foreground/50 uppercase tracking-wider mb-3 bg-black/5 inline-block px-2 py-0.5 rounded-sm">{groupName}</div>
+        <div className="grid grid-cols-4 gap-2">
+          {groups[groupName].map(({ q, idx }) => {
+            const status = responses[q.id]?.status || 'unseen';
+            let bgClass = "bg-white border-black/20 text-foreground/70 hover:bg-black/5"; // unseen
+            if (status === 'visited') bgClass = "bg-red-50 border-red-200 text-red-600";
+            if (status === 'answered') bgClass = "bg-green-100 border-green-200 text-green-700";
+            if (status === 'marked') bgClass = "bg-purple-100 border-purple-200 text-purple-700";
+            
+            const isActive = idx === activeQuestionIndex;
+            
+            return (
+              <button 
+                key={q.id} 
+                onClick={() => handleNavigateQuestion(idx)}
+                className={`h-10 rounded-lg border flex items-center justify-center text-sm font-bold transition-all ${bgClass} ${isActive ? 'ring-2 ring-primary ring-offset-1 scale-105 shadow-sm' : ''}`}
+              >
+                {idx + 1}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    ));
+  };
+
 
   if (loading || !engineData) {
     return (
@@ -391,8 +457,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       <div className="flex-1 flex p-6 gap-6 max-w-[1600px] mx-auto w-full min-h-0">
         {/* Left Side: Question Area */}
         {currentQ && currentResponse ? (
-          <div className="flex-1 bg-white rounded-2xl border border-black/5 shadow-sm p-8 flex flex-col min-h-0 relative">
-            <div className="flex justify-between items-center mb-6 border-b border-black/5 pb-4 shrink-0">
+          <div className="flex-1 bg-white rounded-2xl border border-black/5 shadow-sm px-8 pt-6 pb-4 flex flex-col min-h-0 relative">
+            <div className="flex justify-between items-center mb-4 border-b border-black/5 pb-4 shrink-0">
               <div className="flex gap-2">
                 <span className="bg-primary/10 text-primary px-3 py-1 rounded text-sm font-bold">Part {currentQ.part}</span>
                 <span className="bg-black/5 text-foreground/70 px-3 py-1 rounded text-sm font-bold">{currentQ.type}</span>
@@ -403,20 +469,20 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar pb-4">
-              <div className="text-lg text-[#262626] font-medium whitespace-pre-wrap leading-relaxed mb-6">
+            <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar pb-2">
+              <div className="text-lg text-[#262626] font-medium whitespace-pre-wrap leading-relaxed mb-4">
                 <span className="font-bold mr-2">Q{activeQuestionIndex + 1}.</span>
                 {currentQ.content_text}
               </div>
 
               {currentQ.media_url && (
-                <div className="mb-8 rounded-lg overflow-hidden border border-black/10 inline-block max-w-full">
-                  <img src={currentQ.media_url} alt="Question Media" className="max-h-96 object-contain bg-background/50" />
+                <div className="mb-6 rounded-lg overflow-hidden border border-black/10 inline-block max-w-full">
+                  <img src={currentQ.media_url} alt="Question Media" className="max-h-[300px] object-contain bg-background/50" />
                 </div>
               )}
 
               {/* Dynamic Inputs */}
-              <div className="space-y-3 mt-4 mb-4">
+              <div className="space-y-3 mt-2 mb-2">
                 {currentQ.type === 'NAT' ? (
                   <div className="w-64">
                     <input 
@@ -430,8 +496,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                 ) : currentQ.type === 'SUBJECTIVE' ? (
                   <div className="w-full max-w-2xl">
                     {currentResponse.fileUrl ? (
-                      <div className="h-40 border-2 border-primary/40 rounded-xl bg-primary/5 flex flex-col items-center justify-center text-primary text-sm relative group overflow-hidden">
-                        <FileCheck2 className="w-10 h-10 mb-2" />
+                      <div className="h-32 border-2 border-primary/40 rounded-xl bg-primary/5 flex flex-col items-center justify-center text-primary text-sm relative group overflow-hidden">
+                        <FileCheck2 className="w-8 h-8 mb-2" />
                         <p className="font-bold">{currentResponse.fileUrl}</p>
                         <p className="text-xs mt-1 opacity-70">Successfully attached</p>
                         <label className="absolute inset-0 bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity backdrop-blur-sm">
@@ -440,8 +506,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                         </label>
                       </div>
                     ) : (
-                      <label className="h-40 border-2 border-dashed border-black/20 rounded-xl bg-background/50 hover:bg-black/5 flex flex-col items-center justify-center text-foreground/50 text-sm cursor-pointer transition-colors group">
-                        <UploadCloud className="w-10 h-10 mb-3 text-foreground/30 group-hover:text-primary transition-colors" />
+                      <label className="h-32 border-2 border-dashed border-black/20 rounded-xl bg-background/50 hover:bg-black/5 flex flex-col items-center justify-center text-foreground/50 text-sm cursor-pointer transition-colors group">
+                        <UploadCloud className="w-8 h-8 mb-2 text-foreground/30 group-hover:text-primary transition-colors" />
                         <p className="font-bold text-[#262626]">Click to upload sketch/media</p>
                         <p className="text-xs mt-1 font-medium">Supports JPG, PNG, PDF (Max 10MB)</p>
                         <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, currentQ.id)} />
@@ -450,7 +516,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                   </div>
                 ) : (
                   // MCQ and MSQ
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {currentOptions.map((opt, idx) => {
                       const isSelected = currentResponse.selectedOptions.includes(opt.id);
                       
@@ -468,14 +534,14 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                               updateResponse(currentQ.id, { selectedOptions: newOpts });
                             }
                           }}
-                          className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all ${isSelected ? 'border-primary bg-primary/5 shadow-sm' : 'border-black/10 hover:bg-black/5'}`}
+                          className={`flex items-center gap-4 p-3 border rounded-xl cursor-pointer transition-all ${isSelected ? 'border-primary bg-primary/5 shadow-sm' : 'border-black/10 hover:bg-black/5'}`}
                         >
                           <div className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold shrink-0 ${isSelected ? 'border-primary bg-primary text-white' : 'border-black/20 text-foreground/50'}`}>
                             {String.fromCharCode(65 + idx)}
                           </div>
                           <span className={`text-sm ${isSelected ? 'font-bold text-primary' : 'font-semibold text-[#262626]'}`}>{opt.content_text}</span>
                           {opt.media_url && (
-                             <img src={opt.media_url} alt="Option Media" className="max-h-24 rounded border border-black/5 ml-auto" />
+                             <img src={opt.media_url} alt="Option Media" className="max-h-20 rounded border border-black/5 ml-auto" />
                           )}
                         </div>
                       );
@@ -486,16 +552,16 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             </div>
 
             {/* Bottom Navigation */}
-            <div className="pt-4 border-t border-black/5 flex justify-between items-center shrink-0">
+            <div className="pt-4 border-t border-black/5 flex justify-between items-center shrink-0 mt-auto">
               <Button variant="outline" onClick={() => handleNavigateQuestion(Math.max(0, activeQuestionIndex - 1))} disabled={activeQuestionIndex === 0} className="shadow-sm font-bold">
                 <ArrowLeft className="w-4 h-4 mr-2" /> Previous
               </Button>
               <div className="flex gap-3">
                 <Button variant="outline" onClick={handleMarkForReview} className="border-purple-200 text-purple-700 hover:bg-purple-50 shadow-sm font-bold">
-                  Mark for Review
+                  Mark for Review & Next
                 </Button>
-                <Button onClick={handleSaveAndNext} disabled={activeQuestionIndex === totalQuestions - 1} className="bg-primary text-white hover:bg-primary/90 px-10 shadow-md font-bold">
-                  Save & Next
+                <Button onClick={handleSaveAndNext} disabled={activeQuestionIndex === totalQuestions - 1} className="bg-primary text-white hover:bg-primary/90 px-8 shadow-md font-bold">
+                  Save Response & Next
                 </Button>
               </div>
             </div>
@@ -512,28 +578,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           <h3 className="font-bold text-[#262626] mb-4 text-center">Question Palette</h3>
           
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-            <div className="grid grid-cols-4 gap-2 mb-6">
-              {engineData.questions.map((q, idx) => {
-                const status = responses[q.id]?.status || 'unseen';
-                
-                let bgClass = "bg-white border-black/20 text-foreground/70 hover:bg-black/5"; // unseen
-                if (status === 'visited') bgClass = "bg-red-50 border-red-200 text-red-600";
-                if (status === 'answered') bgClass = "bg-green-100 border-green-200 text-green-700";
-                if (status === 'marked') bgClass = "bg-purple-100 border-purple-200 text-purple-700";
-                
-                const isActive = idx === activeQuestionIndex;
-                
-                return (
-                  <button 
-                    key={q.id} 
-                    onClick={() => handleNavigateQuestion(idx)}
-                    className={`h-10 rounded-lg border flex items-center justify-center text-sm font-bold transition-all ${bgClass} ${isActive ? 'ring-2 ring-primary ring-offset-1 scale-105 shadow-sm' : ''}`}
-                  >
-                    {idx + 1}
-                  </button>
-                );
-              })}
-            </div>
+            {renderPaletteGroups()}
           </div>
           
           <div className="mt-auto space-y-2 pt-4 border-t border-black/5 shrink-0">
