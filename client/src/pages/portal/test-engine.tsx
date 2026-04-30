@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 interface EngineState {
   test: any;
@@ -42,6 +43,11 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   
   // Security State
   const [warningsCount, setWarningsCount] = useState(0);
+  const MAX_WARNINGS = 3;
+
+  // Modal State
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [modalType, setModalType] = useState<'submit' | 'exit'>('submit');
 
   useEffect(() => {
     if (id) fetchTestEngineData();
@@ -55,12 +61,19 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden && testStep === 'test') {
-        setWarningsCount(prev => prev + 1);
-        toast({
-          title: "⚠️ Warning: Malpractice Detected",
-          description: "You have switched tabs or minimized the window. This activity has been logged. Repeated offenses will submit your test.",
-          variant: "destructive",
-          duration: 10000,
+        setWarningsCount(prev => {
+          const newCount = prev + 1;
+          if (newCount >= MAX_WARNINGS) {
+            handleAutoSubmit("Maximum tab switching limit reached (3). Your test has been automatically submitted.");
+          } else {
+            toast({
+              title: "⚠️ Warning: Malpractice Detected",
+              description: `You have switched tabs. This activity has been logged (${newCount}/${MAX_WARNINGS} warnings). Test will auto-submit on the 3rd attempt.`,
+              variant: "destructive",
+              duration: 8000,
+            });
+          }
+          return newCount;
         });
       }
     };
@@ -76,7 +89,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         setTimeLeft(prev => {
           if (prev <= 1) {
             setTimerRunning(false);
-            handleAutoSubmit();
+            handleAutoSubmit("Time's up! Your test has been automatically submitted.");
             return 0;
           }
           return prev - 1;
@@ -170,17 +183,23 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     }
   };
 
-  const handleAutoSubmit = () => {
-    toast({ title: "Time's up!", description: "Your test has been automatically submitted." });
+  const handleAutoSubmit = (reason: string) => {
+    setShowSubmitModal(false);
+    setTimerRunning(false);
     setTestStep('submitted');
+    toast({ title: "Test Auto-Submitted", description: reason, variant: "destructive", duration: 8000 });
   };
 
-  const handleManualSubmit = () => {
-    if (confirm("Are you sure you want to submit your test? You will not be able to change your answers.")) {
-      setTimerRunning(false);
-      setTestStep('submitted');
-      toast({ title: "Test Submitted successfully", description: "Your answers have been securely recorded." });
-    }
+  const confirmSubmit = () => {
+    setShowSubmitModal(false);
+    setTimerRunning(false);
+    setTestStep('submitted');
+    toast({ title: "Test Submitted successfully", description: "Your answers have been securely recorded." });
+  };
+
+  const openSubmitModal = (type: 'submit' | 'exit') => {
+    setModalType(type);
+    setShowSubmitModal(true);
   };
 
   const handleNavigateQuestion = (idx: number) => {
@@ -257,7 +276,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
   if (loading || !engineData) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+      <div className="h-screen w-full bg-background flex flex-col items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-primary mb-6" />
         <h2 className="text-xl font-semibold text-[#262626] animate-pulse">Initializing Test Environment...</h2>
       </div>
@@ -269,8 +288,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   // -------------------------------------------------------------
   if (testStep === 'instructions') {
     return (
-      <div className="min-h-screen bg-[#F8F9FA] flex flex-col">
-        <div className="h-16 bg-white border-b border-black/5 flex items-center px-6 shadow-sm">
+      <div className="h-screen overflow-hidden bg-[#F8F9FA] flex flex-col">
+        <div className="h-16 bg-white border-b border-black/5 flex items-center px-6 shadow-sm shrink-0">
           <Button variant="ghost" size="icon" onClick={() => setLocation('/portal/dashboard')}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -278,18 +297,18 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           <h1 className="font-bold text-[#262626] text-lg">{engineData.test.title} - Instructions</h1>
         </div>
         
-        <div className="flex-1 flex justify-center items-start p-8">
-          <div className="bg-white max-w-4xl w-full rounded-2xl border border-black/5 shadow-sm p-10">
+        <div className="flex-1 overflow-y-auto flex justify-center items-start p-8 custom-scrollbar">
+          <div className="bg-white max-w-4xl w-full rounded-2xl border border-black/5 shadow-sm p-10 mb-8">
             <h2 className="text-2xl font-bold mb-6">Please read carefully before starting</h2>
             
             <div className="prose max-w-none text-foreground/80 space-y-4 mb-10">
               <p>1. Total duration of this examination is <strong>{formatTime(timeLeft)}</strong> hours.</p>
               <p>2. The clock will be set at the server. The countdown timer at the top right of screen will display the remaining time available for you to complete the examination.</p>
-              <p>3. Do not switch tabs, minimize the browser, or open any other applications. The system monitors background activity. Switching tabs will issue a warning, and repeated offenses will automatically terminate and submit your exam.</p>
+              <p>3. Do not switch tabs, minimize the browser, or open any other applications. The system monitors background activity. Switching tabs will issue a warning, and <strong>repeated offenses (3) will automatically terminate and submit your exam.</strong></p>
               <p>4. The Question Palette displayed on the right side of screen will show the status of each question using one of the following symbols:</p>
               
               <ul className="list-none space-y-3 mt-4">
-                <li className="flex items-center gap-3"><div className="w-6 h-6 border border-black/20 rounded-md bg-white flex items-center justify-center text-xs">1</div> You have not visited the question yet.</li>
+                <li className="flex items-center gap-3"><div className="w-6 h-6 border border-black/20 rounded-md bg-white flex items-center justify-center text-xs font-bold">1</div> You have not visited the question yet.</li>
                 <li className="flex items-center gap-3"><div className="w-6 h-6 border border-red-200 rounded-md bg-red-50 text-red-600 flex items-center justify-center text-xs font-bold">2</div> You have visited but not answered the question.</li>
                 <li className="flex items-center gap-3"><div className="w-6 h-6 border border-green-200 rounded-md bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">3</div> You have answered the question.</li>
                 <li className="flex items-center gap-3"><div className="w-6 h-6 border border-purple-200 rounded-md bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">4</div> You have NOT answered the question, but have marked it for review.</li>
@@ -317,7 +336,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   // -------------------------------------------------------------
   if (testStep === 'submitted') {
     return (
-      <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center p-6">
+      <div className="h-screen w-full bg-[#F8F9FA] flex flex-col items-center justify-center p-6">
         <div className="bg-white max-w-lg w-full rounded-2xl border border-black/5 shadow-sm p-10 text-center">
           <FileCheck2 className="w-20 h-20 text-green-500 mx-auto mb-6" />
           <h2 className="text-3xl font-bold text-[#262626] mb-4">Test Submitted!</h2>
@@ -339,16 +358,20 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   const totalQuestions = engineData.questions.length;
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] flex flex-col select-none">
+    <div className="h-screen overflow-hidden bg-[#F8F9FA] flex flex-col select-none">
       {/* Top Bar */}
       <div className="h-16 bg-white border-b border-black/5 flex items-center justify-between px-6 sticky top-0 z-10 shadow-sm shrink-0">
         <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => openSubmitModal('exit')}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="h-6 w-px bg-black/10 mx-2" />
           <h1 className="font-bold text-[#262626]">{engineData.test.title}</h1>
         </div>
         <div className="flex items-center gap-6">
           {warningsCount > 0 && (
             <div className="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-1 rounded-md text-xs font-bold border border-red-200 animate-pulse">
-              <AlertTriangle className="w-4 h-4" /> Warnings: {warningsCount}
+              <AlertTriangle className="w-4 h-4" /> Warnings: {warningsCount}/{MAX_WARNINGS}
             </div>
           )}
           <div className="flex flex-col text-right">
@@ -358,7 +381,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             <Clock className="w-4 h-4" />
             {formatTime(timeLeft)}
           </div>
-          <Button variant="destructive" onClick={handleManualSubmit} className="rounded-full px-6 font-bold shadow-sm">
+          <Button variant="destructive" onClick={() => openSubmitModal('submit')} className="rounded-full px-6 font-bold shadow-sm">
             Submit Test
           </Button>
         </div>
@@ -380,7 +403,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar pb-4">
               <div className="text-lg text-[#262626] font-medium whitespace-pre-wrap leading-relaxed mb-6">
                 <span className="font-bold mr-2">Q{activeQuestionIndex + 1}.</span>
                 {currentQ.content_text}
@@ -393,13 +416,13 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               )}
 
               {/* Dynamic Inputs */}
-              <div className="space-y-3 mt-4 mb-8">
+              <div className="space-y-3 mt-4 mb-4">
                 {currentQ.type === 'NAT' ? (
                   <div className="w-64">
                     <input 
                       type="number" 
                       placeholder="Enter numerical answer..." 
-                      className="w-full h-12 border border-black/20 rounded-md px-4 text-lg bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-sm"
+                      className="w-full h-12 border border-black/20 rounded-md px-4 text-lg bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-sm font-bold"
                       value={currentResponse.answerText}
                       onChange={(e) => updateResponse(currentQ.id, { answerText: e.target.value })}
                     />
@@ -409,18 +432,18 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                     {currentResponse.fileUrl ? (
                       <div className="h-40 border-2 border-primary/40 rounded-xl bg-primary/5 flex flex-col items-center justify-center text-primary text-sm relative group overflow-hidden">
                         <FileCheck2 className="w-10 h-10 mb-2" />
-                        <p className="font-semibold">{currentResponse.fileUrl}</p>
+                        <p className="font-bold">{currentResponse.fileUrl}</p>
                         <p className="text-xs mt-1 opacity-70">Successfully attached</p>
                         <label className="absolute inset-0 bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity backdrop-blur-sm">
-                          <span className="font-bold bg-white px-4 py-2 rounded-lg shadow-sm border border-primary/20">Replace File</span>
+                          <span className="font-bold bg-white px-4 py-2 rounded-lg shadow-sm border border-primary/20 text-[#262626]">Replace File</span>
                           <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, currentQ.id)} />
                         </label>
                       </div>
                     ) : (
                       <label className="h-40 border-2 border-dashed border-black/20 rounded-xl bg-background/50 hover:bg-black/5 flex flex-col items-center justify-center text-foreground/50 text-sm cursor-pointer transition-colors group">
                         <UploadCloud className="w-10 h-10 mb-3 text-foreground/30 group-hover:text-primary transition-colors" />
-                        <p className="font-semibold text-[#262626]">Click to upload sketch/media</p>
-                        <p className="text-xs mt-1">Supports JPG, PNG, PDF (Max 10MB)</p>
+                        <p className="font-bold text-[#262626]">Click to upload sketch/media</p>
+                        <p className="text-xs mt-1 font-medium">Supports JPG, PNG, PDF (Max 10MB)</p>
                         <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, currentQ.id)} />
                       </label>
                     )}
@@ -450,7 +473,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                           <div className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold shrink-0 ${isSelected ? 'border-primary bg-primary text-white' : 'border-black/20 text-foreground/50'}`}>
                             {String.fromCharCode(65 + idx)}
                           </div>
-                          <span className={`text-sm ${isSelected ? 'font-semibold text-primary' : 'font-medium text-[#262626]'}`}>{opt.content_text}</span>
+                          <span className={`text-sm ${isSelected ? 'font-bold text-primary' : 'font-semibold text-[#262626]'}`}>{opt.content_text}</span>
                           {opt.media_url && (
                              <img src={opt.media_url} alt="Option Media" className="max-h-24 rounded border border-black/5 ml-auto" />
                           )}
@@ -463,12 +486,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             </div>
 
             {/* Bottom Navigation */}
-            <div className="mt-4 pt-4 border-t border-black/5 flex justify-between items-center shrink-0">
-              <Button variant="outline" onClick={() => handleNavigateQuestion(Math.max(0, activeQuestionIndex - 1))} disabled={activeQuestionIndex === 0} className="shadow-sm">
+            <div className="pt-4 border-t border-black/5 flex justify-between items-center shrink-0">
+              <Button variant="outline" onClick={() => handleNavigateQuestion(Math.max(0, activeQuestionIndex - 1))} disabled={activeQuestionIndex === 0} className="shadow-sm font-bold">
                 <ArrowLeft className="w-4 h-4 mr-2" /> Previous
               </Button>
               <div className="flex gap-3">
-                <Button variant="outline" onClick={handleMarkForReview} className="border-purple-200 text-purple-700 hover:bg-purple-50 shadow-sm font-semibold">
+                <Button variant="outline" onClick={handleMarkForReview} className="border-purple-200 text-purple-700 hover:bg-purple-50 shadow-sm font-bold">
                   Mark for Review
                 </Button>
                 <Button onClick={handleSaveAndNext} disabled={activeQuestionIndex === totalQuestions - 1} className="bg-primary text-white hover:bg-primary/90 px-10 shadow-md font-bold">
@@ -480,23 +503,23 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         ) : (
           <div className="flex-1 bg-white rounded-2xl border border-black/5 shadow-sm p-10 flex flex-col items-center justify-center">
              <AlertCircle className="w-12 h-12 text-foreground/30 mb-4" />
-             <p className="text-foreground/50 font-medium">Loading question...</p>
+             <p className="text-foreground/50 font-bold">Loading question...</p>
           </div>
         )}
 
         {/* Right Side: Navigation Palette */}
-        <div className="w-80 bg-white rounded-2xl border border-black/5 shadow-sm p-6 flex flex-col shrink-0">
-          <h3 className="font-bold text-[#262626] mb-4">Question Palette</h3>
+        <div className="w-64 bg-white rounded-2xl border border-black/5 shadow-sm p-5 flex flex-col shrink-0">
+          <h3 className="font-bold text-[#262626] mb-4 text-center">Question Palette</h3>
           
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-            <div className="grid grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-4 gap-2 mb-6">
               {engineData.questions.map((q, idx) => {
                 const status = responses[q.id]?.status || 'unseen';
                 
                 let bgClass = "bg-white border-black/20 text-foreground/70 hover:bg-black/5"; // unseen
-                if (status === 'visited') bgClass = "bg-red-50 border-red-200 text-red-600 font-bold";
-                if (status === 'answered') bgClass = "bg-green-100 border-green-200 text-green-700 font-bold";
-                if (status === 'marked') bgClass = "bg-purple-100 border-purple-200 text-purple-700 font-bold";
+                if (status === 'visited') bgClass = "bg-red-50 border-red-200 text-red-600";
+                if (status === 'answered') bgClass = "bg-green-100 border-green-200 text-green-700";
+                if (status === 'marked') bgClass = "bg-purple-100 border-purple-200 text-purple-700";
                 
                 const isActive = idx === activeQuestionIndex;
                 
@@ -504,7 +527,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                   <button 
                     key={q.id} 
                     onClick={() => handleNavigateQuestion(idx)}
-                    className={`h-12 rounded-lg border flex items-center justify-center text-sm transition-all ${bgClass} ${isActive ? 'ring-2 ring-primary ring-offset-2 scale-105 shadow-sm' : ''}`}
+                    className={`h-10 rounded-lg border flex items-center justify-center text-sm font-bold transition-all ${bgClass} ${isActive ? 'ring-2 ring-primary ring-offset-1 scale-105 shadow-sm' : ''}`}
                   >
                     {idx + 1}
                   </button>
@@ -513,14 +536,50 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             </div>
           </div>
           
-          <div className="mt-auto space-y-3 pt-6 border-t border-black/5 shrink-0">
-            <div className="flex items-center gap-3 text-xs font-semibold text-foreground/70"><div className="w-5 h-5 rounded flex items-center justify-center bg-green-100 border border-green-200 text-green-700">3</div> Answered</div>
-            <div className="flex items-center gap-3 text-xs font-semibold text-foreground/70"><div className="w-5 h-5 rounded flex items-center justify-center bg-red-50 border border-red-200 text-red-600">2</div> Not Answered</div>
-            <div className="flex items-center gap-3 text-xs font-semibold text-foreground/70"><div className="w-5 h-5 rounded flex items-center justify-center bg-purple-100 border border-purple-200 text-purple-700">4</div> Marked</div>
-            <div className="flex items-center gap-3 text-xs font-semibold text-foreground/70"><div className="w-5 h-5 rounded flex items-center justify-center border border-black/20 bg-white">1</div> Not Visited</div>
+          <div className="mt-auto space-y-2 pt-4 border-t border-black/5 shrink-0">
+            <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-green-100 border border-green-200 text-green-700">3</div> Answered</div>
+            <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-red-50 border border-red-200 text-red-600">2</div> Not Answered</div>
+            <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-purple-100 border border-purple-200 text-purple-700">4</div> Marked</div>
+            <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center border border-black/20 bg-white">1</div> Not Visited</div>
           </div>
         </div>
       </div>
+
+      {/* Submit/Exit Modal */}
+      <Dialog open={showSubmitModal} onOpenChange={setShowSubmitModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-[#262626]">
+              {modalType === 'submit' ? 'Submit Test?' : 'Leave Test?'}
+            </DialogTitle>
+            <DialogDescription className="text-foreground/70 font-medium pt-2">
+              {modalType === 'submit' 
+                ? "Are you sure you want to submit your test? You will not be able to change your answers after submission."
+                : "You are attempting to leave the test engine. You can submit now, or pause and resume later."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-start gap-3 my-4">
+            <AlertCircle className="w-5 h-5 text-primary shrink-0" />
+            <div className="text-sm font-bold text-primary">
+              Answered: {Object.values(responses).filter(r => r.status === 'answered').length} / {totalQuestions}
+            </div>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-3 sm:space-x-0 mt-2">
+            <Button variant="outline" onClick={() => setShowSubmitModal(false)} className="w-full font-bold">
+              Cancel
+            </Button>
+            {modalType === 'exit' && (
+              <Button variant="outline" onClick={() => setLocation('/portal/dashboard')} className="w-full font-bold border-orange-200 text-orange-600 hover:bg-orange-50">
+                Resume Later
+              </Button>
+            )}
+            <Button onClick={confirmSubmit} className="w-full font-bold bg-primary text-white hover:bg-primary/90">
+              {modalType === 'submit' ? 'Yes, Submit' : 'Submit & Exit'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

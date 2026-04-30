@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2 } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 export default function PortalDashboard() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
@@ -322,8 +322,11 @@ export default function PortalDashboard() {
 
           {activeTab === 'progress' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {/* Dummy Top Stats */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-[#262626]">Submitted Tests & Attempts</h2>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm">
                   <div className="text-sm font-semibold text-foreground/50 mb-2">Total Tests Attempted</div>
                   <div className="text-3xl font-bold text-[#262626]">3</div>
@@ -338,61 +341,98 @@ export default function PortalDashboard() {
                 </div>
               </div>
 
-              {/* Dummy Recent History */}
-              <div>
-                <h3 className="text-lg font-semibold text-[#262626] mb-4">Recent Test History</h3>
-                <div className="space-y-4">
-                  {/* Dummy Card 1 */}
-                  <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center font-bold text-lg border border-green-100">
-                        85
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-[#262626]">NID B.Des Full Mock Test 1</h4>
-                        <div className="flex items-center gap-4 text-xs text-foreground/50 mt-1 font-medium">
-                          <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Completed in 2h 45m</span>
-                          <span>April 26, 2026</span>
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+                <Accordion type="single" collapsible className="w-full space-y-4">
+                  {/* Attempt 1 */}
+                  <AccordionItem value="attempt-1" className="border border-black/5 rounded-xl px-6 py-2 shadow-sm bg-white data-[state=open]:bg-primary/5 transition-colors">
+                    <AccordionTrigger className="hover:no-underline py-4">
+                      <div className="flex items-center justify-between w-full pr-4 text-left">
+                        <div>
+                          <h4 className="font-bold text-lg text-[#262626]">NID B.Des Mock Test - Phase 3 Preview</h4>
+                          <p className="text-xs text-foreground/50 font-medium mt-1">Attempted on: April 30, 2026 • 2h 45m</p>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <div className="text-right">
+                            <p className="text-xs text-foreground/50 font-bold uppercase tracking-wider">Score</p>
+                            <p className="font-bold text-xl text-green-600">82/100</p>
+                          </div>
+                          <div className="px-3 py-1 bg-black/5 rounded-full text-xs font-bold text-foreground/70">Attempt 1</div>
                         </div>
                       </div>
-                    </div>
-                    <Button variant="outline" className="w-full md:w-auto shrink-0">View Analytics Report</Button>
-                  </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-4 pb-6">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 rounded-xl bg-white border border-black/5">
+                          <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
+                            <span>Part A (Objective)</span>
+                            <span className="text-primary">64 / 70</span>
+                          </h5>
+                          <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-primary rounded-full" style={{ width: '91%' }} />
+                          </div>
+                          <p className="text-xs text-foreground/50 mt-2">Excellent performance in Spatial Reasoning.</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-white border border-black/5">
+                          <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
+                            <span>Part B (Subjective)</span>
+                            <span className="text-orange-600">18 / 30</span>
+                          </h5>
+                          <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-orange-500 rounded-full" style={{ width: '60%' }} />
+                          </div>
+                          <p className="text-xs text-foreground/50 mt-2">Needs improvement in line quality and shading.</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex justify-end">
+                        <Button variant="outline" className="text-sm font-bold shadow-sm">View Detailed Analysis</Button>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
 
-                  {/* Dummy Card 2 */}
-                  <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-lg border border-orange-100">
-                        68
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-[#262626]">CEED Design Aptitude Test</h4>
-                        <div className="flex items-center gap-4 text-xs text-foreground/50 mt-1 font-medium">
-                          <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Completed in 3h 00m</span>
-                          <span>April 18, 2026</span>
+                  {/* Attempt 2 */}
+                  <AccordionItem value="attempt-2" className="border border-black/5 rounded-xl px-6 py-2 shadow-sm bg-white data-[state=open]:bg-primary/5 transition-colors">
+                    <AccordionTrigger className="hover:no-underline py-4">
+                      <div className="flex items-center justify-between w-full pr-4 text-left">
+                        <div>
+                          <h4 className="font-bold text-lg text-[#262626]">CEED Aptitude & Sketching Mastery</h4>
+                          <p className="text-xs text-foreground/50 font-medium mt-1">Attempted on: April 18, 2026 • 3h 00m</p>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <div className="text-right">
+                            <p className="text-xs text-foreground/50 font-bold uppercase tracking-wider">Score</p>
+                            <p className="font-bold text-xl text-orange-600">68/100</p>
+                          </div>
+                          <div className="px-3 py-1 bg-black/5 rounded-full text-xs font-bold text-foreground/70">Attempt 1</div>
                         </div>
                       </div>
-                    </div>
-                    <Button variant="outline" className="w-full md:w-auto shrink-0">View Analytics Report</Button>
-                  </div>
-
-                  {/* Dummy Card 3 */}
-                  <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg border border-blue-100">
-                        75
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-[#262626]">NID B.Des Sectional Test - Spatial</h4>
-                        <div className="flex items-center gap-4 text-xs text-foreground/50 mt-1 font-medium">
-                          <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Completed in 45m</span>
-                          <span>April 10, 2026</span>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-4 pb-6">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 rounded-xl bg-white border border-black/5">
+                          <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
+                            <span>Part A (Objective)</span>
+                            <span className="text-primary">45 / 50</span>
+                          </h5>
+                          <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-primary rounded-full" style={{ width: '90%' }} />
+                          </div>
+                        </div>
+                        <div className="p-4 rounded-xl bg-white border border-black/5">
+                          <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
+                            <span>Part B (Subjective)</span>
+                            <span className="text-orange-600">23 / 50</span>
+                          </h5>
+                          <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-orange-500 rounded-full" style={{ width: '46%' }} />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <Button variant="outline" className="w-full md:w-auto shrink-0">View Analytics Report</Button>
-                  </div>
-                </div>
+                      <div className="mt-4 flex justify-end">
+                        <Button variant="outline" className="text-sm font-bold shadow-sm">View Detailed Analysis</Button>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </div>
             </div>
           )}
