@@ -25,6 +25,8 @@ export default function PortalDashboard() {
   // Dashboard Data
   const [activeTests, setActiveTests] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
+  const [pastAttempts, setPastAttempts] = useState<any[]>([]);
+  const [loadingAttempts, setLoadingAttempts] = useState(false);
 
   useEffect(() => {
     checkUser();
@@ -113,6 +115,23 @@ export default function PortalDashboard() {
       setActiveTests(filteredTests);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const fetchAttempts = async (candidateId: string) => {
+    setLoadingAttempts(true);
+    try {
+      const { data, error } = await supabase
+        .from('exam_attempts')
+        .select(`*, exam_tests(title)`)
+        .eq('candidate_id', candidateId)
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: false });
+      if (!error) setPastAttempts(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingAttempts(false);
     }
   };
 
@@ -226,7 +245,7 @@ export default function PortalDashboard() {
               <LayoutDashboard className="w-4 h-4" /> Overview
             </button>
             <button
-              onClick={() => setActiveTab('progress')}
+              onClick={() => { setActiveTab('progress'); if (candidate?.id) fetchAttempts(candidate.id); }}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'progress' ? 'bg-primary/10 text-primary' : 'text-foreground/70 hover:bg-black/5 hover:text-foreground'}`}
             >
               <Clock className="w-4 h-4" /> Progress & History
@@ -348,116 +367,102 @@ export default function PortalDashboard() {
                 <h2 className="text-lg font-semibold text-[#262626]">Submitted Tests & Attempts</h2>
               </div>
               
+              {/* Summary Stats */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm">
                   <div className="text-sm font-semibold text-foreground/50 mb-2">Total Tests Attempted</div>
-                  <div className="text-3xl font-bold text-[#262626]">3</div>
+                  <div className="text-3xl font-bold text-[#262626]">{pastAttempts.length}</div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm">
-                  <div className="text-sm font-semibold text-foreground/50 mb-2">Average Score</div>
-                  <div className="text-3xl font-bold text-green-600">72%</div>
+                  <div className="text-sm font-semibold text-foreground/50 mb-2">Average Part A Score</div>
+                  <div className="text-3xl font-bold text-green-600">
+                    {pastAttempts.length === 0 ? '—' : 
+                      Math.round(pastAttempts.reduce((acc, a) => acc + (a.total_part_a > 0 ? (a.score_part_a / a.total_part_a) * 100 : 0), 0) / pastAttempts.length) + '%'}
+                  </div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm">
-                  <div className="text-sm font-semibold text-foreground/50 mb-2">Highest Score</div>
-                  <div className="text-3xl font-bold text-primary">85/100</div>
+                  <div className="text-sm font-semibold text-foreground/50 mb-2">Best Part A Score</div>
+                  <div className="text-3xl font-bold text-primary">
+                    {pastAttempts.length === 0 ? '—' :
+                      (() => { const best = pastAttempts.reduce((b, a) => (a.score_part_a > b.score_part_a ? a : b), pastAttempts[0]); return `${best.score_part_a}/${best.total_part_a}`; })()
+                    }
+                  </div>
                 </div>
               </div>
 
+              {/* Attempts Accordion */}
               <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
-                <Accordion type="single" collapsible className="w-full space-y-4">
-                  {/* Attempt 1 */}
-                  <AccordionItem value="attempt-1" className="border border-black/5 rounded-xl px-6 py-2 shadow-sm bg-white data-[state=open]:bg-primary/5 transition-colors">
-                    <AccordionTrigger className="hover:no-underline py-4">
-                      <div className="flex items-center justify-between w-full pr-4 text-left">
-                        <div>
-                          <h4 className="font-bold text-lg text-[#262626]">NID B.Des Mock Test - Phase 3 Preview</h4>
-                          <p className="text-xs text-foreground/50 font-medium mt-1">Attempted on: April 30, 2026 • 2h 45m</p>
-                        </div>
-                        <div className="flex items-center gap-6">
-                          <div className="text-right">
-                            <p className="text-xs text-foreground/50 font-bold uppercase tracking-wider">Score</p>
-                            <p className="font-bold text-xl text-green-600">82/100</p>
-                          </div>
-                          <div className="px-3 py-1 bg-black/5 rounded-full text-xs font-bold text-foreground/70">Attempt 1</div>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pt-4 pb-6">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 rounded-xl bg-white border border-black/5">
-                          <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
-                            <span>Part A (Objective)</span>
-                            <span className="text-primary">64 / 70</span>
-                          </h5>
-                          <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
-                            <div className="h-full bg-primary rounded-full" style={{ width: '91%' }} />
-                          </div>
-                          <p className="text-xs text-foreground/50 mt-2">Excellent performance in Spatial Reasoning.</p>
-                        </div>
-                        <div className="p-4 rounded-xl bg-white border border-black/5">
-                          <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
-                            <span>Part B (Subjective)</span>
-                            <span className="text-orange-600">18 / 30</span>
-                          </h5>
-                          <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
-                            <div className="h-full bg-orange-500 rounded-full" style={{ width: '60%' }} />
-                          </div>
-                          <p className="text-xs text-foreground/50 mt-2">Needs improvement in line quality and shading.</p>
-                        </div>
-                      </div>
-                      <div className="mt-4 flex justify-end">
-                        <Button variant="outline" className="text-sm font-bold shadow-sm">View Detailed Analysis</Button>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  {/* Attempt 2 */}
-                  <AccordionItem value="attempt-2" className="border border-black/5 rounded-xl px-6 py-2 shadow-sm bg-white data-[state=open]:bg-primary/5 transition-colors">
-                    <AccordionTrigger className="hover:no-underline py-4">
-                      <div className="flex items-center justify-between w-full pr-4 text-left">
-                        <div>
-                          <h4 className="font-bold text-lg text-[#262626]">CEED Aptitude & Sketching Mastery</h4>
-                          <p className="text-xs text-foreground/50 font-medium mt-1">Attempted on: April 18, 2026 • 3h 00m</p>
-                        </div>
-                        <div className="flex items-center gap-6">
-                          <div className="text-right">
-                            <p className="text-xs text-foreground/50 font-bold uppercase tracking-wider">Score</p>
-                            <p className="font-bold text-xl text-orange-600">68/100</p>
-                          </div>
-                          <div className="px-3 py-1 bg-black/5 rounded-full text-xs font-bold text-foreground/70">Attempt 1</div>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pt-4 pb-6">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 rounded-xl bg-white border border-black/5">
-                          <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
-                            <span>Part A (Objective)</span>
-                            <span className="text-primary">45 / 50</span>
-                          </h5>
-                          <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
-                            <div className="h-full bg-primary rounded-full" style={{ width: '90%' }} />
-                          </div>
-                        </div>
-                        <div className="p-4 rounded-xl bg-white border border-black/5">
-                          <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
-                            <span>Part B (Subjective)</span>
-                            <span className="text-orange-600">23 / 50</span>
-                          </h5>
-                          <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
-                            <div className="h-full bg-orange-500 rounded-full" style={{ width: '46%' }} />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-4 flex justify-end">
-                        <Button variant="outline" className="text-sm font-bold shadow-sm">View Detailed Analysis</Button>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
+                {loadingAttempts ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                ) : pastAttempts.length === 0 ? (
+                  <div className="text-center py-16">
+                    <FileText className="w-12 h-12 text-foreground/20 mx-auto mb-4" />
+                    <h3 className="font-bold text-[#262626] mb-2">No completed attempts yet</h3>
+                    <p className="text-sm text-foreground/50">Your results will appear here once you complete a test.</p>
+                  </div>
+                ) : (
+                  <Accordion type="single" collapsible className="w-full space-y-4">
+                    {pastAttempts.map((attempt, i) => {
+                      const scoreA = attempt.score_part_a || 0;
+                      const totalA = attempt.total_part_a || 0;
+                      const partAPercent = totalA > 0 ? Math.round((scoreA / totalA) * 100) : 0;
+                      const partBAns = attempt.part_b_answered || 0;
+                      const scoreColor = partAPercent >= 70 ? 'text-green-600' : partAPercent >= 40 ? 'text-orange-600' : 'text-red-600';
+                      const completedDate = attempt.completed_at ? new Date(attempt.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+                      
+                      return (
+                        <AccordionItem key={attempt.id} value={attempt.id} className="border border-black/5 rounded-xl px-6 py-2 shadow-sm bg-white data-[state=open]:bg-primary/5 transition-colors">
+                          <AccordionTrigger className="hover:no-underline py-4">
+                            <div className="flex items-center justify-between w-full pr-4 text-left">
+                              <div>
+                                <h4 className="font-bold text-lg text-[#262626]">{attempt.exam_tests?.title || 'Unknown Test'}</h4>
+                                <p className="text-xs text-foreground/50 font-medium mt-1">Completed: {completedDate}</p>
+                              </div>
+                              <div className="flex items-center gap-6">
+                                <div className="text-right">
+                                  <p className="text-xs text-foreground/50 font-bold uppercase tracking-wider">Part A Score</p>
+                                  <p className={`font-bold text-xl ${scoreColor}`}>{scoreA}/{totalA}</p>
+                                </div>
+                                <div className="px-3 py-1 bg-black/5 rounded-full text-xs font-bold text-foreground/70">Attempt {i + 1}</div>
+                              </div>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="pt-4 pb-6">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="p-4 rounded-xl bg-white border border-black/5">
+                                <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
+                                  <span>Part A (Objective)</span>
+                                  <span className="text-primary">{scoreA} / {totalA}</span>
+                                </h5>
+                                <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
+                                  <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${partAPercent}%` }} />
+                                </div>
+                                <p className="text-xs text-foreground/50 mt-2">{partAPercent}% accuracy on objective questions.</p>
+                              </div>
+                              <div className="p-4 rounded-xl bg-white border border-black/5">
+                                <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
+                                  <span>Part B (Subjective)</span>
+                                  <span className="text-orange-600">{partBAns} submitted</span>
+                                </h5>
+                                <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
+                                  <div className="h-full bg-orange-500 rounded-full" style={{ width: partBAns > 0 ? '100%' : '0%' }} />
+                                </div>
+                                <p className="text-xs text-foreground/50 mt-2">Awaiting manual evaluation by faculty.</p>
+                              </div>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
+                  </Accordion>
+                )}
               </div>
             </div>
           )}
+
+
 
           {activeTab === 'profile' && (
             <div className="bg-white rounded-2xl border border-black/5 p-8 shadow-sm max-w-2xl">
