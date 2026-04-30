@@ -299,12 +299,16 @@ export default function AdminExamQuestions() {
               });
             }
           }
+          const rawDiff = (row['Difficulty'] || 'Medium').toLowerCase().trim();
+          let finalDiff = 'Medium';
+          if (rawDiff === 'easy' || rawDiff === 'low') finalDiff = 'Low';
+          if (rawDiff === 'hard' || rawDiff === 'high') finalDiff = 'High';
           
           return {
             _tempId: `bulk-${index}`,
             part: row['Part'] || 'A',
             type: row['Type'] || 'MCQ',
-            difficulty: row['Difficulty'] ? row['Difficulty'].toLowerCase() : 'medium',
+            difficulty: finalDiff,
             content_text: row['Content Text'] || '',
             topics: row['Topics (comma separated)'] ? row['Topics (comma separated)'].split(',').map((t:string) => t.trim()) : [],
             pyq_tag: row['PYQ Tag'] || '',
