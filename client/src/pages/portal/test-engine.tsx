@@ -12,9 +12,10 @@ interface EngineState {
   questions: any[];
   options: Record<string, any[]>;
   partA_TimeThreshold: number; 
+  hasPartB: boolean;
 }
 
-type TestStep = 'instructions' | 'test' | 'submitted';
+type TestStep = 'instructions' | 'test' | 'part-b-instructions' | 'submitted';
 type QuestionStatus = 'unseen' | 'visited' | 'answered' | 'marked';
 
 interface ResponseData {
@@ -50,7 +51,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [modalType, setModalType] = useState<'submit' | 'exit'>('submit');
   
-  // Part B Lock Modal State
+  // Part Locks
   const [showPartBLockedModal, setShowPartBLockedModal] = useState(false);
   const [partBWaitMins, setPartBWaitMins] = useState(0);
 
@@ -97,12 +98,19 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             handleAutoSubmit("Time's up! Your test has been automatically submitted.");
             return 0;
           }
+
+          // Part A to Part B Transition
+          if (engineData?.hasPartB && prev === engineData.partA_TimeThreshold + 1) {
+             setTestStep('part-b-instructions');
+             toast({ title: "Part A Time Up", description: "Part A is now locked. Please proceed to Part B.", duration: 6000 });
+          }
+
           return prev - 1;
         });
       }, 1000);
     }
     return () => clearInterval(timerId);
-  }, [timerRunning, timeLeft]);
+  }, [timerRunning, timeLeft, engineData]);
 
   const fetchTestEngineData = async () => {
     setLoading(true);
@@ -162,13 +170,15 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       const totalMins = sectionsData?.reduce((acc: number, sec: any) => acc + sec.duration_minutes, 0) || 180;
       const partAMins = sectionsData?.find((s: any) => s.part === 'A')?.duration_minutes || 0;
       const partA_TimeThreshold = (totalMins * 60) - (partAMins * 60);
+      const hasPartB = questionsData.some(q => q.part === 'B');
 
       setEngineData({
         test: testData,
         sections: sectionsData || [],
         questions: questionsData,
         options: optionsMap,
-        partA_TimeThreshold
+        partA_TimeThreshold,
+        hasPartB
       });
       setResponses(initialResponses);
       setTimeLeft(totalMins * 60);
@@ -195,6 +205,15 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     }
   };
 
+  const startPartB = () => {
+    setTestStep('test');
+    // Find first Part B question and navigate to it
+    const firstPartBIdx = engineData!.questions.findIndex(q => q.part === 'B');
+    if (firstPartBIdx !== -1) {
+      handleNavigateQuestion(firstPartBIdx, true);
+    }
+  };
+
   const handleAutoSubmit = (reason: string) => {
     setShowSubmitModal(false);
     setTimerRunning(false);
@@ -214,15 +233,24 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     setShowSubmitModal(true);
   };
 
-  const handleNavigateQuestion = (idx: number) => {
+  const handleNavigateQuestion = (idx: number, skipChecks: boolean = false) => {
     const q = engineData!.questions[idx];
+    const isPartBActive = engineData!.hasPartB && timeLeft <= engineData!.partA_TimeThreshold;
     
-    // Part Locking Logic: Cannot access Part B if Part A time is still running
-    if (q.part === 'B' && timeLeft > engineData!.partA_TimeThreshold) {
-      const minsLeftForA = Math.ceil((timeLeft - engineData!.partA_TimeThreshold) / 60);
-      setPartBWaitMins(minsLeftForA);
-      setShowPartBLockedModal(true);
-      return;
+    if (!skipChecks) {
+      // Part Locking Logic: Cannot access Part B if Part A time is still running
+      if (q.part === 'B' && !isPartBActive) {
+        const minsLeftForA = Math.ceil((timeLeft - engineData!.partA_TimeThreshold) / 60);
+        setPartBWaitMins(minsLeftForA);
+        setShowPartBLockedModal(true);
+        return;
+      }
+
+      // Part A Logic: Cannot access Part A if Part B has started
+      if (q.part === 'A' && isPartBActive) {
+        toast({ title: "Section Locked 🔒", description: "Time for Part A has ended. You cannot view or modify those answers.", variant: "destructive" });
+        return;
+      }
     }
 
     setActiveQuestionIndex(idx);
@@ -234,6 +262,17 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   };
 
   const updateResponse = (qId: string, updates: Partial<ResponseData>) => {
+    const q = engineData!.questions.find(x => x.id === qId);
+    if (!q) return;
+    
+    const isPartBActive = engineData!.hasPartB && timeLeft <= engineData!.partA_TimeThreshold;
+    
+    // Safety check, should be blocked by navigation anyway
+    if (q.part === 'A' && isPartBActive) {
+      toast({ title: "Section Locked", description: "Time for Part A has ended. You cannot modify answers.", variant: "destructive" });
+      return;
+    }
+
     setResponses(prev => {
       const current = prev[qId];
       const newResponse = { ...current, ...updates };
@@ -313,9 +352,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     });
 
     return Object.keys(groups).map(groupName => (
-      <div key={groupName} className="mb-5 border-b border-black/5 pb-4 last:border-0">
+      <div key={groupName} className="mb-4 border-b border-black/5 pb-4 last:border-0">
         <div className="text-[10px] font-bold text-foreground/50 uppercase tracking-wider mb-3 bg-black/5 inline-block px-2 py-0.5 rounded-sm">{groupName}</div>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 gap-1.5">
           {groups[groupName].map(({ q, idx }) => {
             const status = responses[q.id]?.status || 'unseen';
             let bgClass = "bg-white border-black/20 text-foreground/70 hover:bg-black/5"; // unseen
@@ -329,7 +368,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               <button 
                 key={q.id} 
                 onClick={() => handleNavigateQuestion(idx)}
-                className={`h-10 rounded-lg border flex items-center justify-center text-sm font-bold transition-all ${bgClass} ${isActive ? 'ring-2 ring-primary ring-offset-1 scale-105 shadow-sm' : ''}`}
+                className={`h-8 rounded-lg border flex items-center justify-center text-xs font-bold transition-all ${bgClass} ${isActive ? 'ring-2 ring-primary ring-offset-1 scale-105 shadow-sm' : ''}`}
               >
                 {idx + 1}
               </button>
@@ -374,12 +413,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               <p>3. Do not switch tabs, minimize the browser, or open any other applications. The system monitors background activity. Switching tabs will issue a warning, and <strong>repeated offenses (3) will automatically terminate and submit your exam.</strong></p>
               <p>4. The Question Palette displayed on the right side of screen will show the status of each question using one of the following symbols:</p>
               
-              <ul className="list-none space-y-3 mt-4">
-                <li className="flex items-center gap-3"><div className="w-6 h-6 border border-black/20 rounded-md bg-white flex items-center justify-center text-xs font-bold">1</div> You have not visited the question yet.</li>
-                <li className="flex items-center gap-3"><div className="w-6 h-6 border border-red-200 rounded-md bg-red-50 text-red-600 flex items-center justify-center text-xs font-bold">2</div> You have visited but not answered the question.</li>
-                <li className="flex items-center gap-3"><div className="w-6 h-6 border border-green-200 rounded-md bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">3</div> You have answered the question.</li>
-                <li className="flex items-center gap-3"><div className="w-6 h-6 border border-purple-200 rounded-md bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">4</div> You have NOT answered the question, but have marked it for review.</li>
-              </ul>
+              <div className="grid grid-cols-2 gap-3 mt-4 max-w-lg bg-black/5 p-4 rounded-xl border border-black/10">
+                <div className="flex items-center gap-3 text-sm font-semibold text-foreground/80"><div className="w-6 h-6 rounded flex items-center justify-center bg-green-100 border border-green-200 text-green-700">3</div> Answered</div>
+                <div className="flex items-center gap-3 text-sm font-semibold text-foreground/80"><div className="w-6 h-6 rounded flex items-center justify-center bg-red-50 border border-red-200 text-red-600">2</div> Not Answered</div>
+                <div className="flex items-center gap-3 text-sm font-semibold text-foreground/80"><div className="w-6 h-6 rounded flex items-center justify-center bg-purple-100 border border-purple-200 text-purple-700">4</div> Marked</div>
+                <div className="flex items-center gap-3 text-sm font-semibold text-foreground/80"><div className="w-6 h-6 rounded flex items-center justify-center border border-black/20 bg-white">1</div> Not Visited</div>
+              </div>
             </div>
             
             <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-start gap-4 mb-8">
@@ -390,6 +429,49 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             <div className="flex justify-center border-t border-black/10 pt-8">
               <Button onClick={startTest} className="bg-primary text-white hover:bg-primary/90 px-12 py-6 text-lg font-bold rounded-xl shadow-lg hover:shadow-primary/20 transition-all hover:-translate-y-1">
                 I am ready to begin
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // PART B INSTRUCTIONS SCREEN
+  // -------------------------------------------------------------
+  if (testStep === 'part-b-instructions') {
+    return (
+      <div className="h-screen overflow-hidden bg-[#F8F9FA] flex flex-col">
+        {/* Top Bar - timer keeps running */}
+        <div className="h-16 bg-white border-b border-black/5 flex items-center justify-between px-6 sticky top-0 z-10 shadow-sm shrink-0">
+          <h1 className="font-bold text-[#262626]">{engineData.test.title} - Part B Subjective</h1>
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col text-right">
+               <span className="text-xs text-foreground/50 font-medium">Remaining Time</span>
+            </div>
+            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold font-mono border transition-colors ${timeLeft < 300 ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>
+              <Clock className="w-4 h-4" />
+              {formatTime(timeLeft)}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto flex justify-center items-start p-8 custom-scrollbar">
+          <div className="bg-white max-w-3xl w-full rounded-2xl border border-orange-200 shadow-sm p-10 mb-8 mt-10">
+            <div className="bg-orange-50 rounded-full w-20 h-20 flex items-center justify-center mb-6 mx-auto">
+              <Clock className="w-10 h-10 text-orange-600" />
+            </div>
+            <h2 className="text-3xl font-bold mb-4 text-center text-[#262626]">Time's Up for Part A!</h2>
+            
+            <div className="prose max-w-none text-foreground/80 space-y-4 mb-10 text-center">
+              <p className="text-lg">The mandatory duration for Part A has concluded. All your answers and marked questions for Part A have been securely auto-saved. <strong>You will no longer be able to modify any Part A responses.</strong></p>
+              <p className="text-lg">The timer is still running. You must now proceed to Part B (Subjective section) and upload your sketches or media files.</p>
+            </div>
+            
+            <div className="flex justify-center border-t border-black/10 pt-8">
+              <Button onClick={startPartB} className="bg-orange-600 text-white hover:bg-orange-700 px-12 py-6 text-lg font-bold rounded-xl shadow-lg hover:shadow-orange-600/20 transition-all hover:-translate-y-1">
+                Start Part B Now
               </Button>
             </div>
           </div>
@@ -582,11 +664,13 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             {renderPaletteGroups()}
           </div>
           
-          <div className="mt-auto space-y-2 pt-4 border-t border-black/5 shrink-0">
-            <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-green-100 border border-green-200 text-green-700">3</div> Answered</div>
-            <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-red-50 border border-red-200 text-red-600">2</div> Not Answered</div>
-            <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-purple-100 border border-purple-200 text-purple-700">4</div> Marked</div>
-            <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center border border-black/20 bg-white">1</div> Not Visited</div>
+          <div className="mt-auto pt-4 border-t border-black/5 shrink-0">
+            <div className="grid grid-cols-2 gap-x-2 gap-y-3">
+              <div className="flex items-center gap-2 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-green-100 border border-green-200 text-green-700">3</div> Answered</div>
+              <div className="flex items-center gap-2 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-red-50 border border-red-200 text-red-600">2</div> Not Answered</div>
+              <div className="flex items-center gap-2 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-purple-100 border border-purple-200 text-purple-700">4</div> Marked</div>
+              <div className="flex items-center gap-2 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center border border-black/20 bg-white">1</div> Not Visited</div>
+            </div>
           </div>
         </div>
       </div>
