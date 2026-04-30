@@ -53,6 +53,7 @@ export default function AdminExamTests() {
   const [testSections, setTestSections] = useState<any[]>([]); // cloned from template so duration can be edited
   const [selectedQuestions, setSelectedQuestions] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const [editingTestId, setEditingTestId] = useState<string | null>(null);
 
   // Quick Gen Modal
   const [quickGenOpen, setQuickGenOpen] = useState(false);
@@ -215,6 +216,47 @@ export default function AdminExamTests() {
     else { toast({ title: "Deleted" }); fetchTests(); }
   };
 
+  const handleEditTest = async (testId: string) => {
+    setLoading(true);
+    try {
+      const { data: testData } = await supabase.from('exam_tests').select('*, exam_programs(name)').eq('id', testId).single();
+      if (!testData) return;
+      
+      const { data: sectionsData } = await supabase.from('exam_test_sections').select('*').eq('test_id', testId);
+      const { data: tqData } = await supabase.from('exam_test_questions').select('question_id').eq('test_id', testId);
+      
+      const questionIds = tqData?.map((t: any) => t.question_id) || [];
+      let questionsData: any[] = [];
+      if (questionIds.length > 0) {
+        const { data: qData } = await supabase.from('exam_questions').select('*').in('id', questionIds);
+        questionsData = qData || [];
+      }
+      
+      const templateId = testData.exam_programs?.name;
+      const template = TEMPLATES.find(t => t.id === templateId) || TEMPLATES[0];
+      
+      setSelectedTemplate(template);
+      setTestTitle(testData.title);
+      setEditingTestId(testId);
+      
+      const mergedSections = (sectionsData || []).map((sec: any) => {
+        const tempSec = template.sections.find((ts: any) => ts.part === sec.part);
+        return {
+          ...sec,
+          requirements: tempSec ? tempSec.requirements : {}
+        };
+      });
+      
+      setTestSections(mergedSections);
+      setSelectedQuestions(questionsData);
+      setCurrentStep('BUILDER');
+    } catch(err: any) {
+      toast({ title: "Error loading test", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const saveTest = async (publish: boolean) => {
     if (!testTitle) return toast({ title: "Error", description: "Please enter a test title.", variant: "destructive" });
 
@@ -236,21 +278,37 @@ export default function AdminExamTests() {
         programId = newProg?.id;
       }
 
-      const { data: testData, error: testErr } = await supabase.from('exam_tests').insert({
-        title: testTitle, program_id: programId, status: publish ? 'published' : 'draft'
-      }).select().single();
-      if (testErr) throw testErr;
+      let testRecordId = editingTestId;
+
+      if (editingTestId) {
+        const { error: testErr } = await supabase.from('exam_tests').update({
+          title: testTitle, program_id: programId, status: publish ? 'published' : 'draft'
+        }).eq('id', editingTestId);
+        if (testErr) throw testErr;
+
+        // Clear old sections and questions to replace them
+        await supabase.from('exam_test_sections').delete().eq('test_id', editingTestId);
+        await supabase.from('exam_test_questions').delete().eq('test_id', editingTestId);
+      } else {
+        const { data: testData, error: testErr } = await supabase.from('exam_tests').insert({
+          title: testTitle, program_id: programId, status: publish ? 'published' : 'draft'
+        }).select().single();
+        if (testErr) throw testErr;
+        testRecordId = testData.id;
+      }
 
       for (const sec of testSections) {
         await supabase.from('exam_test_sections').insert({
-          test_id: testData.id, part: sec.part, duration_minutes: sec.duration
+          test_id: testRecordId, part: sec.part, duration_minutes: sec.duration
         });
       }
 
       const questionsToLink = selectedQuestions.map((q, idx) => ({
-        test_id: testData.id, question_id: q.id,
+        test_id: testRecordId, question_id: q.id,
       }));
-      await supabase.from('exam_test_questions').insert(questionsToLink);
+      if (questionsToLink.length > 0) {
+        await supabase.from('exam_test_questions').insert(questionsToLink);
+      }
 
       toast({ title: "Success", description: `Test ${publish ? 'published' : 'saved as draft'}!` });
       setCurrentStep('LIST');
@@ -290,13 +348,8 @@ export default function AdminExamTests() {
                 <p className="text-sm font-medium text-foreground/60 mb-5">{t.description}</p>
               </div>
               <div className="flex flex-col gap-2">
-                <Button onClick={() => {
-                  setSelectedTemplate(t);
-                  setTestSections(JSON.parse(JSON.stringify(t.sections)));
-                  setTestTitle(""); setSelectedQuestions([]);
-                  setCurrentStep('BUILDER');
-                }} className="w-full bg-primary hover:bg-primary/90 text-white">
-                  Build Manually
+                <Button variant="outline" onClick={() => { setSelectedTemplate(t); setTestSections(JSON.parse(JSON.stringify(t.sections))); setEditingTestId(null); setTestTitle(""); setSelectedQuestions([]); setCurrentStep('BUILDER'); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
+                  <PlusCircle className="w-4 h-4" /> Build Manually
                 </Button>
                 <Button variant="outline" onClick={() => { setSelectedTemplate(t); setQuickGenOpen(true); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
                   <Wand2 className="w-4 h-4" /> Quick Generate
@@ -329,6 +382,9 @@ export default function AdminExamTests() {
                   </span>
                 </div>
                 <div className="col-span-3 flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => handleEditTest(test.id)} className="h-8 text-primary hover:text-primary hover:bg-primary/5 border-primary/20">
+                    <Settings className="w-4 h-4" />
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => deleteTest(test.id)} className="h-8 text-red-500 hover:text-red-600 hover:bg-red-50 border-red-100">
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -505,7 +561,6 @@ export default function AdminExamTests() {
               <div className="flex gap-2 mb-6">
                 <span className="bg-primary/10 text-primary px-2 py-1 rounded text-xs font-bold">Part {currentQ.part}</span>
                 <span className="bg-black/5 text-foreground/70 px-2 py-1 rounded text-xs font-bold">{currentQ.type}</span>
-                <span className="bg-black/5 text-foreground/70 px-2 py-1 rounded text-xs font-bold">{currentQ.difficulty} Diff</span>
                 {currentQ.pyq_tag && <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold">{currentQ.pyq_tag}</span>}
               </div>
 
