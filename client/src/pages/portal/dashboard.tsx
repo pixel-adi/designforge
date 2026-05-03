@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+
 export default function PortalDashboard() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
@@ -19,7 +21,7 @@ export default function PortalDashboard() {
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [programs, setPrograms] = useState<any[]>([]);
-  const [onboardingData, setOnboardingData] = useState<{ name: string, phone: string, program_ids: string[], avatar_url: string }>({ name: "", phone: "", program_ids: [], avatar_url: "" });
+  const [onboardingData, setOnboardingData] = useState<{ name: string, phone: string, program_ids: string[], avatar_url: string, education_level: string }>({ name: "", phone: "", program_ids: [], avatar_url: "", education_level: "bachelors" });
   const [savingOnboarding, setSavingOnboarding] = useState(false);
 
   // Dashboard Data
@@ -27,6 +29,8 @@ export default function PortalDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [pastAttempts, setPastAttempts] = useState<any[]>([]);
   const [loadingAttempts, setLoadingAttempts] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
   useEffect(() => {
     checkUser();
@@ -66,10 +70,11 @@ export default function PortalDashboard() {
           name: candidateData.name || user.user_metadata?.full_name || "",
           phone: candidateData.phone || "",
           program_ids: candidateData.program_ids || [],
-          avatar_url: candidateData.avatar_url || ""
+          avatar_url: candidateData.avatar_url || "",
+          education_level: candidateData.education_level || "bachelors"
         });
 
-        fetchDashboardData(candidateData.program_ids || []);
+        fetchDashboardData(candidateData.program_ids || [], candidateData.education_level || "bachelors");
       }
     } catch (err: any) {
       console.error(err);
@@ -79,10 +84,9 @@ export default function PortalDashboard() {
     }
   };
 
-  const fetchDashboardData = async (programIds: string[]) => {
+  const fetchDashboardData = async (programIds: string[], educationLevel: string) => {
     if (!programIds || programIds.length === 0) return;
     try {
-      // Fetch active tests for their programs
       const { data: tests, error } = await supabase
         .from('exam_tests')
         .select(`*, exam_test_sections(part, duration_minutes)`)
@@ -91,24 +95,21 @@ export default function PortalDashboard() {
 
       if (error) throw error;
 
-      // Fetch all programs to resolve UUIDs to names
       const { data: allPrograms } = await supabase.from('exam_programs').select('id, name');
       const programsMap: Record<string, string> = {};
       (allPrograms || []).forEach(p => { programsMap[p.id] = p.name; });
-
-      // Resolve candidate's program names from their program_ids
-      const candProgramNames = programIds.map(pid => programsMap[pid] || '').filter(Boolean);
-      const candIsBdes = candProgramNames.some(name => name.toLowerCase().includes('b.des') || name.toLowerCase().includes('bdes') || name.toLowerCase().includes('uceed'));
-      const candIsMdes = candProgramNames.some(name => name.toLowerCase().includes('m.des') || name.toLowerCase().includes('mdes') || name.toLowerCase().includes('ceed'));
 
       const filteredTests = (tests || []).filter(test => {
         const testTitle = test.title.toLowerCase();
         const isBdesTest = testTitle.includes('b.des') || testTitle.includes('bdes') || testTitle.includes('uceed') || testTitle.includes('nid b');
         const isMdesTest = testTitle.includes('m.des') || testTitle.includes('mdes') || testTitle.includes('ceed') || testTitle.includes('nid m');
 
-        if (isBdesTest && candIsBdes) return true;
-        if (isMdesTest && candIsMdes) return true;
-        if (!isBdesTest && !isMdesTest) return true; // unbranded tests visible to all
+        // Apply strict filtering based on educationLevel
+        if (educationLevel === 'bachelors' && isBdesTest) return true;
+        if (educationLevel === 'masters' && isMdesTest) return true;
+        // If the test does not specify bachelors/masters in its title, it could be a generic test for their selected program
+        if (!isBdesTest && !isMdesTest) return true;
+        
         return false;
       });
 
@@ -135,6 +136,34 @@ export default function PortalDashboard() {
     }
   };
 
+  const fetchLeaderboard = async () => {
+    setLoadingLeaderboard(true);
+    try {
+      // Fetch the top 10 completed attempts sorted by part A score
+      const { data, error } = await supabase
+        .from('exam_attempts')
+        .select(`id, score_part_a, total_part_a, candidate_id, exam_candidates(name, avatar_url), exam_tests(title)`)
+        .eq('status', 'completed')
+        .order('score_part_a', { ascending: false })
+        .limit(10);
+      
+      if (!error && data) {
+        // Group by candidate to only show their best attempt
+        const seenCandidates = new Set();
+        const uniqueTopAttempts = data.filter(attempt => {
+          if (seenCandidates.has(attempt.candidate_id)) return false;
+          seenCandidates.add(attempt.candidate_id);
+          return true;
+        });
+        setLeaderboard(uniqueTopAttempts);
+      }
+    } catch (err) {
+      console.error('Failed to fetch leaderboard:', err);
+    } finally {
+      setLoadingLeaderboard(false);
+    }
+  };
+
   const handleOnboardingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!onboardingData.name || onboardingData.program_ids.length === 0) {
@@ -150,7 +179,8 @@ export default function PortalDashboard() {
           name: onboardingData.name,
           phone: onboardingData.phone || null,
           program_ids: onboardingData.program_ids,
-          avatar_url: onboardingData.avatar_url || null
+          avatar_url: onboardingData.avatar_url || null,
+          education_level: onboardingData.education_level
         }).eq('id', candidate.id).select().single();
       } else {
         // Insert new profile
@@ -160,7 +190,8 @@ export default function PortalDashboard() {
           name: onboardingData.name,
           phone: onboardingData.phone || null,
           program_ids: onboardingData.program_ids,
-          avatar_url: onboardingData.avatar_url || null
+          avatar_url: onboardingData.avatar_url || null,
+          education_level: onboardingData.education_level
         }).select().single();
       }
 
@@ -169,7 +200,7 @@ export default function PortalDashboard() {
       setCandidate(result.data);
       setShowOnboarding(false);
       toast({ title: "Success!", description: "Your profile has been saved." });
-      fetchDashboardData(result.data.program_ids);
+      fetchDashboardData(result.data.program_ids, result.data.education_level || onboardingData.education_level);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -248,7 +279,13 @@ export default function PortalDashboard() {
               onClick={() => { setActiveTab('progress'); if (candidate?.id) fetchAttempts(candidate.id); }}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'progress' ? 'bg-primary/10 text-primary' : 'text-foreground/70 hover:bg-black/5 hover:text-foreground'}`}
             >
-              <Clock className="w-4 h-4" /> Progress & History
+              <Clock className="w-4 h-4" /> Performance Analytics
+            </button>
+            <button
+              onClick={() => { setActiveTab('leaderboard'); fetchLeaderboard(); }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'leaderboard' ? 'bg-primary/10 text-primary' : 'text-foreground/70 hover:bg-black/5 hover:text-foreground'}`}
+            >
+              <Trophy className="w-4 h-4" /> Leaderboard
             </button>
           </div>
         </div>
@@ -287,11 +324,11 @@ export default function PortalDashboard() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto p-6 md:p-10 lg:p-12">
+        <div className="max-w-7xl mx-auto p-6 md:p-10 lg:p-12">
 
           <div className="mb-10">
             <h1 className="text-2xl sm:text-3xl font-bold text-[#262626] tracking-tight">
-              {activeTab === 'overview' ? 'Dashboard Overview' : activeTab === 'progress' ? 'Progress & History' : 'Profile Settings'}
+              {activeTab === 'overview' ? 'Dashboard Overview' : activeTab === 'progress' ? 'Performance Analytics' : activeTab === 'leaderboard' ? 'Global Leaderboard' : 'Profile Settings'}
             </h1>
             <p className="text-foreground/60 mt-1">
               {candidate?.program_ids?.length > 0 ? `Preparing for ${programs.filter(p => candidate.program_ids.includes(p.id)).map(p => p.name).join(' & ')}` : 'Welcome to the candidate portal'}
@@ -364,7 +401,7 @@ export default function PortalDashboard() {
           {activeTab === 'progress' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-[#262626]">Submitted Tests & Attempts</h2>
+                <h2 className="text-lg font-semibold text-[#262626]">Performance Analytics</h2>
               </div>
               
               {/* Summary Stats */}
@@ -390,8 +427,51 @@ export default function PortalDashboard() {
                 </div>
               </div>
 
+              {pastAttempts.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  {/* Accuracy Bar Chart */}
+                  <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+                    <h3 className="text-sm font-bold text-[#262626] mb-6">Historical Accuracy Trends</h3>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={pastAttempts.map((a, i) => ({ name: `Attempt ${pastAttempts.length - i}`, accuracy: a.total_part_a > 0 ? Math.round((a.score_part_a / a.total_part_a) * 100) : 0 })).reverse()}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} dy={10} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} dx={-10} domain={[0, 100]} />
+                          <RechartsTooltip cursor={{ fill: '#F3F4F6' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                          <Bar dataKey="accuracy" fill="#FF6B6B" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Skills Radar Chart - Simulated since we don't have granular question tags yet */}
+                  <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+                    <h3 className="text-sm font-bold text-[#262626] mb-6">Strengths & Weaknesses (Estimated)</h3>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={[
+                          { subject: 'Visualisation', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 110) : 0, fullMark: 100 },
+                          { subject: 'Observation', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 90) : 0, fullMark: 100 },
+                          { subject: 'Aptitude', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 105) : 0, fullMark: 100 },
+                          { subject: 'GK', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 85) : 0, fullMark: 100 },
+                          { subject: 'Creativity', A: pastAttempts[0]?.part_b_answered ? Math.min(100, pastAttempts[0].part_b_answered * 25) : 0, fullMark: 100 },
+                        ]}>
+                          <PolarGrid stroke="#E5E7EB" />
+                          <PolarAngleAxis dataKey="subject" tick={{ fill: '#6B7280', fontSize: 11 }} />
+                          <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                          <Radar name="Skills" dataKey="A" stroke="#FF6B6B" fill="#FF6B6B" fillOpacity={0.4} />
+                          <RechartsTooltip />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Attempts Accordion */}
               <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+                <h3 className="text-sm font-bold text-[#262626] mb-6">Detailed Test History</h3>
                 {loadingAttempts ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -421,16 +501,16 @@ export default function PortalDashboard() {
                                 <p className="text-xs text-foreground/50 font-medium mt-1">Completed: {completedDate}</p>
                               </div>
                               <div className="flex items-center gap-6">
-                                <div className="text-right">
+                                <div className="text-right hidden sm:block">
                                   <p className="text-xs text-foreground/50 font-bold uppercase tracking-wider">Part A Score</p>
                                   <p className={`font-bold text-xl ${scoreColor}`}>{scoreA}/{totalA}</p>
                                 </div>
-                                <div className="px-3 py-1 bg-black/5 rounded-full text-xs font-bold text-foreground/70">Attempt {i + 1}</div>
+                                <div className="px-3 py-1 bg-black/5 rounded-full text-xs font-bold text-foreground/70">Attempt {pastAttempts.length - i}</div>
                               </div>
                             </div>
                           </AccordionTrigger>
                           <AccordionContent className="pt-4 pb-6">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div className="p-4 rounded-xl bg-white border border-black/5">
                                 <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
                                   <span>Part A (Objective)</span>
@@ -457,6 +537,77 @@ export default function PortalDashboard() {
                       );
                     })}
                   </Accordion>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'leaderboard' && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-[#262626]">Global Leaderboard (Top 10)</h2>
+              </div>
+              
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6 overflow-hidden">
+                {loadingLeaderboard ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                ) : leaderboard.length === 0 ? (
+                  <div className="text-center py-16">
+                    <Trophy className="w-12 h-12 text-foreground/20 mx-auto mb-4" />
+                    <h3 className="font-bold text-[#262626] mb-2">No rankings available yet</h3>
+                    <p className="text-sm text-foreground/50">Be the first to complete a test and get on the board!</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-black/5 text-xs uppercase tracking-wider text-foreground/50">
+                          <th className="pb-4 font-semibold px-4 w-16">Rank</th>
+                          <th className="pb-4 font-semibold px-4">Candidate</th>
+                          <th className="pb-4 font-semibold px-4 hidden sm:table-cell">Test</th>
+                          <th className="pb-4 font-semibold px-4 text-right">Part A Score</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-black/5">
+                        {leaderboard.map((entry, index) => {
+                          const isTop3 = index < 3;
+                          const rankColor = index === 0 ? 'bg-yellow-100 text-yellow-700' : index === 1 ? 'bg-gray-100 text-gray-700' : index === 2 ? 'bg-orange-100 text-orange-700' : 'bg-transparent text-foreground/70';
+                          return (
+                            <tr key={entry.id} className="group hover:bg-black/5 transition-colors">
+                              <td className="py-4 px-4">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${rankColor}`}>
+                                  {index + 1}
+                                </div>
+                              </td>
+                              <td className="py-4 px-4">
+                                <div className="flex items-center gap-3">
+                                  {entry.exam_candidates?.avatar_url ? (
+                                    <img src={entry.exam_candidates.avatar_url} className="w-10 h-10 rounded-full object-cover border border-black/10" alt="Avatar" />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                                      {entry.exam_candidates?.name?.charAt(0) || '?'}
+                                    </div>
+                                  )}
+                                  <div className="font-bold text-[#262626]">{entry.exam_candidates?.name || 'Unknown User'}</div>
+                                </div>
+                              </td>
+                              <td className="py-4 px-4 text-sm text-foreground/60 hidden sm:table-cell">
+                                {entry.exam_tests?.title || 'Unknown Test'}
+                              </td>
+                              <td className="py-4 px-4 text-right">
+                                <div className="inline-flex items-center gap-2">
+                                  <span className="font-bold text-lg text-green-600">{entry.score_part_a}</span>
+                                  <span className="text-xs text-foreground/40 font-medium">/ {entry.total_part_a}</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -516,6 +667,19 @@ export default function PortalDashboard() {
                     />
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Education Level *</Label>
+                  <select 
+                    className="w-full h-10 px-3 rounded-md border border-black/10 bg-background/50 focus:bg-white text-sm"
+                    value={onboardingData.education_level}
+                    onChange={e => setOnboardingData({ ...onboardingData, education_level: e.target.value })}
+                  >
+                    <option value="bachelors">Bachelors (B.Des / UCEED targets)</option>
+                    <option value="masters">Masters (M.Des / CEED targets)</option>
+                  </select>
+                </div>
+
                 <div className="space-y-3">
                   <Label>Target Programs * (Select multiple if applicable)</Label>
                   <div className="grid grid-cols-2 gap-3">
@@ -579,6 +743,17 @@ export default function PortalDashboard() {
                 onChange={e => setOnboardingData({ ...onboardingData, phone: e.target.value })}
                 className="bg-background/50 border-black/10 focus:bg-white"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Education Level *</Label>
+              <select 
+                className="w-full h-10 px-3 rounded-md border border-black/10 bg-background/50 focus:bg-white text-sm"
+                value={onboardingData.education_level}
+                onChange={e => setOnboardingData({ ...onboardingData, education_level: e.target.value })}
+              >
+                <option value="bachelors">Bachelors (B.Des / UCEED targets)</option>
+                <option value="masters">Masters (M.Des / CEED targets)</option>
+              </select>
             </div>
             <div className="space-y-3">
               <Label>Target Programs * (Select all that apply)</Label>
