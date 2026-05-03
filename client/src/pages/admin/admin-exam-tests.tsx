@@ -25,7 +25,7 @@ const TEMPLATES = [
     name: "CEED",
     description: "Duration: 180 Min",
     sections: [
-      { part: "A", duration: 60, requirements: { NAT: 8, MSQ: 10, MCQ: 23 } },
+      { part: "A", duration: 60, requirements: { NAT: 8, MSQ: 10, MCQ: 26 } },
       { part: "B", duration: 120, requirements: { SUBJECTIVE: 5 } }
     ]
   },

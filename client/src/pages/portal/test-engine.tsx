@@ -306,7 +306,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
         if (isUceed || isCeed) {
             natCorrect = 4; natWrong = 0;
-            mcqCorrect = 3; mcqWrong = -0.71;
+            mcqCorrect = 3; 
+            mcqWrong = isCeed ? -0.5 : -0.71;
         }
 
         // Score each Part A question
