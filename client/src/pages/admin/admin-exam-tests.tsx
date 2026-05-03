@@ -35,7 +35,7 @@ const TEMPLATES = [
     description: "Duration: 180 Min",
     sections: [
       { part: "A", duration: 120, requirements: { NAT: 14, MSQ: 15, MCQ: 28 } },
-      { part: "B", duration: 60, requirements: { SUBJECTIVE: 1 } }
+      { part: "B", duration: 60, requirements: { SUBJECTIVE: 2 } }
     ]
   }
 ];

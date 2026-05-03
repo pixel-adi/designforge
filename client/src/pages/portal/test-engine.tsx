@@ -287,37 +287,81 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       if (partAQuestionIds.length > 0) {
         const { data: correctOpts } = await supabase
           .from('exam_options')
-          .select('id, question_id, is_correct')
+          .select('id, question_id, is_correct, content_text')
           .in('question_id', partAQuestionIds)
           .eq('is_correct', true);
 
-        // Build map: question_id -> correct option ids
-        const correctMap: Record<string, string[]> = {};
+        // Build map: question_id -> correct options array
+        const correctMap: Record<string, any[]> = {};
         (correctOpts || []).forEach(opt => {
           if (!correctMap[opt.question_id]) correctMap[opt.question_id] = [];
-          correctMap[opt.question_id].push(opt.id);
+          correctMap[opt.question_id].push(opt);
         });
+
+        const isUceed = engineData!.test.exam_programs?.name?.toUpperCase().includes('UCEED');
+        const isCeed = engineData!.test.exam_programs?.name?.toUpperCase() === 'CEED';
+
+        let natCorrect = 1, natWrong = 0;
+        let mcqCorrect = 1, mcqWrong = 0;
+
+        if (isUceed || isCeed) {
+            natCorrect = 4; natWrong = 0;
+            mcqCorrect = 3; mcqWrong = -0.71;
+        }
 
         // Score each Part A question
         partAQuestionIds.forEach(qId => {
           const qType = engineData!.questions.find(q => q.id === qId)?.type;
           const resp = responses[qId];
-          const correct = correctMap[qId] || [];
-          totalPartA++;
+          const correctOptsArr = correctMap[qId] || [];
+          totalPartA++; // tracking total number of questions in Part A
 
+          const selected = resp?.selectedOptions || [];
+          
           if (qType === 'NAT') {
-            // NAT: compare answer_text to correct option content_text (handled separately)
-            // For now count as 1 mark if answered
-            if (resp?.answerText?.trim()) scorePartA++;
+            const answered = resp?.answerText?.trim();
+            if (answered) {
+               const correctText = correctOptsArr[0]?.content_text?.trim();
+               const isCorrect = !isNaN(parseFloat(answered)) && !isNaN(parseFloat(correctText)) 
+                  ? parseFloat(answered) === parseFloat(correctText) 
+                  : answered.toLowerCase() === correctText?.toLowerCase();
+                  
+               if (isCorrect) scorePartA += natCorrect;
+               else scorePartA += natWrong;
+            }
           } else if (qType === 'MCQ') {
-            const selected = resp?.selectedOptions || [];
-            if (selected.length === 1 && correct.includes(selected[0])) scorePartA++;
+            if (selected.length > 0) {
+               const isCorrect = selected.length === 1 && correctOptsArr.some(c => c.id === selected[0]);
+               if (isCorrect) scorePartA += mcqCorrect;
+               else scorePartA += mcqWrong;
+            }
           } else if (qType === 'MSQ') {
-            const selected = resp?.selectedOptions || [];
-            const allCorrect = correct.every(c => selected.includes(c)) && selected.every(s => correct.includes(s));
-            if (allCorrect && selected.length > 0) scorePartA++;
+            if (selected.length > 0) {
+               if (isUceed || isCeed) {
+                  const correctIds = correctOptsArr.map(c => c.id);
+                  const C = correctIds.length;
+                  const S = selected.length;
+                  const W = selected.filter(s => !correctIds.includes(s)).length;
+                  
+                  if (W > 0) {
+                     scorePartA -= 1; // Wrong option selected -> -1
+                  } else {
+                     // No wrong options selected
+                     if (S === C) scorePartA += 4; // All correct chosen -> +4
+                     else scorePartA += S; // Partial marking -> +S
+                  }
+               } else {
+                  // Fallback generic MSQ
+                  const correctIds = correctOptsArr.map(c => c.id);
+                  const allCorrect = correctIds.every(c => selected.includes(c)) && selected.every(s => correctIds.includes(s));
+                  if (allCorrect) scorePartA += 1;
+               }
+            }
           }
         });
+        
+        // Floor to 2 decimals if needed, but since it's score, keeping precision to 2
+        scorePartA = Math.round(scorePartA * 100) / 100;
       }
 
       const partBAnswered = engineData!.questions
