@@ -15,7 +15,7 @@ interface EngineState {
   hasPartB: boolean;
 }
 
-type TestStep = 'instructions' | 'test' | 'part-b-instructions' | 'submitted';
+type TestStep = 'instructions' | 'test' | 'part-b-instructions' | 'submitted' | 'review';
 type QuestionStatus = 'unseen' | 'visited' | 'answered' | 'marked';
 
 interface ResponseData {
@@ -58,6 +58,11 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   // Attempt & Auto-Save State
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  
+  // Scoring Details State
+  const [scoreBreakdown, setScoreBreakdown] = useState<Record<string, number>>({ NAT: 0, MSQ: 0, MCQ: 0 });
+  const [questionScores, setQuestionScores] = useState<Record<string, number>>({});
+  const [correctAnswersMap, setCorrectAnswersMap] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
     if (id) fetchTestEngineData();
@@ -310,6 +315,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             mcqWrong = isCeed ? -0.5 : -0.71;
         }
 
+        let breakdown = { NAT: 0, MSQ: 0, MCQ: 0 };
+        let qScores: Record<string, number> = {};
+
         // Score each Part A question
         partAQuestionIds.forEach(qId => {
           const qType = engineData!.questions.find(q => q.id === qId)?.type;
@@ -318,6 +326,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           totalPartA++; // tracking total number of questions in Part A
 
           const selected = resp?.selectedOptions || [];
+          let earned = 0;
           
           if (qType === 'NAT') {
             const answered = resp?.answerText?.trim();
@@ -327,15 +336,17 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                   ? parseFloat(answered) === parseFloat(correctText) 
                   : answered.toLowerCase() === correctText?.toLowerCase();
                   
-               if (isCorrect) scorePartA += natCorrect;
-               else scorePartA += natWrong;
+               if (isCorrect) earned = natCorrect;
+               else earned = natWrong;
             }
+            breakdown.NAT += earned;
           } else if (qType === 'MCQ') {
             if (selected.length > 0) {
                const isCorrect = selected.length === 1 && correctOptsArr.some(c => c.id === selected[0]);
-               if (isCorrect) scorePartA += mcqCorrect;
-               else scorePartA += mcqWrong;
+               if (isCorrect) earned = mcqCorrect;
+               else earned = mcqWrong;
             }
+            breakdown.MCQ += earned;
           } else if (qType === 'MSQ') {
             if (selected.length > 0) {
                if (isUceed || isCeed) {
@@ -345,24 +356,35 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                   const W = selected.filter(s => !correctIds.includes(s)).length;
                   
                   if (W > 0) {
-                     scorePartA -= 1; // Wrong option selected -> -1
+                     earned = -1; // Wrong option selected -> -1
                   } else {
                      // No wrong options selected
-                     if (S === C) scorePartA += 4; // All correct chosen -> +4
-                     else scorePartA += S; // Partial marking -> +S
+                     if (S === C) earned = 4; // All correct chosen -> +4
+                     else earned = S; // Partial marking -> +S
                   }
                } else {
                   // Fallback generic MSQ
                   const correctIds = correctOptsArr.map(c => c.id);
                   const allCorrect = correctIds.every(c => selected.includes(c)) && selected.every(s => correctIds.includes(s));
-                  if (allCorrect) scorePartA += 1;
+                  if (allCorrect) earned = 1;
                }
             }
+            breakdown.MSQ += earned;
           }
+          
+          qScores[qId] = earned;
+          scorePartA += earned;
         });
         
         // Floor to 2 decimals if needed, but since it's score, keeping precision to 2
         scorePartA = Math.round(scorePartA * 100) / 100;
+        breakdown.NAT = Math.round(breakdown.NAT * 100) / 100;
+        breakdown.MSQ = Math.round(breakdown.MSQ * 100) / 100;
+        breakdown.MCQ = Math.round(breakdown.MCQ * 100) / 100;
+        
+        setScoreBreakdown(breakdown);
+        setQuestionScores(qScores);
+        setCorrectAnswersMap(correctMap);
       }
 
       const partBAnswered = engineData!.questions
@@ -574,9 +596,15 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               <button 
                 key={q.id} 
                 onClick={() => handleNavigateQuestion(idx)}
-                className={`h-8 rounded-lg border flex items-center justify-center text-xs font-bold transition-all ${bgClass} ${isActive ? 'ring-2 ring-primary ring-offset-1 scale-105 shadow-sm' : ''}`}
+                className={`relative h-8 rounded-lg border flex flex-col items-center justify-center text-xs font-bold transition-all ${bgClass} ${isActive ? 'ring-2 ring-primary ring-offset-1 scale-105 shadow-sm' : ''}`}
               >
-                {idx + 1}
+                {testStep === 'review' && q.part === 'A' && questionScores[q.id] !== undefined ? (
+                   <span className={`text-[10px] leading-none ${questionScores[q.id] > 0 ? 'text-green-700' : questionScores[q.id] < 0 ? 'text-red-700' : ''}`}>
+                     {questionScores[q.id] > 0 ? '+' : ''}{questionScores[q.id]}
+                   </span>
+                ) : (
+                   <span>{idx + 1}</span>
+                )}
               </button>
             );
           })}
@@ -691,14 +719,41 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   // -------------------------------------------------------------
   if (testStep === 'submitted') {
     return (
-      <div className="h-screen w-full bg-[#F8F9FA] flex flex-col items-center justify-center p-6">
-        <div className="bg-white max-w-lg w-full rounded-2xl border border-black/5 shadow-sm p-10 text-center">
+      <div className="min-h-screen w-full bg-[#F8F9FA] flex flex-col items-center justify-center p-6 py-12">
+        <div className="bg-white max-w-3xl w-full rounded-2xl border border-black/5 shadow-sm p-10 text-center">
           <FileCheck2 className="w-20 h-20 text-green-500 mx-auto mb-6" />
-          <h2 className="text-3xl font-bold text-[#262626] mb-4">Test Submitted!</h2>
-          <p className="text-foreground/60 mb-8">Your answers have been successfully recorded. You may now safely close this window or return to the dashboard.</p>
-          <Button onClick={() => setLocation('/portal/dashboard')} className="w-full">
-            Return to Dashboard
-          </Button>
+          <h2 className="text-3xl font-bold text-[#262626] mb-2">Test Submitted!</h2>
+          <p className="text-foreground/60 mb-8 font-medium">Your attempt has been recorded. Here is your preliminary Part A breakdown.</p>
+          
+          {scoreBreakdown && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 text-left">
+              <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex flex-col items-center justify-center">
+                 <span className="text-xs font-bold text-foreground/50 uppercase tracking-wider mb-1">NAT Marks</span>
+                 <span className="text-2xl font-bold text-primary">{scoreBreakdown.NAT}</span>
+              </div>
+              <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex flex-col items-center justify-center">
+                 <span className="text-xs font-bold text-foreground/50 uppercase tracking-wider mb-1">MSQ Marks</span>
+                 <span className="text-2xl font-bold text-primary">{scoreBreakdown.MSQ}</span>
+              </div>
+              <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex flex-col items-center justify-center">
+                 <span className="text-xs font-bold text-foreground/50 uppercase tracking-wider mb-1">MCQ Marks</span>
+                 <span className="text-2xl font-bold text-primary">{scoreBreakdown.MCQ}</span>
+              </div>
+              <div className="bg-black border border-black/20 p-4 rounded-xl flex flex-col items-center justify-center">
+                 <span className="text-xs font-bold text-white/70 uppercase tracking-wider mb-1">Total Part A</span>
+                 <span className="text-2xl font-bold text-white">{scoreBreakdown.NAT + scoreBreakdown.MSQ + scoreBreakdown.MCQ}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-4 max-w-lg mx-auto">
+             <Button variant="outline" onClick={() => { setActiveQuestionIndex(0); setTestStep('review'); }} className="w-full font-bold border-primary text-primary hover:bg-primary/5 h-12 shadow-sm">
+               Review Marked Answers
+             </Button>
+             <Button onClick={() => setLocation('/portal/dashboard')} className="w-full h-12 font-bold shadow-sm">
+               Return to Dashboard
+             </Button>
+          </div>
         </div>
       </div>
     );
@@ -717,29 +772,35 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       {/* Top Bar */}
       <div className="h-16 bg-white border-b border-black/5 flex items-center justify-between px-6 sticky top-0 z-10 shadow-sm shrink-0">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => openSubmitModal('exit')}>
+          <Button variant="ghost" size="icon" onClick={() => testStep === 'review' ? setTestStep('submitted') : openSubmitModal('exit')}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="h-6 w-px bg-black/10 mx-2" />
-          <h1 className="font-bold text-[#262626]">{engineData.test.title}</h1>
+          <h1 className="font-bold text-[#262626]">{engineData.test.title} {testStep === 'review' && <span className="text-primary ml-2 border border-primary/20 bg-primary/5 px-2 py-1 rounded text-sm">Review Mode</span>}</h1>
         </div>
-        <div className="flex items-center gap-6">
-          {warningsCount > 0 && (
-            <div className="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-1 rounded-md text-xs font-bold border border-red-200 animate-pulse">
-              <AlertTriangle className="w-4 h-4" /> Warnings: {warningsCount}/{MAX_WARNINGS}
+        {testStep !== 'review' ? (
+          <div className="flex items-center gap-6">
+            {warningsCount > 0 && (
+              <div className="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-1 rounded-md text-xs font-bold border border-red-200 animate-pulse">
+                <AlertTriangle className="w-4 h-4" /> Warnings: {warningsCount}/{MAX_WARNINGS}
+              </div>
+            )}
+            <div className="flex flex-col text-right">
+               <span className="text-xs text-foreground/50 font-medium">Remaining Time</span>
             </div>
-          )}
-          <div className="flex flex-col text-right">
-             <span className="text-xs text-foreground/50 font-medium">Remaining Time</span>
+            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold font-mono border transition-colors ${timeLeft < 300 ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>
+              <Clock className="w-4 h-4" />
+              {formatTime(timeLeft)}
+            </div>
+            <Button variant="destructive" onClick={() => openSubmitModal('submit')} className="rounded-full px-6 font-bold shadow-sm">
+              Submit Test
+            </Button>
           </div>
-          <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold font-mono border transition-colors ${timeLeft < 300 ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>
-            <Clock className="w-4 h-4" />
-            {formatTime(timeLeft)}
-          </div>
-          <Button variant="destructive" onClick={() => openSubmitModal('submit')} className="rounded-full px-6 font-bold shadow-sm">
-            Submit Test
+        ) : (
+          <Button variant="outline" onClick={() => setTestStep('submitted')} className="rounded-full px-6 font-bold shadow-sm border-black/20">
+            Exit Review
           </Button>
-        </div>
+        )}
       </div>
 
       {/* Main Content Area */}
@@ -753,8 +814,15 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                 <span className="bg-black/5 text-foreground/70 px-3 py-1 rounded text-sm font-bold">{currentQ.type}</span>
                 {currentQ.pyq_tag && <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded text-sm font-bold">{currentQ.pyq_tag}</span>}
               </div>
-              <div className="text-sm font-bold text-foreground/50">
-                Question {activeQuestionIndex + 1} of {totalQuestions}
+              <div className="flex items-center gap-4">
+                {testStep === 'review' && currentQ.part === 'A' && questionScores[currentQ.id] !== undefined && (
+                  <div className={`text-xs font-bold border px-3 py-1 rounded-md shadow-sm ${questionScores[currentQ.id] > 0 ? 'bg-green-50 text-green-700 border-green-200' : questionScores[currentQ.id] < 0 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-black/5 text-foreground/70 border-black/10'}`}>
+                     Awarded: {questionScores[currentQ.id] > 0 ? '+' : ''}{questionScores[currentQ.id]} Marks
+                  </div>
+                )}
+                <div className="text-sm font-bold text-foreground/50">
+                  Question {activeQuestionIndex + 1} of {totalQuestions}
+                </div>
               </div>
             </div>
 
@@ -777,10 +845,16 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                     <input 
                       type="number" 
                       placeholder="Enter numerical answer..." 
-                      className="w-full h-12 border border-black/20 rounded-md px-4 text-lg bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-sm font-bold"
+                      className="w-full h-12 border border-black/20 rounded-md px-4 text-lg bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-sm font-bold disabled:bg-gray-50 disabled:text-black"
                       value={currentResponse.answerText}
+                      disabled={testStep === 'review'}
                       onChange={(e) => updateResponse(currentQ.id, { answerText: e.target.value })}
                     />
+                    {testStep === 'review' && correctAnswersMap[currentQ.id] && (
+                        <div className="mt-2 text-sm font-bold text-green-600 bg-green-50 border border-green-200 px-3 py-2 rounded">
+                          Correct Answer: {correctAnswersMap[currentQ.id][0]?.content_text}
+                        </div>
+                    )}
                   </div>
                 ) : currentQ.type === 'SUBJECTIVE' ? (
                   <div className="w-full max-w-2xl">
@@ -808,11 +882,29 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {currentOptions.map((opt, idx) => {
                       const isSelected = currentResponse.selectedOptions.includes(opt.id);
+                      const isCorrectAnswer = testStep === 'review' && correctAnswersMap[currentQ.id]?.some(c => c.id === opt.id);
+                      const isSelectedButWrong = testStep === 'review' && isSelected && !isCorrectAnswer;
+                      
+                      let containerClass = isSelected ? 'border-primary bg-primary/5 shadow-sm' : 'border-black/10 hover:bg-black/5';
+                      let letterClass = isSelected ? 'border-primary bg-primary text-white' : 'border-black/20 text-foreground/50';
+                      
+                      if (testStep === 'review') {
+                         if (isCorrectAnswer) {
+                            containerClass = 'border-green-500 bg-green-50 shadow-sm ring-1 ring-green-500';
+                            letterClass = 'border-green-500 bg-green-500 text-white';
+                         } else if (isSelectedButWrong) {
+                            containerClass = 'border-red-500 bg-red-50';
+                            letterClass = 'border-red-500 bg-red-500 text-white';
+                         } else {
+                            containerClass = 'border-black/10 opacity-50';
+                         }
+                      }
                       
                       return (
                         <div 
                           key={opt.id} 
                           onClick={() => {
+                            if (testStep === 'review') return;
                             if (currentQ.type === 'MCQ') {
                               updateResponse(currentQ.id, { selectedOptions: [opt.id] });
                             } else {
@@ -823,12 +915,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                               updateResponse(currentQ.id, { selectedOptions: newOpts });
                             }
                           }}
-                          className={`flex items-center gap-4 p-3 border rounded-xl cursor-pointer transition-all ${isSelected ? 'border-primary bg-primary/5 shadow-sm' : 'border-black/10 hover:bg-black/5'}`}
+                          className={`flex items-center gap-4 p-3 border rounded-xl cursor-pointer transition-all ${containerClass}`}
                         >
-                          <div className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold shrink-0 ${isSelected ? 'border-primary bg-primary text-white' : 'border-black/20 text-foreground/50'}`}>
+                          <div className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold shrink-0 ${letterClass}`}>
                             {String.fromCharCode(65 + idx)}
                           </div>
-                          <span className={`text-sm ${isSelected ? 'font-bold text-primary' : 'font-semibold text-[#262626]'}`}>{opt.content_text}</span>
+                          <span className={`text-sm font-semibold ${testStep === 'review' && (isCorrectAnswer || isSelectedButWrong) ? 'text-[#262626]' : (isSelected ? 'font-bold text-primary' : 'text-[#262626]')}`}>{opt.content_text}</span>
                           {opt.media_url && (
                              <img src={opt.media_url} alt="Option Media" className="max-h-20 rounded border border-black/5 ml-auto" />
                           )}
@@ -846,11 +938,13 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                 <ArrowLeft className="w-4 h-4 mr-2" /> Previous
               </Button>
               <div className="flex gap-3">
-                <Button variant="outline" onClick={handleMarkForReview} className="border-purple-200 text-purple-700 hover:bg-purple-50 shadow-sm font-bold">
-                  Mark for Review & Next
-                </Button>
-                <Button onClick={handleSaveAndNext} disabled={activeQuestionIndex === totalQuestions - 1} className="bg-primary text-white hover:bg-primary/90 px-8 shadow-md font-bold">
-                  Save Response & Next
+                {testStep !== 'review' && (
+                  <Button variant="outline" onClick={handleMarkForReview} className="border-purple-200 text-purple-700 hover:bg-purple-50 shadow-sm font-bold">
+                    Mark for Review & Next
+                  </Button>
+                )}
+                <Button onClick={testStep === 'review' ? () => handleNavigateQuestion(Math.min(totalQuestions - 1, activeQuestionIndex + 1)) : handleSaveAndNext} disabled={activeQuestionIndex === totalQuestions - 1} className="bg-primary text-white hover:bg-primary/90 px-8 shadow-md font-bold">
+                  {testStep === 'review' ? 'Next' : 'Save Response & Next'}
                 </Button>
               </div>
             </div>
