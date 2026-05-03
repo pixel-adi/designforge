@@ -102,7 +102,7 @@ export default function PortalDashboard() {
       const filteredTests = (tests || []).filter(test => {
         const testTitle = test.title.toLowerCase();
         const isBdesTest = testTitle.includes('b.des') || testTitle.includes('bdes') || testTitle.includes('uceed') || testTitle.includes('nid b');
-        const isMdesTest = testTitle.includes('m.des') || testTitle.includes('mdes') || testTitle.includes('ceed') || testTitle.includes('nid m');
+        const isMdesTest = testTitle.includes('m.des') || testTitle.includes('mdes') || (testTitle.includes('ceed') && !testTitle.includes('uceed')) || testTitle.includes('nid m');
 
         // Apply strict filtering based on educationLevel
         if (educationLevel === 'bachelors' && isBdesTest) return true;
@@ -531,6 +531,11 @@ export default function PortalDashboard() {
                                 </div>
                                 <p className="text-xs text-foreground/50 mt-2">Awaiting manual evaluation by faculty.</p>
                               </div>
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-black/5 text-right">
+                               <Button variant="outline" onClick={() => setLocation(`/portal/test/${attempt.test_id}?review_attempt=${attempt.id}`)} className="font-bold border-primary text-primary hover:bg-primary/5">
+                                 Review Scorecard & Answers
+                               </Button>
                             </div>
                           </AccordionContent>
                         </AccordionItem>

@@ -72,6 +72,45 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     }
   }, [id]);
 
+  useEffect(() => {
+     if (engineData && !loading) {
+       const searchParams = new URLSearchParams(window.location.search);
+       const attemptIdFromUrl = searchParams.get('review_attempt');
+       if (attemptIdFromUrl && testStep === 'instructions') {
+          loadReviewAttempt(attemptIdFromUrl);
+       }
+     }
+  }, [engineData, loading]);
+
+  const loadReviewAttempt = async (attemptIdFromUrl: string) => {
+    try {
+      setLoading(true);
+      const { data: pastResp } = await supabase.from('exam_responses').select('*').eq('attempt_id', attemptIdFromUrl);
+      if (pastResp) {
+         setAttemptId(attemptIdFromUrl);
+         
+         const loadedResponses = { ...responses };
+         pastResp.forEach(r => {
+            loadedResponses[r.question_id] = {
+               status: r.status,
+               selectedOptions: r.selected_options || [],
+               answerText: r.answer_text || '',
+               fileUrl: r.file_url || ''
+            };
+         });
+         
+         setResponses(loadedResponses);
+         setTestStep('submitted');
+         
+         await finalizeAttempt(loadedResponses, attemptIdFromUrl, true);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Tab switching detection
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -278,8 +317,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   };
 
   // ---------- TASK 4: Score Evaluation + Finalize Attempt ----------
-  const finalizeAttempt = async () => {
-    if (!attemptId) return;
+  const finalizeAttempt = async (responsesToScore: Record<string, ResponseData> = responses, currentAttemptId: string | null = attemptId, isReviewOnly: boolean = false) => {
+    if (!currentAttemptId) return;
     try {
       // Fetch correct answers for all Part A questions in this test
       const partAQuestionIds = engineData!.questions
@@ -315,13 +354,13 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             mcqWrong = isCeed ? -0.5 : -0.71;
         }
 
-        let breakdown = { NAT: 0, MSQ: 0, MCQ: 0 };
+        let breakdown: Record<string, number> = { NAT: 0, MSQ: 0, MCQ: 0, NAT_A: 0, MSQ_A: 0, MCQ_A: 0, NAT_T: 0, MSQ_T: 0, MCQ_T: 0 };
         let qScores: Record<string, number> = {};
 
         // Score each Part A question
         partAQuestionIds.forEach(qId => {
           const qType = engineData!.questions.find(q => q.id === qId)?.type;
-          const resp = responses[qId];
+          const resp = responsesToScore[qId];
           const correctOptsArr = correctMap[qId] || [];
           totalPartA++; // tracking total number of questions in Part A
 
@@ -329,8 +368,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           let earned = 0;
           
           if (qType === 'NAT') {
+            breakdown.NAT_T++;
             const answered = resp?.answerText?.trim();
             if (answered) {
+               breakdown.NAT_A++;
                const correctText = correctOptsArr[0]?.content_text?.trim();
                const isCorrect = !isNaN(parseFloat(answered)) && !isNaN(parseFloat(correctText)) 
                   ? parseFloat(answered) === parseFloat(correctText) 
@@ -341,14 +382,18 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             }
             breakdown.NAT += earned;
           } else if (qType === 'MCQ') {
+            breakdown.MCQ_T++;
             if (selected.length > 0) {
+               breakdown.MCQ_A++;
                const isCorrect = selected.length === 1 && correctOptsArr.some(c => c.id === selected[0]);
                if (isCorrect) earned = mcqCorrect;
                else earned = mcqWrong;
             }
             breakdown.MCQ += earned;
           } else if (qType === 'MSQ') {
+            breakdown.MSQ_T++;
             if (selected.length > 0) {
+               breakdown.MSQ_A++;
                if (isUceed || isCeed) {
                   const correctIds = correctOptsArr.map(c => c.id);
                   const C = correctIds.length;
@@ -389,21 +434,25 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
       const partBAnswered = engineData!.questions
         .filter(q => q.part === 'B')
-        .filter(q => responses[q.id]?.fileUrl || responses[q.id]?.answerText?.trim()).length;
+        .filter(q => responsesToScore[q.id]?.fileUrl || responsesToScore[q.id]?.answerText?.trim()).length;
 
       // Update attempt with scores
-      await supabase.from('exam_attempts').update({
-        completed_at: new Date().toISOString(),
-        status: 'completed',
-        score_part_a: scorePartA,
-        total_part_a: totalPartA,
-        part_b_answered: partBAnswered,
-      }).eq('id', attemptId);
+      if (!isReviewOnly) {
+        await supabase.from('exam_attempts').update({
+          completed_at: new Date().toISOString(),
+          status: 'completed',
+          score_part_a: scorePartA,
+          total_part_a: totalPartA,
+          part_b_answered: partBAnswered,
+        }).eq('id', currentAttemptId);
+      }
 
     } catch (err) {
       console.error('Failed to finalize attempt:', err);
       // Still mark as completed even if scoring fails
-      await supabase.from('exam_attempts').update({ completed_at: new Date().toISOString(), status: 'completed' }).eq('id', attemptId);
+      if (!isReviewOnly) {
+        await supabase.from('exam_attempts').update({ completed_at: new Date().toISOString(), status: 'completed' }).eq('id', currentAttemptId);
+      }
     }
   };
 
@@ -727,24 +776,33 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           
           {scoreBreakdown && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 text-left">
-              <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex flex-col items-center justify-center">
+              <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex flex-col items-center justify-center relative">
                  <span className="text-xs font-bold text-foreground/50 uppercase tracking-wider mb-1">NAT Marks</span>
                  <span className="text-2xl font-bold text-primary">{scoreBreakdown.NAT}</span>
+                 <span className="text-[10px] font-bold text-foreground/40 mt-1">Attempted: {scoreBreakdown.NAT_A} | Unattempted: {scoreBreakdown.NAT_T - scoreBreakdown.NAT_A}</span>
               </div>
-              <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex flex-col items-center justify-center">
+              <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex flex-col items-center justify-center relative">
                  <span className="text-xs font-bold text-foreground/50 uppercase tracking-wider mb-1">MSQ Marks</span>
                  <span className="text-2xl font-bold text-primary">{scoreBreakdown.MSQ}</span>
+                 <span className="text-[10px] font-bold text-foreground/40 mt-1">Attempted: {scoreBreakdown.MSQ_A} | Unattempted: {scoreBreakdown.MSQ_T - scoreBreakdown.MSQ_A}</span>
               </div>
-              <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex flex-col items-center justify-center">
+              <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex flex-col items-center justify-center relative">
                  <span className="text-xs font-bold text-foreground/50 uppercase tracking-wider mb-1">MCQ Marks</span>
                  <span className="text-2xl font-bold text-primary">{scoreBreakdown.MCQ}</span>
+                 <span className="text-[10px] font-bold text-foreground/40 mt-1">Attempted: {scoreBreakdown.MCQ_A} | Unattempted: {scoreBreakdown.MCQ_T - scoreBreakdown.MCQ_A}</span>
               </div>
-              <div className="bg-black border border-black/20 p-4 rounded-xl flex flex-col items-center justify-center">
+              <div className="bg-black border border-black/20 p-4 rounded-xl flex flex-col items-center justify-center relative">
                  <span className="text-xs font-bold text-white/70 uppercase tracking-wider mb-1">Total Part A</span>
-                 <span className="text-2xl font-bold text-white">{scoreBreakdown.NAT + scoreBreakdown.MSQ + scoreBreakdown.MCQ}</span>
+                 <span className="text-2xl font-bold text-white">{(scoreBreakdown.NAT + scoreBreakdown.MSQ + scoreBreakdown.MCQ).toFixed(2)}</span>
+                 <span className="text-[10px] font-bold text-white/40 mt-1">Attempted: {scoreBreakdown.NAT_A + scoreBreakdown.MSQ_A + scoreBreakdown.MCQ_A} | Unattempted: {(scoreBreakdown.NAT_T + scoreBreakdown.MSQ_T + scoreBreakdown.MCQ_T) - (scoreBreakdown.NAT_A + scoreBreakdown.MSQ_A + scoreBreakdown.MCQ_A)}</span>
               </div>
             </div>
           )}
+          
+          <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-8 flex items-center justify-center gap-3">
+             <AlertCircle className="w-5 h-5 text-orange-600 shrink-0" />
+             <p className="text-sm font-bold text-orange-800">Part B will be evaluated manually and the combined scorecard will be shared later.</p>
+          </div>
 
           <div className="flex gap-4 max-w-lg mx-auto">
              <Button variant="outline" onClick={() => { setActiveQuestionIndex(0); setTestStep('review'); }} className="w-full font-bold border-primary text-primary hover:bg-primary/5 h-12 shadow-sm">
