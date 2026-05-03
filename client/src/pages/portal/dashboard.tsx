@@ -166,8 +166,8 @@ export default function PortalDashboard() {
 
   const handleOnboardingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!onboardingData.name || onboardingData.program_ids.length === 0) {
-      toast({ title: "Missing Fields", description: "Please provide your name and select at least one program.", variant: "destructive" });
+    if (!onboardingData.name) {
+      toast({ title: "Missing Fields", description: "Please provide your name.", variant: "destructive" });
       return;
     }
     setSavingOnboarding(true);
@@ -674,41 +674,17 @@ export default function PortalDashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Education Level *</Label>
+                  <Label>Target Programs for Preparation *</Label>
                   <select 
-                    className="w-full h-10 px-3 rounded-md border border-black/10 bg-background/50 focus:bg-white text-sm"
+                    className="w-full h-10 px-3 rounded-md border border-black/10 bg-background/50 focus:bg-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     value={onboardingData.education_level}
                     onChange={e => setOnboardingData({ ...onboardingData, education_level: e.target.value })}
+                    disabled={!!candidate}
                   >
                     <option value="bachelors">Bachelors (B.Des / UCEED targets)</option>
                     <option value="masters">Masters (M.Des / CEED targets)</option>
                   </select>
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Target Programs * (Select multiple if applicable)</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {programs.map(p => {
-                      const isSelected = onboardingData.program_ids?.includes(p.id);
-                      return (
-                        <label key={p.id} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'border-black/10 hover:bg-black/5'}`}>
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-primary focus:ring-primary accent-primary"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setOnboardingData(prev => ({ ...prev, program_ids: [...(prev.program_ids || []), p.id] }));
-                              } else {
-                                setOnboardingData(prev => ({ ...prev, program_ids: (prev.program_ids || []).filter(id => id !== p.id) }));
-                              }
-                            }}
-                          />
-                          <span className={`text-sm font-medium ${isSelected ? 'text-primary' : 'text-[#262626]'}`}>{p.name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                  {candidate && <p className="text-[10px] text-foreground/50">To change your target program later, please contact support.</p>}
                 </div>
                 <Button type="submit" disabled={savingOnboarding} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white gap-2">
                   {savingOnboarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Save Changes
@@ -750,7 +726,7 @@ export default function PortalDashboard() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Education Level *</Label>
+              <Label>Target Programs for Preparation *</Label>
               <select 
                 className="w-full h-10 px-3 rounded-md border border-black/10 bg-background/50 focus:bg-white text-sm"
                 value={onboardingData.education_level}
@@ -759,31 +735,6 @@ export default function PortalDashboard() {
                 <option value="bachelors">Bachelors (B.Des / UCEED targets)</option>
                 <option value="masters">Masters (M.Des / CEED targets)</option>
               </select>
-            </div>
-            <div className="space-y-3">
-              <Label>Target Programs * (Select all that apply)</Label>
-              <div className="grid grid-cols-2 gap-3">
-                {programs.map(p => {
-                  const isSelected = onboardingData.program_ids?.includes(p.id);
-                  return (
-                    <label key={p.id} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'border-black/10 hover:bg-black/5'}`}>
-                      <input
-                        type="checkbox"
-                        className="w-4 h-4 text-primary focus:ring-primary accent-primary"
-                        checked={isSelected}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setOnboardingData(prev => ({ ...prev, program_ids: [...(prev.program_ids || []), p.id] }));
-                          } else {
-                            setOnboardingData(prev => ({ ...prev, program_ids: (prev.program_ids || []).filter(id => id !== p.id) }));
-                          }
-                        }}
-                      />
-                      <span className={`text-sm font-medium ${isSelected ? 'text-primary' : 'text-[#262626]'}`}>{p.name}</span>
-                    </label>
-                  );
-                })}
-              </div>
             </div>
             <DialogFooter className="pt-4">
               <Button type="submit" disabled={savingOnboarding} className="w-full bg-primary hover:bg-primary/90 text-white">
