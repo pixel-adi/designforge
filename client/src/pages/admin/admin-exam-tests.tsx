@@ -12,18 +12,21 @@ const TEMPLATES = [
     id: "NID Bdes",
     name: "NID B.Des",
     description: "Duration: 180 Min",
+    programFormat: "bachelors",
     sections: [{ part: "B", duration: 180, requirements: { SUBJECTIVE: 6 } }]
   },
   {
     id: "NID Mdes",
     name: "NID M.Des",
     description: "Duration: 180 Min",
+    programFormat: "masters",
     sections: [{ part: "B", duration: 180, requirements: { SUBJECTIVE: 6 } }]
   },
   {
     id: "CEED",
     name: "CEED",
     description: "Duration: 180 Min",
+    programFormat: "masters",
     sections: [
       { part: "A", duration: 60, requirements: { NAT: 8, MSQ: 10, MCQ: 26 } },
       { part: "B", duration: 120, requirements: { SUBJECTIVE: 5 } }
@@ -33,6 +36,7 @@ const TEMPLATES = [
     id: "UCEED",
     name: "UCEED",
     description: "Duration: 180 Min",
+    programFormat: "bachelors",
     sections: [
       { part: "A", duration: 120, requirements: { NAT: 14, MSQ: 15, MCQ: 28 } },
       { part: "B", duration: 60, requirements: { SUBJECTIVE: 2 } }
@@ -50,6 +54,7 @@ export default function AdminExamTests() {
   const [currentStep, setCurrentStep] = useState<'LIST' | 'BUILDER' | 'PREVIEW'>('LIST');
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [testTitle, setTestTitle] = useState("");
+  const [programFormat, setProgramFormat] = useState("bachelors");
   const [testSections, setTestSections] = useState<any[]>([]); // cloned from template so duration can be edited
   const [selectedQuestions, setSelectedQuestions] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
@@ -134,6 +139,7 @@ export default function AdminExamTests() {
     setSelectedTemplate(template);
     setTestSections(JSON.parse(JSON.stringify(template.sections)));
     setTestTitle(`${template.name} - ${targetDifficulty} Mock`);
+    setProgramFormat(template.programFormat || "bachelors");
     setSelectedQuestions(newSelectedQs);
     setCurrentStep('PREVIEW'); // Drop straight into preview
     setPreviewIndex(0);
@@ -330,6 +336,7 @@ export default function AdminExamTests() {
       
       setSelectedTemplate(template);
       setTestTitle(testData.title);
+      setProgramFormat(testData.program_format || template.programFormat || "bachelors");
       setEditingTestId(testId);
       
       const mergedSections = (sectionsData || []).map((sec: any) => {
@@ -375,7 +382,7 @@ export default function AdminExamTests() {
 
       if (editingTestId) {
         const { error: testErr } = await supabase.from('exam_tests').update({
-          title: testTitle, program_id: programId, status: publish ? 'published' : 'draft'
+          title: testTitle, program_id: programId, status: publish ? 'published' : 'draft', program_format: programFormat
         }).eq('id', editingTestId);
         if (testErr) throw testErr;
 
@@ -384,7 +391,7 @@ export default function AdminExamTests() {
         await supabase.from('exam_test_questions').delete().eq('test_id', editingTestId);
       } else {
         const { data: testData, error: testErr } = await supabase.from('exam_tests').insert({
-          title: testTitle, program_id: programId, status: publish ? 'published' : 'draft'
+          title: testTitle, program_id: programId, status: publish ? 'published' : 'draft', program_format: programFormat
         }).select().single();
         if (testErr) throw testErr;
         testRecordId = testData.id;
@@ -441,7 +448,7 @@ export default function AdminExamTests() {
                 <p className="text-sm font-medium text-foreground/60 mb-5">{t.description}</p>
               </div>
               <div className="flex flex-col gap-2">
-                <Button variant="outline" onClick={() => { setSelectedTemplate(t); setTestSections(JSON.parse(JSON.stringify(t.sections))); setEditingTestId(null); setTestTitle(""); setSelectedQuestions([]); setCurrentStep('BUILDER'); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
+                <Button variant="outline" onClick={() => { setSelectedTemplate(t); setTestSections(JSON.parse(JSON.stringify(t.sections))); setEditingTestId(null); setTestTitle(""); setProgramFormat(t.programFormat || "bachelors"); setSelectedQuestions([]); setCurrentStep('BUILDER'); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
                   <PlusCircle className="w-4 h-4" /> Build Manually
                 </Button>
                 <Button variant="outline" onClick={() => { setSelectedTemplate(t); setQuickGenOpen(true); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
@@ -534,9 +541,23 @@ export default function AdminExamTests() {
       </div>
 
       <div className="bg-white p-6 rounded-xl border border-black/10 shadow-sm space-y-6">
-        <div>
-          <Label className="text-sm font-semibold">Test Title</Label>
-          <Input value={testTitle} onChange={(e) => setTestTitle(e.target.value)} placeholder={`e.g. ${selectedTemplate.name} Mock Test 1`} className="max-w-md mt-1 h-10" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <Label className="text-sm font-semibold">Test Title</Label>
+            <Input value={testTitle} onChange={(e) => setTestTitle(e.target.value)} placeholder={`e.g. ${selectedTemplate.name} Mock Test 1`} className="mt-1 h-10" />
+          </div>
+          <div>
+            <Label className="text-sm font-semibold">Target Program Format</Label>
+            <select 
+              className="w-full h-10 mt-1 border border-black/10 rounded-md px-3 bg-white text-sm"
+              value={programFormat}
+              onChange={e => setProgramFormat(e.target.value)}
+            >
+              <option value="bachelors">Bachelors (B.Des / UCEED targets)</option>
+              <option value="masters">Masters (M.Des / CEED targets)</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
         </div>
 
         <div className="space-y-6">

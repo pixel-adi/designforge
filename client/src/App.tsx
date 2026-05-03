@@ -30,6 +30,7 @@ const AdminRegistrations = lazy(() => import("@/pages/admin/admin-registrations"
 const AdminSubscribers = lazy(() => import("@/pages/admin/admin-subscribers"));
 const AdminExamQuestions = lazy(() => import("@/pages/admin/admin-exam-questions"));
 const AdminExamTests = lazy(() => import("@/pages/admin/admin-exam-tests"));
+const AdminUsers = lazy(() => import("@/pages/admin/admin-users"));
 
 // Candidate Portal
 const PortalLogin = lazy(() => import("@/pages/portal/login"));
@@ -86,6 +87,9 @@ function Router() {
           </Route>
           <Route path="/admin/exam-tests">
             {() => <AdminLayout><AdminExamTests /></AdminLayout>}
+          </Route>
+          <Route path="/admin/users">
+            {() => <AdminLayout><AdminUsers /></AdminLayout>}
           </Route>
 
           {/* Fallback to 404 */}

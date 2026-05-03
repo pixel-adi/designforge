@@ -85,7 +85,6 @@ export default function PortalDashboard() {
   };
 
   const fetchDashboardData = async (programIds: string[], educationLevel: string) => {
-    if (!programIds || programIds.length === 0) return;
     try {
       const { data: tests, error } = await supabase
         .from('exam_tests')
@@ -100,15 +99,18 @@ export default function PortalDashboard() {
       (allPrograms || []).forEach(p => { programsMap[p.id] = p.name; });
 
       const filteredTests = (tests || []).filter(test => {
-        const testTitle = test.title.toLowerCase();
-        const isBdesTest = testTitle.includes('b.des') || testTitle.includes('bdes') || testTitle.includes('uceed') || testTitle.includes('nid b');
-        const isMdesTest = testTitle.includes('m.des') || testTitle.includes('mdes') || (testTitle.includes('ceed') && !testTitle.includes('uceed')) || testTitle.includes('nid m');
+        if (test.program_format === 'both') return true;
+        if (test.program_format === educationLevel) return true;
 
-        // Apply strict filtering based on educationLevel
-        if (educationLevel === 'bachelors' && isBdesTest) return true;
-        if (educationLevel === 'masters' && isMdesTest) return true;
-        // If the test does not specify bachelors/masters in its title, it could be a generic test for their selected program
-        if (!isBdesTest && !isMdesTest) return true;
+        if (!test.program_format) {
+          const testTitle = test.title.toLowerCase();
+          const isBdesTest = testTitle.includes('b.des') || testTitle.includes('bdes') || testTitle.includes('uceed') || testTitle.includes('nid b');
+          const isMdesTest = testTitle.includes('m.des') || testTitle.includes('mdes') || (testTitle.includes('ceed') && !testTitle.includes('uceed')) || testTitle.includes('nid m');
+
+          if (educationLevel === 'bachelors' && isBdesTest) return true;
+          if (educationLevel === 'masters' && isMdesTest) return true;
+          if (!isBdesTest && !isMdesTest) return true;
+        }
         
         return false;
       });

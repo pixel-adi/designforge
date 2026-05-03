@@ -11,6 +11,7 @@ const navItems = [
   { label: "Programs", href: "/admin/programs", icon: BookOpen },
   { label: "Exam Questions", href: "/admin/exam-questions", icon: FileQuestion },
   { label: "Exam Tests", href: "/admin/exam-tests", icon: ClipboardList },
+  { label: "User Portal", href: "/admin/users", icon: Users },
   { label: "Registrations", href: "/admin/registrations", icon: Users },
   { label: "Subscribers", href: "/admin/subscribers", icon: Mail },
 ];
