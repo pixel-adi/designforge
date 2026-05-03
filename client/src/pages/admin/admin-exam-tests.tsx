@@ -247,15 +247,21 @@ export default function AdminExamTests() {
       doc.text(`Total Objective Questions: ${objectiveQs.length}`, 14, 28);
 
       const tableData = objectiveQs.map((q, idx) => {
-        let ans = q.correct_answer;
+        let ansText = q.correct_answer;
         if (q.type === 'MCQ' || q.type === 'MSQ') {
           try {
-             const parsedAns = typeof ans === 'string' && ans.startsWith('[') ? JSON.parse(ans) : [ans];
+             const parsedAns = typeof q.correct_answer === 'string' && q.correct_answer.startsWith('[') ? JSON.parse(q.correct_answer) : [q.correct_answer];
+             const parsedOptions = typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || []);
+             
              if (Array.isArray(parsedAns)) {
-                ans = parsedAns.map(a => {
+                ansText = parsedAns.map(a => {
                   const num = parseInt(a);
-                  return !isNaN(num) && num >= 0 && num < 4 ? String.fromCharCode(65 + num) : a;
-                }).join(', ');
+                  if (!isNaN(num) && num >= 0 && num < parsedOptions.length) {
+                    const letter = String.fromCharCode(65 + num);
+                    return `${letter}) ${parsedOptions[num]}`;
+                  }
+                  return a;
+                }).join('\n');
              }
           } catch(e) {}
         }
@@ -263,7 +269,7 @@ export default function AdminExamTests() {
           (idx + 1).toString(),
           q.type,
           q.marks?.toString() || '1',
-          ans?.toString() || 'N/A'
+          ansText?.toString() || 'N/A'
         ];
       });
 
