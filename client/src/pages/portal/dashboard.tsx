@@ -31,6 +31,7 @@ export default function PortalDashboard() {
   const [loadingAttempts, setLoadingAttempts] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+  const [leaderboardFilterTestId, setLeaderboardFilterTestId] = useState<string>('all');
 
   useEffect(() => {
     checkUser();
@@ -141,13 +142,23 @@ export default function PortalDashboard() {
   const fetchLeaderboard = async () => {
     setLoadingLeaderboard(true);
     try {
-      // Fetch the top 10 completed attempts sorted by part A score
-      const { data, error } = await supabase
+      // Build the query
+      let query = supabase
         .from('exam_attempts')
-        .select(`id, score_part_a, total_part_a, candidate_id, exam_candidates(name, avatar_url), exam_tests(title)`)
+        .select(`id, score_part_a, total_part_a, candidate_id, test_id, exam_candidates!inner(name, avatar_url, education_level), exam_tests!inner(title, program_format)`)
         .eq('status', 'completed')
-        .order('score_part_a', { ascending: false })
-        .limit(10);
+        .order('score_part_a', { ascending: false });
+
+      if (leaderboardFilterTestId !== 'all') {
+         query = query.eq('test_id', leaderboardFilterTestId);
+      }
+
+      // Filter by profile education level
+      if (candidate?.education_level) {
+         query = query.eq('exam_tests.program_format', candidate.education_level);
+      }
+
+      const { data, error } = await query.limit(50);
       
       if (!error && data) {
         // Group by candidate to only show their best attempt
@@ -156,7 +167,7 @@ export default function PortalDashboard() {
           if (seenCandidates.has(attempt.candidate_id)) return false;
           seenCandidates.add(attempt.candidate_id);
           return true;
-        });
+        }).slice(0, 10); // Keep top 10 after unique filtering
         setLeaderboard(uniqueTopAttempts);
       }
     } catch (err) {
@@ -165,6 +176,12 @@ export default function PortalDashboard() {
       setLoadingLeaderboard(false);
     }
   };
+
+  useEffect(() => {
+    if (activeTab === 'leaderboard' && candidate) {
+      fetchLeaderboard();
+    }
+  }, [activeTab, leaderboardFilterTestId, candidate]);
 
   const handleOnboardingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -551,8 +568,19 @@ export default function PortalDashboard() {
 
           {activeTab === 'leaderboard' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
                 <h2 className="text-lg font-semibold text-[#262626]">Global Leaderboard (Top 10)</h2>
+                
+                <select 
+                  className="h-10 px-4 rounded-xl border border-black/10 bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm min-w-[200px]"
+                  value={leaderboardFilterTestId}
+                  onChange={(e) => setLeaderboardFilterTestId(e.target.value)}
+                >
+                  <option value="all">All Tests ({candidate?.education_level === 'masters' ? 'M.Des' : 'B.Des'})</option>
+                  {activeTests.map(test => (
+                    <option key={test.id} value={test.id}>{test.title}</option>
+                  ))}
+                </select>
               </div>
               
               <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6 overflow-hidden">
