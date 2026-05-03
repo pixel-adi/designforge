@@ -475,7 +475,9 @@ export default function AdminExamTests() {
             {tests.map(test => (
               <div key={test.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center hover:bg-background/30 transition-colors text-sm">
                 <div className="col-span-4 font-semibold text-[#262626]">{test.title}</div>
-                <div className="col-span-3 text-foreground/60 font-medium bg-black/5 inline-block px-2 py-1 rounded w-fit text-xs">{test.exam_programs?.name || 'Unknown Format'}</div>
+                <div className="col-span-3 text-foreground/60 font-medium bg-black/5 inline-block px-2 py-1 rounded w-fit text-xs">
+                  {test.program_format === 'both' ? 'Both' : test.program_format === 'masters' ? 'Masters (M.Des/CEED)' : test.program_format === 'bachelors' ? 'Bachelors (B.Des/UCEED)' : 'Unknown'}
+                </div>
                 <div className="col-span-2">
                   <span className={`px-2 py-1 rounded-full text-xs font-bold ${test.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                     {test.status.toUpperCase()}
