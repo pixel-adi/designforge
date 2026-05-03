@@ -226,9 +226,11 @@ export default function AdminExamTests() {
       }
 
       const qIds = tqData.map(t => t.question_id);
-      const { data: qData, error: qErr } = await supabase.from('exam_questions').select('*').in('id', qIds);
+      const { data: qData, error: qErr } = await supabase.from('exam_questions').select('*, exam_options(*)').in('id', qIds);
       if (qErr) throw qErr;
 
+      // Ensure consistent order based on the mapping table order if order_index existed, 
+      // but since it doesn't, we just sort them safely or map them as they come.
       // Filter to Objective Questions only (Part A typically)
       const objectiveQs = (qData || []).filter(q => q.type !== 'SUBJECTIVE');
       if (objectiveQs.length === 0) {
@@ -247,29 +249,28 @@ export default function AdminExamTests() {
       doc.text(`Total Objective Questions: ${objectiveQs.length}`, 14, 28);
 
       const tableData = objectiveQs.map((q, idx) => {
-        let ansText = q.correct_answer;
-        if (q.type === 'MCQ' || q.type === 'MSQ') {
-          try {
-             const parsedAns = typeof q.correct_answer === 'string' && q.correct_answer.startsWith('[') ? JSON.parse(q.correct_answer) : [q.correct_answer];
-             const parsedOptions = typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || []);
-             
-             if (Array.isArray(parsedAns)) {
-                ansText = parsedAns.map(a => {
-                  const num = parseInt(a);
-                  if (!isNaN(num) && num >= 0 && num < parsedOptions.length) {
-                    const letter = String.fromCharCode(65 + num);
-                    return `${letter}) ${parsedOptions[num]}`;
-                  }
-                  return a;
-                }).join('\n');
+        let ansText = 'N/A';
+        
+        if (q.exam_options && Array.isArray(q.exam_options)) {
+          // Sort options by created_at to maintain original A, B, C, D ordering
+          const sortedOptions = [...q.exam_options].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          
+          if (q.type === 'NAT') {
+             const correctOpt = sortedOptions.find(o => o.is_correct);
+             if (correctOpt) ansText = correctOpt.content_text;
+          } else {
+             const correctOpts = sortedOptions.map((o, i) => ({ opt: o, letter: String.fromCharCode(65 + i) })).filter(item => item.opt.is_correct);
+             if (correctOpts.length > 0) {
+                 ansText = correctOpts.map(item => `${item.letter}) ${item.opt.content_text}`).join('\n');
              }
-          } catch(e) {}
+          }
         }
+
         return [
           (idx + 1).toString(),
           q.type,
-          q.marks?.toString() || '1',
-          ansText?.toString() || 'N/A'
+          '-', // Marks are currently section-based, so individual marks are implicit
+          ansText
         ];
       });
 
