@@ -125,6 +125,12 @@ export default function AdminExamTests() {
       toast({ title: "Success", description: "Test fully generated!" });
     }
 
+    const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3, 'SUBJECTIVE': 4 };
+    newSelectedQs.sort((a, b) => {
+      if (a.part !== b.part) return a.part.localeCompare(b.part);
+      return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
+    });
+
     setSelectedTemplate(template);
     setTestSections(JSON.parse(JSON.stringify(template.sections)));
     setTestTitle(`${template.name} - ${targetDifficulty} Mock`);
@@ -232,7 +238,14 @@ export default function AdminExamTests() {
       // Ensure consistent order based on the mapping table order if order_index existed, 
       // but since it doesn't, we just sort them safely or map them as they come.
       // Filter to Objective Questions only (Part A typically)
-      const objectiveQs = (qData || []).filter(q => q.type !== 'SUBJECTIVE');
+      let objectiveQs = (qData || []).filter(q => q.type !== 'SUBJECTIVE');
+      
+      const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3 };
+      objectiveQs.sort((a, b) => {
+        if (a.part !== b.part) return a.part.localeCompare(b.part);
+        return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
+      });
+
       if (objectiveQs.length === 0) {
         toast({ title: "No Objective Questions", description: "This test has no objective questions (Part A) to generate an answer key for." });
         return;
@@ -304,6 +317,12 @@ export default function AdminExamTests() {
       if (questionIds.length > 0) {
         const { data: qData } = await supabase.from('exam_questions').select('*').in('id', questionIds);
         questionsData = qData || [];
+        
+        const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3, 'SUBJECTIVE': 4 };
+        questionsData.sort((a, b) => {
+          if (a.part !== b.part) return a.part.localeCompare(b.part);
+          return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
+        });
       }
       
       const templateId = testData.exam_programs?.name;
