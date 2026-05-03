@@ -342,14 +342,16 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           correctMap[opt.question_id].push(opt);
         });
 
-        const isUceed = engineData!.test.exam_programs?.name?.toUpperCase().includes('UCEED');
-        const isCeed = engineData!.test.exam_programs?.name?.toUpperCase() === 'CEED';
+        const isUceed = engineData!.test.program_format === 'bachelors' || engineData!.test.title?.toUpperCase().includes('UCEED') || engineData!.test.title?.toUpperCase().includes('B.DES') || engineData!.test.exam_programs?.name?.toUpperCase().includes('UCEED');
+        const isCeed = engineData!.test.program_format === 'masters' || engineData!.test.title?.toUpperCase().includes('CEED') || engineData!.test.title?.toUpperCase().includes('M.DES') || engineData!.test.exam_programs?.name?.toUpperCase() === 'CEED';
 
         let natCorrect = 1, natWrong = 0;
+        let msCorrect = 1, msWrong = 0;
         let mcqCorrect = 1, mcqWrong = 0;
 
         if (isUceed || isCeed) {
             natCorrect = 4; natWrong = 0;
+            msCorrect = 4; msWrong = -1;
             mcqCorrect = 3; 
             mcqWrong = isCeed ? -0.5 : -0.71;
         }
@@ -362,7 +364,13 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           const qType = engineData!.questions.find(q => q.id === qId)?.type;
           const resp = responsesToScore[qId];
           const correctOptsArr = correctMap[qId] || [];
-          totalPartA++; // tracking total number of questions in Part A
+          
+          let maxMarks = 1;
+          if (qType === 'NAT') maxMarks = natCorrect;
+          else if (qType === 'MCQ') maxMarks = mcqCorrect;
+          else if (qType === 'MSQ') maxMarks = msCorrect;
+          
+          totalPartA += maxMarks; // Accumulating total possible marks
 
           const selected = resp?.selectedOptions || [];
           let earned = 0;
@@ -401,10 +409,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                   const W = selected.filter(s => !correctIds.includes(s)).length;
                   
                   if (W > 0) {
-                     earned = -1; // Wrong option selected -> -1
+                     earned = msWrong; // Wrong option selected -> negative marking
                   } else {
                      // No wrong options selected
-                     if (S === C) earned = 4; // All correct chosen -> +4
+                     if (S === C) earned = msCorrect; // All correct chosen -> full marks
                      else earned = S; // Partial marking -> +S
                   }
                } else {
