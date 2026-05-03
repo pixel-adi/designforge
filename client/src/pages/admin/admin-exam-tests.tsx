@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ClipboardList, PlusCircle, CheckCircle2, Search, ArrowLeft, Loader2, FileText, Clock, Trash2, Filter, Settings, Wand2, RefreshCw } from "lucide-react";
+import { ClipboardList, PlusCircle, CheckCircle2, Search, ArrowLeft, Loader2, FileText, Clock, Trash2, Filter, Settings, Wand2, RefreshCw, FileDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -216,6 +216,73 @@ export default function AdminExamTests() {
     else { toast({ title: "Deleted" }); fetchTests(); }
   };
 
+  const downloadAnswerKey = async (testId: string, testTitle: string) => {
+    try {
+      const { data: tqData, error: tqErr } = await supabase.from('exam_test_questions').select('question_id').eq('test_id', testId);
+      if (tqErr) throw tqErr;
+      if (!tqData || tqData.length === 0) {
+        toast({ title: "No Questions", description: "This test has no questions.", variant: "destructive" });
+        return;
+      }
+
+      const qIds = tqData.map(t => t.question_id);
+      const { data: qData, error: qErr } = await supabase.from('exam_questions').select('*').in('id', qIds);
+      if (qErr) throw qErr;
+
+      // Filter to Objective Questions only (Part A typically)
+      const objectiveQs = (qData || []).filter(q => q.type !== 'SUBJECTIVE');
+      if (objectiveQs.length === 0) {
+        toast({ title: "No Objective Questions", description: "This test has no objective questions (Part A) to generate an answer key for." });
+        return;
+      }
+
+      const { jsPDF } = await import('jspdf');
+      const autoTable = (await import('jspdf-autotable')).default;
+
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text(`Answer Key: ${testTitle}`, 14, 20);
+      
+      doc.setFontSize(11);
+      doc.text(`Total Objective Questions: ${objectiveQs.length}`, 14, 28);
+
+      const tableData = objectiveQs.map((q, idx) => {
+        let ans = q.correct_answer;
+        if (q.type === 'MCQ' || q.type === 'MSQ') {
+          try {
+             const parsedAns = typeof ans === 'string' && ans.startsWith('[') ? JSON.parse(ans) : [ans];
+             if (Array.isArray(parsedAns)) {
+                ans = parsedAns.map(a => {
+                  const num = parseInt(a);
+                  return !isNaN(num) && num >= 0 && num < 4 ? String.fromCharCode(65 + num) : a;
+                }).join(', ');
+             }
+          } catch(e) {}
+        }
+        return [
+          (idx + 1).toString(),
+          q.type,
+          q.marks?.toString() || '1',
+          ans?.toString() || 'N/A'
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 35,
+        head: [['Q.No.', 'Type', 'Marks', 'Correct Answer']],
+        body: tableData,
+        headStyles: { fillColor: [255, 107, 107] },
+      });
+
+      doc.save(`${testTitle.replace(/\s+/g, '_')}_Answer_Key.pdf`);
+      toast({ title: "Success", description: "Answer Key PDF downloaded successfully." });
+
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "Download Failed", description: err.message, variant: "destructive" });
+    }
+  };
+
   const handleEditTest = async (testId: string) => {
     setLoading(true);
     try {
@@ -382,6 +449,11 @@ export default function AdminExamTests() {
                   </span>
                 </div>
                 <div className="col-span-3 flex justify-end gap-2">
+                  {test.status === 'published' && (
+                    <Button variant="outline" size="sm" onClick={() => downloadAnswerKey(test.id, testTitle || test.title)} className="h-8 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200" title="Download Answer Key">
+                      <FileDown className="w-4 h-4" />
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" onClick={() => handleEditTest(test.id)} className="h-8 text-primary hover:text-primary hover:bg-primary/5 border-primary/20">
                     <Settings className="w-4 h-4" />
                   </Button>
