@@ -10,9 +10,16 @@ REVOKE ALL ON exam_responses FROM anon;
 
 -- 3. Clear existing conflicting policies
 DROP POLICY IF EXISTS "Candidates can manage their own profile" ON exam_candidates;
+DROP POLICY IF EXISTS "Candidates can read their own profile" ON exam_candidates;
+DROP POLICY IF EXISTS "Candidates can insert their own profile" ON exam_candidates;
+DROP POLICY IF EXISTS "Candidates can update their own profile" ON exam_candidates;
+DROP POLICY IF EXISTS "Admins can delete profiles" ON exam_candidates;
+
 DROP POLICY IF EXISTS "Candidates can view their own attempts" ON exam_attempts;
 DROP POLICY IF EXISTS "Candidates can insert their own attempts" ON exam_attempts;
 DROP POLICY IF EXISTS "Candidates can update their own attempts" ON exam_attempts;
+DROP POLICY IF EXISTS "Candidates can manage their own attempts" ON exam_attempts;
+
 DROP POLICY IF EXISTS "Candidates can manage their own responses" ON exam_responses;
 
 -- 4. Candidate Profile Policies (Link to auth.uid() OR admin domain)
@@ -31,6 +38,11 @@ CREATE POLICY "Candidates can update their own profile"
   TO authenticated
   USING (auth_user_id = auth.uid() OR auth.jwt()->>'email' LIKE '%@designforge.co.in')
   WITH CHECK (auth_user_id = auth.uid() OR auth.jwt()->>'email' LIKE '%@designforge.co.in');
+
+CREATE POLICY "Admins can delete profiles"
+  ON exam_candidates FOR DELETE
+  TO authenticated
+  USING (auth.jwt()->>'email' LIKE '%@designforge.co.in');
 
 -- 5. Exam Attempts Policies (Must belong to candidate OR admin domain)
 CREATE POLICY "Candidates can manage their own attempts"

@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Users, Edit, Save, X } from "lucide-react";
+import { Loader2, Users, Edit, Save, X, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AdminUsers() {
@@ -63,6 +63,19 @@ export default function AdminUsers() {
     }
   };
 
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to permanently revoke access for ${name}? This will delete their profile and all test attempts.`)) return;
+    
+    try {
+      const { error } = await supabase.from('exam_candidates').delete().eq('id', id);
+      if (error) throw error;
+      toast({ title: "Access Revoked", description: "Candidate has been permanently deleted." });
+      fetchCandidates();
+    } catch (err: any) {
+      toast({ title: "Delete Failed", description: err.message, variant: "destructive" });
+    }
+  };
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   return (
@@ -101,7 +114,10 @@ export default function AdminUsers() {
                             {candidate.name?.charAt(0) || '?'}
                           </div>
                         )}
-                        <div className="font-semibold text-sm">{candidate.name}</div>
+                        <div className="flex flex-col">
+                          <div className="font-semibold text-sm">{candidate.name}</div>
+                          <div className="text-[10px] uppercase font-bold tracking-widest text-foreground/40 mt-0.5">{candidate.unique_id}</div>
+                        </div>
                       </div>
                     )}
                   </td>
@@ -145,9 +161,14 @@ export default function AdminUsers() {
                         </Button>
                       </div>
                     ) : (
-                      <Button variant="ghost" size="sm" onClick={() => startEdit(candidate)} className="h-8 w-8 p-0 text-primary hover:bg-primary/10">
-                        <Edit className="w-4 h-4" />
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => startEdit(candidate)} className="h-8 w-8 p-0 text-primary hover:bg-primary/10" title="Edit User">
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(candidate.id, candidate.name)} className="h-8 w-8 p-0 text-red-500 hover:bg-red-500/10" title="Revoke Access & Delete">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     )}
                   </td>
                 </tr>
