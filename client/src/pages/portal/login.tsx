@@ -16,9 +16,41 @@ export default function PortalLogin() {
   const [step, setStep] = useState<'email' | 'otp'>('email');
   const [loading, setLoading] = useState(false);
 
+  const isValidCandidateEmail = (emailAddress: string) => {
+    // 1. Block + aliases often used for generating multiple accounts
+    if (emailAddress.includes('+')) return false;
+
+    const domain = emailAddress.split('@')[1]?.toLowerCase();
+    if (!domain) return false;
+
+    // 2. Allow list of standard trusted providers and academic domains
+    const trustedDomains = [
+      'gmail.com', 'yahoo.com', 'yahoo.co.in', 'outlook.com', 
+      'hotmail.com', 'icloud.com', 'proton.me', 'protonmail.com', 
+      'mac.com', 'me.com'
+    ];
+    
+    if (trustedDomains.includes(domain)) return true;
+    
+    // 3. Allow university/academic domains
+    if (domain.endsWith('.edu') || domain.endsWith('.ac.in') || domain.endsWith('.edu.in')) return true;
+
+    return false;
+  };
+
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
+
+    if (!isValidCandidateEmail(email)) {
+      toast({ 
+        title: "Invalid Email Provider", 
+        description: "Please use a standard email provider (Gmail, Yahoo, Outlook, etc.) or a university email. Disposable/generated emails are not allowed.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({

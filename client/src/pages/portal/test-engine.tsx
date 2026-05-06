@@ -277,7 +277,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
     debounceTimers.current[qId] = setTimeout(async () => {
       try {
-        await supabase.from('exam_responses').upsert({
+        const { error } = await supabase.from('exam_responses').upsert({
           attempt_id: currentAttemptId,
           question_id: qId,
           status: response.status,
@@ -285,6 +285,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           answer_text: response.answerText || null,
           file_url: response.fileUrl || null,
         }, { onConflict: 'attempt_id,question_id' });
+        if (error) throw error;
       } catch (err) {
         console.error('Auto-save failed for question', qId, err);
       }
@@ -446,13 +447,15 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
       // Update attempt with scores
       if (!isReviewOnly) {
-        await supabase.from('exam_attempts').update({
+        const { error: updateError } = await supabase.from('exam_attempts').update({
           completed_at: new Date().toISOString(),
           status: 'completed',
           score_part_a: scorePartA,
           total_part_a: totalPartA,
           part_b_answered: partBAnswered,
         }).eq('id', currentAttemptId);
+        
+        if (updateError) throw updateError;
       }
 
     } catch (err) {
@@ -643,9 +646,20 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           {groups[groupName].map(({ q, idx }) => {
             const status = responses[q.id]?.status || 'unseen';
             let bgClass = "bg-white border-black/20 text-foreground/70 hover:bg-black/5"; // unseen
-            if (status === 'visited') bgClass = "bg-red-50 border-red-200 text-red-600";
-            if (status === 'answered') bgClass = "bg-green-100 border-green-200 text-green-700";
-            if (status === 'marked') bgClass = "bg-purple-100 border-purple-200 text-purple-700";
+            if (testStep === 'review') {
+              const score = questionScores[q.id];
+              if (score !== undefined) {
+                if (score > 0) bgClass = "bg-green-100 border-green-300 text-green-700";
+                else if (score < 0) bgClass = "bg-red-100 border-red-300 text-red-700";
+                else bgClass = "bg-gray-100 border-gray-300 text-gray-500";
+              } else {
+                bgClass = "bg-gray-100 border-gray-300 text-gray-500";
+              }
+            } else {
+              if (status === 'visited') bgClass = "bg-red-50 border-red-200 text-red-600";
+              if (status === 'answered') bgClass = "bg-green-100 border-green-200 text-green-700";
+              if (status === 'marked') bgClass = "bg-purple-100 border-purple-200 text-purple-700";
+            }
 
             const isActive = idx === activeQuestionIndex;
 
@@ -656,7 +670,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                 className={`relative h-8 rounded-lg border flex flex-col items-center justify-center text-xs font-bold transition-all ${bgClass} ${isActive ? 'ring-2 ring-primary ring-offset-1 scale-105 shadow-sm' : ''}`}
               >
                 {testStep === 'review' && q.part === 'A' && questionScores[q.id] !== undefined ? (
-                  <span className={`text-[10px] leading-none ${questionScores[q.id] > 0 ? 'text-green-700' : questionScores[q.id] < 0 ? 'text-red-700' : ''}`}>
+                  <span className={`text-[10px] leading-none ${questionScores[q.id] > 0 ? 'text-green-700 font-bold' : questionScores[q.id] < 0 ? 'text-red-700 font-bold' : 'text-gray-500 font-bold'}`}>
                     {questionScores[q.id] > 0 ? '+' : ''}{questionScores[q.id]}
                   </span>
                 ) : (
