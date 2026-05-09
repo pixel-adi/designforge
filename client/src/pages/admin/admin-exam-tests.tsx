@@ -604,7 +604,7 @@ export default function AdminExamTests() {
                           <div className="flex items-center gap-3">
                             <span className="font-semibold text-foreground/40 w-6">{idx + 1}.</span>
                             <span className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded font-bold">{q.type}</span>
-                            <span className="text-foreground/80 line-clamp-1 max-w-xl break-words whitespace-pre-wrap [&_p]:inline [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4" dangerouslySetInnerHTML={{ __html: (q.content_text || '').replace(/&nbsp;/g, ' ') }}></span>
+                            <span className="text-foreground/80 line-clamp-1 max-w-xl break-words whitespace-pre-wrap [&_p]:inline [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4" dangerouslySetInnerHTML={{ __html: (q.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ') }}></span>
                           </div>
                           <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:bg-red-50" onClick={() => toggleQuestionSelection(q)}>
                             <Trash2 className="w-4 h-4" />
@@ -687,7 +687,7 @@ export default function AdminExamTests() {
 
               <div className="text-lg text-[#262626] font-medium leading-relaxed mb-8 flex items-start w-full overflow-hidden">
                 <span className="font-bold mr-2 shrink-0">Q{previewIndex + 1}.</span>
-                <div className="break-words whitespace-pre-wrap w-full min-w-0 [&_p]:mb-4 last:[&_p]:mb-0 [&_p:empty]:h-6 [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-4 [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-4" dangerouslySetInnerHTML={{ __html: (currentQ.content_text || '').replace(/&nbsp;/g, ' ') }}></div>
+                <div className="break-words whitespace-pre-wrap w-full min-w-0 [&_p]:mb-4 last:[&_p]:mb-0 [&_p:empty]:h-6 [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-4 [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-4" dangerouslySetInnerHTML={{ __html: (currentQ.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ') }}></div>
               </div>
 
               {currentQ.media_url && (
