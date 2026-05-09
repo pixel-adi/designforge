@@ -688,7 +688,7 @@ export default function AdminExamQuestions() {
                   <span className="bg-primary/10 text-primary px-2 py-1 rounded text-xs font-bold">{q.type}</span>
                 </div>
 
-                <div className="col-span-1 md:col-span-4 text-foreground/80 line-clamp-2 pr-4" dangerouslySetInnerHTML={{ __html: q.content_text }}>
+                <div className="col-span-1 md:col-span-4 text-foreground/80 line-clamp-2 pr-4 [&>ul]:list-disc [&>ul]:ml-4 [&>ol]:list-decimal [&>ol]:ml-4" dangerouslySetInnerHTML={{ __html: q.content_text }}>
                 </div>
 
                 <div className="col-span-1">
@@ -750,7 +750,7 @@ export default function AdminExamQuestions() {
             </div>
 
             <div className="p-4 bg-background rounded-xl border border-black/5 shadow-sm text-[#262626]">
-              <div className="whitespace-pre-wrap leading-relaxed prose max-w-none [&>p]:mb-0" dangerouslySetInnerHTML={{ __html: newQuestion.content_text }}></div>
+              <div className="whitespace-pre-wrap leading-relaxed [&>p]:mb-0 [&>ul]:list-disc [&>ul]:ml-6 [&>ol]:list-decimal [&>ol]:ml-6" dangerouslySetInnerHTML={{ __html: newQuestion.content_text }}></div>
               {questionMediaPreview && (
                 <div className="mt-4 rounded-lg overflow-hidden border border-black/10 inline-block max-w-full">
                   <img src={questionMediaPreview} alt="Question Media" className="max-h-64 object-contain" />
