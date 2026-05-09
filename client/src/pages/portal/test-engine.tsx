@@ -185,11 +185,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         const { data: qData } = await supabase.from('exam_questions').select('*').in('id', questionIds);
         questionsData = qData || [];
 
-        // Sort questions by Part, then strictly NAT -> MSQ -> MCQ -> SUBJECTIVE
+        // Sort questions by Part, then strictly NAT -> MSQ -> MCQ -> SUBJECTIVE, then ID for determinism
         const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3, 'SUBJECTIVE': 4 };
         questionsData.sort((a, b) => {
           if (a.part !== b.part) return a.part.localeCompare(b.part);
-          return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
+          if (a.type !== b.type) return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
+          return a.id.localeCompare(b.id);
         });
 
         // Fetch Options securely

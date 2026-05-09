@@ -249,7 +249,8 @@ export default function AdminExamTests() {
       const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3 };
       objectiveQs.sort((a, b) => {
         if (a.part !== b.part) return a.part.localeCompare(b.part);
-        return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
+        if (a.type !== b.type) return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
+        return a.id.localeCompare(b.id);
       });
 
       if (objectiveQs.length === 0) {
@@ -284,6 +285,9 @@ export default function AdminExamTests() {
              }
           }
         }
+
+        // Strip HTML tags and normalize spaces so it looks clean in PDF
+        ansText = ansText.replace(/<[^>]*>?/gm, '').replace(/(?:&nbsp;|\u00A0)/g, ' ').trim();
 
         return [
           (idx + 1).toString(),
@@ -327,7 +331,8 @@ export default function AdminExamTests() {
         const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3, 'SUBJECTIVE': 4 };
         questionsData.sort((a, b) => {
           if (a.part !== b.part) return a.part.localeCompare(b.part);
-          return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
+          if (a.type !== b.type) return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
+          return a.id.localeCompare(b.id);
         });
       }
       
