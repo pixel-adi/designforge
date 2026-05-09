@@ -688,7 +688,7 @@ export default function AdminExamQuestions() {
                   <span className="bg-primary/10 text-primary px-2 py-1 rounded text-xs font-bold">{q.type}</span>
                 </div>
 
-                <div className="col-span-1 md:col-span-4 text-foreground/80 line-clamp-2 pr-4 [&>ul]:list-disc [&>ul]:ml-4 [&>ol]:list-decimal [&>ol]:ml-4" dangerouslySetInnerHTML={{ __html: q.content_text }}>
+                <div className="col-span-1 md:col-span-4 text-foreground/80 line-clamp-2 pr-4 break-words whitespace-pre-wrap [&_p]:inline [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4" dangerouslySetInnerHTML={{ __html: q.content_text }}>
                 </div>
 
                 <div className="col-span-1">
@@ -749,8 +749,8 @@ export default function AdminExamQuestions() {
                {newQuestion.pyq_tag && <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold">{newQuestion.pyq_tag}</span>}
             </div>
 
-            <div className="p-4 bg-background rounded-xl border border-black/5 shadow-sm text-[#262626]">
-              <div className="whitespace-pre-wrap leading-relaxed [&>p]:mb-0 [&>ul]:list-disc [&>ul]:ml-6 [&>ol]:list-decimal [&>ol]:ml-6" dangerouslySetInnerHTML={{ __html: newQuestion.content_text }}></div>
+            <div className="p-4 bg-background rounded-xl border border-black/5 shadow-sm text-[#262626] overflow-hidden">
+              <div className="w-full break-words whitespace-pre-wrap leading-relaxed [&_p]:mb-4 last:[&_p]:mb-0 [&_p:empty]:h-6 [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-4 [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-4" dangerouslySetInnerHTML={{ __html: newQuestion.content_text }}></div>
               {questionMediaPreview && (
                 <div className="mt-4 rounded-lg overflow-hidden border border-black/10 inline-block max-w-full">
                   <img src={questionMediaPreview} alt="Question Media" className="max-h-64 object-contain" />
