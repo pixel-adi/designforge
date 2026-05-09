@@ -604,7 +604,7 @@ export default function AdminExamTests() {
                           <div className="flex items-center gap-3">
                             <span className="font-semibold text-foreground/40 w-6">{idx + 1}.</span>
                             <span className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded font-bold">{q.type}</span>
-                            <span className="text-foreground/80 line-clamp-1 max-w-xl">{q.content_text}</span>
+                            <span className="text-foreground/80 line-clamp-1 max-w-xl" dangerouslySetInnerHTML={{ __html: q.content_text }}></span>
                           </div>
                           <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:bg-red-50" onClick={() => toggleQuestionSelection(q)}>
                             <Trash2 className="w-4 h-4" />
@@ -685,9 +685,9 @@ export default function AdminExamTests() {
                 {currentQ.pyq_tag && <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold">{currentQ.pyq_tag}</span>}
               </div>
 
-              <div className="text-lg text-[#262626] font-medium whitespace-pre-wrap leading-relaxed mb-8">
-                <span className="font-bold mr-2">Q{previewIndex + 1}.</span>
-                {currentQ.content_text}
+              <div className="text-lg text-[#262626] font-medium whitespace-pre-wrap leading-relaxed mb-8 flex items-start">
+                <span className="font-bold mr-2 shrink-0">Q{previewIndex + 1}.</span>
+                <div className="prose max-w-none [&>p]:mb-0" dangerouslySetInnerHTML={{ __html: currentQ.content_text }}></div>
               </div>
 
               {currentQ.media_url && (

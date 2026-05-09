@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Papa from "papaparse";
+import ReactQuill from "react-quill";
+import "react-quill/dist/quill.snow.css";
 
 interface Question {
   id: string;
@@ -493,12 +495,21 @@ export default function AdminExamQuestions() {
           {/* Content & Media Row */}
           <div className="md:col-span-2 lg:col-span-3">
             <Label className="text-xs text-[#262626]/60 mb-1 block">Question Content</Label>
-            <Textarea 
-              value={newQuestion.content_text} 
-              onChange={(e) => setNewQuestion({...newQuestion, content_text: e.target.value})}
-              placeholder="Enter the question text here..."
-              className="min-h-[140px]" 
-            />
+            <div className="bg-white rounded-md border-0">
+              <ReactQuill 
+                theme="snow" 
+                value={newQuestion.content_text} 
+                onChange={(content) => setNewQuestion({...newQuestion, content_text: content})}
+                placeholder="Enter the question text here..."
+                className="h-[140px] mb-12"
+                modules={{
+                  toolbar: [
+                    ['bold', 'italic', 'underline'],
+                    [{'list': 'bullet'}, {'list': 'ordered'}],
+                  ],
+                }}
+              />
+            </div>
           </div>
 
           <div className="md:col-span-2 lg:col-span-1">
@@ -677,8 +688,7 @@ export default function AdminExamQuestions() {
                   <span className="bg-primary/10 text-primary px-2 py-1 rounded text-xs font-bold">{q.type}</span>
                 </div>
 
-                <div className="col-span-1 md:col-span-4 text-foreground/80 line-clamp-2 pr-4">
-                  {q.content_text}
+                <div className="col-span-1 md:col-span-4 text-foreground/80 line-clamp-2 pr-4" dangerouslySetInnerHTML={{ __html: q.content_text }}>
                 </div>
 
                 <div className="col-span-1">
@@ -740,7 +750,7 @@ export default function AdminExamQuestions() {
             </div>
 
             <div className="p-4 bg-background rounded-xl border border-black/5 shadow-sm text-[#262626]">
-              <p className="whitespace-pre-wrap leading-relaxed">{newQuestion.content_text}</p>
+              <div className="whitespace-pre-wrap leading-relaxed prose max-w-none [&>p]:mb-0" dangerouslySetInnerHTML={{ __html: newQuestion.content_text }}></div>
               {questionMediaPreview && (
                 <div className="mt-4 rounded-lg overflow-hidden border border-black/10 inline-block max-w-full">
                   <img src={questionMediaPreview} alt="Question Media" className="max-h-64 object-contain" />
