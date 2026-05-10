@@ -455,7 +455,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           total_part_a: totalPartA,
           part_b_answered: partBAnswered,
         }).eq('id', currentAttemptId);
-        
+
         if (updateError) throw updateError;
       }
 
