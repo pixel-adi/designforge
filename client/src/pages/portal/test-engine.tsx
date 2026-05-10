@@ -195,8 +195,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
         // Fetch Options securely
         const { data: optData } = await supabase.from('exam_options')
-          .select('id, question_id, content_text, media_url')
-          .in('question_id', questionIds);
+          .select('id, question_id, content_text, media_url, created_at')
+          .in('question_id', questionIds)
+          .order('created_at', { ascending: true });
 
         if (optData) {
           optData.forEach(opt => {
