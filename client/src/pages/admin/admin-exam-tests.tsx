@@ -272,8 +272,8 @@ export default function AdminExamTests() {
         let ansText = 'N/A';
         
         if (q.exam_options && Array.isArray(q.exam_options)) {
-          // Sort options by created_at to maintain original A, B, C, D ordering
-          const sortedOptions = [...q.exam_options].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          // Sort options by ID to naturally shuffle (UUIDs are random) but maintain deterministic order
+          const sortedOptions = [...q.exam_options].sort((a, b) => a.id.localeCompare(b.id));
           
           if (q.type === 'NAT') {
              const correctOpt = sortedOptions.find(o => o.is_correct);

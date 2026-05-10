@@ -197,7 +197,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         const { data: optData } = await supabase.from('exam_options')
           .select('id, question_id, content_text, media_url, created_at')
           .in('question_id', questionIds)
-          .order('created_at', { ascending: true });
+          .order('id', { ascending: true }); // Sort by random UUID to naturally shuffle options while staying deterministic
 
         if (optData) {
           optData.forEach(opt => {
