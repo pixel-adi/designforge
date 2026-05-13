@@ -274,37 +274,51 @@ export default function AdminPartBEvaluations() {
           <div className="grid grid-cols-12 gap-4 border-b border-black/5 p-4 bg-background/50 text-xs font-semibold text-foreground/50 uppercase tracking-widest hidden md:grid">
             <div className="col-span-3">Candidate</div>
             <div className="col-span-3">Test</div>
-            <div className="col-span-2">Submitted On</div>
+            <div className="col-span-2">Date</div>
             <div className="col-span-2">Scores</div>
             <div className="col-span-2 text-right">Action</div>
           </div>
           <div className="divide-y divide-black/5">
             {filteredAttempts.map(attempt => (
-              <div key={attempt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center hover:bg-background/30 transition-colors text-sm">
-                <div className="col-span-3">
-                  <p className="font-semibold text-[#262626]">{attempt.exam_candidates?.name}</p>
-                  <p className="text-xs text-foreground/50">{attempt.exam_candidates?.unique_id}</p>
+              <div key={attempt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-3 px-4 items-center hover:bg-background/30 transition-colors text-sm">
+                <div className="col-span-3 flex flex-col justify-center">
+                  <p className="font-bold text-[#262626] leading-tight">{attempt.exam_candidates?.name}</p>
+                  <p className="text-[11px] text-foreground/50 mt-0.5">{attempt.exam_candidates?.unique_id}</p>
                 </div>
-                <div className="col-span-3 text-foreground/70 font-medium">{attempt.exam_tests?.title}</div>
-                <div className="col-span-2 text-foreground/60">
+                <div className="col-span-3 text-foreground/70 font-semibold truncate text-xs" title={attempt.exam_tests?.title}>
+                  {attempt.exam_tests?.title}
+                </div>
+                <div className="col-span-2 text-foreground/60 text-xs font-medium">
                   {new Date(attempt.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </div>
-                <div className="col-span-2 font-bold text-sm">
-                  <div className="text-green-600">Part A: {attempt.score_part_a} / {attempt.total_part_a}</div>
+                <div className="col-span-2 flex flex-wrap gap-1.5 items-center">
+                  {attempt.total_part_a > 0 && (
+                    <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-bold border border-green-200">
+                      A: {attempt.score_part_a}/{attempt.total_part_a}
+                    </span>
+                  )}
                   {attempt.score_part_b !== null && (
-                    <div className="text-orange-600 mt-0.5">Part B: {attempt.score_part_b}</div>
+                    <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold border border-orange-200">
+                      B: {attempt.score_part_b}
+                    </span>
                   )}
                   {attempt.total_score !== null && (
-                    <div className="text-primary mt-0.5">Total: {attempt.total_score}</div>
+                    <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-black border border-primary/20">
+                      Total: {attempt.total_score}
+                    </span>
+                  )}
+                  {attempt.total_part_a === 0 && attempt.score_part_b === null && (
+                    <span className="text-[11px] font-medium text-foreground/40 italic">Pending</span>
                   )}
                 </div>
                 <div className="col-span-2 flex justify-end">
                   <Button 
                     onClick={() => loadEvaluation(attempt)} 
                     variant={activeTab === 'completed' ? "outline" : "default"}
-                    className={`h-8 font-bold text-xs ${activeTab === 'completed' ? '' : 'bg-primary text-white hover:bg-primary/90'}`}
+                    size="sm"
+                    className={`h-7 px-3 font-bold text-xs rounded-md ${activeTab === 'completed' ? '' : 'bg-primary text-white hover:bg-primary/90 shadow-sm'}`}
                   >
-                    {activeTab === 'completed' ? 'Edit Evaluation' : activeTab === 'draft' ? 'Resume Draft' : 'Evaluate'}
+                    {activeTab === 'completed' ? 'Edit' : activeTab === 'draft' ? 'Resume' : 'Evaluate'}
                   </Button>
                 </div>
               </div>
