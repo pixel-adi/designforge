@@ -88,20 +88,26 @@ export default function PortalDashboard() {
 
   const fetchDashboardData = async (programIds: string[], educationLevel: string, candidateId: string) => {
     try {
-      const { data: tests, error } = await supabase
-        .from('exam_tests')
-        .select(`*, exam_test_sections(part, duration_minutes)`)
-        .eq('status', 'published')
-        .order('created_at', { ascending: false });
+      const [testsRes, attemptsRes, programsRes] = await Promise.all([
+        supabase
+          .from('exam_tests')
+          .select(`*, exam_test_sections(part, duration_minutes)`)
+          .eq('status', 'published')
+          .order('created_at', { ascending: false }),
+        supabase.from('exam_attempts').select('id, test_id, status').eq('candidate_id', candidateId),
+        supabase.from('exam_programs').select('id, name')
+      ]);
 
-      if (error) throw error;
+      if (testsRes.error) throw testsRes.error;
 
-      const { data: attempts } = await supabase.from('exam_attempts').select('id, test_id, status').eq('candidate_id', candidateId);
+      const tests = testsRes.data;
+      const attempts = attemptsRes.data;
+      const allPrograms = programsRes.data;
+
       const attemptMap: Record<string, any> = {};
       (attempts || []).forEach(a => { attemptMap[a.test_id] = a; });
       setCandidateAttemptsMap(attemptMap);
 
-      const { data: allPrograms } = await supabase.from('exam_programs').select('id, name');
       const programsMap: Record<string, string> = {};
       (allPrograms || []).forEach(p => { programsMap[p.id] = p.name; });
 
