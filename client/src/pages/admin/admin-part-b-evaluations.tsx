@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, MessageSquare, Video, FileText } from "lucide-react";
+import { Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, MessageSquare, Video, FileText, Maximize, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 
@@ -29,6 +29,7 @@ export default function AdminPartBEvaluations() {
   
   const [saving, setSaving] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAttempts();
@@ -258,7 +259,7 @@ export default function AdminPartBEvaluations() {
             <div className="col-span-3">Candidate</div>
             <div className="col-span-3">Test</div>
             <div className="col-span-2">Submitted On</div>
-            <div className="col-span-2">Part A Score</div>
+            <div className="col-span-2">Scores</div>
             <div className="col-span-2 text-right">Action</div>
           </div>
           <div className="divide-y divide-black/5">
@@ -272,8 +273,14 @@ export default function AdminPartBEvaluations() {
                 <div className="col-span-2 text-foreground/60">
                   {new Date(attempt.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </div>
-                <div className="col-span-2 font-bold text-green-600">
-                  {attempt.score_part_a} / {attempt.total_part_a}
+                <div className="col-span-2 font-bold text-sm">
+                  <div className="text-green-600">Part A: {attempt.score_part_a} / {attempt.total_part_a}</div>
+                  {attempt.score_part_b !== null && (
+                    <div className="text-orange-600 mt-0.5">Part B: {attempt.score_part_b}</div>
+                  )}
+                  {attempt.total_score !== null && (
+                    <div className="text-primary mt-0.5">Total: {attempt.total_score}</div>
+                  )}
                 </div>
                 <div className="col-span-2 flex justify-end">
                   <Button 
@@ -339,7 +346,7 @@ export default function AdminPartBEvaluations() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Side: Question & Candidate Upload */}
-        <div className="w-1/2 bg-[#F8F9FA] border-r border-black/5 flex flex-col overflow-y-auto custom-scrollbar p-8">
+        <div className="w-2/3 bg-[#F8F9FA] border-r border-black/5 flex flex-col overflow-y-auto custom-scrollbar p-8">
           <div className="flex justify-between items-center mb-6">
             <span className="bg-primary/10 text-primary px-3 py-1 rounded text-sm font-bold uppercase tracking-widest">Part B - Subjective</span>
             <span className="text-sm font-bold text-foreground/50">Question {currentQIndex + 1} of {responses.length}</span>
@@ -352,9 +359,14 @@ export default function AdminPartBEvaluations() {
           )}
           
           <h3 className="font-bold text-sm text-foreground/50 uppercase tracking-widest mb-4">Candidate Submission</h3>
-          <div className="bg-white p-4 rounded-xl border border-black/5 shadow-sm flex-1 flex flex-col items-center justify-center min-h-[400px]">
+          <div className="bg-white p-4 rounded-xl border border-black/5 shadow-sm flex-1 flex flex-col items-center justify-center min-h-[400px] overflow-hidden group relative">
              {currentResponse?.file_url ? (
-               <img src={currentResponse.file_url} className="max-h-[600px] w-auto object-contain rounded-lg border border-black/10" alt="Candidate Submission" />
+               <>
+                 <img src={currentResponse.file_url} className="max-h-[600px] w-auto object-contain rounded-lg border border-black/10 cursor-pointer" alt="Candidate Submission" onClick={() => setFullscreenImage(currentResponse.file_url)} />
+                 <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                   <Button onClick={() => setFullscreenImage(currentResponse.file_url)} variant="secondary" className="shadow-md bg-white text-black hover:bg-gray-100"><Maximize className="w-4 h-4 mr-2" /> Full Screen</Button>
+                 </div>
+               </>
              ) : currentResponse?.answer_text ? (
                <div className="w-full h-full bg-background/50 rounded-lg p-6 border border-black/10 text-lg font-medium">
                  {currentResponse.answer_text}
@@ -369,8 +381,8 @@ export default function AdminPartBEvaluations() {
         </div>
 
         {/* Right Side: Evaluation Form */}
-        <div className="w-1/2 bg-white flex flex-col overflow-y-auto custom-scrollbar p-8">
-           <h3 className="text-xl font-bold text-[#262626] mb-8 flex items-center gap-2"><PenTool className="w-5 h-5 text-primary" /> Evaluation Form</h3>
+        <div className="w-1/3 bg-white flex flex-col overflow-y-auto custom-scrollbar p-6">
+           <h3 className="text-xl font-bold text-[#262626] mb-6 flex items-center gap-2"><PenTool className="w-5 h-5 text-primary" /> Evaluation Form</h3>
            
            <div className="space-y-8 flex-1">
              {/* Marks Input */}
@@ -461,6 +473,16 @@ export default function AdminPartBEvaluations() {
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Yes, Complete Evaluation'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fullscreen Image Preview */}
+      <Dialog open={!!fullscreenImage} onOpenChange={() => setFullscreenImage(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+          <Button variant="ghost" size="icon" onClick={() => setFullscreenImage(null)} className="absolute top-4 right-4 text-white hover:bg-white/20 z-50">
+            <X className="w-6 h-6" />
+          </Button>
+          <img src={fullscreenImage || ''} className="max-w-full max-h-[90vh] object-contain" />
         </DialogContent>
       </Dialog>
     </div>

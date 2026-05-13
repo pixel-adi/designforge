@@ -151,9 +151,9 @@ export default function PortalDashboard() {
       // Build the query
       let query = supabase
         .from('exam_attempts')
-        .select(`id, score_part_a, total_part_a, candidate_id, test_id, exam_candidates!inner(name, avatar_url, education_level), exam_tests!inner(title, program_format)`)
+        .select(`id, score_part_a, total_part_a, score_part_b, total_score, part_b_evaluation_status, candidate_id, test_id, exam_candidates!inner(name, avatar_url, education_level), exam_tests!inner(title, program_format)`)
         .eq('status', 'completed')
-        .order('score_part_a', { ascending: false });
+        .order('total_score', { ascending: false });
 
       if (leaderboardFilterTestId !== 'all') {
          query = query.eq('test_id', leaderboardFilterTestId);
@@ -568,8 +568,12 @@ export default function PortalDashboard() {
                               </div>
                               <div className="flex items-center gap-6">
                                 <div className="text-right hidden sm:block">
-                                  <p className="text-xs text-foreground/50 font-bold uppercase tracking-wider">Part A Score</p>
-                                  <p className={`font-bold text-xl ${scoreColor}`}>{scoreA}/{totalA}</p>
+                                  <p className="text-xs text-foreground/50 font-bold uppercase tracking-wider">Score</p>
+                                  {attempt.total_score !== null ? (
+                                    <p className={`font-bold text-xl text-primary`}>{attempt.total_score}</p>
+                                  ) : (
+                                    <p className={`font-bold text-xl ${scoreColor}`}>{scoreA}/{totalA}</p>
+                                  )}
                                 </div>
                                 <div className="px-3 py-1 bg-black/5 rounded-full text-xs font-bold text-foreground/70">Attempt {pastAttempts.length - i}</div>
                               </div>
@@ -587,18 +591,40 @@ export default function PortalDashboard() {
                                 </div>
                                 <p className="text-xs text-foreground/50 mt-2">{partAPercent}% accuracy on objective questions.</p>
                               </div>
-                              <div className="p-4 rounded-xl bg-white border border-black/5">
-                                <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
-                                  <span>Part B (Subjective)</span>
-                                  <span className="text-orange-600">{partBAns} submitted</span>
-                                </h5>
-                                <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
-                                  <div className="h-full bg-orange-500 rounded-full" style={{ width: partBAns > 0 ? '100%' : '0%' }} />
+                              <div className="p-4 rounded-xl bg-white border border-black/5 flex flex-col justify-between">
+                                  <div>
+                                    <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
+                                      <span>Part B (Subjective)</span>
+                                      {attempt.part_b_evaluation_status === 'completed' && attempt.score_part_b !== null ? (
+                                        <span className="text-green-600">{attempt.score_part_b} Marks</span>
+                                      ) : (
+                                        <span className="text-orange-600">{partBAns} submitted</span>
+                                      )}
+                                    </h5>
+                                    {attempt.part_b_evaluation_status === 'completed' ? (
+                                      <div className="h-2 w-full bg-green-100 rounded-full overflow-hidden mt-1">
+                                        <div className="h-full bg-green-500 rounded-full w-full" />
+                                      </div>
+                                    ) : (
+                                      <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden mt-1">
+                                        <div className="h-full bg-orange-500 rounded-full" style={{ width: partBAns > 0 ? '100%' : '0%' }} />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-foreground/50 mt-2">
+                                    {attempt.part_b_evaluation_status === 'completed' 
+                                      ? "Evaluated. Click below to view feedback." 
+                                      : "Awaiting manual evaluation by faculty."}
+                                  </p>
                                 </div>
-                                <p className="text-xs text-foreground/50 mt-2">Awaiting manual evaluation by faculty.</p>
                               </div>
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-black/5 text-right">
+                              {attempt.total_score !== null && (
+                                <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20 flex justify-between items-center">
+                                  <span className="font-bold text-[#262626]">Total Final Score</span>
+                                  <span className="text-xl font-black text-primary">{attempt.total_score}</span>
+                                </div>
+                              )}
+                              <div className="mt-4 pt-4 border-t border-black/5 text-right">
                                <Button variant="outline" onClick={() => setLocation(`/portal/test/${attempt.test_id}?review_attempt=${attempt.id}`)} className="font-bold border-primary text-primary hover:bg-primary/5">
                                  Review Scorecard & Answers
                                </Button>
@@ -649,7 +675,7 @@ export default function PortalDashboard() {
                           <th className="pb-4 font-semibold px-4 w-16">Rank</th>
                           <th className="pb-4 font-semibold px-4">Candidate</th>
                           <th className="pb-4 font-semibold px-4 hidden sm:table-cell">Test</th>
-                          <th className="pb-4 font-semibold px-4 text-right">Part A Score</th>
+                          <th className="pb-4 font-semibold px-4 text-right">Score</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-black/5">
@@ -680,8 +706,17 @@ export default function PortalDashboard() {
                               </td>
                               <td className="py-4 px-4 text-right">
                                 <div className="inline-flex items-center gap-2">
-                                  <span className="font-bold text-lg text-green-600">{entry.score_part_a}</span>
-                                  <span className="text-xs text-foreground/40 font-medium">/ {entry.total_part_a}</span>
+                                  {entry.total_score !== null ? (
+                                    <>
+                                      <span className="font-bold text-lg text-primary">{entry.total_score}</span>
+                                      <span className="text-xs text-foreground/40 font-medium">Total</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="font-bold text-lg text-green-600">{entry.score_part_a}</span>
+                                      <span className="text-xs text-foreground/40 font-medium">/ {entry.total_part_a}</span>
+                                    </>
+                                  )}
                                 </div>
                               </td>
                             </tr>
