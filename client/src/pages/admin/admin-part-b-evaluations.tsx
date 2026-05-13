@@ -346,15 +346,15 @@ export default function AdminPartBEvaluations() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Side: Question & Candidate Upload */}
-        <div className="w-2/3 bg-[#F8F9FA] border-r border-black/5 flex flex-col overflow-y-auto custom-scrollbar p-8">
-          <div className="flex justify-between items-center mb-6">
+        <div className="w-3/5 bg-[#F8F9FA] border-r border-black/5 flex flex-col overflow-y-auto custom-scrollbar p-6 lg:p-10">
+          <div className="flex justify-between items-center mb-4">
             <span className="bg-primary/10 text-primary px-3 py-1 rounded text-sm font-bold uppercase tracking-widest">Part B - Subjective</span>
             <span className="text-sm font-bold text-foreground/50">Question {currentQIndex + 1} of {responses.length}</span>
           </div>
           
           {currentQ && (
-            <div className="bg-white p-6 rounded-xl border border-black/5 shadow-sm mb-6">
-               <div className="text-lg text-[#262626] font-medium leading-relaxed flex items-start w-full [&_p]:inline" dangerouslySetInnerHTML={{ __html: (currentQ.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ').replace(/\n/g, '<br/>') }}></div>
+            <div className="bg-white p-5 rounded-xl border border-black/5 shadow-sm mb-6">
+               <div className="text-sm text-[#262626] leading-relaxed max-w-full overflow-hidden prose prose-sm prose-p:my-1 prose-img:max-h-40 prose-img:w-auto" dangerouslySetInnerHTML={{ __html: (currentQ.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ') }}></div>
             </div>
           )}
           
@@ -381,8 +381,8 @@ export default function AdminPartBEvaluations() {
         </div>
 
         {/* Right Side: Evaluation Form */}
-        <div className="w-1/3 bg-white flex flex-col overflow-y-auto custom-scrollbar p-6">
-           <h3 className="text-xl font-bold text-[#262626] mb-6 flex items-center gap-2"><PenTool className="w-5 h-5 text-primary" /> Evaluation Form</h3>
+        <div className="w-2/5 bg-white flex flex-col overflow-y-auto custom-scrollbar p-6 lg:p-10">
+           <h3 className="text-lg font-bold text-[#262626] mb-6 flex items-center gap-2"><PenTool className="w-5 h-5 text-primary" /> Evaluation Form</h3>
            
            <div className="space-y-8 flex-1">
              {/* Marks Input */}
