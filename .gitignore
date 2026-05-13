@@ -6,3 +6,12 @@ vite.config.ts.*
 *.tar.gz
 .env
 .env.local
+
+# Dev/debug scripts — not needed in production repo
+test-db.js
+test-db.mjs
+test-supabase.js
+seed.js
+check-db.mjs
+check-schema.mjs
+client/seed_programs.js

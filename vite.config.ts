@@ -37,6 +37,10 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
+    // Strip console.* and debugger statements in production
+    esbuild: {
+      drop: process.env.NODE_ENV === "production" ? ["console", "debugger"] : [],
+    },
     rollupOptions: {
       output: {
         manualChunks: {

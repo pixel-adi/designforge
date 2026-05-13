@@ -17,13 +17,20 @@ export default function AdminLogin() {
     setLoading(true);
     setError(null);
 
+    // Domain lock — only @designforge.co.in accounts can access admin
+    if (!email.toLowerCase().endsWith("@designforge.co.in")) {
+      setError("Access restricted. Only authorized Designforge accounts can log in.");
+      setLoading(false);
+      return;
+    }
+
     const { error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (authError) {
-      setError(authError.message);
+      setError("Invalid credentials. Please try again.");
       setLoading(false);
       return;
     }
