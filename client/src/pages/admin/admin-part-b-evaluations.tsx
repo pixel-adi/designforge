@@ -381,14 +381,14 @@ export default function AdminPartBEvaluations() {
         </div>
 
         {/* Right Side: Evaluation Form */}
-        <div className="w-2/5 bg-white flex flex-col overflow-y-auto custom-scrollbar p-6 lg:p-10">
-           <h3 className="text-lg font-bold text-[#262626] mb-6 flex items-center gap-2"><PenTool className="w-5 h-5 text-primary" /> Evaluation Form</h3>
+        <div className="w-2/5 bg-white flex flex-col overflow-y-auto custom-scrollbar p-6 lg:p-8">
+           <h3 className="text-lg font-bold text-[#262626] mb-5 flex items-center gap-2"><PenTool className="w-5 h-5 text-primary" /> Evaluation Form</h3>
            
-           <div className="space-y-8 flex-1">
+           <div className="space-y-5 flex-1">
              {/* Marks Input */}
              <div>
-               <label className="block text-sm font-bold text-foreground/70 mb-2">Marks Awarded</label>
-               <div className="flex items-center gap-4">
+               <label className="block text-xs font-bold text-foreground/70 mb-1.5 uppercase tracking-wider">Marks Awarded</label>
+               <div className="flex items-center gap-3">
                  <input 
                    type="number" 
                    value={evalForm.marks_awarded}
@@ -397,55 +397,55 @@ export default function AdminPartBEvaluations() {
                      if (parseFloat(val) > maxMarksPerQ) val = maxMarksPerQ.toString();
                      setEvalForm({ ...evalForm, marks_awarded: val });
                    }}
-                   className="w-32 h-14 border-2 border-primary/20 rounded-xl px-4 text-2xl font-bold bg-primary/5 focus:outline-none focus:border-primary text-primary"
+                   className="w-24 h-12 border-2 border-primary/20 rounded-xl px-4 text-xl font-bold bg-primary/5 focus:outline-none focus:border-primary text-primary text-center"
                    placeholder="0"
                  />
-                 <span className="text-lg font-bold text-foreground/40">/ {maxMarksPerQ.toFixed(2)} Max</span>
+                 <span className="text-sm font-bold text-foreground/40">/ {maxMarksPerQ.toFixed(2)} Max</span>
                </div>
              </div>
              
              {/* Comments */}
              <div>
-               <label className="flex items-center gap-2 text-sm font-bold text-foreground/70 mb-2"><MessageSquare className="w-4 h-4" /> Mentor Comments (Feedback)</label>
+               <label className="flex items-center gap-1.5 text-xs font-bold text-foreground/70 mb-1.5 uppercase tracking-wider"><MessageSquare className="w-3.5 h-3.5" /> Mentor Comments</label>
                <textarea 
                  value={evalForm.mentor_comments}
                  onChange={e => setEvalForm({ ...evalForm, mentor_comments: e.target.value })}
-                 className="w-full h-32 border border-black/10 rounded-xl p-4 bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-sm resize-none"
-                 placeholder="Provide detailed feedback on what the candidate did well and what went wrong..."
+                 className="w-full h-24 border border-black/10 rounded-xl p-3 bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-sm resize-none"
+                 placeholder="Provide feedback on what the candidate did well and what went wrong..."
                />
              </div>
 
              {/* Improvements */}
              <div>
-               <label className="flex items-center gap-2 text-sm font-bold text-foreground/70 mb-2"><CheckCircle2 className="w-4 h-4" /> Areas for Improvement</label>
+               <label className="flex items-center gap-1.5 text-xs font-bold text-foreground/70 mb-1.5 uppercase tracking-wider"><CheckCircle2 className="w-3.5 h-3.5" /> Areas for Improvement</label>
                <textarea 
                  value={evalForm.mentor_improvements}
                  onChange={e => setEvalForm({ ...evalForm, mentor_improvements: e.target.value })}
-                 className="w-full h-24 border border-black/10 rounded-xl p-4 bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-sm resize-none"
-                 placeholder="Specific tips on how to improve this sketch/answer..."
+                 className="w-full h-20 border border-black/10 rounded-xl p-3 bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-sm resize-none"
+                 placeholder="Specific tips on how to improve..."
                />
              </div>
 
              {/* Loom Link */}
              <div>
-               <label className="flex items-center gap-2 text-sm font-bold text-foreground/70 mb-2"><Video className="w-4 h-4" /> Loom Video Link (Optional)</label>
+               <label className="flex items-center gap-1.5 text-xs font-bold text-foreground/70 mb-1.5 uppercase tracking-wider"><Video className="w-3.5 h-3.5" /> Loom Video Link (Optional)</label>
                <input 
                  type="url"
                  value={evalForm.mentor_loom_link}
                  onChange={e => setEvalForm({ ...evalForm, mentor_loom_link: e.target.value })}
-                 className="w-full h-12 border border-black/10 rounded-xl px-4 bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-sm"
+                 className="w-full h-10 border border-black/10 rounded-xl px-3 bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-sm"
                  placeholder="https://www.loom.com/share/..."
                />
              </div>
            </div>
            
            {/* Navigation Bottom */}
-           <div className="border-t border-black/10 pt-6 mt-8 flex justify-between items-center shrink-0">
-             <Button variant="outline" onClick={handlePrevQuestion} disabled={currentQIndex === 0} className="shadow-sm font-bold h-12 px-6">
-               <ArrowLeft className="w-4 h-4 mr-2" /> Previous Question
+           <div className="border-t border-black/10 pt-4 mt-5 flex justify-between items-center shrink-0">
+             <Button variant="outline" onClick={handlePrevQuestion} disabled={currentQIndex === 0} className="shadow-sm font-bold h-10 px-4">
+               <ArrowLeft className="w-4 h-4 mr-2" /> Previous
              </Button>
-             <Button onClick={handleNextQuestion} disabled={currentQIndex === responses.length - 1} className="bg-black text-white hover:bg-black/80 shadow-sm font-bold h-12 px-8">
-               Save & Next Question <ChevronRight className="w-4 h-4 ml-2" />
+             <Button onClick={handleNextQuestion} disabled={currentQIndex === responses.length - 1} className="bg-black text-white hover:bg-black/80 shadow-sm font-bold h-10 px-6">
+               Save & Next <ChevronRight className="w-4 h-4 ml-2" />
              </Button>
            </div>
         </div>
