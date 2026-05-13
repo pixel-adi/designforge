@@ -23,6 +23,10 @@ interface ResponseData {
   selectedOptions: string[];
   answerText: string;
   fileUrl: string;
+  marksAwarded?: number;
+  mentorComments?: string;
+  mentorImprovements?: string;
+  mentorLoomLink?: string;
 }
 
 export default function PortalTestEngine({ params }: { params?: { id: string } }) {
@@ -63,6 +67,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   const [scoreBreakdown, setScoreBreakdown] = useState<Record<string, number>>({ NAT: 0, MSQ: 0, MCQ: 0 });
   const [questionScores, setQuestionScores] = useState<Record<string, number>>({});
   const [correctAnswersMap, setCorrectAnswersMap] = useState<Record<string, any[]>>({});
+  const [attemptDetails, setAttemptDetails] = useState<any>(null);
 
   useEffect(() => {
     if (id) fetchTestEngineData();
@@ -86,16 +91,26 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     try {
       setLoading(true);
       const { data: pastResp } = await supabase.from('exam_responses').select('*').eq('attempt_id', attemptIdFromUrl);
+      const { data: attemptInfo } = await supabase.from('exam_attempts').select('*').eq('id', attemptIdFromUrl).single();
+      
+      if (attemptInfo) {
+        setAttemptDetails(attemptInfo);
+      }
+
       if (pastResp) {
         setAttemptId(attemptIdFromUrl);
 
-        const loadedResponses = { ...responses };
+        const loadedResponses: Record<string, ResponseData> = { ...responses };
         pastResp.forEach(r => {
           loadedResponses[r.question_id] = {
             status: r.status,
             selectedOptions: r.selected_options || [],
             answerText: r.answer_text || '',
-            fileUrl: r.file_url || ''
+            fileUrl: r.file_url || '',
+            marksAwarded: r.marks_awarded,
+            mentorComments: r.mentor_comments,
+            mentorImprovements: r.mentor_improvements,
+            mentorLoomLink: r.mentor_loom_link
           };
         });
 
@@ -823,10 +838,27 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             </div>
           )}
 
-          <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-8 flex items-center justify-center gap-3">
-            <AlertCircle className="w-5 h-5 text-orange-600 shrink-0" />
-            <p className="text-sm font-bold text-orange-800">Part B will be evaluated manually and the combined scorecard will be shared later.</p>
-          </div>
+          {attemptDetails?.part_b_evaluation_status === 'completed' ? (
+            <div className="bg-green-50 border border-green-200 p-6 rounded-xl mb-8 flex flex-col items-center justify-center gap-3">
+               <h3 className="text-xl font-bold text-green-800">Part B Evaluation Complete</h3>
+               <div className="flex items-center gap-6 mt-2">
+                 <div className="text-center">
+                    <span className="text-[10px] uppercase font-bold text-green-700/60 block mb-1">Part B Score</span>
+                    <span className="text-3xl font-black text-green-700">{attemptDetails.score_part_b}</span>
+                 </div>
+                 <div className="h-10 w-px bg-green-200"></div>
+                 <div className="text-center">
+                    <span className="text-[10px] uppercase font-bold text-green-700/60 block mb-1">Total Grand Score</span>
+                    <span className="text-3xl font-black text-green-700">{attemptDetails.total_score}</span>
+                 </div>
+               </div>
+            </div>
+          ) : engineData.hasPartB ? (
+            <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-8 flex items-center justify-center gap-3">
+              <AlertCircle className="w-5 h-5 text-orange-600 shrink-0" />
+              <p className="text-sm font-bold text-orange-800">Part B will be evaluated manually and the combined scorecard will be shared later.</p>
+            </div>
+          ) : null}
 
           <div className="flex gap-4 max-w-lg mx-auto">
             <Button variant="outline" onClick={() => { setActiveQuestionIndex(0); setTestStep('review'); }} className="w-full font-bold border-primary text-primary hover:bg-primary/5 h-12 shadow-sm">
@@ -941,13 +973,18 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                 ) : currentQ.type === 'SUBJECTIVE' ? (
                   <div className="w-full max-w-2xl">
                     {currentResponse.fileUrl ? (
-                      <div className="h-32 border-2 border-primary/40 rounded-xl bg-primary/5 flex flex-col items-center justify-center text-primary text-sm relative group overflow-hidden">
+                      <div 
+                        className="h-32 border-2 border-primary/40 rounded-xl bg-primary/5 flex flex-col items-center justify-center text-primary text-sm relative group overflow-hidden cursor-pointer"
+                        onClick={() => testStep === 'review' ? window.open(currentResponse.fileUrl, '_blank') : null}
+                      >
                         <FileCheck2 className="w-8 h-8 mb-2" />
-                        <p className="font-bold">{currentResponse.fileUrl}</p>
+                        <p className="font-bold">{currentResponse.fileUrl.split('/').pop() || 'Uploaded File'}</p>
                         <p className="text-xs mt-1 opacity-70">Successfully attached</p>
-                        <label className="absolute inset-0 bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity backdrop-blur-sm">
-                          <span className="font-bold bg-white px-4 py-2 rounded-lg shadow-sm border border-primary/20 text-[#262626]">Replace File</span>
-                          <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, currentQ.id)} />
+                        <label className="absolute inset-0 bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm cursor-pointer">
+                          <span className="font-bold bg-white px-4 py-2 rounded-lg shadow-sm border border-primary/20 text-[#262626]">
+                            {testStep === 'review' ? 'View Uploaded File ↗' : 'Replace File'}
+                          </span>
+                          {testStep !== 'review' && <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, currentQ.id)} />}
                         </label>
                       </div>
                     ) : (
@@ -957,6 +994,39 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                         <p className="text-xs mt-1 font-medium">Supports JPG, PNG, PDF (Max 10MB)</p>
                         <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, currentQ.id)} />
                       </label>
+                    )}
+
+                    {testStep === 'review' && attemptDetails?.part_b_evaluation_status === 'completed' && (currentResponse.mentorComments || currentResponse.marksAwarded !== undefined) && (
+                      <div className="mt-6 p-6 bg-orange-50 border border-orange-200 rounded-xl shadow-sm">
+                        <div className="flex items-center justify-between mb-4 border-b border-orange-200 pb-4">
+                          <h4 className="font-bold text-orange-800 text-lg">Mentor Evaluation</h4>
+                          <div className="bg-white border border-orange-200 px-3 py-1 rounded-lg text-orange-600 font-bold">
+                            {currentResponse.marksAwarded} Marks
+                          </div>
+                        </div>
+                        <div className="space-y-4 text-sm text-orange-900">
+                          {currentResponse.mentorComments && (
+                            <div>
+                              <span className="font-bold opacity-70 uppercase tracking-wider text-[10px] block mb-1">Feedback & Comments</span>
+                              <p>{currentResponse.mentorComments}</p>
+                            </div>
+                          )}
+                          {currentResponse.mentorImprovements && (
+                            <div>
+                              <span className="font-bold opacity-70 uppercase tracking-wider text-[10px] block mb-1">Areas for Improvement</span>
+                              <p>{currentResponse.mentorImprovements}</p>
+                            </div>
+                          )}
+                          {currentResponse.mentorLoomLink && (
+                            <div>
+                              <span className="font-bold opacity-70 uppercase tracking-wider text-[10px] block mb-1">Video Review</span>
+                              <a href={currentResponse.mentorLoomLink} target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold inline-flex items-center gap-1">
+                                Watch Loom Recording ↗
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
                 ) : (

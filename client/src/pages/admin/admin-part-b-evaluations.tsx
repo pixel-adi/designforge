@@ -1,0 +1,468 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { Button } from "@/components/ui/button";
+import { Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, MessageSquare, Video, FileText } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+
+export default function AdminPartBEvaluations() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'pending' | 'draft' | 'completed'>('pending');
+  
+  // Data
+  const [attempts, setAttempts] = useState<any[]>([]);
+  const [evaluatingAttempt, setEvaluatingAttempt] = useState<any>(null);
+  
+  // Evaluation Details State
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [responses, setResponses] = useState<any[]>([]);
+  const [currentQIndex, setCurrentQIndex] = useState(0);
+  
+  // Form State for current question
+  const [evalForm, setEvalForm] = useState({
+    marks_awarded: "",
+    mentor_comments: "",
+    mentor_improvements: "",
+    mentor_loom_link: ""
+  });
+  
+  const [saving, setSaving] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  useEffect(() => {
+    fetchAttempts();
+  }, []);
+
+  const fetchAttempts = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('exam_attempts')
+        .select(`
+          *,
+          exam_candidates(name, unique_id, email),
+          exam_tests(title)
+        `)
+        .gt('part_b_answered', 0)
+        .order('completed_at', { ascending: false });
+        
+      if (error) throw error;
+      setAttempts(data || []);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadEvaluation = async (attempt: any) => {
+    setLoading(true);
+    setEvaluatingAttempt(attempt);
+    try {
+      // Get all Part B questions for this test
+      const { data: tqData } = await supabase.from('exam_test_questions').select('question_id').eq('test_id', attempt.test_id);
+      const questionIds = tqData?.map(t => t.question_id) || [];
+      
+      const { data: qData } = await supabase.from('exam_questions').select('*').in('id', questionIds).eq('part', 'B');
+      const partBQs = qData || [];
+      
+      // Sort questions so it's consistent
+      partBQs.sort((a, b) => a.id.localeCompare(b.id));
+      setQuestions(partBQs);
+      
+      // Get responses
+      const { data: rData } = await supabase.from('exam_responses').select('*').eq('attempt_id', attempt.id).in('question_id', partBQs.map(q => q.id));
+      
+      // We only care about questions they actually answered
+      const answeredResponses = (rData || []).filter(r => r.fileUrl !== null || r.answer_text !== null || r.file_url !== null);
+      
+      // Map to state
+      setResponses(answeredResponses);
+      setCurrentQIndex(0);
+      
+      if (answeredResponses.length > 0) {
+        populateForm(answeredResponses[0]);
+      }
+      
+    } catch (err: any) {
+      toast({ title: "Failed to load evaluation details", description: err.message, variant: "destructive" });
+      setEvaluatingAttempt(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const populateForm = (response: any) => {
+    if (!response) return;
+    setEvalForm({
+      marks_awarded: response.marks_awarded !== null ? response.marks_awarded.toString() : "",
+      mentor_comments: response.mentor_comments || "",
+      mentor_improvements: response.mentor_improvements || "",
+      mentor_loom_link: response.mentor_loom_link || ""
+    });
+  };
+
+  const saveCurrentQuestionDraft = async () => {
+    if (!evaluatingAttempt || responses.length === 0) return;
+    
+    const currentResponse = responses[currentQIndex];
+    if (!currentResponse) return;
+    
+    // Update local state
+    const updatedResponses = [...responses];
+    updatedResponses[currentQIndex] = {
+      ...currentResponse,
+      marks_awarded: evalForm.marks_awarded !== "" ? parseFloat(evalForm.marks_awarded) : null,
+      mentor_comments: evalForm.mentor_comments,
+      mentor_improvements: evalForm.mentor_improvements,
+      mentor_loom_link: evalForm.mentor_loom_link
+    };
+    setResponses(updatedResponses);
+    
+    // Save to DB
+    try {
+      await supabase.from('exam_responses').update({
+        marks_awarded: evalForm.marks_awarded !== "" ? parseFloat(evalForm.marks_awarded) : null,
+        mentor_comments: evalForm.mentor_comments || null,
+        mentor_improvements: evalForm.mentor_improvements || null,
+        mentor_loom_link: evalForm.mentor_loom_link || null
+      }).eq('id', currentResponse.id);
+      
+      // Update attempt status to draft if it was pending
+      if (evaluatingAttempt.part_b_evaluation_status === 'pending') {
+        await supabase.from('exam_attempts').update({ part_b_evaluation_status: 'draft' }).eq('id', evaluatingAttempt.id);
+        setEvaluatingAttempt({ ...evaluatingAttempt, part_b_evaluation_status: 'draft' });
+      }
+      
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleNextQuestion = async () => {
+    await saveCurrentQuestionDraft();
+    if (currentQIndex < responses.length - 1) {
+      setCurrentQIndex(currentQIndex + 1);
+      populateForm(responses[currentQIndex + 1]);
+    }
+  };
+
+  const handlePrevQuestion = async () => {
+    await saveCurrentQuestionDraft();
+    if (currentQIndex > 0) {
+      setCurrentQIndex(currentQIndex - 1);
+      populateForm(responses[currentQIndex - 1]);
+    }
+  };
+  
+  const submitCompleteEvaluation = async () => {
+    await saveCurrentQuestionDraft();
+    setSaving(true);
+    try {
+      // Calculate total score
+      let scorePartB = 0;
+      responses.forEach(r => {
+        if (r.marks_awarded) scorePartB += parseFloat(r.marks_awarded);
+      });
+      // Add the currently viewed one just in case state isn't synced yet
+      if (evalForm.marks_awarded !== "" && !isNaN(parseFloat(evalForm.marks_awarded))) {
+         // Replace the currently viewed one in the sum calculation
+         const currentRespId = responses[currentQIndex].id;
+         scorePartB = 0;
+         responses.forEach(r => {
+            if (r.id === currentRespId) scorePartB += parseFloat(evalForm.marks_awarded);
+            else if (r.marks_awarded) scorePartB += parseFloat(r.marks_awarded);
+         });
+      }
+      
+      const totalScore = (evaluatingAttempt.score_part_a || 0) + scorePartB;
+      
+      // Update attempt
+      await supabase.from('exam_attempts').update({
+        score_part_b: scorePartB,
+        total_score: totalScore,
+        part_b_evaluation_status: 'completed',
+        part_b_evaluated_at: new Date().toISOString()
+      }).eq('id', evaluatingAttempt.id);
+      
+      // Trigger email notification via Edge Function
+      try {
+        await supabase.functions.invoke('send-evaluation-email', {
+          body: {
+            email: evaluatingAttempt.exam_candidates.email,
+            candidateName: evaluatingAttempt.exam_candidates.name,
+            testTitle: evaluatingAttempt.exam_tests?.title || 'Exam',
+            score: totalScore.toFixed(2),
+            loginUrl: `${window.location.origin}/portal/dashboard`
+          }
+        });
+      } catch (err) {
+        console.error("Failed to trigger email notification", err);
+      }
+      
+      toast({ title: "Evaluation Complete!", description: `Candidate scored ${scorePartB} in Part B. Total Score: ${totalScore}. Email notification triggered.` });
+      
+      setShowConfirmModal(false);
+      setEvaluatingAttempt(null);
+      fetchAttempts();
+      
+    } catch (err: any) {
+      toast({ title: "Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading && !evaluatingAttempt) {
+    return <div className="flex items-center justify-center py-20 text-foreground/40"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  }
+
+  // -------------------------------------------------------------
+  // LIST VIEW
+  // -------------------------------------------------------------
+  if (!evaluatingAttempt) {
+    const filteredAttempts = attempts.filter(a => a.part_b_evaluation_status === activeTab || (!a.part_b_evaluation_status && activeTab === 'pending'));
+
+    return (
+      <div className="space-y-8 pb-12 animate-in fade-in duration-300">
+        <div>
+          <h1 className="text-2xl font-semibold text-[#262626]">Part B Evaluations</h1>
+          <p className="text-sm text-[#262626]/50 mt-1">Review and grade subjective candidate submissions.</p>
+        </div>
+
+        {/* Filters */}
+        <div className="flex gap-2 p-1 bg-black/5 rounded-xl w-fit">
+          <button 
+            onClick={() => setActiveTab('pending')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'pending' ? 'bg-white shadow-sm text-primary' : 'text-foreground/60 hover:text-foreground'}`}
+          >
+            Pending
+          </button>
+          <button 
+            onClick={() => setActiveTab('draft')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'draft' ? 'bg-white shadow-sm text-orange-600' : 'text-foreground/60 hover:text-foreground'}`}
+          >
+            Drafts
+          </button>
+          <button 
+            onClick={() => setActiveTab('completed')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'completed' ? 'bg-white shadow-sm text-green-600' : 'text-foreground/60 hover:text-foreground'}`}
+          >
+            Evaluated
+          </button>
+        </div>
+
+        <div className="bg-white rounded-xl border border-black/5 overflow-hidden shadow-sm">
+          <div className="grid grid-cols-12 gap-4 border-b border-black/5 p-4 bg-background/50 text-xs font-semibold text-foreground/50 uppercase tracking-widest hidden md:grid">
+            <div className="col-span-3">Candidate</div>
+            <div className="col-span-3">Test</div>
+            <div className="col-span-2">Submitted On</div>
+            <div className="col-span-2">Part A Score</div>
+            <div className="col-span-2 text-right">Action</div>
+          </div>
+          <div className="divide-y divide-black/5">
+            {filteredAttempts.map(attempt => (
+              <div key={attempt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center hover:bg-background/30 transition-colors text-sm">
+                <div className="col-span-3">
+                  <p className="font-semibold text-[#262626]">{attempt.exam_candidates?.name}</p>
+                  <p className="text-xs text-foreground/50">{attempt.exam_candidates?.unique_id}</p>
+                </div>
+                <div className="col-span-3 text-foreground/70 font-medium">{attempt.exam_tests?.title}</div>
+                <div className="col-span-2 text-foreground/60">
+                  {new Date(attempt.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </div>
+                <div className="col-span-2 font-bold text-green-600">
+                  {attempt.score_part_a} / {attempt.total_part_a}
+                </div>
+                <div className="col-span-2 flex justify-end">
+                  <Button 
+                    onClick={() => loadEvaluation(attempt)} 
+                    variant={activeTab === 'completed' ? "outline" : "default"}
+                    className={`h-8 font-bold text-xs ${activeTab === 'completed' ? '' : 'bg-primary text-white hover:bg-primary/90'}`}
+                  >
+                    {activeTab === 'completed' ? 'Edit Evaluation' : activeTab === 'draft' ? 'Resume Draft' : 'Evaluate'}
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {filteredAttempts.length === 0 && (
+              <div className="p-12 text-center text-foreground/40">
+                <PenTool className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>No attempts found in this category.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // SIDE-BY-SIDE EVALUATION VIEW
+  // -------------------------------------------------------------
+  
+  const currentResponse = responses[currentQIndex];
+  const currentQ = questions.find(q => q.id === currentResponse?.question_id);
+  const maxMarksPerQ = questions.length > 0 ? (100 / questions.length) : 0;
+  
+  // Find current marks sum for the confirmation modal
+  let currentSum = 0;
+  responses.forEach(r => {
+    if (r.id === currentResponse?.id) {
+       currentSum += evalForm.marks_awarded !== "" && !isNaN(parseFloat(evalForm.marks_awarded)) ? parseFloat(evalForm.marks_awarded) : 0;
+    } else {
+       if (r.marks_awarded) currentSum += parseFloat(r.marks_awarded);
+    }
+  });
+
+  return (
+    <div className="h-[calc(100vh-80px)] flex flex-col -m-6 animate-in fade-in duration-300">
+      {/* Top Nav */}
+      <div className="h-16 bg-white border-b border-black/5 flex items-center justify-between px-6 shrink-0 z-10 shadow-sm">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => { saveCurrentQuestionDraft(); setEvaluatingAttempt(null); }} className="text-foreground/60"><ArrowLeft className="w-4 h-4 mr-2" /> Back to List</Button>
+          <div className="h-6 w-px bg-black/10 mx-2" />
+          <h2 className="text-lg font-bold text-[#262626]">
+             {evaluatingAttempt.exam_candidates.name} <span className="text-foreground/40 font-normal ml-2">({evaluatingAttempt.exam_candidates.unique_id})</span>
+          </h2>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={() => { saveCurrentQuestionDraft(); toast({ title: "Draft Saved" }); }} className="font-bold border-orange-200 text-orange-600 hover:bg-orange-50">
+            Save Draft
+          </Button>
+          <Button onClick={() => setShowConfirmModal(true)} className="font-bold bg-green-600 text-white hover:bg-green-700">
+            Verify & Complete
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Side: Question & Candidate Upload */}
+        <div className="w-1/2 bg-[#F8F9FA] border-r border-black/5 flex flex-col overflow-y-auto custom-scrollbar p-8">
+          <div className="flex justify-between items-center mb-6">
+            <span className="bg-primary/10 text-primary px-3 py-1 rounded text-sm font-bold uppercase tracking-widest">Part B - Subjective</span>
+            <span className="text-sm font-bold text-foreground/50">Question {currentQIndex + 1} of {responses.length}</span>
+          </div>
+          
+          {currentQ && (
+            <div className="bg-white p-6 rounded-xl border border-black/5 shadow-sm mb-6">
+               <div className="text-lg text-[#262626] font-medium leading-relaxed flex items-start w-full [&_p]:inline" dangerouslySetInnerHTML={{ __html: (currentQ.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ').replace(/\n/g, '<br/>') }}></div>
+            </div>
+          )}
+          
+          <h3 className="font-bold text-sm text-foreground/50 uppercase tracking-widest mb-4">Candidate Submission</h3>
+          <div className="bg-white p-4 rounded-xl border border-black/5 shadow-sm flex-1 flex flex-col items-center justify-center min-h-[400px]">
+             {currentResponse?.file_url ? (
+               <img src={currentResponse.file_url} className="max-h-[600px] w-auto object-contain rounded-lg border border-black/10" alt="Candidate Submission" />
+             ) : currentResponse?.answer_text ? (
+               <div className="w-full h-full bg-background/50 rounded-lg p-6 border border-black/10 text-lg font-medium">
+                 {currentResponse.answer_text}
+               </div>
+             ) : (
+               <div className="text-foreground/40 flex flex-col items-center">
+                 <FileText className="w-12 h-12 mb-2 opacity-50" />
+                 <p className="font-medium text-lg">No file uploaded for this question.</p>
+               </div>
+             )}
+          </div>
+        </div>
+
+        {/* Right Side: Evaluation Form */}
+        <div className="w-1/2 bg-white flex flex-col overflow-y-auto custom-scrollbar p-8">
+           <h3 className="text-xl font-bold text-[#262626] mb-8 flex items-center gap-2"><PenTool className="w-5 h-5 text-primary" /> Evaluation Form</h3>
+           
+           <div className="space-y-8 flex-1">
+             {/* Marks Input */}
+             <div>
+               <label className="block text-sm font-bold text-foreground/70 mb-2">Marks Awarded</label>
+               <div className="flex items-center gap-4">
+                 <input 
+                   type="number" 
+                   value={evalForm.marks_awarded}
+                   onChange={e => {
+                     let val = e.target.value;
+                     if (parseFloat(val) > maxMarksPerQ) val = maxMarksPerQ.toString();
+                     setEvalForm({ ...evalForm, marks_awarded: val });
+                   }}
+                   className="w-32 h-14 border-2 border-primary/20 rounded-xl px-4 text-2xl font-bold bg-primary/5 focus:outline-none focus:border-primary text-primary"
+                   placeholder="0"
+                 />
+                 <span className="text-lg font-bold text-foreground/40">/ {maxMarksPerQ.toFixed(2)} Max</span>
+               </div>
+             </div>
+             
+             {/* Comments */}
+             <div>
+               <label className="flex items-center gap-2 text-sm font-bold text-foreground/70 mb-2"><MessageSquare className="w-4 h-4" /> Mentor Comments (Feedback)</label>
+               <textarea 
+                 value={evalForm.mentor_comments}
+                 onChange={e => setEvalForm({ ...evalForm, mentor_comments: e.target.value })}
+                 className="w-full h-32 border border-black/10 rounded-xl p-4 bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-sm resize-none"
+                 placeholder="Provide detailed feedback on what the candidate did well and what went wrong..."
+               />
+             </div>
+
+             {/* Improvements */}
+             <div>
+               <label className="flex items-center gap-2 text-sm font-bold text-foreground/70 mb-2"><CheckCircle2 className="w-4 h-4" /> Areas for Improvement</label>
+               <textarea 
+                 value={evalForm.mentor_improvements}
+                 onChange={e => setEvalForm({ ...evalForm, mentor_improvements: e.target.value })}
+                 className="w-full h-24 border border-black/10 rounded-xl p-4 bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-sm resize-none"
+                 placeholder="Specific tips on how to improve this sketch/answer..."
+               />
+             </div>
+
+             {/* Loom Link */}
+             <div>
+               <label className="flex items-center gap-2 text-sm font-bold text-foreground/70 mb-2"><Video className="w-4 h-4" /> Loom Video Link (Optional)</label>
+               <input 
+                 type="url"
+                 value={evalForm.mentor_loom_link}
+                 onChange={e => setEvalForm({ ...evalForm, mentor_loom_link: e.target.value })}
+                 className="w-full h-12 border border-black/10 rounded-xl px-4 bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-sm"
+                 placeholder="https://www.loom.com/share/..."
+               />
+             </div>
+           </div>
+           
+           {/* Navigation Bottom */}
+           <div className="border-t border-black/10 pt-6 mt-8 flex justify-between items-center shrink-0">
+             <Button variant="outline" onClick={handlePrevQuestion} disabled={currentQIndex === 0} className="shadow-sm font-bold h-12 px-6">
+               <ArrowLeft className="w-4 h-4 mr-2" /> Previous Question
+             </Button>
+             <Button onClick={handleNextQuestion} disabled={currentQIndex === responses.length - 1} className="bg-black text-white hover:bg-black/80 shadow-sm font-bold h-12 px-8">
+               Save & Next Question <ChevronRight className="w-4 h-4 ml-2" />
+             </Button>
+           </div>
+        </div>
+      </div>
+
+      {/* Confirmation Modal */}
+      <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-[#262626]">Complete Evaluation?</DialogTitle>
+            <DialogDescription className="text-foreground/70 font-medium pt-2">
+              You are about to finalize the evaluation for {evaluatingAttempt.exam_candidates.name}. An email will be dispatched to notify them of their score.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-green-50 border border-green-200 p-6 rounded-xl my-4 text-center">
+            <p className="text-sm font-bold text-green-800 uppercase tracking-widest mb-2">Final Part B Score</p>
+            <p className="text-5xl font-black text-green-600">{currentSum.toFixed(2)}</p>
+            <p className="text-xs font-bold text-green-700/60 mt-2">Total marks awarded across {responses.length} questions</p>
+          </div>
+          <DialogFooter className="mt-2">
+            <Button variant="outline" onClick={() => setShowConfirmModal(false)} className="w-full font-bold">
+              Cancel
+            </Button>
+            <Button onClick={submitCompleteEvaluation} disabled={saving} className="w-full font-bold bg-green-600 text-white hover:bg-green-700">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Yes, Complete Evaluation'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

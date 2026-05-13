@@ -30,6 +30,7 @@ const AdminRegistrations = lazy(() => import("@/pages/admin/admin-registrations"
 const AdminSubscribers = lazy(() => import("@/pages/admin/admin-subscribers"));
 const AdminExamQuestions = lazy(() => import("@/pages/admin/admin-exam-questions"));
 const AdminExamTests = lazy(() => import("@/pages/admin/admin-exam-tests"));
+const AdminPartBEvaluations = lazy(() => import("@/pages/admin/admin-part-b-evaluations"));
 const AdminUsers = lazy(() => import("@/pages/admin/admin-users"));
 
 // Candidate Portal
@@ -87,6 +88,9 @@ function Router() {
           </Route>
           <Route path="/admin/exam-tests">
             {() => <AdminLayout><AdminExamTests /></AdminLayout>}
+          </Route>
+          <Route path="/admin/part-b-evaluations">
+            {() => <AdminLayout><AdminPartBEvaluations /></AdminLayout>}
           </Route>
           <Route path="/admin/users">
             {() => <AdminLayout><AdminUsers /></AdminLayout>}

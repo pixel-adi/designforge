@@ -55,6 +55,7 @@ export default function AdminExamTests() {
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [testTitle, setTestTitle] = useState("");
   const [programFormat, setProgramFormat] = useState("bachelors");
+  const [expiresAt, setExpiresAt] = useState("");
   const [testSections, setTestSections] = useState<any[]>([]); // cloned from template so duration can be edited
   const [selectedQuestions, setSelectedQuestions] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
@@ -342,6 +343,7 @@ export default function AdminExamTests() {
       setSelectedTemplate(template);
       setTestTitle(testData.title);
       setProgramFormat(testData.program_format || template.programFormat || "bachelors");
+      setExpiresAt(testData.expires_at ? new Date(testData.expires_at).toISOString().slice(0, 16) : "");
       setEditingTestId(testId);
       
       const mergedSections = (sectionsData || []).map((sec: any) => {
@@ -387,7 +389,7 @@ export default function AdminExamTests() {
 
       if (editingTestId) {
         const { error: testErr } = await supabase.from('exam_tests').update({
-          title: testTitle, program_id: programId, status: publish ? 'published' : 'draft', program_format: programFormat
+          title: testTitle, program_id: programId, status: publish ? 'published' : 'draft', program_format: programFormat, expires_at: expiresAt || null
         }).eq('id', editingTestId);
         if (testErr) throw testErr;
 
@@ -396,7 +398,7 @@ export default function AdminExamTests() {
         await supabase.from('exam_test_questions').delete().eq('test_id', editingTestId);
       } else {
         const { data: testData, error: testErr } = await supabase.from('exam_tests').insert({
-          title: testTitle, program_id: programId, status: publish ? 'published' : 'draft', program_format: programFormat
+          title: testTitle, program_id: programId, status: publish ? 'published' : 'draft', program_format: programFormat, expires_at: expiresAt || null
         }).select().single();
         if (testErr) throw testErr;
         testRecordId = testData.id;
@@ -419,6 +421,7 @@ export default function AdminExamTests() {
       setCurrentStep('LIST');
       setSelectedTemplate(null);
       setTestTitle("");
+      setExpiresAt("");
       setSelectedQuestions([]);
     } catch (err: any) {
       toast({ title: "Failed", description: err.message, variant: "destructive" });
@@ -453,7 +456,7 @@ export default function AdminExamTests() {
                 <p className="text-sm font-medium text-foreground/60 mb-5">{t.description}</p>
               </div>
               <div className="flex flex-col gap-2">
-                <Button variant="outline" onClick={() => { setSelectedTemplate(t); setTestSections(JSON.parse(JSON.stringify(t.sections))); setEditingTestId(null); setTestTitle(""); setProgramFormat(t.programFormat || "bachelors"); setSelectedQuestions([]); setCurrentStep('BUILDER'); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
+                <Button variant="outline" onClick={() => { setSelectedTemplate(t); setTestSections(JSON.parse(JSON.stringify(t.sections))); setEditingTestId(null); setTestTitle(""); setExpiresAt(""); setProgramFormat(t.programFormat || "bachelors"); setSelectedQuestions([]); setCurrentStep('BUILDER'); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
                   <PlusCircle className="w-4 h-4" /> Build Manually
                 </Button>
                 <Button variant="outline" onClick={() => { setSelectedTemplate(t); setQuickGenOpen(true); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
@@ -564,6 +567,10 @@ export default function AdminExamTests() {
               <option value="masters">Masters (M.Des / CEED targets)</option>
               <option value="both">Both</option>
             </select>
+          </div>
+          <div>
+            <Label className="text-sm font-semibold">Expiry Date & Time (Optional)</Label>
+            <Input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="mt-1 h-10 bg-white" />
           </div>
         </div>
 

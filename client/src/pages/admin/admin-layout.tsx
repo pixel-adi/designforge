@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabaseClient";
-import { LayoutDashboard, Trophy, Calendar, BookOpen, Users, Mail, LogOut, Loader2, Menu, X, FileQuestion, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Trophy, Calendar, BookOpen, Users, Mail, LogOut, Loader2, Menu, X, FileQuestion, ClipboardList, PenTool } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { label: "Programs", href: "/admin/programs", icon: BookOpen },
   { label: "Exam Questions", href: "/admin/exam-questions", icon: FileQuestion },
   { label: "Exam Tests", href: "/admin/exam-tests", icon: ClipboardList },
+  { label: "Part B Evaluations", href: "/admin/part-b-evaluations", icon: PenTool },
   { label: "User Portal", href: "/admin/users", icon: Users },
   { label: "Registrations", href: "/admin/registrations", icon: Users },
   { label: "Subscribers", href: "/admin/subscribers", icon: Mail },

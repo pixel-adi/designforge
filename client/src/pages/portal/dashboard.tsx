@@ -26,6 +26,7 @@ export default function PortalDashboard() {
 
   // Dashboard Data
   const [activeTests, setActiveTests] = useState<any[]>([]);
+  const [candidateAttemptsMap, setCandidateAttemptsMap] = useState<Record<string, any>>({});
   const [activeTab, setActiveTab] = useState('overview');
   const [pastAttempts, setPastAttempts] = useState<any[]>([]);
   const [loadingAttempts, setLoadingAttempts] = useState(false);
@@ -75,7 +76,7 @@ export default function PortalDashboard() {
           education_level: candidateData.education_level || "bachelors"
         });
 
-        fetchDashboardData(candidateData.program_ids || [], candidateData.education_level || "bachelors");
+        fetchDashboardData(candidateData.program_ids || [], candidateData.education_level || "bachelors", candidateData.id);
       }
     } catch (err: any) {
       console.error(err);
@@ -85,7 +86,7 @@ export default function PortalDashboard() {
     }
   };
 
-  const fetchDashboardData = async (programIds: string[], educationLevel: string) => {
+  const fetchDashboardData = async (programIds: string[], educationLevel: string, candidateId: string) => {
     try {
       const { data: tests, error } = await supabase
         .from('exam_tests')
@@ -94,6 +95,11 @@ export default function PortalDashboard() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      const { data: attempts } = await supabase.from('exam_attempts').select('id, test_id, status').eq('candidate_id', candidateId);
+      const attemptMap: Record<string, any> = {};
+      (attempts || []).forEach(a => { attemptMap[a.test_id] = a; });
+      setCandidateAttemptsMap(attemptMap);
 
       const { data: allPrograms } = await supabase.from('exam_programs').select('id, name');
       const programsMap: Record<string, string> = {};
@@ -219,7 +225,7 @@ export default function PortalDashboard() {
       setCandidate(result.data);
       setShowOnboarding(false);
       toast({ title: "Success!", description: "Your profile has been saved." });
-      fetchDashboardData(result.data.program_ids, result.data.education_level || onboardingData.education_level);
+      fetchDashboardData(result.data.program_ids, result.data.education_level || onboardingData.education_level, result.data.id);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -380,14 +386,38 @@ export default function PortalDashboard() {
                         <FileText className="w-12 h-12 text-foreground/20 mx-auto mb-3" />
                         <p className="text-foreground/50 font-medium">No active tests available for your program at the moment.</p>
                       </div>
-                    ) : activeTests.map((test: any) => (
-                      <div key={test.id} className="bg-white border border-black/5 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
+                    ) : activeTests.map((test: any) => {
+                      const isExpired = test.expires_at ? new Date(test.expires_at).getTime() < Date.now() : false;
+                      const attempt = candidateAttemptsMap[test.id];
+                      const hasCompletedAttempt = attempt?.status === 'completed';
+                      
+                      let expiryText = "";
+                      if (test.expires_at) {
+                        if (isExpired) expiryText = "Expired";
+                        else {
+                          const diffHours = Math.round((new Date(test.expires_at).getTime() - Date.now()) / (1000 * 60 * 60));
+                          if (diffHours > 24) expiryText = `Expires in ${Math.round(diffHours / 24)} days`;
+                          else expiryText = `Expires in ${diffHours} hours`;
+                        }
+                      }
+
+                      return (
+                      <div key={test.id} className={`bg-white border border-black/5 p-6 rounded-2xl shadow-sm transition-shadow group flex flex-col justify-between ${isExpired && !hasCompletedAttempt ? 'opacity-70' : 'hover:shadow-md'}`}>
                         <div>
                           <div className="flex justify-between items-start mb-4">
                             <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
                               <FileText className="w-5 h-5" />
                             </div>
-                            <span className="bg-green-100 text-green-700 text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full">New</span>
+                            <div className="flex gap-2">
+                              {test.expires_at && (
+                                <span className={`${isExpired ? 'bg-gray-100 text-gray-600' : 'bg-orange-100 text-orange-700'} text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full`}>
+                                  {expiryText}
+                                </span>
+                              )}
+                              {!test.expires_at && !hasCompletedAttempt && (
+                                <span className="bg-green-100 text-green-700 text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full">New</span>
+                              )}
+                            </div>
                           </div>
                           <h3 className="font-bold text-lg text-[#262626] mb-2">{test.title}</h3>
 
@@ -403,14 +433,31 @@ export default function PortalDashboard() {
                           </div>
                         </div>
 
-                        <Button
-                          onClick={() => setLocation(`/portal/test/${test.id}`)}
-                          className="w-full bg-primary hover:bg-primary/90 text-white gap-2 group-hover:shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] transition-all"
-                        >
-                          Start Test <ChevronRight className="w-4 h-4" />
-                        </Button>
+                        {hasCompletedAttempt ? (
+                          <Button
+                            onClick={() => setLocation(`/portal/test/${test.id}?review_attempt=${attempt.id}`)}
+                            variant="outline"
+                            className="w-full border-primary text-primary hover:bg-primary/5 transition-all"
+                          >
+                            Review Attempt <ChevronRight className="w-4 h-4 ml-1" />
+                          </Button>
+                        ) : isExpired ? (
+                          <Button
+                            disabled
+                            className="w-full bg-gray-200 text-gray-500 cursor-not-allowed"
+                          >
+                            Missed Deadline
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => setLocation(`/portal/test/${test.id}`)}
+                            className="w-full bg-primary hover:bg-primary/90 text-white gap-2 group-hover:shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] transition-all"
+                          >
+                            Start Test <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
-                    ))}
+                    )})}
                   </div>
                 </section>
               )}
