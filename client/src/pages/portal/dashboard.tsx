@@ -568,11 +568,24 @@ export default function PortalDashboard() {
                               </div>
                               <div className="flex items-center gap-6">
                                 <div className="text-right hidden sm:block">
-                                  <p className="text-xs text-foreground/50 font-bold uppercase tracking-wider">Score</p>
-                                  {attempt.total_score !== null ? (
-                                    <p className={`font-bold text-xl text-primary`}>{attempt.total_score}</p>
-                                  ) : (
-                                    <p className={`font-bold text-xl ${scoreColor}`}>{scoreA}/{totalA}</p>
+                                  {totalA > 0 && (
+                                    <div className="text-xs font-semibold text-foreground/60 mb-0.5">
+                                      Part A: <span className={`font-bold ${scoreColor}`}>{scoreA}/{totalA}</span>
+                                    </div>
+                                  )}
+                                  {partBAns > 0 && (
+                                    <div className="text-xs font-semibold text-foreground/60 mb-0.5">
+                                      Part B: {attempt.part_b_evaluation_status === 'completed' ? (
+                                        <span className="font-bold text-green-600">{attempt.score_part_b}</span>
+                                      ) : (
+                                        <span className="font-bold text-orange-500">Pending</span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {attempt.total_score !== null && (
+                                    <div className="text-sm font-bold text-primary mt-1 border-t border-black/5 pt-1">
+                                      Total: {attempt.total_score}
+                                    </div>
                                   )}
                                 </div>
                                 <div className="px-3 py-1 bg-black/5 rounded-full text-xs font-bold text-foreground/70">Attempt {pastAttempts.length - i}</div>
@@ -580,17 +593,19 @@ export default function PortalDashboard() {
                             </div>
                           </AccordionTrigger>
                           <AccordionContent className="pt-4 pb-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              <div className="p-4 rounded-xl bg-white border border-black/5">
-                                <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
-                                  <span>Part A (Objective)</span>
-                                  <span className="text-primary">{scoreA} / {totalA}</span>
-                                </h5>
-                                <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
-                                  <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${partAPercent}%` }} />
+                            <div className={`grid grid-cols-1 ${totalA > 0 ? 'sm:grid-cols-2' : ''} gap-4`}>
+                              {totalA > 0 && (
+                                <div className="p-4 rounded-xl bg-white border border-black/5">
+                                  <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
+                                    <span>Part A (Objective)</span>
+                                    <span className="text-primary">{scoreA} / {totalA}</span>
+                                  </h5>
+                                  <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
+                                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${partAPercent}%` }} />
+                                  </div>
+                                  <p className="text-xs text-foreground/50 mt-2">{partAPercent}% accuracy on objective questions.</p>
                                 </div>
-                                <p className="text-xs text-foreground/50 mt-2">{partAPercent}% accuracy on objective questions.</p>
-                              </div>
+                              )}
                               <div className="p-4 rounded-xl bg-white border border-black/5 flex flex-col justify-between">
                                   <div>
                                     <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
