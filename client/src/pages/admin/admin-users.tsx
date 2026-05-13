@@ -3,9 +3,11 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Users, Edit, Save, X, Trash2 } from "lucide-react";
+import { Loader2, Edit, Save, X, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+const PAGE_SIZE = 50;
 
 export default function AdminUsers() {
   const { toast } = useToast();
@@ -14,18 +16,34 @@ export default function AdminUsers() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
   
-  const { data: candidates = [], isLoading: loading } = useQuery({
-    queryKey: ['admin-candidates'],
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ['admin-candidates', page, search],
     queryFn: async () => {
-      const { data, error } = await supabase.from('exam_candidates').select('*').order('created_at', { ascending: false });
+      let query = supabase
+        .from('exam_candidates')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      
+      if (search.trim()) {
+        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      }
+
+      const { data, error, count } = await query;
       if (error) {
         toast({ title: "Error loading candidates", description: error.message, variant: "destructive" });
         throw error;
       }
-      return data || [];
-    }
+      return { candidates: data || [], total: count || 0 };
+    },
+    placeholderData: (prev) => prev,
   });
+
+  const candidates = data?.candidates || [];
+  const totalPages = Math.ceil((data?.total || 0) / PAGE_SIZE);
   
 
   const startEdit = (candidate: any) => {
@@ -78,9 +96,22 @@ export default function AdminUsers() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300 pb-12">
-      <div>
-        <h1 className="text-2xl font-semibold text-[#262626]">User Portal (Candidates)</h1>
-        <p className="text-sm text-[#262626]/50 mt-1">Manage portal users, view their details, and assign target programs (B.Des / M.Des).</p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-[#262626]">User Portal (Candidates)</h1>
+          <p className="text-sm text-[#262626]/50 mt-1">Manage portal users, view their details, and assign target programs (B.Des / M.Des).</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Input
+            placeholder="Search by name or email…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(0); }}
+            className="h-9 w-64 text-sm"
+          />
+          {data?.total !== undefined && (
+            <span className="text-xs text-foreground/50 whitespace-nowrap">{data.total} candidates</span>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-black/10 overflow-hidden shadow-sm">
@@ -183,6 +214,33 @@ export default function AdminUsers() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <span className="text-xs text-foreground/50">
+            Page {page + 1} of {totalPages} &mdash; {data?.total} total
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline" size="sm"
+              disabled={page === 0 || loading}
+              onClick={() => setPage(p => p - 1)}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline" size="sm"
+              disabled={page >= totalPages - 1 || loading}
+              onClick={() => setPage(p => p + 1)}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,34 +2,51 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, MessageSquare, Video, FileText, Maximize, X } from "lucide-react";
+import { Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, ChevronLeft, MessageSquare, Video, FileText, Maximize, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+
+const PAGE_SIZE = 100;
 
 export default function AdminPartBEvaluations() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'pending' | 'draft' | 'completed'>('pending');
+  const [page, setPage] = useState(0);
   
-  // Data Fetching via React Query
-  const { data: attempts = [], isLoading: isLoadingAttempts } = useQuery({
-    queryKey: ['admin-part-b-attempts'],
+  // Data Fetching via React Query — paginated per tab
+  const { data: attemptsData, isLoading: isLoadingAttempts } = useQuery({
+    queryKey: ['admin-part-b-attempts', activeTab, page],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const statusFilter = activeTab === 'pending' ? null : activeTab;
+      let query = supabase
         .from('exam_attempts')
         .select(`
           *,
           exam_candidates(name, unique_id, email),
           exam_tests(title)
-        `)
+        `, { count: 'exact' })
         .gt('part_b_answered', 0)
-        .order('completed_at', { ascending: false });
+        .order('completed_at', { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
         
+      if (statusFilter) {
+        query = query.eq('part_b_evaluation_status', statusFilter);
+      } else {
+        // pending = null or 'pending'
+        query = query.or('part_b_evaluation_status.is.null,part_b_evaluation_status.eq.pending');
+      }
+      
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data || [];
-    }
+      return { attempts: data || [], total: count || 0 };
+    },
+    placeholderData: (prev) => prev,
   });
+
+  const attempts = attemptsData?.attempts || [];
+  const totalPages = Math.ceil((attemptsData?.total || 0) / PAGE_SIZE);
   const [evaluatingAttempt, setEvaluatingAttempt] = useState<any>(null);
   
   // Evaluation Details State
@@ -238,7 +255,8 @@ export default function AdminPartBEvaluations() {
   // LIST VIEW
   // -------------------------------------------------------------
   if (!evaluatingAttempt) {
-    const filteredAttempts = attempts.filter(a => a.part_b_evaluation_status === activeTab || (!a.part_b_evaluation_status && activeTab === 'pending'));
+    // Data is already filtered server-side per activeTab
+    const filteredAttempts = attempts;
 
     return (
       <div className="space-y-8 pb-12 animate-in fade-in duration-300">
@@ -250,22 +268,22 @@ export default function AdminPartBEvaluations() {
         {/* Filters */}
         <div className="flex gap-2 p-1 bg-black/5 rounded-xl w-fit">
           <button 
-            onClick={() => setActiveTab('pending')}
+            onClick={() => { setActiveTab('pending'); setPage(0); }}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'pending' ? 'bg-white shadow-sm text-primary' : 'text-foreground/60 hover:text-foreground'}`}
           >
-            Pending
+            Pending {activeTab === 'pending' && attemptsData?.total !== undefined && <span className="ml-1 text-xs opacity-60">({attemptsData.total})</span>}
           </button>
           <button 
-            onClick={() => setActiveTab('draft')}
+            onClick={() => { setActiveTab('draft'); setPage(0); }}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'draft' ? 'bg-white shadow-sm text-orange-600' : 'text-foreground/60 hover:text-foreground'}`}
           >
-            Drafts
+            Drafts {activeTab === 'draft' && attemptsData?.total !== undefined && <span className="ml-1 text-xs opacity-60">({attemptsData.total})</span>}
           </button>
           <button 
-            onClick={() => setActiveTab('completed')}
+            onClick={() => { setActiveTab('completed'); setPage(0); }}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'completed' ? 'bg-white shadow-sm text-green-600' : 'text-foreground/60 hover:text-foreground'}`}
           >
-            Evaluated
+            Evaluated {activeTab === 'completed' && attemptsData?.total !== undefined && <span className="ml-1 text-xs opacity-60">({attemptsData.total})</span>}
           </button>
         </div>
 
@@ -330,6 +348,23 @@ export default function AdminPartBEvaluations() {
             )}
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-foreground/50">
+              Page {page + 1} of {totalPages} &mdash; {attemptsData?.total} total
+            </span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={page === 0 || isLoadingAttempts} onClick={() => setPage(p => p - 1)} className="h-8 w-8 p-0">
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="sm" disabled={page >= totalPages - 1 || isLoadingAttempts} onClick={() => setPage(p => p + 1)} className="h-8 w-8 p-0">
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
