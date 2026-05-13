@@ -324,7 +324,7 @@ export default function AdminPartBEvaluations() {
   });
 
   return (
-    <div className="h-[calc(100vh-80px)] flex flex-col -m-6 animate-in fade-in duration-300">
+    <div className="absolute inset-0 z-20 bg-[#F8F9FA] flex flex-col animate-in fade-in duration-300">
       {/* Top Nav */}
       <div className="h-16 bg-white border-b border-black/5 flex items-center justify-between px-6 shrink-0 z-10 shadow-sm">
         <div className="flex items-center gap-4">
