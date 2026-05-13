@@ -5,30 +5,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Users, Edit, Save, X, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export default function AdminUsers() {
   const { toast } = useToast();
-  const [candidates, setCandidates] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    fetchCandidates();
-  }, []);
-
-  const fetchCandidates = async () => {
-    setLoading(true);
-    const { data, error } = await supabase.from('exam_candidates').select('*').order('created_at', { ascending: false });
-    if (error) {
-      toast({ title: "Error loading candidates", description: error.message, variant: "destructive" });
-    } else {
-      setCandidates(data || []);
+  
+  const { data: candidates = [], isLoading: loading } = useQuery({
+    queryKey: ['admin-candidates'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('exam_candidates').select('*').order('created_at', { ascending: false });
+      if (error) {
+        toast({ title: "Error loading candidates", description: error.message, variant: "destructive" });
+        throw error;
+      }
+      return data || [];
     }
-    setLoading(false);
-  };
+  });
+  
 
   const startEdit = (candidate: any) => {
     setEditingId(candidate.id);
@@ -55,7 +53,7 @@ export default function AdminUsers() {
       
       toast({ title: "Success", description: "Candidate updated successfully." });
       setEditingId(null);
-      fetchCandidates();
+      queryClient.invalidateQueries({ queryKey: ['admin-candidates'] });
     } catch (err: any) {
       toast({ title: "Update Failed", description: err.message, variant: "destructive" });
     } finally {
@@ -70,7 +68,7 @@ export default function AdminUsers() {
       const { error } = await supabase.from('exam_candidates').delete().eq('id', id);
       if (error) throw error;
       toast({ title: "Access Revoked", description: "Candidate has been permanently deleted." });
-      fetchCandidates();
+      queryClient.invalidateQueries({ queryKey: ['admin-candidates'] });
     } catch (err: any) {
       toast({ title: "Delete Failed", description: err.message, variant: "destructive" });
     }

@@ -1,17 +1,35 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, MessageSquare, Video, FileText, Maximize, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 
 export default function AdminPartBEvaluations() {
+  const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'pending' | 'draft' | 'completed'>('pending');
   
-  // Data
-  const [attempts, setAttempts] = useState<any[]>([]);
+  // Data Fetching via React Query
+  const { data: attempts = [], isLoading: isLoadingAttempts } = useQuery({
+    queryKey: ['admin-part-b-attempts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('exam_attempts')
+        .select(`
+          *,
+          exam_candidates(name, unique_id, email),
+          exam_tests(title)
+        `)
+        .gt('part_b_answered', 0)
+        .order('completed_at', { ascending: false });
+        
+      if (error) throw error;
+      return data || [];
+    }
+  });
   const [evaluatingAttempt, setEvaluatingAttempt] = useState<any>(null);
   
   // Evaluation Details State
@@ -38,31 +56,7 @@ export default function AdminPartBEvaluations() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchAttempts();
-  }, []);
-
-  const fetchAttempts = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('exam_attempts')
-        .select(`
-          *,
-          exam_candidates(name, unique_id, email),
-          exam_tests(title)
-        `)
-        .gt('part_b_answered', 0)
-        .order('completed_at', { ascending: false });
-        
-      if (error) throw error;
-      setAttempts(data || []);
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Note: fetchAttempts has been replaced by useQuery above
 
   const loadEvaluation = async (attempt: any) => {
     setLoading(true);
@@ -149,6 +143,11 @@ export default function AdminPartBEvaluations() {
       // Update attempt status to draft if it was pending
       if (evaluatingAttempt.part_b_evaluation_status === 'pending') {
         await supabase.from('exam_attempts').update({ part_b_evaluation_status: 'draft' }).eq('id', evaluatingAttempt.id);
+        
+        queryClient.setQueryData(['admin-part-b-attempts'], (old: any) => 
+          (old || []).map((a: any) => a.id === evaluatingAttempt.id ? { ...a, part_b_evaluation_status: 'draft' } : a)
+        );
+        
         setEvaluatingAttempt({ ...evaluatingAttempt, part_b_evaluation_status: 'draft' });
       }
       
@@ -222,7 +221,7 @@ export default function AdminPartBEvaluations() {
       
       setShowConfirmModal(false);
       setEvaluatingAttempt(null);
-      fetchAttempts();
+      queryClient.invalidateQueries({ queryKey: ['admin-part-b-attempts'] });
       
     } catch (err: any) {
       toast({ title: "Failed", description: err.message, variant: "destructive" });
@@ -231,7 +230,7 @@ export default function AdminPartBEvaluations() {
     }
   };
 
-  if (loading && !evaluatingAttempt) {
+  if (isLoadingAttempts && !evaluatingAttempt) {
     return <div className="flex items-center justify-center py-20 text-foreground/40"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   }
 
