@@ -22,6 +22,13 @@ export default function AdminPartBEvaluations() {
   // Form State for current question
   const [evalForm, setEvalForm] = useState({
     marks_awarded: "",
+    rubric_marks: {
+      critical_thinking: "",
+      ideation: "",
+      storytelling: "",
+      conceptualisation: "",
+      representation: ""
+    },
     mentor_comments: "",
     mentor_improvements: "",
     mentor_loom_link: ""
@@ -98,6 +105,13 @@ export default function AdminPartBEvaluations() {
     if (!response) return;
     setEvalForm({
       marks_awarded: response.marks_awarded !== null ? response.marks_awarded.toString() : "",
+      rubric_marks: response.rubric_marks || {
+        critical_thinking: "",
+        ideation: "",
+        storytelling: "",
+        conceptualisation: "",
+        representation: ""
+      },
       mentor_comments: response.mentor_comments || "",
       mentor_improvements: response.mentor_improvements || "",
       mentor_loom_link: response.mentor_loom_link || ""
@@ -115,6 +129,7 @@ export default function AdminPartBEvaluations() {
     updatedResponses[currentQIndex] = {
       ...currentResponse,
       marks_awarded: evalForm.marks_awarded !== "" ? parseFloat(evalForm.marks_awarded) : null,
+      rubric_marks: evalForm.rubric_marks,
       mentor_comments: evalForm.mentor_comments,
       mentor_improvements: evalForm.mentor_improvements,
       mentor_loom_link: evalForm.mentor_loom_link
@@ -125,6 +140,7 @@ export default function AdminPartBEvaluations() {
     try {
       await supabase.from('exam_responses').update({
         marks_awarded: evalForm.marks_awarded !== "" ? parseFloat(evalForm.marks_awarded) : null,
+        rubric_marks: evalForm.rubric_marks,
         mentor_comments: evalForm.mentor_comments || null,
         mentor_improvements: evalForm.mentor_improvements || null,
         mentor_loom_link: evalForm.mentor_loom_link || null
@@ -346,7 +362,7 @@ export default function AdminPartBEvaluations() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Side: Question & Candidate Upload */}
-        <div className="w-3/5 bg-[#F8F9FA] border-r border-black/5 flex flex-col overflow-y-auto custom-scrollbar p-6 lg:p-10">
+        <div className="w-[70%] bg-[#F8F9FA] border-r border-black/5 flex flex-col overflow-y-auto custom-scrollbar p-6 lg:p-10">
           <div className="flex justify-between items-center mb-4">
             <span className="bg-primary/10 text-primary px-3 py-1 rounded text-sm font-bold uppercase tracking-widest">Part B - Subjective</span>
             <span className="text-sm font-bold text-foreground/50">Question {currentQIndex + 1} of {responses.length}</span>
@@ -381,26 +397,56 @@ export default function AdminPartBEvaluations() {
         </div>
 
         {/* Right Side: Evaluation Form */}
-        <div className="w-2/5 bg-white flex flex-col overflow-y-auto custom-scrollbar p-6 lg:p-8">
+        <div className="w-[30%] bg-white flex flex-col overflow-y-auto custom-scrollbar p-6 lg:p-8">
            <h3 className="text-lg font-bold text-[#262626] mb-5 flex items-center gap-2"><PenTool className="w-5 h-5 text-primary" /> Evaluation Form</h3>
            
            <div className="space-y-5 flex-1">
-             {/* Marks Input */}
+             {/* Marks Input via Rubric */}
              <div>
-               <label className="block text-xs font-bold text-foreground/70 mb-1.5 uppercase tracking-wider">Marks Awarded</label>
-               <div className="flex items-center gap-3">
-                 <input 
-                   type="number" 
-                   value={evalForm.marks_awarded}
-                   onChange={e => {
-                     let val = e.target.value;
-                     if (parseFloat(val) > maxMarksPerQ) val = maxMarksPerQ.toString();
-                     setEvalForm({ ...evalForm, marks_awarded: val });
-                   }}
-                   className="w-24 h-12 border-2 border-primary/20 rounded-xl px-4 text-xl font-bold bg-primary/5 focus:outline-none focus:border-primary text-primary text-center"
-                   placeholder="0"
-                 />
-                 <span className="text-sm font-bold text-foreground/40">/ {maxMarksPerQ.toFixed(2)} Max</span>
+               <div className="flex items-center justify-between mb-3">
+                 <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider">Rubric Evaluation</label>
+                 <div className="text-right">
+                   <span className="text-lg font-black text-primary">{evalForm.marks_awarded || '0'}</span>
+                   <span className="text-xs font-bold text-foreground/40 ml-1">/ {maxMarksPerQ.toFixed(2)}</span>
+                 </div>
+               </div>
+               
+               <div className="grid grid-cols-2 gap-3">
+                 {[
+                   { key: 'critical_thinking', label: 'Critical Thinking' },
+                   { key: 'ideation', label: 'Ideation' },
+                   { key: 'storytelling', label: 'Storytelling' },
+                   { key: 'conceptualisation', label: 'Conceptualisation' },
+                   { key: 'representation', label: 'Representation' }
+                 ].map(criteria => (
+                   <div key={criteria.key} className="col-span-1">
+                     <label className="block text-[10px] font-bold text-foreground/60 mb-1">{criteria.label}</label>
+                     <div className="relative">
+                       <input 
+                         type="number" 
+                         value={(evalForm.rubric_marks as any)[criteria.key]}
+                         onChange={e => {
+                           const maxPerCriteria = maxMarksPerQ / 5;
+                           let val = e.target.value;
+                           if (parseFloat(val) > maxPerCriteria) val = maxPerCriteria.toString();
+                           
+                           const newRubric = { ...evalForm.rubric_marks, [criteria.key]: val };
+                           
+                           // Calculate total
+                           let sum = 0;
+                           Object.values(newRubric).forEach(v => {
+                             if (v !== "" && !isNaN(parseFloat(v as string))) sum += parseFloat(v as string);
+                           });
+                           
+                           setEvalForm({ ...evalForm, rubric_marks: newRubric, marks_awarded: sum.toString() });
+                         }}
+                         className="w-full h-9 border-2 border-primary/10 rounded-lg px-2 text-sm font-bold bg-primary/5 focus:outline-none focus:border-primary text-primary text-left [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                         placeholder="0"
+                       />
+                       <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-foreground/30 pointer-events-none">/ {(maxMarksPerQ / 5).toFixed(1)}</div>
+                     </div>
+                   </div>
+                 ))}
                </div>
              </div>
              
