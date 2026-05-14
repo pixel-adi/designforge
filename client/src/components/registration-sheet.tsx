@@ -232,15 +232,15 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
               </>
             )}
             {step === 2 && (
-              <>
-                <Button variant="ghost" className="mb-4 -ml-4 h-8 px-4 text-foreground/60 hover:text-foreground hover:bg-transparent" onClick={() => { setStep(1); setSubmitError(null); }}>
+              <div className="flex flex-col">
+                <Button variant="ghost" className="self-start -ml-2 mb-6 h-8 px-2 text-foreground/60 hover:text-foreground hover:bg-transparent" onClick={() => { setStep(1); setSubmitError(null); }}>
                   <ArrowLeft className="w-4 h-4 mr-2" /> Back to details
                 </Button>
                 <SheetTitle className="text-4xl font-heading tracking-tight text-[#262626]">Complete Payment</SheetTitle>
                 <SheetDescription className="text-base text-foreground/70 mt-3 leading-relaxed">
-                  You are registering for <span className="text-foreground font-medium">{watch('program')}</span>. Complete payment to secure your spot.
+                  You are registering for <strong className="text-foreground font-bold">{watch('program')}</strong>. Complete payment to secure your spot.
                 </SheetDescription>
-              </>
+              </div>
             )}
             {step === 3 && (
               <>
@@ -364,51 +364,53 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
               {/* Order Summary Card */}
-              <div className="bg-white rounded-2xl p-8 border border-border shadow-sm">
-                <h4 className="text-xl font-heading mb-6">Order Summary</h4>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-4 border-b border-border">
-                    <span className="text-foreground/60">Program</span>
-                    <span className="font-medium text-foreground">{watch('program')}</span>
+              <div className="bg-[#F8F9FA] rounded-2xl p-6 border border-black/5 shadow-sm">
+                <h4 className="text-lg font-bold text-foreground/80 mb-5 uppercase tracking-wider text-xs">Order Summary</h4>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-foreground/60 text-sm font-medium">Program</span>
+                    <span className="font-bold text-foreground text-sm">{watch('program')}</span>
                   </div>
-                  <div className="flex justify-between items-center pb-4 border-b border-border">
-                    <span className="text-foreground/60">Name</span>
-                    <span className="font-medium text-foreground">{watch('name')}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-foreground/60 text-sm font-medium">Name</span>
+                    <span className="font-bold text-foreground text-sm">{watch('name')}</span>
                   </div>
-                  <div className="flex justify-between items-center pb-4 border-b border-border">
-                    <span className="text-foreground/60">Email</span>
-                    <span className="font-medium text-foreground text-sm">{watch('email')}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-foreground/60 text-sm font-medium">Email</span>
+                    <span className="font-bold text-foreground text-sm">{watch('email')}</span>
                   </div>
                 </div>
               </div>
 
               {/* Payment Type Selection */}
               <div className="space-y-3">
-                <p className="text-sm font-medium text-foreground/80">Choose payment option</p>
-                <div className="grid grid-cols-2 gap-3">
+                <p className="text-xs font-bold text-foreground/80 uppercase tracking-wider">Choose payment option</p>
+                <div className="grid grid-cols-2 gap-4">
                   <button
                     type="button"
                     onClick={() => setPaymentType('full')}
-                    className={`p-4 rounded-xl border-2 text-left transition-all ${paymentType === 'full'
-                        ? 'border-primary bg-primary/5 shadow-sm'
-                        : 'border-border hover:border-primary/30'
+                    className={`p-5 rounded-2xl border-2 text-left transition-all relative overflow-hidden ${paymentType === 'full'
+                        ? 'border-primary bg-primary/5 shadow-md scale-[1.02]'
+                        : 'border-border bg-white hover:border-primary/30 hover:bg-gray-50'
                       }`}
                   >
-                    <p className="text-sm font-medium text-foreground/60 mb-1">One-time Payment</p>
-                    <p className="text-xl font-heading text-foreground">₹{ONE_TIME_PRICE.toLocaleString('en-IN')}</p>
-                    <p className="text-xs text-foreground/50 mt-1"><span className="line-through">₹{ORIGINAL_PRICE.toLocaleString('en-IN')}</span> — Save ₹{(ORIGINAL_PRICE - ONE_TIME_PRICE).toLocaleString('en-IN')}</p>
+                    {paymentType === 'full' && <div className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">SELECTED</div>}
+                    <p className="text-sm font-bold text-foreground/70 mb-2">One-time Payment</p>
+                    <p className="text-2xl font-black text-foreground mb-1">₹{ONE_TIME_PRICE.toLocaleString('en-IN')}</p>
+                    <p className="text-xs font-bold text-green-600"><span className="line-through text-foreground/30 mr-1">₹{ORIGINAL_PRICE.toLocaleString('en-IN')}</span> Save ₹{(ORIGINAL_PRICE - ONE_TIME_PRICE).toLocaleString('en-IN')}</p>
                   </button>
                   <button
                     type="button"
                     onClick={() => setPaymentType('installment')}
-                    className={`p-4 rounded-xl border-2 text-left transition-all ${paymentType === 'installment'
-                        ? 'border-primary bg-primary/5 shadow-sm'
-                        : 'border-border hover:border-primary/30'
+                    className={`p-5 rounded-2xl border-2 text-left transition-all relative overflow-hidden ${paymentType === 'installment'
+                        ? 'border-primary bg-primary/5 shadow-md scale-[1.02]'
+                        : 'border-border bg-white hover:border-primary/30 hover:bg-gray-50'
                       }`}
                   >
-                    <p className="text-sm font-medium text-foreground/60 mb-1">EMI / Installments</p>
-                    <p className="text-xl font-heading text-foreground">₹{INSTALLMENT_FIRST.toLocaleString('en-IN')}</p>
-                    <p className="text-xs text-foreground/50 mt-1">+ ₹{INSTALLMENT_SECOND.toLocaleString('en-IN')} due after 1 month</p>
+                    {paymentType === 'installment' && <div className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">SELECTED</div>}
+                    <p className="text-sm font-bold text-foreground/70 mb-2">EMI / Installments</p>
+                    <p className="text-2xl font-black text-foreground mb-1">₹{INSTALLMENT_FIRST.toLocaleString('en-IN')}</p>
+                    <p className="text-xs font-bold text-foreground/50">+ ₹{INSTALLMENT_SECOND.toLocaleString('en-IN')} due after 1 month</p>
                   </button>
                 </div>
               </div>
