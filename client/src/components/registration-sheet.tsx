@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,17 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
     }
   });
 
+  // Pre-load Razorpay script as soon as the drawer opens
+  useEffect(() => {
+    if (open && !document.getElementById('razorpay-checkout-js')) {
+      const script = document.createElement('script');
+      script.id = 'razorpay-checkout-js';
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, [open]);
+
   const onNextStep = async () => {
     const isStepValid = await trigger();
     if (isStepValid) {
@@ -58,23 +69,42 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
     setIsProcessing(true);
     setSubmitError(null);
     const formData = { ...watch() };
-    const amount = paymentType === 'full' ? ONE_TIME_PRICE : INSTALLMENT_FIRST;
+    
+    // Strict Phone Sanitization (strip all spaces, dashes, + signs to keep pure digits)
+    const sanitizedPhone = formData.phone.replace(/\D/g, "");
 
     try {
       // Step 1: Create Razorpay order via Edge Function
       setPaymentStep('creating');
-      const { data: rawResponse, error: fnError } = await supabase.functions.invoke('create-order', {
-        body: {
-          formData: {
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone.replace(/^\+/, ''),
-            program: formData.program,
-            stage: formData.stage,
+      
+      let rawResponse = null;
+      let fnError = null;
+
+      // 3-attempt auto-retry loop
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const result = await supabase.functions.invoke('create-order', {
+          body: {
+            formData: {
+              name: formData.name,
+              email: formData.email,
+              phone: sanitizedPhone,
+              program: formData.program,
+              stage: formData.stage,
+            },
+            paymentType
           },
-          paymentType
-        },
-      });
+        });
+
+        rawResponse = result.data;
+        fnError = result.error;
+
+        if (!fnError && rawResponse?.order_id) break; // Success!
+        
+        if (attempt < 3) {
+          console.warn(`Payment initiate attempt ${attempt} failed, retrying...`);
+          await new Promise(res => setTimeout(res, 1000 * attempt));
+        }
+      }
 
       console.log('Edge Function response:', { rawResponse, fnError });
 
@@ -94,19 +124,23 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
       // Step 2: Open Razorpay checkout
       setPaymentStep('redirecting');
       
-      const loadRazorpay = () => {
-        return new Promise((resolve) => {
-          const script = document.createElement('script');
-          script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-          script.onload = () => resolve(true);
-          script.onerror = () => resolve(false);
-          document.body.appendChild(script);
-        });
-      };
-
-      const isLoaded = await loadRazorpay();
+      // The script is already preloaded by useEffect, but wait for window object to be ready just in case
+      let isLoaded = !!(window as any).Razorpay;
       if (!isLoaded) {
-        setSubmitError('Failed to load payment gateway. Please check your internet connection.');
+        await new Promise<void>((resolve) => {
+          const check = setInterval(() => {
+            if ((window as any).Razorpay) {
+              clearInterval(check);
+              isLoaded = true;
+              resolve();
+            }
+          }, 200);
+          setTimeout(() => { clearInterval(check); resolve(); }, 4000); // 4 second timeout
+        });
+      }
+
+      if (!isLoaded) {
+        setSubmitError('Failed to load payment gateway. Please disable ad-blockers and try again.');
         setIsProcessing(false);
         setPaymentStep(null);
         return;

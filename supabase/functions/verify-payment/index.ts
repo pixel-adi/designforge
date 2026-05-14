@@ -37,6 +37,38 @@ serve(async (req) => {
       );
     }
 
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const signatureHeader = req.headers.get('x-razorpay-signature');
+    
+    // Path A: Server-to-Server Webhook (Guarantees data integrity if browser closes)
+    if (signatureHeader) {
+      const bodyText = await req.text();
+      const expectedWebhookSig = await hmacSha256(RAZORPAY_KEY_SECRET, bodyText);
+      
+      if (expectedWebhookSig !== signatureHeader) {
+        console.error("Webhook signature mismatch", { expected: expectedWebhookSig, received: signatureHeader });
+        return new Response("Invalid webhook signature", { status: 400 });
+      }
+
+      const payload = JSON.parse(bodyText);
+      if (payload.event === 'order.paid' || payload.event === 'payment.captured') {
+        const order_id = payload.payload.payment.entity.order_id;
+        if (order_id) {
+          const { error: updateError } = await supabase
+            .from("registrations")
+            .update({ payment_status: "paid" })
+            .eq("payment_id", order_id);
+          
+          if (updateError) console.error("Webhook DB Update Error:", updateError);
+        }
+      }
+      return new Response(JSON.stringify({ status: "webhook received" }), { status: 200, headers: corsHeaders });
+    }
+
+    // Path B: Client-side Verification (Instant UI feedback)
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = await req.json();
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -58,11 +90,6 @@ serve(async (req) => {
       );
     }
 
-    // Update registration in Supabase
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     const { error: updateError } = await supabase
       .from("registrations")
       .update({ payment_status: "paid" })
@@ -76,7 +103,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Razorpay Payment Verified: ${razorpay_order_id}`);
+    console.log(`Razorpay Payment Verified via Frontend: ${razorpay_order_id}`);
 
     return new Response(
       JSON.stringify({ status: "success" }),
