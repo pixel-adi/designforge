@@ -72,7 +72,7 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
             program: formData.program,
             stage: formData.stage,
           },
-          amount
+          paymentType
         },
       });
 

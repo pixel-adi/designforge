@@ -13,12 +13,28 @@ serve(async (req) => {
   }
 
   try {
-    const { formData, amount } = await req.json();
+    const { formData, paymentType } = await req.json();
 
     // Validate required fields
-    if (!formData || !formData.name || !formData.email || !formData.phone || !amount) {
+    if (!formData || !formData.name || !formData.email || !formData.phone || !paymentType) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // SECURITY: Calculate pricing securely on the backend instead of trusting the client
+    const ONE_TIME_PRICE = 20000;
+    const INSTALLMENT_FIRST = 12000;
+    
+    let amount = 0;
+    if (paymentType === 'full') {
+      amount = ONE_TIME_PRICE;
+    } else if (paymentType === 'installment') {
+      amount = INSTALLMENT_FIRST;
+    } else {
+      return new Response(
+        JSON.stringify({ error: "Invalid payment type" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
