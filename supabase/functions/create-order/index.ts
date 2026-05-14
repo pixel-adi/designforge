@@ -13,10 +13,10 @@ serve(async (req) => {
   }
 
   try {
-    const { registration_id, amount, customer_name, customer_email, customer_phone } = await req.json();
+    const { formData, amount } = await req.json();
 
     // Validate required fields
-    if (!registration_id || !amount || !customer_name || !customer_email || !customer_phone) {
+    if (!formData || !formData.name || !formData.email || !formData.phone || !amount) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -33,11 +33,13 @@ serve(async (req) => {
       );
     }
 
+    // Generate a receipt ID to use for the order creation
+    const receipt_id = crypto.randomUUID().substring(0, 40);
+
     // Razorpay uses Basic Auth: base64(key_id:key_secret)
     const basicAuth = btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
 
     // Create order with Razorpay
-    // Note: Razorpay amount is in smaller currency sub-unit (paise for INR). So multiply by 100.
     const razorpayResponse = await fetch(`https://api.razorpay.com/v1/orders`, {
       method: "POST",
       headers: {
@@ -47,11 +49,11 @@ serve(async (req) => {
       body: JSON.stringify({
         amount: Math.round(amount * 100), // amount in paise
         currency: "INR",
-        receipt: registration_id.substring(0, 40), // max length 40
+        receipt: receipt_id, // max length 40
         notes: {
-          customer_name,
-          customer_email,
-          customer_phone,
+          customer_name: formData.name,
+          customer_email: formData.email,
+          customer_phone: formData.phone,
         }
       }),
     });
@@ -68,15 +70,31 @@ serve(async (req) => {
 
     const order_id = razorpayData.id;
 
-    // Update registration with the Razorpay order ID
+    // Insert the registration into Supabase using the Service Role Key
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    await supabase
+    const { error: dbError } = await supabase
       .from("registrations")
-      .update({ payment_id: order_id, order_amount: amount })
-      .eq("id", registration_id);
+      .insert({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        program: formData.program,
+        stage: formData.stage,
+        payment_status: "pending",
+        payment_id: order_id,
+        order_amount: amount
+      });
+
+    if (dbError) {
+      console.error("Database insert error:", dbError);
+      return new Response(
+        JSON.stringify({ error: "Failed to save registration to database" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     return new Response(
       JSON.stringify({

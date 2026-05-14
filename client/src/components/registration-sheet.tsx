@@ -61,39 +61,18 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
     const amount = paymentType === 'full' ? ONE_TIME_PRICE : INSTALLMENT_FIRST;
 
     try {
-      // Step 1: Save registration to Supabase
-      setPaymentStep('saving');
-      // Generate ID client-side to avoid needing a SELECT policy for anon users
-      const registrationId = crypto.randomUUID();
-      const { error: regError } = await supabase
-        .from('registrations')
-        .insert({
-          id: registrationId,
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          program: formData.program,
-          stage: formData.stage,
-          payment_status: 'pending',
-        });
-
-      if (regError) {
-        console.error('Registration insert error:', regError);
-        setSubmitError('Could not save your registration. Please try again.');
-        setIsProcessing(false);
-        setPaymentStep(null);
-        return;
-      }
-
-      // Step 2: Create Razorpay order via Edge Function
+      // Step 1: Create Razorpay order via Edge Function
       setPaymentStep('creating');
       const { data: rawResponse, error: fnError } = await supabase.functions.invoke('create-order', {
         body: {
-          registration_id: registrationId,
-          amount,
-          customer_name: formData.name,
-          customer_email: formData.email,
-          customer_phone: formData.phone.replace(/^\+/, ''),
+          formData: {
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone.replace(/^\+/, ''),
+            program: formData.program,
+            stage: formData.stage,
+          },
+          amount
         },
       });
 
@@ -109,7 +88,7 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
         return;
       }
 
-      // Step 3: Open Razorpay checkout
+      // Step 2: Open Razorpay checkout
       setPaymentStep('redirecting');
       
       const loadRazorpay = () => {
