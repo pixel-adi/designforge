@@ -23,12 +23,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (!session) setLocation("/admin");
+        setLoading(false);
+      })
+      .catch(() => {
+        // Session fetch failed (network error etc.) — redirect to login
         setLocation("/admin");
-      }
-      setLoading(false);
-    });
+        setLoading(false);
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {

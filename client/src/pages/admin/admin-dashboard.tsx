@@ -19,20 +19,25 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchData = async () => {
-    const [regsRes, subsRes] = await Promise.all([
-      supabase.from("registrations").select("*").order("created_at", { ascending: false }),
-      supabase.from("subscribers").select("*", { count: "exact", head: true }),
-    ]);
+    try {
+      const [regsRes, subsRes] = await Promise.all([
+        supabase.from("registrations").select("*").order("created_at", { ascending: false }),
+        supabase.from("subscribers").select("*", { count: "exact", head: true }),
+      ]);
 
-    const regs = regsRes.data || [];
-    setStats({
-      totalRegistrations: regs.length,
-      paidRegistrations: regs.filter((r) => r.payment_status === "paid").length,
-      pendingPayments: regs.filter((r) => r.payment_status === "pending").length,
-      totalSubscribers: subsRes.count || 0,
-    });
-    setRecentRegistrations(regs.slice(0, 8));
-    setLoading(false);
+      const regs = regsRes.data || [];
+      setStats({
+        totalRegistrations: regs.length,
+        paidRegistrations: regs.filter((r) => r.payment_status === "paid").length,
+        pendingPayments: regs.filter((r) => r.payment_status === "pending").length,
+        totalSubscribers: subsRes.count || 0,
+      });
+      setRecentRegistrations(regs.slice(0, 8));
+    } catch (err) {
+      console.error("Dashboard fetchData error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const statCards = [
@@ -97,7 +102,9 @@ export default function AdminDashboard() {
                       {reg.payment_status}
                     </span>
                   </td>
-                  <td className="p-4 text-[#262626]/40 text-xs">{new Date(reg.created_at).toLocaleDateString()}</td>
+                  <td className="p-4 text-[#262626]/40 text-xs">
+                    {reg.created_at ? new Date(reg.created_at).toLocaleDateString() : '—'}
+                  </td>
                 </tr>
               ))}
               {recentRegistrations.length === 0 && (
