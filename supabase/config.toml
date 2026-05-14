@@ -385,7 +385,8 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 
 [functions.create-order]
 enabled = true
-verify_jwt = false
+verify_jwt = true
+import_map = "./functions/create-order/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/create-order/index.ts"
@@ -395,7 +396,8 @@ entrypoint = "./functions/create-order/index.ts"
 
 [functions.verify-payment]
 enabled = true
-verify_jwt = false
+verify_jwt = true
+import_map = "./functions/verify-payment/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/verify-payment/index.ts"
