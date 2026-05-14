@@ -32,9 +32,14 @@ export default function AdminWorkshops() {
   useEffect(() => { fetchWorkshops(); }, []);
 
   const fetchWorkshops = async () => {
-    const { data } = await supabase.from("workshops").select("*").order("display_order");
-    setWorkshops(data || []);
-    setLoading(false);
+    try {
+      const { data } = await supabase.from("workshops").select("*").order("display_order");
+      setWorkshops(data || []);
+    } catch (err) {
+      console.error("fetchWorkshops unexpected error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openNew = () => {

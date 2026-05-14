@@ -30,9 +30,14 @@ export default function AdminPrograms() {
   useEffect(() => { fetchPrograms(); }, []);
 
   const fetchPrograms = async () => {
-    const { data } = await supabase.from("programs").select("*").order("display_order");
-    setPrograms(data || []);
-    setLoading(false);
+    try {
+      const { data } = await supabase.from("programs").select("*").order("display_order");
+      setPrograms(data || []);
+    } catch (err) {
+      console.error("fetchPrograms unexpected error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openNew = () => {

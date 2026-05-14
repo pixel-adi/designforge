@@ -12,9 +12,14 @@ export default function AdminSubscribers() {
   useEffect(() => { fetchSubscribers(); }, []);
 
   const fetchSubscribers = async () => {
-    const { data } = await supabase.from("subscribers").select("*").order("created_at", { ascending: false });
-    setSubscribers(data || []);
-    setLoading(false);
+    try {
+      const { data } = await supabase.from("subscribers").select("*").order("created_at", { ascending: false });
+      setSubscribers(data || []);
+    } catch (err) {
+      console.error("fetchSubscribers unexpected error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const deleteSub = async (id: string) => {
@@ -90,7 +95,7 @@ export default function AdminSubscribers() {
                 <tr key={sub.id} className="border-b border-[#262626]/5 hover:bg-gray-50/50 transition-colors">
                   <td className="p-4 text-[#262626] font-medium">{sub.email}</td>
                   <td className="p-4 text-[#262626]/60">
-                    {new Date(sub.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}
+                    {sub.created_at ? new Date(sub.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) : '—'}
                   </td>
                   <td className="p-4 text-right">
                     <button onClick={() => deleteSub(sub.id)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors rounded">

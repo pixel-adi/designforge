@@ -13,9 +13,14 @@ export default function AdminRegistrations() {
   useEffect(() => { fetchRegistrations(); }, []);
 
   const fetchRegistrations = async () => {
-    const { data } = await supabase.from("registrations").select("*").order("created_at", { ascending: false });
-    setRegistrations(data || []);
-    setLoading(false);
+    try {
+      const { data } = await supabase.from("registrations").select("*").order("created_at", { ascending: false });
+      setRegistrations(data || []);
+    } catch (err) {
+      console.error("fetchRegistrations unexpected error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const exportCSV = () => {
@@ -112,7 +117,7 @@ export default function AdminRegistrations() {
                       <div>
                         <div className="font-medium text-[#262626] whitespace-nowrap">{reg.name}</div>
                         <div className="text-xs text-[#262626]/40 mt-0.5">
-                          {new Date(reg.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}
+                          {reg.created_at ? new Date(reg.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) : '—'}
                         </div>
                       </div>
                     </div>

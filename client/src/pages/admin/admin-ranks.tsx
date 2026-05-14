@@ -41,13 +41,15 @@ export default function AdminRanks() {
   useEffect(() => { fetchRanks(); }, []);
 
   const fetchRanks = async () => {
-    const { data, error } = await supabase.from("ranks").select("*").order("display_order");
-    if (error) {
-      console.error("Error fetching ranks:", error);
-      alert("Error loading ranks: " + error.message);
+    try {
+      const { data, error } = await supabase.from("ranks").select("*").order("display_order");
+      if (error) console.error("Error fetching ranks:", error);
+      setRanks(data || []);
+    } catch (err) {
+      console.error("fetchRanks unexpected error:", err);
+    } finally {
+      setLoading(false);
     }
-    setRanks(data || []);
-    setLoading(false);
   };
 
   const handleSaveRank = async () => {
