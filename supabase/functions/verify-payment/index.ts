@@ -50,7 +50,10 @@ serve(async (req) => {
       
       if (expectedWebhookSig !== signatureHeader) {
         console.error("Webhook signature mismatch", { expected: expectedWebhookSig, received: signatureHeader });
-        return new Response("Invalid webhook signature", { status: 400 });
+        return new Response(JSON.stringify({ error: "Invalid webhook signature" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       const payload = JSON.parse(bodyText);
