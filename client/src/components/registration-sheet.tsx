@@ -82,7 +82,10 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
 
       if (fnError || !orderResponse?.order_id || !orderResponse?.key_id) {
         console.error('Order creation error:', fnError, orderResponse);
-        setSubmitError('Could not initiate payment. Please try again or contact us.');
+        const errorMessage = orderResponse?.error 
+          ? (typeof orderResponse.error === 'string' ? orderResponse.error : JSON.stringify(orderResponse.error))
+          : (fnError?.message || 'Could not initiate payment. Please try again or contact us.');
+        setSubmitError(errorMessage);
         setIsProcessing(false);
         setPaymentStep(null);
         return;
