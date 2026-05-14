@@ -85,7 +85,7 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
         return;
       }
 
-      // Step 2: Create Cashfree order via Edge Function
+      // Step 2: Create Razorpay order via Edge Function
       setPaymentStep('creating');
       const { data: rawResponse, error: fnError } = await supabase.functions.invoke('create-order', {
         body: {
@@ -99,10 +99,9 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
 
       console.log('Edge Function response:', { rawResponse, fnError });
 
-      // supabase.functions.invoke may return data as-is or wrapped
       const orderResponse = typeof rawResponse === 'string' ? JSON.parse(rawResponse) : rawResponse;
 
-      if (fnError || !orderResponse?.payment_session_id) {
+      if (fnError || !orderResponse?.order_id || !orderResponse?.key_id) {
         console.error('Order creation error:', fnError, orderResponse);
         setSubmitError('Could not initiate payment. Please try again or contact us.');
         setIsProcessing(false);
@@ -110,33 +109,78 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
         return;
       }
 
-      // Step 3: Open Cashfree checkout
+      // Step 3: Open Razorpay checkout
       setPaymentStep('redirecting');
-      const { load: loadCashfree } = await import("@cashfreepayments/cashfree-js");
-      const cashfree = await loadCashfree({ mode: "production" });
-
-      const checkoutOptions = {
-        paymentSessionId: orderResponse.payment_session_id,
-        redirectTarget: "_modal" as const,
+      
+      const loadRazorpay = () => {
+        return new Promise((resolve) => {
+          const script = document.createElement('script');
+          script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+          script.onload = () => resolve(true);
+          script.onerror = () => resolve(false);
+          document.body.appendChild(script);
+        });
       };
 
-      const result = await cashfree.checkout(checkoutOptions);
-
-      if (result.error) {
-        console.error('Cashfree checkout error:', result.error);
-        setSubmitError('Payment was not completed. You can try again.');
+      const isLoaded = await loadRazorpay();
+      if (!isLoaded) {
+        setSubmitError('Failed to load payment gateway. Please check your internet connection.');
         setIsProcessing(false);
         setPaymentStep(null);
         return;
       }
 
-      if (result.paymentDetails) {
-        // Payment completed successfully
-        setStep(3);
-      }
+      const options = {
+        key: orderResponse.key_id, 
+        amount: orderResponse.amount, 
+        currency: "INR",
+        name: "Designforge",
+        description: formData.program + " Mentorship Registration",
+        order_id: orderResponse.order_id,
+        handler: async function (response: any) {
+          // Verify payment directly
+          setIsProcessing(true);
+          try {
+            const { error: verifyError } = await supabase.functions.invoke('verify-payment', {
+              body: {
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature
+              }
+            });
+            if (verifyError) throw verifyError;
+            setStep(3); // Payment successful
+          } catch (err) {
+            console.error('Verification error:', err);
+            setSubmitError('Payment successful but verification failed. We will update it manually.');
+          } finally {
+            setIsProcessing(false);
+          }
+        },
+        prefill: {
+          name: formData.name,
+          email: formData.email,
+          contact: formData.phone
+        },
+        theme: {
+          color: "#E23A25" // Designforge primary brand color roughly
+        },
+        modal: {
+          ondismiss: function() {
+            setIsProcessing(false);
+            setPaymentStep(null);
+            setSubmitError('Payment was cancelled.');
+          }
+        }
+      };
 
-      setIsProcessing(false);
-      setPaymentStep(null);
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (response: any) {
+        console.error("Razorpay payment failed:", response.error);
+        setSubmitError(`Payment failed: ${response.error.description}`);
+      });
+      rzp.open();
+
     } catch (err) {
       console.error('Unexpected error:', err);
       setSubmitError('Something went wrong. Please try again or contact us directly.');
@@ -392,7 +436,7 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
                   )}
                 </Button>
                 <p className="text-center text-sm text-foreground/50 mt-6 leading-relaxed">
-                  Secure payment powered by Cashfree. UPI, cards, and netbanking accepted.
+                  Secure payment powered by Razorpay. UPI, cards, and netbanking accepted.
                 </p>
                 {submitError && (
                   <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">

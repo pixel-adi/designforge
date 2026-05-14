@@ -23,56 +23,52 @@ serve(async (req) => {
       );
     }
 
-    const CASHFREE_APP_ID = Deno.env.get("CASHFREE_APP_ID");
-    const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_SECRET_KEY");
-    const CASHFREE_API_URL = Deno.env.get("CASHFREE_API_URL") || "https://api.cashfree.com";
+    const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID");
+    const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET");
 
-    if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
       return new Response(
-        JSON.stringify({ error: "Payment configuration error" }),
+        JSON.stringify({ error: "Payment configuration error (Razorpay keys missing)" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Generate a unique order ID
-    const order_id = `DF_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    // Razorpay uses Basic Auth: base64(key_id:key_secret)
+    const basicAuth = btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
 
-    // Create order with Cashfree
-    const cashfreeResponse = await fetch(`${CASHFREE_API_URL}/pg/orders`, {
+    // Create order with Razorpay
+    // Note: Razorpay amount is in smaller currency sub-unit (paise for INR). So multiply by 100.
+    const razorpayResponse = await fetch(`https://api.razorpay.com/v1/orders`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-client-id": CASHFREE_APP_ID,
-        "x-client-secret": CASHFREE_SECRET_KEY,
-        "x-api-version": "2023-08-01",
+        "Authorization": `Basic ${basicAuth}`,
       },
       body: JSON.stringify({
-        order_id,
-        order_amount: amount,
-        order_currency: "INR",
-        customer_details: {
-          customer_id: registration_id,
+        amount: Math.round(amount * 100), // amount in paise
+        currency: "INR",
+        receipt: registration_id.substring(0, 40), // max length 40
+        notes: {
           customer_name,
           customer_email,
           customer_phone,
-        },
-        order_meta: {
-          return_url: `${req.headers.get("origin") || "https://designforge.in"}/focus-batch?order_id=${order_id}&status={order_status}`,
-        },
+        }
       }),
     });
 
-    const cashfreeData = await cashfreeResponse.json();
+    const razorpayData = await razorpayResponse.json();
 
-    if (!cashfreeResponse.ok) {
-      console.error("Cashfree error:", cashfreeData);
+    if (!razorpayResponse.ok) {
+      console.error("Razorpay error:", razorpayData);
       return new Response(
-        JSON.stringify({ error: "Failed to create payment order", details: cashfreeData }),
+        JSON.stringify({ error: "Failed to create payment order", details: razorpayData }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Update registration with the Cashfree order ID
+    const order_id = razorpayData.id;
+
+    // Update registration with the Razorpay order ID
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -84,9 +80,9 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        payment_session_id: cashfreeData.payment_session_id,
-        order_id: cashfreeData.cf_order_id,
-        order_token: order_id,
+        order_id: order_id,
+        amount: razorpayData.amount, // returning paise amount back to frontend
+        key_id: RAZORPAY_KEY_ID // send key_id to frontend so we don't need it in VITE env vars
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

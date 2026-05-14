@@ -3,10 +3,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-signature, x-webhook-timestamp",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// HMAC-SHA256 using Web Crypto API (built into Deno, no external deps)
+// HMAC-SHA256 using Web Crypto API
 async function hmacSha256(key: string, message: string): Promise<string> {
   const encoder = new TextEncoder();
   const cryptoKey = await crypto.subtle.importKey(
@@ -17,7 +17,10 @@ async function hmacSha256(key: string, message: string): Promise<string> {
     ["sign"]
   );
   const signature = await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(message));
-  return btoa(String.fromCharCode(...new Uint8Array(signature)));
+  // Convert ArrayBuffer to Hex String
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 serve(async (req) => {
@@ -26,49 +29,33 @@ serve(async (req) => {
   }
 
   try {
-    const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_SECRET_KEY");
-    if (!CASHFREE_SECRET_KEY) {
+    const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET");
+    if (!RAZORPAY_KEY_SECRET) {
       return new Response(
-        JSON.stringify({ error: "Configuration error" }),
+        JSON.stringify({ error: "Configuration error (Razorpay secret missing)" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const rawBody = await req.text();
-    const timestamp = req.headers.get("x-webhook-timestamp") || "";
-    const receivedSignature = req.headers.get("x-webhook-signature") || "";
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = await req.json();
 
-    // Verify webhook signature
-    const signaturePayload = timestamp + rawBody;
-    const expectedSignature = await hmacSha256(CASHFREE_SECRET_KEY, signaturePayload);
-
-    if (receivedSignature !== expectedSignature) {
-      console.error("Webhook signature mismatch");
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return new Response(
-        JSON.stringify({ error: "Invalid signature" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const webhookData = JSON.parse(rawBody);
-    const { data } = webhookData;
-
-    if (!data || !data.order || !data.order.order_id) {
-      return new Response(
-        JSON.stringify({ error: "Invalid webhook payload" }),
+        JSON.stringify({ error: "Missing Razorpay verification payload" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const orderId = data.order.order_id;
-    const orderStatus = data.order.order_status;
+    // Verify Razorpay signature: HMAC_HEX(secret, order_id + "|" + payment_id)
+    const signaturePayload = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expectedSignature = await hmacSha256(RAZORPAY_KEY_SECRET, signaturePayload);
 
-    // Map Cashfree status to our status
-    let paymentStatus = "pending";
-    if (orderStatus === "PAID") {
-      paymentStatus = "paid";
-    } else if (orderStatus === "EXPIRED" || orderStatus === "CANCELLED" || orderStatus === "VOID") {
-      paymentStatus = "failed";
+    if (expectedSignature !== razorpay_signature) {
+      console.error("Razorpay signature mismatch", { expected: expectedSignature, received: razorpay_signature });
+      return new Response(
+        JSON.stringify({ error: "Invalid payment signature" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Update registration in Supabase
@@ -78,25 +65,25 @@ serve(async (req) => {
 
     const { error: updateError } = await supabase
       .from("registrations")
-      .update({ payment_status: paymentStatus })
-      .eq("payment_id", orderId);
+      .update({ payment_status: "paid" })
+      .eq("payment_id", razorpay_order_id);
 
     if (updateError) {
       console.error("Database update error:", updateError);
       return new Response(
-        JSON.stringify({ error: "Failed to update payment status" }),
+        JSON.stringify({ error: "Failed to update payment status in database" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`Payment ${orderId}: ${paymentStatus}`);
+    console.log(`Razorpay Payment Verified: ${razorpay_order_id}`);
 
     return new Response(
-      JSON.stringify({ status: "ok" }),
+      JSON.stringify({ status: "success" }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Webhook processing error:", error);
+    console.error("Verification processing error:", error);
     return new Response(
       JSON.stringify({ error: "Internal error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
