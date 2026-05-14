@@ -33,7 +33,7 @@ serve(async (req) => {
     if (!RAZORPAY_KEY_SECRET) {
       return new Response(
         JSON.stringify({ error: "Configuration error (Razorpay secret missing)" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -110,10 +110,11 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Verification processing error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Verification processing error:", message);
     return new Response(
-      JSON.stringify({ error: "Internal error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: `Server error: ${message}` }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
