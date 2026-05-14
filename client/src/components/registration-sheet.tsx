@@ -10,6 +10,25 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { supabase } from "@/lib/supabaseClient";
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+/** Call an Edge Function directly via fetch, bypassing the Supabase SDK wrapper
+ *  which converts all non-2xx responses to opaque FunctionsHttpError objects. */
+async function invokeEdgeFunction(name: string, body: unknown) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'apikey': SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  return { data, httpStatus: res.status };
+}
+
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").regex(/^[a-zA-Z\s]*$/, "Name can only contain letters and spaces"),
   email: z.string().email("Please enter a valid email address"),
@@ -77,13 +96,12 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
       // Step 1: Create Razorpay order via Edge Function
       setPaymentStep('creating');
       
-      let rawResponse = null;
-      let fnError = null;
+      let orderResponse: any = null;
 
-      // 3-attempt auto-retry loop
+      // 3-attempt auto-retry loop using raw fetch (bypasses SDK error wrapping)
       for (let attempt = 1; attempt <= 3; attempt++) {
-        const result = await supabase.functions.invoke('create-order', {
-          body: {
+        try {
+          const { data, httpStatus } = await invokeEdgeFunction('create-order', {
             formData: {
               name: formData.name,
               email: formData.email,
@@ -91,30 +109,26 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
               program: formData.program,
               stage: formData.stage,
             },
-            paymentType
-          },
-        });
+            paymentType,
+          });
 
-        rawResponse = result.data;
-        fnError = result.error;
+          console.log(`create-order attempt ${attempt} → HTTP ${httpStatus}:`, data);
+          orderResponse = data;
 
-        if (!fnError && rawResponse?.order_id) break; // Success!
-        
-        if (attempt < 3) {
-          console.warn(`Payment initiate attempt ${attempt} failed, retrying...`);
-          await new Promise(res => setTimeout(res, 1000 * attempt));
+          if (orderResponse?.order_id && orderResponse?.key_id) break; // ✅ success
+        } catch (fetchErr) {
+          console.warn(`create-order attempt ${attempt} fetch error:`, fetchErr);
+          orderResponse = null;
         }
+
+        if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
       }
 
-      console.log('Edge Function response:', { rawResponse, fnError });
-
-      const orderResponse = typeof rawResponse === 'string' ? JSON.parse(rawResponse) : rawResponse;
-
-      if (fnError || !orderResponse?.order_id || !orderResponse?.key_id) {
-        console.error('Order creation error:', fnError, orderResponse);
-        const errorMessage = orderResponse?.error 
+      if (!orderResponse?.order_id || !orderResponse?.key_id) {
+        const errorMessage = orderResponse?.error
           ? (typeof orderResponse.error === 'string' ? orderResponse.error : JSON.stringify(orderResponse.error))
-          : (fnError?.message || 'Could not initiate payment. Please try again or contact us.');
+          : 'Could not initiate payment. Please check your connection and try again.';
+        console.error('Order creation failed after retries:', orderResponse);
         setSubmitError(errorMessage);
         setIsProcessing(false);
         setPaymentStep(null);
@@ -154,41 +168,23 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
         description: formData.program + " Mentorship Registration",
         order_id: orderResponse.order_id,
         handler: async function (response: any) {
-          // Verify payment server-side
+          // Verify payment server-side via raw fetch
           setIsProcessing(true);
           try {
-            const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
-              body: {
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_order_id:   response.razorpay_order_id,
-                razorpay_signature:  response.razorpay_signature,
-              }
+            const { data: verifyData, httpStatus } = await invokeEdgeFunction('verify-payment', {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_signature:  response.razorpay_signature,
             });
-
-            // Check for Supabase-level transport error
-            if (verifyError) {
-              console.error('Verification transport error:', verifyError);
-              // Payment DID go through on Razorpay — don't show hard failure
-              setStep(3);
-              return;
-            }
-
-            // Check for application-level error returned inside the 200 body
-            if (verifyData?.error) {
-              console.error('Verification logic error:', verifyData.error);
-              // Signature mismatch or DB error — still advance user since Razorpay succeeded
-              // Webhook will update DB in background
-              setStep(3);
-              return;
-            }
-
-            setStep(3); // Payment verified successfully
+            console.log(`verify-payment → HTTP ${httpStatus}:`, verifyData);
+            if (verifyData?.error) console.error('Verification error:', verifyData.error);
           } catch (err) {
-            console.error('Verification exception:', err);
-            // Don't block user — payment was captured by Razorpay, webhook will sync DB
-            setStep(3);
+            console.error('Verification fetch error:', err);
           } finally {
+            // Always advance to success — Razorpay has captured the payment,
+            // webhook will update DB status in the background if needed.
             setIsProcessing(false);
+            setStep(3);
           }
         },
         prefill: {
