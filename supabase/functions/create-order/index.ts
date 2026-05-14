@@ -86,6 +86,9 @@ serve(async (req) => {
 
     const order_id = razorpayData.id;
 
+    // Backend phone sanitization just to be doubly safe
+    const safePhone = formData.phone ? formData.phone.replace(/\D/g, "") : "";
+
     // Insert the registration into Supabase using the Service Role Key
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -96,7 +99,7 @@ serve(async (req) => {
       .insert({
         name: formData.name,
         email: formData.email,
-        phone: formData.phone,
+        phone: safePhone,
         program: formData.program,
         stage: formData.stage,
         payment_status: "pending",
@@ -107,7 +110,7 @@ serve(async (req) => {
     if (dbError) {
       console.error("Database insert error:", dbError);
       return new Response(
-        JSON.stringify({ error: "Failed to save registration to database" }),
+        JSON.stringify({ error: `Registration failed: ${dbError.message || dbError.details || "Database error"}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
