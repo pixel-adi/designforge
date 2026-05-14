@@ -78,6 +78,11 @@ serve(async (req) => {
       return jsonOk({ error: "Missing required fields: name, email, phone, or paymentType" });
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return jsonOk({ error: "Invalid email address format" });
+    }
+
     // --- Phone sanitization ---
     const { digits: phone, error: phoneError } = sanitizePhone(formData.phone);
     if (phoneError) {
@@ -108,7 +113,7 @@ serve(async (req) => {
     const receipt_id = crypto.randomUUID().substring(0, 40);
     const basicAuth  = btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
 
-    console.log(`Creating Razorpay order | amount: ${amount} | phone: ${phone} | email: ${email}`);
+    console.log(`Creating Razorpay order | amount: ${amount}`);
 
     const razorpayResponse = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
