@@ -19,7 +19,7 @@ serve(async (req) => {
     if (!formData || !formData.name || !formData.email || !formData.phone || !paymentType) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -35,7 +35,7 @@ serve(async (req) => {
     } else {
       return new Response(
         JSON.stringify({ error: "Invalid payment type" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -45,7 +45,7 @@ serve(async (req) => {
     if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
       return new Response(
         JSON.stringify({ error: "Payment configuration error (Razorpay keys missing)" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -80,7 +80,7 @@ serve(async (req) => {
       console.error("Razorpay error:", razorpayData);
       return new Response(
         JSON.stringify({ error: "Failed to create payment order", details: razorpayData }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -111,7 +111,7 @@ serve(async (req) => {
       console.error("Database insert error:", dbError);
       return new Response(
         JSON.stringify({ error: `Registration failed: ${dbError.message || dbError.details || "Database error"}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

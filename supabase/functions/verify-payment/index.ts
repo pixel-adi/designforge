@@ -74,7 +74,7 @@ serve(async (req) => {
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return new Response(
         JSON.stringify({ error: "Missing Razorpay verification payload" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -86,7 +86,7 @@ serve(async (req) => {
       console.error("Razorpay signature mismatch", { expected: expectedSignature, received: razorpay_signature });
       return new Response(
         JSON.stringify({ error: "Invalid payment signature" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -99,7 +99,7 @@ serve(async (req) => {
       console.error("Database update error:", updateError);
       return new Response(
         JSON.stringify({ error: "Failed to update payment status in database" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
