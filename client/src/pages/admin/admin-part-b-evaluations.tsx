@@ -472,6 +472,7 @@ export default function AdminPartBEvaluations() {
                      <div className="relative">
                        <input 
                          type="number" 
+                         aria-label={`Score for ${criteria.label}`}
                          value={(evalForm.rubric_marks as any)[criteria.key]}
                          onChange={e => {
                            const maxPerCriteria = maxMarksPerQ / 5;
@@ -502,6 +503,7 @@ export default function AdminPartBEvaluations() {
              <div>
                <label className="flex items-center gap-1.5 text-xs font-bold text-foreground/70 mb-1.5 uppercase tracking-wider"><MessageSquare className="w-3.5 h-3.5" /> Mentor Comments</label>
                <textarea 
+                 aria-label="Mentor Comments"
                  value={evalForm.mentor_comments}
                  onChange={e => setEvalForm({ ...evalForm, mentor_comments: e.target.value })}
                  className="w-full h-24 border border-black/10 rounded-xl p-3 bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-sm resize-none"
@@ -513,6 +515,7 @@ export default function AdminPartBEvaluations() {
              <div>
                <label className="flex items-center gap-1.5 text-xs font-bold text-foreground/70 mb-1.5 uppercase tracking-wider"><CheckCircle2 className="w-3.5 h-3.5" /> Areas for Improvement</label>
                <textarea 
+                 aria-label="Areas for Improvement"
                  value={evalForm.mentor_improvements}
                  onChange={e => setEvalForm({ ...evalForm, mentor_improvements: e.target.value })}
                  className="w-full h-20 border border-black/10 rounded-xl p-3 bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-sm resize-none"
@@ -525,6 +528,7 @@ export default function AdminPartBEvaluations() {
                <label className="flex items-center gap-1.5 text-xs font-bold text-foreground/70 mb-1.5 uppercase tracking-wider"><Video className="w-3.5 h-3.5" /> Loom Video Link (Optional)</label>
                <input 
                  type="url"
+                 aria-label="Loom Video Link"
                  value={evalForm.mentor_loom_link}
                  onChange={e => setEvalForm({ ...evalForm, mentor_loom_link: e.target.value })}
                  className="w-full h-10 border border-black/10 rounded-xl px-3 bg-[#F8F9FA] focus:bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-sm"

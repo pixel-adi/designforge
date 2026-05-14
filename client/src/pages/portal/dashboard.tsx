@@ -9,6 +9,7 @@ import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, 
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 
 export default function PortalDashboard() {
@@ -286,7 +287,48 @@ export default function PortalDashboard() {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex">
+        <div className="w-64 bg-white border-r border-black/5 flex flex-col hidden md:flex sticky top-0 h-screen">
+          <div className="p-6 border-b border-black/5">
+            <Skeleton className="h-8 w-32" />
+          </div>
+          <div className="p-4 space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="mt-auto p-4 border-t border-black/5">
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-10 h-10 rounded-full" />
+              <div className="flex-col gap-2">
+                <Skeleton className="h-4 w-24 mb-1" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="h-16 bg-white border-b border-black/5 px-6 flex items-center md:hidden">
+            <Skeleton className="h-8 w-32" />
+          </div>
+          <div className="p-6 md:p-10 max-w-6xl mx-auto w-full space-y-8">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-4 w-96" />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <Skeleton className="h-[200px] w-full rounded-2xl" />
+                <Skeleton className="h-[200px] w-full rounded-2xl" />
+              </div>
+              <div className="space-y-6">
+                <Skeleton className="h-[300px] w-full rounded-2xl" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -7,6 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ScrollToTop } from "@/components/scroll-to-top";
 import { SecurityGuard } from "@/components/security-guard";
 
+import { ErrorBoundary } from "@/components/error-boundary";
+
 // Lazy-loaded pages — each becomes its own chunk
 const Home = lazy(() => import("@/pages/home"));
 const Mentorship = lazy(() => import("@/pages/mentorship"));
@@ -48,21 +50,22 @@ function Router() {
         </div>
       }>
         <Switch>
+          {/* Public Routes */}
           <Route path="/" component={Home} />
-          <Route path="/about" component={AboutPage} />
-          <Route path="/apprenticeship" component={ApprenticeshipPage} />
-          <Route path="/join-us" component={JoinUsPage} />
           <Route path="/mentorship" component={Mentorship} />
           <Route path="/community" component={Community} />
           <Route path="/focus-batch" component={FocusBatchPage} />
+          <Route path="/about" component={AboutPage} />
+          <Route path="/join-us" component={JoinUsPage} />
+          <Route path="/apprenticeship" component={ApprenticeshipPage} />
           <Route path="/privacy-policy" component={PrivacyPolicy} />
           <Route path="/terms-of-service" component={TermsOfService} />
-          
+
           {/* Candidate Portal */}
           <Route path="/portal/login" component={PortalLogin} />
           <Route path="/portal/dashboard" component={PortalDashboard} />
           <Route path="/portal/test/:id" component={PortalTestEngine} />
-          
+
           {/* Admin Routes */}
           <Route path="/admin" component={AdminLogin} />
           <Route path="/admin/dashboard">
@@ -106,13 +109,15 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <SecurityGuard />
-        <Toaster />
-        <Router />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <SecurityGuard />
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

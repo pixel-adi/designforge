@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert, WifiOff } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -47,6 +47,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   const [timeLeft, setTimeLeft] = useState(0); // in seconds
   const [timerRunning, setTimerRunning] = useState(false);
 
+  // Network State
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
   // Security State
   const [warningsCount, setWarningsCount] = useState(0);
   const MAX_WARNINGS = 3;
@@ -76,6 +79,17 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       setLocation('/portal/dashboard');
     }
   }, [id]);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     if (engineData && !loading) {
@@ -882,7 +896,13 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   const totalQuestions = engineData.questions.length;
 
   return (
-    <div className="h-screen overflow-hidden bg-[#F8F9FA] flex flex-col select-none">
+    <div className="h-screen overflow-hidden bg-[#F8F9FA] flex flex-col select-none relative">
+      {!isOnline && (
+        <div className="absolute top-0 left-0 w-full z-50 bg-red-500 text-white p-2 flex justify-center items-center gap-2 font-bold shadow-md animate-in slide-in-from-top-full">
+          <WifiOff className="w-5 h-5" />
+          You are offline. Auto-save paused. Do not refresh or exit.
+        </div>
+      )}
       {/* Top Bar */}
       <div className="h-16 bg-white border-b border-black/5 flex items-center justify-between px-6 sticky top-0 z-10 shadow-sm shrink-0">
         <div className="flex items-center gap-4">
