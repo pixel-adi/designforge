@@ -26,6 +26,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      const message = this.state.error?.message || "Unknown error";
+      const isDev = import.meta.env.DEV;
       return (
         <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-black/5 p-8">
@@ -33,10 +35,15 @@ export class ErrorBoundary extends Component<Props, State> {
               <AlertTriangle className="w-8 h-8" />
             </div>
             <h1 className="text-2xl font-semibold text-[#262626] mb-3">Something went wrong</h1>
-            <p className="text-sm text-foreground/60 mb-8 leading-relaxed">
+            <p className="text-sm text-foreground/60 mb-4 leading-relaxed">
               We've encountered an unexpected error. Please try refreshing the page or returning home.
             </p>
-            <div className="flex flex-col gap-3">
+            {isDev && (
+              <pre className="text-left text-xs bg-red-50 text-red-700 rounded-lg p-3 mb-6 overflow-auto max-h-32 whitespace-pre-wrap break-all">
+                {message}
+              </pre>
+            )}
+            <div className="flex flex-col gap-3 mt-4">
               <button 
                 onClick={() => window.location.reload()}
                 className="w-full flex items-center justify-center gap-2 h-11 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-colors"

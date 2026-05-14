@@ -1,4 +1,5 @@
 import { Suspense, lazy } from "react";
+import React from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -6,7 +7,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ScrollToTop } from "@/components/scroll-to-top";
 import { SecurityGuard } from "@/components/security-guard";
-
 import { ErrorBoundary } from "@/components/error-boundary";
 
 // Lazy-loaded pages — each becomes its own chunk
@@ -40,84 +40,92 @@ const PortalLogin = lazy(() => import("@/pages/portal/login"));
 const PortalDashboard = lazy(() => import("@/pages/portal/dashboard"));
 const PortalTestEngine = lazy(() => import("@/pages/portal/test-engine"));
 
-function Router() {
+// Per-route wrapper — each page gets its own ErrorBoundary so one crash
+// doesn't bring down the entire app, just that single page.
+function PageWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <>
-      <ScrollToTop />
+    <ErrorBoundary>
       <Suspense fallback={
         <div className="min-h-screen flex items-center justify-center">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       }>
-        <Switch>
-          {/* Public Routes */}
-          <Route path="/" component={Home} />
-          <Route path="/mentorship" component={Mentorship} />
-          <Route path="/community" component={Community} />
-          <Route path="/focus-batch" component={FocusBatchPage} />
-          <Route path="/about" component={AboutPage} />
-          <Route path="/join-us" component={JoinUsPage} />
-          <Route path="/apprenticeship" component={ApprenticeshipPage} />
-          <Route path="/privacy-policy" component={PrivacyPolicy} />
-          <Route path="/terms-of-service" component={TermsOfService} />
-
-          {/* Candidate Portal */}
-          <Route path="/portal/login" component={PortalLogin} />
-          <Route path="/portal/dashboard" component={PortalDashboard} />
-          <Route path="/portal/test/:id" component={PortalTestEngine} />
-
-          {/* Admin Routes */}
-          <Route path="/admin" component={AdminLogin} />
-          <Route path="/admin/dashboard">
-            {() => <AdminLayout><AdminDashboard /></AdminLayout>}
-          </Route>
-          <Route path="/admin/ranks">
-            {() => <AdminLayout><AdminRanks /></AdminLayout>}
-          </Route>
-          <Route path="/admin/workshops">
-            {() => <AdminLayout><AdminWorkshops /></AdminLayout>}
-          </Route>
-          <Route path="/admin/programs">
-            {() => <AdminLayout><AdminPrograms /></AdminLayout>}
-          </Route>
-          <Route path="/admin/registrations">
-            {() => <AdminLayout><AdminRegistrations /></AdminLayout>}
-          </Route>
-          <Route path="/admin/subscribers">
-            {() => <AdminLayout><AdminSubscribers /></AdminLayout>}
-          </Route>
-          <Route path="/admin/exam-questions">
-            {() => <AdminLayout><AdminExamQuestions /></AdminLayout>}
-          </Route>
-          <Route path="/admin/exam-tests">
-            {() => <AdminLayout><AdminExamTests /></AdminLayout>}
-          </Route>
-          <Route path="/admin/part-b-evaluations">
-            {() => <AdminLayout><AdminPartBEvaluations /></AdminLayout>}
-          </Route>
-          <Route path="/admin/users">
-            {() => <AdminLayout><AdminUsers /></AdminLayout>}
-          </Route>
-
-          {/* Fallback to 404 */}
-          <Route component={NotFound} />
-        </Switch>
+        {children}
       </Suspense>
+    </ErrorBoundary>
+  );
+}
+
+function Router() {
+  return (
+    <>
+      <ScrollToTop />
+      <Switch>
+        {/* Public Routes */}
+        <Route path="/">{() => <PageWrapper><Home /></PageWrapper>}</Route>
+        <Route path="/mentorship">{() => <PageWrapper><Mentorship /></PageWrapper>}</Route>
+        <Route path="/community">{() => <PageWrapper><Community /></PageWrapper>}</Route>
+        <Route path="/focus-batch">{() => <PageWrapper><FocusBatchPage /></PageWrapper>}</Route>
+        <Route path="/about">{() => <PageWrapper><AboutPage /></PageWrapper>}</Route>
+        <Route path="/join-us">{() => <PageWrapper><JoinUsPage /></PageWrapper>}</Route>
+        <Route path="/apprenticeship">{() => <PageWrapper><ApprenticeshipPage /></PageWrapper>}</Route>
+        <Route path="/privacy-policy">{() => <PageWrapper><PrivacyPolicy /></PageWrapper>}</Route>
+        <Route path="/terms-of-service">{() => <PageWrapper><TermsOfService /></PageWrapper>}</Route>
+
+        {/* Candidate Portal */}
+        <Route path="/portal/login">{() => <PageWrapper><PortalLogin /></PageWrapper>}</Route>
+        <Route path="/portal/dashboard">{() => <PageWrapper><PortalDashboard /></PageWrapper>}</Route>
+        <Route path="/portal/test/:id">{() => <PageWrapper><PortalTestEngine /></PageWrapper>}</Route>
+
+        {/* Admin Routes */}
+        <Route path="/admin">{() => <PageWrapper><AdminLogin /></PageWrapper>}</Route>
+        <Route path="/admin/dashboard">
+          {() => <PageWrapper><AdminLayout><AdminDashboard /></AdminLayout></PageWrapper>}
+        </Route>
+        <Route path="/admin/ranks">
+          {() => <PageWrapper><AdminLayout><AdminRanks /></AdminLayout></PageWrapper>}
+        </Route>
+        <Route path="/admin/workshops">
+          {() => <PageWrapper><AdminLayout><AdminWorkshops /></AdminLayout></PageWrapper>}
+        </Route>
+        <Route path="/admin/programs">
+          {() => <PageWrapper><AdminLayout><AdminPrograms /></AdminLayout></PageWrapper>}
+        </Route>
+        <Route path="/admin/registrations">
+          {() => <PageWrapper><AdminLayout><AdminRegistrations /></AdminLayout></PageWrapper>}
+        </Route>
+        <Route path="/admin/subscribers">
+          {() => <PageWrapper><AdminLayout><AdminSubscribers /></AdminLayout></PageWrapper>}
+        </Route>
+        <Route path="/admin/exam-questions">
+          {() => <PageWrapper><AdminLayout><AdminExamQuestions /></AdminLayout></PageWrapper>}
+        </Route>
+        <Route path="/admin/exam-tests">
+          {() => <PageWrapper><AdminLayout><AdminExamTests /></AdminLayout></PageWrapper>}
+        </Route>
+        <Route path="/admin/part-b-evaluations">
+          {() => <PageWrapper><AdminLayout><AdminPartBEvaluations /></AdminLayout></PageWrapper>}
+        </Route>
+        <Route path="/admin/users">
+          {() => <PageWrapper><AdminLayout><AdminUsers /></AdminLayout></PageWrapper>}
+        </Route>
+
+        {/* Fallback to 404 */}
+        <Route>{() => <PageWrapper><NotFound /></PageWrapper>}</Route>
+      </Switch>
     </>
   );
 }
 
 function App() {
   return (
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <SecurityGuard />
-          <Toaster />
-          <Router />
-        </TooltipProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <SecurityGuard />
+        <Toaster />
+        <Router />
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 
