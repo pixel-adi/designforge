@@ -1,3 +1,8 @@
 {
-    "workbench.colorTheme": "Default Dark+"
+    "workbench.colorTheme": "Default Dark+",
+    "deno.enable": false,
+    "deno.enablePaths": [
+        "supabase/functions"
+    ],
+    "deno.unstable": true
 }
