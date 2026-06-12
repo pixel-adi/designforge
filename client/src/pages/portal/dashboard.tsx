@@ -160,7 +160,8 @@ export default function PortalDashboard() {
         .from('exam_attempts')
         .select(`id, score_part_a, total_part_a, score_part_b, total_score, part_b_evaluation_status, candidate_id, test_id, exam_candidates!inner(name, avatar_url, education_level), exam_tests!inner(title, program_format)`)
         .eq('status', 'completed')
-        .order('total_score', { ascending: false });
+        .order('total_score', { ascending: false, nullsFirst: false })
+        .order('score_part_a', { ascending: false, nullsFirst: false });
 
       if (leaderboardFilterTestId !== 'all') {
          query = query.eq('test_id', leaderboardFilterTestId);
@@ -171,12 +172,19 @@ export default function PortalDashboard() {
          query = query.eq('exam_tests.program_format', candidate.education_level);
       }
 
-      const { data, error } = await query.limit(50);
+      const { data, error } = await query;
       
       if (!error && data) {
+        // Sort in Javascript by actual score descending: (total_score !== null ? total_score : score_part_a)
+        const sortedData = [...data].sort((a, b) => {
+          const scoreA = a.total_score !== null ? Number(a.total_score) : Number(a.score_part_a || 0);
+          const scoreB = b.total_score !== null ? Number(b.total_score) : Number(b.score_part_a || 0);
+          return scoreB - scoreA;
+        });
+
         // Group by candidate to only show their best attempt
         const seenCandidates = new Set();
-        const uniqueTopAttempts = data.filter(attempt => {
+        const uniqueTopAttempts = sortedData.filter(attempt => {
           if (seenCandidates.has(attempt.candidate_id)) return false;
           seenCandidates.add(attempt.candidate_id);
           return true;
