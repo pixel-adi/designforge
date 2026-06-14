@@ -1,13 +1,38 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Loader2, Edit, Save, X, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Edit, Save, X, Trash2, ChevronLeft, ChevronRight, Shield, Users as UsersIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const PAGE_SIZE = 50;
+
+const ACCESS_LEVELS = [
+  { value: 'all', label: 'All Users' },
+  { value: 'generic', label: 'Generic' },
+  { value: 'materials_only', label: 'Materials Only' },
+  { value: 'focus_batch', label: 'Focus Batch' },
+];
+
+const ACCESS_BADGE_STYLES: Record<string, string> = {
+  focus_batch: 'bg-green-100 text-green-800',
+  materials_only: 'bg-blue-100 text-blue-800',
+  generic: 'bg-gray-100 text-gray-600',
+};
+
+const ACCESS_LABELS: Record<string, string> = {
+  focus_batch: 'Focus Batch',
+  materials_only: 'Materials Only',
+  generic: 'Generic',
+};
+
+/** Compute rolling expiry: April 30 of the next applicable year */
+function getDefaultExpiry(): string {
+  const now = new Date();
+  const expiryYear = now.getMonth() >= 4 ? now.getFullYear() + 1 : now.getFullYear();
+  return new Date(expiryYear, 3, 30).toISOString().split('T')[0]; // YYYY-MM-DD
+}
 
 export default function AdminUsers() {
   const { toast } = useToast();
@@ -18,9 +43,10 @@ export default function AdminUsers() {
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
+  const [accessFilter, setAccessFilter] = useState("all");
   
   const { data, isLoading: loading } = useQuery({
-    queryKey: ['admin-candidates', page, search],
+    queryKey: ['admin-candidates', page, search, accessFilter],
     queryFn: async () => {
       let query = supabase
         .from('exam_candidates')
@@ -30,6 +56,10 @@ export default function AdminUsers() {
       
       if (search.trim()) {
         query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      }
+
+      if (accessFilter !== 'all') {
+        query = query.eq('access_level', accessFilter);
       }
 
       const { data, error, count } = await query;
@@ -42,13 +72,36 @@ export default function AdminUsers() {
     placeholderData: (prev) => prev,
   });
 
+  // Stats query (separate so filters don't affect counts)
+  const { data: stats } = useQuery({
+    queryKey: ['admin-candidates-stats'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('exam_candidates')
+        .select('access_level');
+      if (error) throw error;
+      const all = data || [];
+      return {
+        total: all.length,
+        focus_batch: all.filter(c => c.access_level === 'focus_batch').length,
+        materials_only: all.filter(c => c.access_level === 'materials_only').length,
+        generic: all.filter(c => !c.access_level || c.access_level === 'generic').length,
+      };
+    },
+  });
+
   const candidates = data?.candidates || [];
   const totalPages = Math.ceil((data?.total || 0) / PAGE_SIZE);
   
 
   const startEdit = (candidate: any) => {
     setEditingId(candidate.id);
-    setEditForm({ ...candidate });
+    setEditForm({ 
+      ...candidate,
+      access_expires_at_date: candidate.access_expires_at 
+        ? new Date(candidate.access_expires_at).toISOString().split('T')[0]
+        : '',
+    });
   };
 
   const cancelEdit = () => {
@@ -61,17 +114,31 @@ export default function AdminUsers() {
     
     setSaving(true);
     try {
-      const { error } = await supabase.from('exam_candidates').update({
+      const updateData: any = {
         name: editForm.name,
         phone: editForm.phone || null,
-        education_level: editForm.education_level
-      }).eq('id', editingId);
+        education_level: editForm.education_level,
+        access_level: editForm.access_level || 'generic',
+      };
+
+      // Set expiry when access level is not generic
+      if (editForm.access_level && editForm.access_level !== 'generic') {
+        updateData.access_expires_at = editForm.access_expires_at_date
+          ? new Date(editForm.access_expires_at_date + 'T23:59:59Z').toISOString()
+          : new Date(getDefaultExpiry() + 'T23:59:59Z').toISOString();
+      } else {
+        updateData.access_expires_at = null;
+        updateData.access_payment_id = null;
+      }
+
+      const { error } = await supabase.from('exam_candidates').update(updateData).eq('id', editingId);
       
       if (error) throw error;
       
       toast({ title: "Success", description: "Candidate updated successfully." });
       setEditingId(null);
       queryClient.invalidateQueries({ queryKey: ['admin-candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-candidates-stats'] });
     } catch (err: any) {
       toast({ title: "Update Failed", description: err.message, variant: "destructive" });
     } finally {
@@ -87,6 +154,7 @@ export default function AdminUsers() {
       if (error) throw error;
       toast({ title: "Access Revoked", description: "Candidate has been permanently deleted." });
       queryClient.invalidateQueries({ queryKey: ['admin-candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-candidates-stats'] });
     } catch (err: any) {
       toast({ title: "Delete Failed", description: err.message, variant: "destructive" });
     }
@@ -95,11 +163,11 @@ export default function AdminUsers() {
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300 pb-12">
+    <div className="space-y-6 animate-in fade-in duration-300 pb-12">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-[#262626]">User Portal (Candidates)</h1>
-          <p className="text-sm text-[#262626]/50 mt-1">Manage portal users, view their details, and assign target programs (B.Des / M.Des).</p>
+          <p className="text-sm text-[#262626]/50 mt-1">Manage portal users, access levels, and subscriptions.</p>
         </div>
         <div className="flex items-center gap-3">
           <Input
@@ -108,10 +176,47 @@ export default function AdminUsers() {
             onChange={e => { setSearch(e.target.value); setPage(0); }}
             className="h-9 w-64 text-sm"
           />
-          {data?.total !== undefined && (
-            <span className="text-xs text-foreground/50 whitespace-nowrap">{data.total} candidates</span>
-          )}
         </div>
+      </div>
+
+      {/* Stats Bar */}
+      {stats && (
+        <div className="grid grid-cols-4 gap-3">
+          <div className="bg-white rounded-xl border border-black/10 p-4 text-center">
+            <p className="text-2xl font-bold text-[#262626]">{stats.total}</p>
+            <p className="text-xs text-foreground/50 font-medium mt-1">Total Users</p>
+          </div>
+          <div className="bg-white rounded-xl border border-green-200 p-4 text-center">
+            <p className="text-2xl font-bold text-green-700">{stats.focus_batch}</p>
+            <p className="text-xs text-green-600 font-medium mt-1">Focus Batch</p>
+          </div>
+          <div className="bg-white rounded-xl border border-blue-200 p-4 text-center">
+            <p className="text-2xl font-bold text-blue-700">{stats.materials_only}</p>
+            <p className="text-xs text-blue-600 font-medium mt-1">Materials Only</p>
+          </div>
+          <div className="bg-white rounded-xl border border-black/10 p-4 text-center">
+            <p className="text-2xl font-bold text-gray-500">{stats.generic}</p>
+            <p className="text-xs text-foreground/50 font-medium mt-1">Generic</p>
+          </div>
+        </div>
+      )}
+
+      {/* Filter Bar */}
+      <div className="flex items-center gap-2">
+        {ACCESS_LEVELS.map(level => (
+          <button
+            key={level.value}
+            onClick={() => { setAccessFilter(level.value); setPage(0); }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              accessFilter === level.value
+                ? 'bg-primary/10 text-primary border border-primary/20'
+                : 'bg-white text-foreground/60 border border-black/10 hover:bg-black/5'
+            }`}
+          >
+            {level.label}
+          </button>
+        ))}
+        <span className="ml-auto text-xs text-foreground/50">{data?.total ?? 0} candidates</span>
       </div>
 
       <div className="bg-white rounded-xl border border-black/10 overflow-hidden shadow-sm">
@@ -121,6 +226,8 @@ export default function AdminUsers() {
               <th className="p-4 font-semibold">User</th>
               <th className="p-4 font-semibold">Contact</th>
               <th className="p-4 font-semibold">Target Program</th>
+              <th className="p-4 font-semibold">Access Level</th>
+              <th className="p-4 font-semibold">Access Expiry</th>
               <th className="p-4 font-semibold">Joined At</th>
               <th className="p-4 font-semibold text-right">Actions</th>
             </tr>
@@ -128,6 +235,7 @@ export default function AdminUsers() {
           <tbody className="divide-y divide-black/5">
             {candidates.map(candidate => {
               const isEditing = editingId === candidate.id;
+              const accessLevel = candidate.access_level || 'generic';
               
               return (
                 <tr key={candidate.id} className="hover:bg-black/5 transition-colors">
@@ -176,6 +284,56 @@ export default function AdminUsers() {
                       </span>
                     )}
                   </td>
+                  <td className="p-4">
+                    {isEditing ? (
+                      <select 
+                        className="h-8 px-2 rounded border border-black/10 bg-white text-sm"
+                        value={editForm.access_level || 'generic'}
+                        onChange={e => {
+                          const newLevel = e.target.value;
+                          setEditForm({ 
+                            ...editForm, 
+                            access_level: newLevel,
+                            access_expires_at_date: newLevel !== 'generic' && !editForm.access_expires_at_date
+                              ? getDefaultExpiry()
+                              : newLevel === 'generic' ? '' : editForm.access_expires_at_date,
+                          });
+                        }}
+                      >
+                        <option value="generic">Generic</option>
+                        <option value="materials_only">Materials Only</option>
+                        <option value="focus_batch">Focus Batch</option>
+                      </select>
+                    ) : (
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${ACCESS_BADGE_STYLES[accessLevel] || ACCESS_BADGE_STYLES.generic}`}>
+                        {accessLevel === 'focus_batch' && <Shield className="w-3 h-3" />}
+                        {ACCESS_LABELS[accessLevel] || 'Generic'}
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-4 text-sm text-foreground/50">
+                    {isEditing ? (
+                      editForm.access_level && editForm.access_level !== 'generic' ? (
+                        <Input 
+                          type="date" 
+                          value={editForm.access_expires_at_date || ''} 
+                          onChange={e => setEditForm({ ...editForm, access_expires_at_date: e.target.value })}
+                          className="h-8 text-sm w-36"
+                        />
+                      ) : (
+                        <span className="text-xs text-foreground/30">—</span>
+                      )
+                    ) : (
+                      candidate.access_expires_at ? (
+                        <span className={new Date(candidate.access_expires_at) < new Date() ? 'text-red-500 font-semibold' : ''}>
+                          {new Date(candidate.access_expires_at).toLocaleDateString()}
+                          {new Date(candidate.access_expires_at) < new Date() && ' (Expired)'}
+                        </span>
+                      ) : (
+                        <span className="text-foreground/30">—</span>
+                      )
+                    )}
+                  </td>
                   <td className="p-4 text-sm text-foreground/50">
                     {new Date(candidate.created_at).toLocaleDateString()}
                   </td>
@@ -206,8 +364,8 @@ export default function AdminUsers() {
             
             {candidates.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-8 text-center text-foreground/50 text-sm">
-                  No candidates have registered on the portal yet.
+                <td colSpan={7} className="p-8 text-center text-foreground/50 text-sm">
+                  No candidates found{accessFilter !== 'all' ? ` with "${ACCESS_LABELS[accessFilter]}" access level` : ''}.
                 </td>
               </tr>
             )}

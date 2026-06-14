@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy } from "lucide-react";
+import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy, BookOpen, Lightbulb, ClipboardList, Lock, CreditCard, ExternalLink, Download, Eye, EyeOff, Upload, AlertCircle, Star, Shield } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -34,6 +34,49 @@ export default function PortalDashboard() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   const [leaderboardFilterTestId, setLeaderboardFilterTestId] = useState<string>('all');
+
+  // New section states
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [upgradingPayment, setUpgradingPayment] = useState(false);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+
+  // Question Bank state
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [questionOptions, setQuestionOptions] = useState<Record<string, any[]>>({});
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [questionPartFilter, setQuestionPartFilter] = useState<'A' | 'B'>('A');
+  const [questionTypeFilter, setQuestionTypeFilter] = useState('all');
+  const [questionDifficultyFilter, setQuestionDifficultyFilter] = useState('all');
+  const [questionTopicFilter, setQuestionTopicFilter] = useState('');
+  const [showAnswers, setShowAnswers] = useState<Record<string, boolean>>({});
+
+  // Study Materials state
+  const [studyMaterials, setStudyMaterials] = useState<any[]>([]);
+  const [loadingMaterials, setLoadingMaterials] = useState(false);
+  const [materialCategoryFilter, setMaterialCategoryFilter] = useState('all');
+  const [materialExamFilter, setMaterialExamFilter] = useState('all');
+
+  // Assignments state
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [assignmentSubmissions, setAssignmentSubmissions] = useState<Record<string, any>>({});
+  const [loadingAssignments, setLoadingAssignments] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
+  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+  const [submissionText, setSubmissionText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Class Notes state
+  const [classNotes, setClassNotes] = useState<any[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [notesCategoryFilter, setNotesCategoryFilter] = useState('all');
+  const [notesExamFilter, setNotesExamFilter] = useState('all');
+
+  // Access level helpers
+  const isPaidUser = candidate?.access_level === 'materials_only' || candidate?.access_level === 'focus_batch';
+  const isAccessExpired = candidate?.access_expires_at && new Date(candidate.access_expires_at) < new Date();
+  const hasActiveAccess = isPaidUser && !isAccessExpired;
+  const isFocusBatch = candidate?.access_level === 'focus_batch' && !isAccessExpired;
 
   useEffect(() => {
     checkUser();
@@ -158,7 +201,7 @@ export default function PortalDashboard() {
       // Build the query
       let query = supabase
         .from('exam_attempts')
-        .select(`id, score_part_a, total_part_a, score_part_b, total_score, part_b_evaluation_status, candidate_id, test_id, exam_candidates!inner(name, avatar_url, education_level), exam_tests!inner(title, program_format)`)
+        .select(`id, score_part_a, total_part_a, score_part_b, total_score, part_b_evaluation_status, candidate_id, test_id, exam_candidates!inner(name, avatar_url, education_level, access_level), exam_tests!inner(title, program_format)`)
         .eq('status', 'completed')
         .order('total_score', { ascending: false, nullsFirst: false })
         .order('score_part_a', { ascending: false, nullsFirst: false });
@@ -294,6 +337,182 @@ export default function PortalDashboard() {
     reader.readAsDataURL(file);
   };
 
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+  const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+  async function invokeEdgeFunction(name: string, body: unknown) {
+    const session = (await supabase.auth.getSession()).data.session;
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify(body),
+    });
+    return { data: await res.json(), httpStatus: res.status };
+  }
+
+  const fetchQuestions = async () => {
+    setLoadingQuestions(true);
+    try {
+      let query = supabase.from('exam_questions').select('*').eq('part', questionPartFilter).order('created_at', { ascending: false });
+      if (questionTypeFilter !== 'all') query = query.eq('type', questionTypeFilter);
+      if (questionDifficultyFilter !== 'all') query = query.eq('difficulty', questionDifficultyFilter);
+      const { data, error } = await query;
+      if (error) throw error;
+      setQuestions(data || []);
+      // Fetch options for Part A questions
+      if (questionPartFilter === 'A' && data && data.length > 0) {
+        const { data: opts } = await supabase.from('exam_options').select('*').in('question_id', data.map(q => q.id));
+        const optMap: Record<string, any[]> = {};
+        (opts || []).forEach(o => { if (!optMap[o.question_id]) optMap[o.question_id] = []; optMap[o.question_id].push(o); });
+        setQuestionOptions(optMap);
+      } else {
+        setQuestionOptions({});
+      }
+    } catch (err) { console.error(err); } finally { setLoadingQuestions(false); }
+  };
+
+  const fetchStudyMaterials = async () => {
+    setLoadingMaterials(true);
+    try {
+      const { data, error } = await supabase.from('study_materials').select('*').eq('is_visible', true).order('display_order').order('created_at', { ascending: false });
+      if (!error) setStudyMaterials(data || []);
+    } catch (err) { console.error(err); } finally { setLoadingMaterials(false); }
+  };
+
+  const fetchAssignments = async () => {
+    if (!candidate?.id) return;
+    setLoadingAssignments(true);
+    try {
+      const [assignRes, subRes] = await Promise.all([
+        supabase.from('class_assignments').select('*').eq('is_visible', true).order('created_at', { ascending: false }),
+        supabase.from('assignment_submissions').select('*').eq('candidate_id', candidate.id)
+      ]);
+      if (!assignRes.error) setAssignments(assignRes.data || []);
+      if (!subRes.error) {
+        const subMap: Record<string, any> = {};
+        (subRes.data || []).forEach(s => { subMap[s.assignment_id] = s; });
+        setAssignmentSubmissions(subMap);
+      }
+    } catch (err) { console.error(err); } finally { setLoadingAssignments(false); }
+  };
+
+  const fetchClassNotes = async () => {
+    setLoadingNotes(true);
+    try {
+      const { data, error } = await supabase.from('class_notes').select('*').eq('is_visible', true).order('display_order').order('created_at', { ascending: false });
+      if (!error) setClassNotes(data || []);
+    } catch (err) { console.error(err); } finally { setLoadingNotes(false); }
+  };
+
+  const handleSubmitAssignment = async () => {
+    if (!submissionFile || !selectedAssignment || !candidate?.id) return;
+    setSubmitting(true);
+    try {
+      const fileExt = submissionFile.name.split('.').pop();
+      const filePath = `${candidate.id}/${selectedAssignment.id}/${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('assignment-submissions').upload(filePath, submissionFile);
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('assignment-submissions').getPublicUrl(filePath);
+      
+      const existing = assignmentSubmissions[selectedAssignment.id];
+      if (existing) {
+        const { error } = await supabase.from('assignment_submissions').update({ file_url: publicUrl, answer_text: submissionText || null, status: 'submitted', submitted_at: new Date().toISOString(), reviewed_at: null }).eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('assignment_submissions').insert({ assignment_id: selectedAssignment.id, candidate_id: candidate.id, file_url: publicUrl, answer_text: submissionText || null });
+        if (error) throw error;
+      }
+      toast({ title: 'Success!', description: 'Assignment submitted successfully.' });
+      setShowSubmitModal(false);
+      setSubmissionFile(null);
+      setSubmissionText('');
+      fetchAssignments();
+    } catch (err: any) {
+      toast({ title: 'Submission Failed', description: err.message, variant: 'destructive' });
+    } finally { setSubmitting(false); }
+  };
+
+  const handleUpgradePayment = async () => {
+    setUpgradingPayment(true);
+    setUpgradeError(null);
+    try {
+      // Preload Razorpay script
+      if (!document.getElementById('razorpay-checkout-js')) {
+        const script = document.createElement('script');
+        script.id = 'razorpay-checkout-js';
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.async = true;
+        document.body.appendChild(script);
+      }
+
+      // Create order
+      let orderResponse: any = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const { data } = await invokeEdgeFunction('create-upgrade-order', {});
+          orderResponse = data;
+          if (orderResponse?.order_id && orderResponse?.key_id) break;
+        } catch (err) { console.warn(`Attempt ${attempt} failed:`, err); }
+        if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
+      }
+
+      if (!orderResponse?.order_id || !orderResponse?.key_id) {
+        setUpgradeError(orderResponse?.error || 'Could not create payment order. Please try again.');
+        setUpgradingPayment(false);
+        return;
+      }
+
+      // Wait for Razorpay to load
+      let isLoaded = !!(window as any).Razorpay;
+      if (!isLoaded) {
+        await new Promise<void>((resolve) => {
+          const check = setInterval(() => { if ((window as any).Razorpay) { clearInterval(check); isLoaded = true; resolve(); } }, 200);
+          setTimeout(() => { clearInterval(check); resolve(); }, 4000);
+        });
+      }
+      if (!isLoaded) { setUpgradeError('Failed to load payment gateway. Please disable ad-blockers.'); setUpgradingPayment(false); return; }
+
+      const options = {
+        key: orderResponse.key_id,
+        amount: orderResponse.amount,
+        currency: 'INR',
+        name: 'Designforge',
+        description: 'Unlock Assignments & Notes Access',
+        order_id: orderResponse.order_id,
+        handler: async function (response: any) {
+          try {
+            const { data: verifyData } = await invokeEdgeFunction('verify-upgrade-payment', {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            if (verifyData?.status === 'success') {
+              // Refetch candidate profile to update access level
+              const { data: updatedCandidate } = await supabase.from('exam_candidates').select('*').eq('auth_user_id', authUser.id).maybeSingle();
+              if (updatedCandidate) setCandidate(updatedCandidate);
+              setShowPremiumModal(false);
+              toast({ title: '🎉 Access Unlocked!', description: 'You now have access to Class Assignments and Notes.' });
+            }
+          } catch (err) { console.error('Verification error:', err); }
+          setUpgradingPayment(false);
+        },
+        prefill: { name: candidate?.name, email: candidate?.email },
+        theme: { color: '#E23A25' },
+        modal: { ondismiss: () => { setUpgradingPayment(false); setUpgradeError('Payment was cancelled.'); } },
+      };
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', (r: any) => { setUpgradeError(`Payment failed: ${r.error.description}`); });
+      rzp.open();
+    } catch (err) {
+      setUpgradeError('Something went wrong. Please try again.');
+      setUpgradingPayment(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex">
@@ -369,6 +588,36 @@ export default function PortalDashboard() {
               <Trophy className="w-4 h-4" /> Leaderboard
             </button>
           </div>
+
+          <p className="px-4 text-xs font-semibold uppercase tracking-wider text-foreground/40 mb-2 mt-6">Resources</p>
+          <div className="space-y-1">
+            <button
+              onClick={() => { setActiveTab('questions'); fetchQuestions(); }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'questions' ? 'bg-primary/10 text-primary' : 'text-foreground/70 hover:bg-black/5 hover:text-foreground'}`}
+            >
+              <BookOpen className="w-4 h-4" /> Question Bank
+            </button>
+            <button
+              onClick={() => { setActiveTab('materials'); fetchStudyMaterials(); }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'materials' ? 'bg-primary/10 text-primary' : 'text-foreground/70 hover:bg-black/5 hover:text-foreground'}`}
+            >
+              <Lightbulb className="w-4 h-4" /> Study Materials
+            </button>
+            <button
+              onClick={() => { if (hasActiveAccess) { setActiveTab('assignments'); fetchAssignments(); } else { setShowPremiumModal(true); } }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'assignments' ? 'bg-primary/10 text-primary' : !hasActiveAccess ? 'text-foreground/30 cursor-default' : 'text-foreground/70 hover:bg-black/5 hover:text-foreground'}`}
+            >
+              <ClipboardList className="w-4 h-4" /> Assignments
+              {!hasActiveAccess && <Lock className="w-3 h-3 ml-auto" />}
+            </button>
+            <button
+              onClick={() => { if (hasActiveAccess) { setActiveTab('notes'); fetchClassNotes(); } else { setShowPremiumModal(true); } }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'notes' ? 'bg-primary/10 text-primary' : !hasActiveAccess ? 'text-foreground/30 cursor-default' : 'text-foreground/70 hover:bg-black/5 hover:text-foreground'}`}
+            >
+              <FileText className="w-4 h-4" /> Class Notes
+              {!hasActiveAccess && <Lock className="w-3 h-3 ml-auto" />}
+            </button>
+          </div>
         </div>
 
         <div className="mt-auto p-4 border-t border-black/5">
@@ -409,7 +658,7 @@ export default function PortalDashboard() {
 
           <div className="mb-10">
             <h1 className="text-2xl sm:text-3xl font-bold text-[#262626] tracking-tight">
-              {activeTab === 'overview' ? 'Dashboard Overview' : activeTab === 'progress' ? 'Performance Analytics' : activeTab === 'leaderboard' ? 'Global Leaderboard' : 'Profile Settings'}
+              {activeTab === 'overview' ? 'Dashboard Overview' : activeTab === 'progress' ? 'Performance Analytics' : activeTab === 'leaderboard' ? 'Global Leaderboard' : activeTab === 'questions' ? 'Question Bank' : activeTab === 'materials' ? 'Study Materials' : activeTab === 'assignments' ? 'Class Assignments' : activeTab === 'notes' ? 'Class Notes' : 'Profile Settings'}
             </h1>
             <p className="text-foreground/60 mt-1">
               {candidate?.program_ids?.length > 0 ? `Preparing for ${programs.filter(p => candidate.program_ids.includes(p.id)).map(p => p.name).join(' & ')}` : 'Welcome to the candidate portal'}
@@ -769,7 +1018,14 @@ export default function PortalDashboard() {
                                       {entry.exam_candidates?.name?.charAt(0) || '?'}
                                     </div>
                                   )}
-                                  <div className="font-bold text-[#262626]">{entry.exam_candidates?.name || 'Unknown User'}</div>
+                                  <div className="font-bold text-[#262626]">
+                                    {entry.exam_candidates?.name || 'Unknown User'}
+                                    {entry.exam_candidates?.access_level === 'focus_batch' && (
+                                      <span className="ml-2 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">
+                                        <Shield className="w-2.5 h-2.5" /> FB
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                               <td className="py-4 px-4 text-sm text-foreground/60 hidden sm:table-cell">
@@ -801,7 +1057,250 @@ export default function PortalDashboard() {
             </div>
           )}
 
+          {activeTab === 'questions' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {/* Part A / Part B Toggle */}
+              <div className="flex gap-2">
+                {(['A', 'B'] as const).map(p => (
+                  <button key={p} onClick={() => { setQuestionPartFilter(p); setTimeout(fetchQuestions, 0); }}
+                    className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${questionPartFilter === p ? 'bg-primary text-white shadow-md' : 'bg-white text-foreground/60 border border-black/10 hover:bg-black/5'}`}
+                  >Part {p}</button>
+                ))}
+              </div>
+              {/* Filters */}
+              <div className="flex flex-wrap gap-3">
+                <select value={questionTypeFilter} onChange={e => { setQuestionTypeFilter(e.target.value); setTimeout(fetchQuestions, 0); }}
+                  className="h-9 px-3 rounded-lg border border-black/10 bg-white text-sm">
+                  <option value="all">All Types</option>
+                  {questionPartFilter === 'A' ? (<><option value="MCQ">MCQ</option><option value="MSQ">MSQ</option><option value="NAT">NAT</option></>) : (<option value="SUBJECTIVE">Subjective</option>)}
+                </select>
+                <select value={questionDifficultyFilter} onChange={e => { setQuestionDifficultyFilter(e.target.value); setTimeout(fetchQuestions, 0); }}
+                  className="h-9 px-3 rounded-lg border border-black/10 bg-white text-sm">
+                  <option value="all">All Difficulty</option>
+                  <option value="Low">Low</option><option value="Medium">Medium</option><option value="High">High</option>
+                </select>
+                <input placeholder="Filter by topic..." value={questionTopicFilter} onChange={e => setQuestionTopicFilter(e.target.value)}
+                  className="h-9 px-3 rounded-lg border border-black/10 bg-white text-sm w-48" />
+              </div>
+              {/* Questions */}
+              {loadingQuestions ? (
+                <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+              ) : questions.filter(q => !questionTopicFilter || (q.topics || []).some((t: string) => t.toLowerCase().includes(questionTopicFilter.toLowerCase()))).length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-2xl border border-black/5">
+                  <BookOpen className="w-12 h-12 text-foreground/20 mx-auto mb-4" />
+                  <h3 className="font-bold text-[#262626] mb-2">No questions found</h3>
+                  <p className="text-sm text-foreground/50">Try adjusting your filters.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {questions.filter(q => !questionTopicFilter || (q.topics || []).some((t: string) => t.toLowerCase().includes(questionTopicFilter.toLowerCase()))).map(q => (
+                    <div key={q.id} className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex flex-wrap gap-2">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">{q.type}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${q.difficulty === 'High' ? 'bg-red-100 text-red-700' : q.difficulty === 'Medium' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>{q.difficulty}</span>
+                          {q.pyq_tag && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">{q.pyq_tag}</span>}
+                        </div>
+                        {(q.topics || []).map((t: string) => <span key={t} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-black/5 text-foreground/60">{t}</span>)}
+                      </div>
+                      <div className="prose prose-sm max-w-none text-[#262626] mb-4" dangerouslySetInnerHTML={{ __html: q.content_text || '' }} />
+                      {q.media_url && <img src={q.media_url} alt="Question media" className="max-w-md rounded-lg border border-black/10 mb-4" />}
+                      {questionPartFilter === 'A' && questionOptions[q.id] && (
+                        <div className="mt-4 border-t border-black/5 pt-4">
+                          <button onClick={() => setShowAnswers(prev => ({ ...prev, [q.id]: !prev[q.id] }))} className="flex items-center gap-2 text-sm font-medium text-primary mb-3 hover:underline">
+                            {showAnswers[q.id] ? <><EyeOff className="w-4 h-4" /> Hide Answer</> : <><Eye className="w-4 h-4" /> Show Answer</>}
+                          </button>
+                          {showAnswers[q.id] && (
+                            <div className="space-y-2">
+                              {questionOptions[q.id].map((opt: any) => (
+                                <div key={opt.id} className={`flex items-start gap-3 p-3 rounded-lg text-sm ${opt.is_correct ? 'bg-green-50 border border-green-200' : 'bg-black/5'}`}>
+                                  <span className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${opt.is_correct ? 'bg-green-500 text-white' : 'bg-black/10 text-foreground/40'}`}>
+                                    {opt.is_correct ? '✓' : ''}
+                                  </span>
+                                  <span>{opt.content_text}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
+          {activeTab === 'materials' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex flex-wrap gap-3">
+                <select value={materialExamFilter} onChange={e => setMaterialExamFilter(e.target.value)}
+                  className="h-9 px-3 rounded-lg border border-black/10 bg-white text-sm">
+                  <option value="all">All Exams</option>
+                  <option value="UCEED">UCEED</option><option value="CEED">CEED</option><option value="NID">NID</option>
+                </select>
+                <select value={materialCategoryFilter} onChange={e => setMaterialCategoryFilter(e.target.value)}
+                  className="h-9 px-3 rounded-lg border border-black/10 bg-white text-sm">
+                  <option value="all">All Categories</option>
+                  {Array.from(new Set(studyMaterials.map(m => m.category))).sort().map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              {loadingMaterials ? (
+                <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+              ) : studyMaterials.filter(m => (materialExamFilter === 'all' || m.target_exam === 'all' || m.target_exam === materialExamFilter) && (materialCategoryFilter === 'all' || m.category === materialCategoryFilter)).length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-2xl border border-black/5">
+                  <Lightbulb className="w-12 h-12 text-foreground/20 mx-auto mb-4" />
+                  <h3 className="font-bold text-[#262626] mb-2">No study materials available</h3>
+                  <p className="text-sm text-foreground/50">New materials will appear here when added.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {studyMaterials.filter(m => (materialExamFilter === 'all' || m.target_exam === 'all' || m.target_exam === materialExamFilter) && (materialCategoryFilter === 'all' || m.category === materialCategoryFilter)).map(m => (
+                    <div key={m.id} className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 className="font-bold text-[#262626]">{m.title}</h3>
+                        <div className="flex gap-2">
+                          {m.is_focus_batch_exclusive && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700 flex items-center gap-1"><Star className="w-3 h-3" /> Exclusive</span>}
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-black/5 text-foreground/60">{m.category}</span>
+                          {m.target_exam !== 'all' && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">{m.target_exam}</span>}
+                        </div>
+                      </div>
+                      {m.description && <p className="text-sm text-foreground/60 mb-4 line-clamp-2">{m.description}</p>}
+                      <div className="flex gap-2">
+                        {m.file_url && <a href={m.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"><Download className="w-3.5 h-3.5" /> Download</a>}
+                        {m.external_url && <a href={m.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100 transition-colors"><ExternalLink className="w-3.5 h-3.5" /> Open Link</a>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'assignments' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {loadingAssignments ? (
+                <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+              ) : assignments.length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-2xl border border-black/5">
+                  <ClipboardList className="w-12 h-12 text-foreground/20 mx-auto mb-4" />
+                  <h3 className="font-bold text-[#262626] mb-2">No assignments yet</h3>
+                  <p className="text-sm text-foreground/50">New assignments will appear here when posted.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {assignments.map(a => {
+                    const sub = assignmentSubmissions[a.id];
+                    const isOverdue = a.due_date && new Date(a.due_date) < new Date();
+                    return (
+                      <div key={a.id} className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h3 className="font-bold text-lg text-[#262626]">{a.title}</h3>
+                            {a.due_date && (
+                              <p className={`text-xs font-medium mt-1 ${isOverdue ? 'text-red-500' : 'text-foreground/50'}`}>
+                                Due: {new Date(a.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                {isOverdue && ' (Overdue)'}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            {a.target_exam !== 'all' && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">{a.target_exam}</span>}
+                            {sub ? (
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${sub.status === 'reviewed' ? 'bg-green-100 text-green-700' : sub.status === 'needs_revision' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {sub.status === 'reviewed' ? '✅ Reviewed' : sub.status === 'needs_revision' ? '⚠️ Needs Revision' : '📤 Submitted'}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                        {a.description && <p className="text-sm text-foreground/60 mb-4">{a.description}</p>}
+                        {a.content_text && <div className="prose prose-sm max-w-none text-foreground/70 mb-4 border-l-2 border-primary/20 pl-4" dangerouslySetInnerHTML={{ __html: a.content_text }} />}
+                        {a.file_url && <a href={a.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors mb-4"><Download className="w-3.5 h-3.5" /> Download Brief</a>}
+                        
+                        {/* Mentor Feedback (Focus Batch only gets detailed) */}
+                        {sub && sub.status !== 'submitted' && (
+                          <div className="mt-4 p-4 rounded-xl bg-black/5 border border-black/10">
+                            <h4 className="text-sm font-bold text-[#262626] mb-2">Mentor Feedback</h4>
+                            {isFocusBatch ? (
+                              <div className="space-y-2">
+                                {sub.mentor_comments && <div className="text-sm text-foreground/70"><strong>Comments:</strong> {sub.mentor_comments}</div>}
+                                {sub.mentor_improvements && <div className="text-sm text-foreground/70"><strong>Improvements:</strong> {sub.mentor_improvements}</div>}
+                                {sub.mentor_loom_link && <a href={sub.mentor_loom_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:underline"><ExternalLink className="w-3.5 h-3.5" /> Watch Video Feedback</a>}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-foreground/50">Your work has been {sub.status === 'reviewed' ? 'reviewed' : 'marked for revision'}. Detailed feedback is available for Focus Batch students.</p>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Action Buttons */}
+                        <div className="mt-4 flex gap-3">
+                          {!sub ? (
+                            <Button onClick={() => { setSelectedAssignment(a); setShowSubmitModal(true); }} className="bg-primary hover:bg-primary/90 text-white gap-2">
+                              <Upload className="w-4 h-4" /> Submit Work
+                            </Button>
+                          ) : sub.status === 'needs_revision' ? (
+                            <Button onClick={() => { setSelectedAssignment(a); setShowSubmitModal(true); setSubmissionText(sub.answer_text || ''); }} variant="outline" className="border-orange-300 text-orange-600 hover:bg-orange-50 gap-2">
+                              <Upload className="w-4 h-4" /> Resubmit
+                            </Button>
+                          ) : sub.file_url ? (
+                            <a href={sub.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-black/5 text-foreground/60 text-sm font-medium hover:bg-black/10 transition-colors">
+                              <Eye className="w-4 h-4" /> View Submission
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'notes' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex flex-wrap gap-3">
+                <select value={notesExamFilter} onChange={e => setNotesExamFilter(e.target.value)}
+                  className="h-9 px-3 rounded-lg border border-black/10 bg-white text-sm">
+                  <option value="all">All Exams</option>
+                  <option value="UCEED">UCEED</option><option value="CEED">CEED</option><option value="NID">NID</option>
+                </select>
+                <select value={notesCategoryFilter} onChange={e => setNotesCategoryFilter(e.target.value)}
+                  className="h-9 px-3 rounded-lg border border-black/10 bg-white text-sm">
+                  <option value="all">All Categories</option>
+                  {Array.from(new Set(classNotes.map(n => n.category))).sort().map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              {loadingNotes ? (
+                <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+              ) : classNotes.filter(n => (notesExamFilter === 'all' || n.target_exam === 'all' || n.target_exam === notesExamFilter) && (notesCategoryFilter === 'all' || n.category === notesCategoryFilter)).length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-2xl border border-black/5">
+                  <FileText className="w-12 h-12 text-foreground/20 mx-auto mb-4" />
+                  <h3 className="font-bold text-[#262626] mb-2">No class notes available</h3>
+                  <p className="text-sm text-foreground/50">Notes will appear here when published.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {classNotes.filter(n => (notesExamFilter === 'all' || n.target_exam === 'all' || n.target_exam === notesExamFilter) && (notesCategoryFilter === 'all' || n.category === notesCategoryFilter)).map(n => (
+                    <div key={n.id} className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 className="font-bold text-[#262626]">{n.title}</h3>
+                        <div className="flex gap-2">
+                          {n.is_focus_batch_exclusive && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700 flex items-center gap-1"><Star className="w-3 h-3" /> Exclusive</span>}
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-black/5 text-foreground/60">{n.category}</span>
+                        </div>
+                      </div>
+                      {n.description && <p className="text-sm text-foreground/60 mb-4 line-clamp-2">{n.description}</p>}
+                      <div className="flex gap-2">
+                        {n.file_url && <a href={n.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"><Download className="w-3.5 h-3.5" /> Download</a>}
+                        {n.external_url && <a href={n.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100 transition-colors"><ExternalLink className="w-3.5 h-3.5" /> Open Link</a>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {activeTab === 'profile' && (
             <div className="bg-white rounded-2xl border border-black/5 p-8 shadow-sm max-w-2xl">
@@ -925,6 +1424,68 @@ export default function PortalDashboard() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Premium Content Modal */}
+      <Dialog open={showPremiumModal} onOpenChange={setShowPremiumModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2"><Lock className="w-5 h-5 text-primary" /> Premium Content</DialogTitle>
+            <DialogDescription>
+              Class Assignments and Notes are available for Focus Batch students and subscribers.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
+              <h4 className="font-bold text-[#262626] mb-1">Unlock for ₹2,000</h4>
+              <p className="text-sm text-foreground/60 mb-3">Get access to all class assignments, notes, and study materials until April 30, {new Date().getMonth() >= 4 ? new Date().getFullYear() + 1 : new Date().getFullYear()}.</p>
+              <ul className="text-sm text-foreground/70 space-y-1">
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-500" /> Class Assignments with submission</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-500" /> Class Notes & Study Materials</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-500" /> Question Bank access</li>
+              </ul>
+            </div>
+            {upgradeError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                <p className="text-sm text-red-700">{upgradeError}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-col">
+            <Button onClick={handleUpgradePayment} disabled={upgradingPayment} className="w-full bg-primary hover:bg-primary/90 text-white gap-2 h-12">
+              {upgradingPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+              {upgradingPayment ? 'Processing...' : 'Unlock Now — ₹2,000'}
+            </Button>
+            <a href="/focus-batch" className="text-center text-sm text-primary font-medium hover:underline">Learn more about the Focus Batch →</a>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Submit Assignment Modal */}
+      <Dialog open={showSubmitModal} onOpenChange={(open) => { setShowSubmitModal(open); if (!open) { setSubmissionFile(null); setSubmissionText(''); setSelectedAssignment(null); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Submit Assignment</DialogTitle>
+            <DialogDescription>{selectedAssignment?.title}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Upload File (PDF, Image) *</Label>
+              <Input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => setSubmissionFile(e.target.files?.[0] || null)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Additional Notes (Optional)</Label>
+              <textarea value={submissionText} onChange={e => setSubmissionText(e.target.value)} rows={3} placeholder="Any comments about your submission..." className="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/20" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSubmitAssignment} disabled={!submissionFile || submitting} className="w-full bg-primary hover:bg-primary/90 text-white gap-2">
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              {submitting ? 'Uploading...' : 'Submit'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

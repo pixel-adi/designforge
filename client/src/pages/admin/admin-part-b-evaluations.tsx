@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, ChevronLeft, MessageSquare, Video, FileText, Maximize, X } from "lucide-react";
+import { Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, ChevronLeft, MessageSquare, Video, FileText, Maximize, X, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 
@@ -24,7 +24,7 @@ export default function AdminPartBEvaluations() {
         .from('exam_attempts')
         .select(`
           *,
-          exam_candidates(name, unique_id, email),
+          exam_candidates(name, unique_id, email, access_level),
           exam_tests(title)
         `, { count: 'exact' })
         .gt('part_b_answered', 0)
@@ -40,7 +40,16 @@ export default function AdminPartBEvaluations() {
       
       const { data, error, count } = await query;
       if (error) throw error;
-      return { attempts: data || [], total: count || 0 };
+      let sortedData = data || [];
+      // Priority sort: Focus Batch students first in pending tab
+      if (activeTab === 'pending') {
+        sortedData = [...sortedData].sort((a, b) => {
+          const aFB = a.exam_candidates?.access_level === 'focus_batch' ? 0 : 1;
+          const bFB = b.exam_candidates?.access_level === 'focus_batch' ? 0 : 1;
+          return aFB - bFB;
+        });
+      }
+      return { attempts: sortedData, total: count || 0 };
     },
     placeholderData: (prev) => prev,
   });
@@ -299,7 +308,14 @@ export default function AdminPartBEvaluations() {
             {filteredAttempts.map(attempt => (
               <div key={attempt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-3 px-4 items-center hover:bg-background/30 transition-colors text-sm">
                 <div className="col-span-3 flex flex-col justify-center">
-                  <p className="font-bold text-[#262626] leading-tight">{attempt.exam_candidates?.name}</p>
+                  <p className="font-bold text-[#262626] leading-tight">
+                    {attempt.exam_candidates?.name}
+                    {attempt.exam_candidates?.access_level === 'focus_batch' && (
+                      <span className="ml-2 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 align-middle">
+                        <Shield className="w-2.5 h-2.5" /> FB
+                      </span>
+                    )}
+                  </p>
                   <p className="text-[11px] text-foreground/50 mt-0.5">{attempt.exam_candidates?.unique_id}</p>
                 </div>
                 <div className="col-span-3 text-foreground/70 font-semibold truncate text-xs" title={attempt.exam_tests?.title}>
