@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       return jsonOk(req, { error: "Payment configuration error. Please contact support." });
     }
 
-    const amount = 2000; // ₹2,000
+    const amount = 4999; // ₹4,999
     const receipt_id = crypto.randomUUID().substring(0, 40);
     const basicAuth = btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
 

@@ -1438,7 +1438,7 @@ export default function PortalDashboard() {
           </DialogHeader>
           <div className="py-4 space-y-4">
             <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
-              <h4 className="font-bold text-[#262626] mb-1">Unlock for ₹2,000</h4>
+              <h4 className="font-bold text-[#262626] mb-1">Unlock for ₹4,999</h4>
               <p className="text-sm text-foreground/60 mb-3">Get access to all class assignments, notes, and study materials until April 30, {new Date().getMonth() >= 4 ? new Date().getFullYear() + 1 : new Date().getFullYear()}.</p>
               <ul className="text-sm text-foreground/70 space-y-1">
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-500" /> Class Assignments with submission</li>
@@ -1456,7 +1456,7 @@ export default function PortalDashboard() {
           <DialogFooter className="flex flex-col gap-2 sm:flex-col">
             <Button onClick={handleUpgradePayment} disabled={upgradingPayment} className="w-full bg-primary hover:bg-primary/90 text-white gap-2 h-12">
               {upgradingPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-              {upgradingPayment ? 'Processing...' : 'Unlock Now — ₹2,000'}
+              {upgradingPayment ? 'Processing...' : 'Unlock Now — ₹4,999'}
             </Button>
             <a href="/focus-batch" className="text-center text-sm text-primary font-medium hover:underline">Learn more about the Focus Batch →</a>
           </DialogFooter>
