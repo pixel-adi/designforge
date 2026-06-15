@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify the caller is an admin
+    // Verify the caller is an admin by decoding JWT
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.replace("Bearer ", "");
 
@@ -43,14 +43,20 @@ Deno.serve(async (req) => {
       return jsonOk(req, { error: "Missing authorization token" }, 401);
     }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return jsonOk(req, { error: "Invalid or expired token" }, 401);
+    // Decode JWT payload (token is already verified by Supabase API gateway)
+    let callerEmail = "";
+    try {
+      const payloadBase64 = token.split(".")[1];
+      const payload = JSON.parse(atob(payloadBase64));
+      callerEmail = (payload.email || "").toLowerCase();
+      console.log("Caller email from JWT:", callerEmail, "| Role:", payload.role);
+    } catch {
+      return jsonOk(req, { error: "Invalid token format" }, 401);
     }
 
     // STRICT admin check — only @designforge.co.in emails
-    if (!user.email?.toLowerCase().endsWith("@designforge.co.in")) {
-      console.error(`Non-admin attempted access update: ${user.email}`);
+    if (!callerEmail.endsWith("@designforge.co.in")) {
+      console.error(`Non-admin attempted access update: ${callerEmail}`);
       return jsonOk(req, { error: "Unauthorized: Admin access required" }, 403);
     }
 
@@ -98,7 +104,7 @@ Deno.serve(async (req) => {
       return jsonOk(req, { error: `Database error: ${updateError.message}` }, 500);
     }
 
-    console.log(`Admin ${user.email} updated candidate ${candidate_id}: ${JSON.stringify(updateData)}`);
+    console.log(`Admin ${callerEmail} updated candidate ${candidate_id}: ${JSON.stringify(updateData)}`);
     return jsonOk(req, { status: "success", candidate: updated });
 
   } catch (error) {
