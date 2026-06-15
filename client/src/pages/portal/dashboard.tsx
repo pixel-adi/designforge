@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
@@ -72,11 +72,83 @@ export default function PortalDashboard() {
   const [notesCategoryFilter, setNotesCategoryFilter] = useState('all');
   const [notesExamFilter, setNotesExamFilter] = useState('all');
 
+  // Session enforcement state
+  const sessionIdRef = useRef<string>('');
+  const [sessionKicked, setSessionKicked] = useState(false);
+  const [contentBlurred, setContentBlurred] = useState(false);
+
   // Access level helpers
   const isPaidUser = candidate?.access_level === 'materials_only' || candidate?.access_level === 'focus_batch';
   const isAccessExpired = candidate?.access_expires_at && new Date(candidate.access_expires_at) < new Date();
   const hasActiveAccess = isPaidUser && !isAccessExpired;
   const isFocusBatch = candidate?.access_level === 'focus_batch' && !isAccessExpired;
+
+  // ===== SINGLE-DEVICE SESSION ENFORCEMENT =====
+  const registerSession = useCallback(async (candidateId: string) => {
+    const newSessionId = crypto.randomUUID();
+    sessionIdRef.current = newSessionId;
+    await supabase.from('exam_candidates').update({ active_session_id: newSessionId }).eq('id', candidateId);
+    return newSessionId;
+  }, []);
+
+  const checkSession = useCallback(async (candidateId: string) => {
+    if (!sessionIdRef.current) return;
+    const { data } = await supabase.from('exam_candidates').select('active_session_id').eq('id', candidateId).maybeSingle();
+    if (data && data.active_session_id !== sessionIdRef.current) {
+      // Another device logged in
+      setSessionKicked(true);
+      await supabase.auth.signOut();
+    }
+  }, []);
+
+  // Session check interval
+  useEffect(() => {
+    if (!candidate?.id || sessionKicked) return;
+    const interval = setInterval(() => checkSession(candidate.id), 15000); // Check every 15s
+    return () => clearInterval(interval);
+  }, [candidate?.id, sessionKicked, checkSession]);
+
+  // ===== ANTI-SCREENSHOT: Blur on focus loss =====
+  useEffect(() => {
+    const handleBlur = () => setContentBlurred(true);
+    const handleFocus = () => setContentBlurred(false);
+    const handleVisChange = () => setContentBlurred(document.hidden);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisChange);
+    return () => {
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisChange);
+    };
+  }, []);
+
+  // ===== ANTI-COPY: Disable right-click, text selection, keyboard shortcuts =====
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => { e.preventDefault(); };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Block Ctrl/Cmd + C, Ctrl/Cmd + A, Ctrl/Cmd + P (print), PrintScreen
+      if ((e.ctrlKey || e.metaKey) && ['c', 'a', 'p', 'u', 's'].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+      if (e.key === 'PrintScreen' || e.key === 'F12') {
+        e.preventDefault();
+      }
+    };
+    const handleCopy = (e: ClipboardEvent) => { e.preventDefault(); };
+    const handleDragStart = (e: DragEvent) => { e.preventDefault(); };
+
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('copy', handleCopy);
+    document.addEventListener('dragstart', handleDragStart);
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('copy', handleCopy);
+      document.removeEventListener('dragstart', handleDragStart);
+    };
+  }, []);
 
   useEffect(() => {
     checkUser();
@@ -119,6 +191,9 @@ export default function PortalDashboard() {
           avatar_url: candidateData.avatar_url || "",
           education_level: candidateData.education_level || "bachelors"
         });
+
+        // Register this device session
+        registerSession(candidateData.id);
 
         fetchDashboardData(candidateData.program_ids || [], candidateData.education_level || "bachelors", candidateData.id);
       }
@@ -558,8 +633,26 @@ export default function PortalDashboard() {
     );
   }
 
+  // Session kicked — show logged out screen
+  if (sessionKicked) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-black/10 shadow-sm p-8 max-w-md w-full text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold text-[#262626]">Signed Out</h2>
+          <p className="text-foreground/60 text-sm">You've been logged out because your account was signed in on another device. Only one active session is allowed at a time.</p>
+          <Button onClick={() => setLocation('/portal/login')} className="bg-primary hover:bg-primary/90 text-white w-full h-12">
+            Sign In Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#F8F9FA] flex">
+    <div className={`min-h-screen bg-[#F8F9FA] flex ${contentBlurred ? 'blur-lg pointer-events-none' : ''}`} style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
       {/* Sidebar */}
       <div className="w-64 bg-white border-r border-black/5 flex flex-col hidden md:flex sticky top-0 h-screen">
         <div className="p-6 border-b border-black/5">
