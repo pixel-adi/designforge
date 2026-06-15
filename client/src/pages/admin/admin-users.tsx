@@ -219,8 +219,8 @@ export default function AdminUsers() {
         <span className="ml-auto text-xs text-foreground/50">{data?.total ?? 0} candidates</span>
       </div>
 
-      <div className="bg-white rounded-xl border border-black/10 overflow-hidden shadow-sm">
-        <table className="w-full text-left border-collapse">
+      <div className="bg-white rounded-xl border border-black/10 overflow-x-auto shadow-sm">
+        <table className="w-full text-left border-collapse min-w-[900px]">
           <thead>
             <tr className="bg-black/5 border-b border-black/10 text-xs uppercase tracking-wider text-foreground/50">
               <th className="p-4 font-semibold">User</th>
@@ -229,7 +229,7 @@ export default function AdminUsers() {
               <th className="p-4 font-semibold">Access Level</th>
               <th className="p-4 font-semibold">Access Expiry</th>
               <th className="p-4 font-semibold">Joined At</th>
-              <th className="p-4 font-semibold text-right">Actions</th>
+              <th className="p-4 font-semibold text-right sticky right-0 bg-[#f5f5f5]">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-black/5">
@@ -337,7 +337,7 @@ export default function AdminUsers() {
                   <td className="p-4 text-sm text-foreground/50">
                     {new Date(candidate.created_at).toLocaleDateString()}
                   </td>
-                  <td className="p-4 text-right">
+                  <td className="p-4 text-right sticky right-0 bg-white">
                     {isEditing ? (
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="sm" onClick={cancelEdit} disabled={saving} className="h-8 w-8 p-0 text-foreground/50 hover:bg-black/10">
