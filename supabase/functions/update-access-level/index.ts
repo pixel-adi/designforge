@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify the caller is an admin by decoding JWT
+    // Decode JWT to get caller's user ID
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.replace("Bearer ", "");
 
@@ -43,21 +43,20 @@ Deno.serve(async (req) => {
       return jsonOk(req, { error: "Missing authorization token" }, 401);
     }
 
-    // Decode JWT payload (token is already verified by Supabase API gateway)
+    let callerUid = "";
     let callerEmail = "";
     try {
       const payloadBase64 = token.split(".")[1];
       const payload = JSON.parse(atob(payloadBase64));
+      callerUid = payload.sub || "";
       callerEmail = (payload.email || "").toLowerCase();
-      console.log("Caller email from JWT:", callerEmail, "| Role:", payload.role);
+      console.log("Caller:", callerEmail, "| UID:", callerUid);
     } catch {
       return jsonOk(req, { error: "Invalid token format" }, 401);
     }
 
-    // STRICT admin check — only @designforge.co.in emails
-    if (!callerEmail.endsWith("@designforge.co.in")) {
-      console.error(`Non-admin attempted access update: ${callerEmail}`);
-      return jsonOk(req, { error: "Unauthorized: Admin access required" }, 403);
+    if (!callerUid) {
+      return jsonOk(req, { error: "Invalid token: missing user ID" }, 401);
     }
 
     const body = await req.json();
@@ -65,6 +64,23 @@ Deno.serve(async (req) => {
 
     if (!candidate_id) {
       return jsonOk(req, { error: "candidate_id is required" }, 400);
+    }
+
+    // SECURITY: Prevent self-escalation
+    // Check if the caller IS the candidate being updated
+    const { data: targetCandidate, error: lookupError } = await supabase
+      .from("exam_candidates")
+      .select("auth_user_id")
+      .eq("id", candidate_id)
+      .single();
+
+    if (lookupError || !targetCandidate) {
+      return jsonOk(req, { error: "Candidate not found" }, 404);
+    }
+
+    if (targetCandidate.auth_user_id === callerUid) {
+      console.error(`Self-escalation blocked: ${callerEmail} tried to modify their own access`);
+      return jsonOk(req, { error: "You cannot modify your own access level" }, 403);
     }
 
     // Validate access_level
