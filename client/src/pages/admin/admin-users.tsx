@@ -114,26 +114,36 @@ export default function AdminUsers() {
     
     setSaving(true);
     try {
-      const updateData: any = {
+      // 1. Update basic profile fields via direct DB (safe — no access columns)
+      const profileData: any = {
         name: editForm.name,
         phone: editForm.phone || null,
         education_level: editForm.education_level,
-        access_level: editForm.access_level || 'generic',
       };
 
-      // Set expiry when access level is not generic
-      if (editForm.access_level && editForm.access_level !== 'generic') {
-        updateData.access_expires_at = editForm.access_expires_at_date
+      const { error: profileError } = await supabase.from('exam_candidates').update(profileData).eq('id', editingId);
+      if (profileError) throw profileError;
+
+      // 2. Update access level via secure edge function (admin-verified server-side)
+      const accessLevel = editForm.access_level || 'generic';
+      let accessExpiresAt: string | null = null;
+
+      if (accessLevel !== 'generic') {
+        accessExpiresAt = editForm.access_expires_at_date
           ? new Date(editForm.access_expires_at_date + 'T23:59:59Z').toISOString()
           : new Date(getDefaultExpiry() + 'T23:59:59Z').toISOString();
-      } else {
-        updateData.access_expires_at = null;
-        updateData.access_payment_id = null;
       }
 
-      const { error } = await supabase.from('exam_candidates').update(updateData).eq('id', editingId);
-      
-      if (error) throw error;
+      const { data: accessResult, error: accessError } = await supabase.functions.invoke('update-access-level', {
+        body: {
+          candidate_id: editingId,
+          access_level: accessLevel,
+          access_expires_at: accessExpiresAt,
+        },
+      });
+
+      if (accessError) throw accessError;
+      if (accessResult?.error) throw new Error(accessResult.error);
       
       toast({ title: "Success", description: "Candidate updated successfully." });
       setEditingId(null);
