@@ -134,22 +134,35 @@ export default function AdminUsers() {
           : new Date(getDefaultExpiry() + 'T23:59:59Z').toISOString();
       }
 
-      const { data: accessResult, error: accessError } = await supabase.functions.invoke('update-access-level', {
-        body: {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/update-access-level`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
           candidate_id: editingId,
           access_level: accessLevel,
           access_expires_at: accessExpiresAt,
-        },
+        }),
       });
 
-      if (accessError) throw accessError;
-      if (accessResult?.error) throw new Error(accessResult.error);
+      const accessResult = await response.json();
+      if (!response.ok || accessResult?.error) {
+        throw new Error(accessResult?.error || `Server returned ${response.status}`);
+      }
       
       toast({ title: "Success", description: "Candidate updated successfully." });
       setEditingId(null);
       queryClient.invalidateQueries({ queryKey: ['admin-candidates'] });
       queryClient.invalidateQueries({ queryKey: ['admin-candidates-stats'] });
     } catch (err: any) {
+      console.error('Update error:', err);
       toast({ title: "Update Failed", description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
