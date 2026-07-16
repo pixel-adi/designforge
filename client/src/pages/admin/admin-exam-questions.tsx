@@ -118,6 +118,10 @@ export default function AdminExamQuestions() {
   const [testingKey, setTestingKey] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
 
+  const [startPage, setStartPage] = useState<number>(1);
+  const [endPage, setEndPage] = useState<number>(10);
+  const [totalPages, setTotalPages] = useState<number | null>(null);
+
 
   useEffect(() => { 
     fetchQuestions(); 
@@ -250,6 +254,8 @@ export default function AdminExamQuestions() {
       setAiProcessingStatus("Analyzing exam paper with Gemini AI...");
       
       const systemPrompt = `You are an expert exam extraction AI. Your task is to extract all questions (Part A and Part B) and their corresponding correct answers from the provided Question Paper PDF and Answer Key PDF.
+      
+      CRITICAL: You must ONLY extract questions that are located between page ${startPage} and page ${endPage} (inclusive) of the Question Paper PDF. Do not extract questions from any other pages. If no questions are found on these pages, return an empty array.
       
       Return a structured JSON object containing a "questions" array.
       
@@ -626,6 +632,26 @@ export default function AdminExamQuestions() {
         media_url: opt.media_url,
         is_correct: opt.is_correct
       })));
+    }
+  };
+
+  const handleQuestionPdfChange = async (file: File | null) => {
+    setQuestionPdfFile(file);
+    if (!file) {
+      setTotalPages(null);
+      return;
+    }
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdfDoc = await loadingTask.promise;
+      setTotalPages(pdfDoc.numPages);
+      setStartPage(1);
+      setEndPage(pdfDoc.numPages);
+    } catch (err) {
+      console.error("Failed to parse PDF pages:", err);
     }
   };
 
@@ -1643,7 +1669,17 @@ export default function AdminExamQuestions() {
                     </div>
                   </div>
                   
-                  <p className="text-sm text-foreground/80 font-medium">{bq.content_text}</p>
+                  <div className="mt-2 space-y-1">
+                    <Label className="text-[10px] font-semibold text-foreground/40">Question Text (Editable)</Label>
+                    <Textarea 
+                      value={bq.content_text} 
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setBulkQuestions(prev => prev.map(q => q._tempId === bq._tempId ? { ...q, content_text: val } : q));
+                      }}
+                      className="text-sm font-medium w-full min-h-[60px] bg-background border border-black/10 rounded-xl p-2.5 focus:ring-1 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
 
                   {/* Duplicate warning and conflict resolution selection */}
                   {bq.is_duplicate && (
@@ -1691,13 +1727,23 @@ export default function AdminExamQuestions() {
                     <div className="mt-3 pl-4 border-l-2 border-black/10 space-y-2">
                       {bq.options.map((opt: any, oIdx: number) => (
                         <div key={oIdx} className="text-xs space-y-1">
-                          <div className="flex items-center gap-2">
-                            {opt.is_correct ? <CheckCircle2 className="w-3 h-3 text-green-600" /> : <div className="w-3 h-3" />}
-                            <span className={opt.is_correct ? 'font-bold text-green-700' : 'text-foreground/60'}>
-                              {opt.content_text || "(No text)"}
-                            </span>
+                          <div className="flex items-center gap-2 w-full">
+                            {opt.is_correct ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" /> : <div className="w-3.5 h-3.5 shrink-0 border rounded-full border-black/20" />}
+                            <Input
+                              value={opt.content_text}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setBulkQuestions(prev => prev.map(q => {
+                                  if (q._tempId !== bq._tempId) return q;
+                                  const newOpts = [...q.options];
+                                  newOpts[oIdx] = { ...newOpts[oIdx], content_text: val };
+                                  return { ...q, options: newOpts };
+                                }));
+                              }}
+                              className="h-8 text-xs bg-background border border-black/10 rounded-lg px-2.5 py-1 w-full"
+                            />
                             {opt.media_filename && !opt.media_exists && (
-                              <span className="text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-100 font-mono ml-2">
+                              <span className="text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-100 font-mono ml-2 shrink-0">
                                 ⚠️ Missing image: {opt.media_filename}
                               </span>
                             )}
@@ -1831,7 +1877,7 @@ export default function AdminExamQuestions() {
                     <input
                       type="file"
                       accept=".pdf"
-                      onChange={(e) => setQuestionPdfFile(e.target.files?.[0] || null)}
+                      onChange={(e) => handleQuestionPdfChange(e.target.files?.[0] || null)}
                       className="absolute inset-0 opacity-0 cursor-pointer"
                     />
                     <Upload className="w-6 h-6 text-foreground/30 mx-auto mb-2" />
@@ -1857,6 +1903,34 @@ export default function AdminExamQuestions() {
                   </div>
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-4 border-t pt-4 border-black/5">
+                <div className="space-y-2">
+                  <Label htmlFor="start-page">Start Page to Parse</Label>
+                  <Input 
+                    id="start-page"
+                    type="number"
+                    min={1}
+                    max={totalPages || 100}
+                    value={startPage}
+                    onChange={(e) => setStartPage(Math.max(1, parseInt(e.target.value) || 1))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end-page">End Page to Parse {totalPages ? `(of ${totalPages})` : ""}</Label>
+                  <Input 
+                    id="end-page"
+                    type="number"
+                    min={startPage}
+                    max={totalPages || 100}
+                    value={endPage}
+                    onChange={(e) => setEndPage(Math.max(startPage, parseInt(e.target.value) || startPage))}
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-foreground/40 leading-normal">
+                💡 <b>Tip:</b> Parsing page ranges (e.g. 5-10 pages at a time) prevents hitting AI response size limits and ensures no questions get missed.
+              </p>
             </div>
           ) : (
             <div className="py-8 flex flex-col items-center justify-center space-y-4">
