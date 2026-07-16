@@ -115,6 +115,9 @@ export default function AdminExamQuestions() {
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [aiProcessingStatus, setAiProcessingStatus] = useState("");
 
+  const [testingKey, setTestingKey] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
 
   useEffect(() => { 
     fetchQuestions(); 
@@ -169,6 +172,35 @@ export default function AdminExamQuestions() {
       setShowSettings(false);
     } catch (err: any) {
       toast({ title: "Failed to save settings", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const testApiKey = async () => {
+    if (!geminiKey) {
+      setTestResult("❌ Please enter an API key first.");
+      return;
+    }
+    setTestingKey(true);
+    setTestResult(null);
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        setTestResult(`❌ Connection Failed: ${response.status} - ${errorText}`);
+        return;
+      }
+      const data = await response.json();
+      const models = data.models || [];
+      if (models.length === 0) {
+        setTestResult("⚠️ Connected, but no generative models are available for this key.");
+      } else {
+        const modelNames = models.map((m: any) => m.name.replace("models/", "")).join(", ");
+        setTestResult(`✅ Success! Available Models: ${modelNames}`);
+      }
+    } catch (err: any) {
+      setTestResult(`❌ Connection Failed: ${err.message}`);
+    } finally {
+      setTestingKey(false);
     }
   };
 
@@ -1743,6 +1775,24 @@ export default function AdminExamQuestions() {
                   <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro Stable (Alternative)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={testApiKey} 
+                disabled={testingKey}
+                className="w-full text-xs"
+              >
+                {testingKey ? "Testing..." : "Test API Key Connection"}
+              </Button>
+              {testResult && (
+                <div className="text-xs p-3 rounded-lg border bg-black/5 leading-relaxed break-all font-mono">
+                  {testResult}
+                </div>
+              )}
             </div>
           </div>
 
