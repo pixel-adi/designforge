@@ -264,7 +264,10 @@ export default function AdminExamQuestions() {
       1. part: "A" or "B"
       2. type: "MCQ", "MSQ", "NAT", or "SUBJECTIVE"
       3. difficulty: Make a reasonable guess of "Low", "Medium", or "High"
-      4. content_text: The complete question text. Keep HTML formatting if there are paragraphs (<p>), bullet lists (<ul>/<li>), or bold text (<b>).
+      4. content_text: The complete question text.
+         * Output clean plain text.
+         * DO NOT include any HTML tags (such as <p>, <b>, <i>, <ul>, <li>, span, etc.).
+         * Strip off any question numbering or index prefix (e.g. strip "Q1.", "Question 1:", "12.", "15.", etc. from the beginning so the question text starts directly with the content).
       5. topics: Guess relevant design/theory topics (array of strings, e.g. ["Perspective", "Color Theory", "Visualization"])
       6. pyq_tag: Use the provided PYQ Tag: "${aiPyqTag}"
       7. has_diagram: true if the question body contains a diagram, sketch, drawing, photo, or visual illustration. Otherwise false.
@@ -272,7 +275,10 @@ export default function AdminExamQuestions() {
       9. diagram_bbox: If has_diagram is true, detect the bounding box of the diagram on that page. Bounding box coordinates must be [ymin, xmin, ymax, xmax] normalized from 0 to 1000 (where [0, 0, 1000, 1000] is the entire page: ymin is top, xmin is left, ymax is bottom, xmax is right). Ensure you capture the full illustration but exclude text labels.
       10. options: For MCQ/MSQ/NAT, provide options. (For NAT, specify the correct answer as the first option and set it as correct, or specify options as empty. MCQ/MSQ must have 4 options).
           Each option has:
-          - content_text: Option text (e.g. "Option A" or "42.5" for NAT)
+          - content_text: Option text.
+            * Output clean plain text.
+            * DO NOT include any HTML tags.
+            * Strip option prefix labels (e.g. strip "A.", "B.", "a)", "b)", "(a)", "(b)", etc. from the beginning so only the option content remains).
           - is_correct: true or false (resolve correctness from the Answer Key PDF!)
           - has_diagram: true if the option itself is an image/diagram.
           - diagram_page: The page number where the option diagram is located.
