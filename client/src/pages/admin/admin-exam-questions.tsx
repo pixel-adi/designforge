@@ -98,6 +98,7 @@ export default function AdminExamQuestions() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [bulkImagesMap, setBulkImagesMap] = useState<Map<string, File>>(new Map());
+  const [bulkImagesPreviewMap, setBulkImagesPreviewMap] = useState<Map<string, string>>(new Map());
   const [bulkQuestions, setBulkQuestions] = useState<any[]>([]);
   const [isUploadingBulk, setIsUploadingBulk] = useState(false);
   const [bulkSelectedIds, setBulkSelectedIds] = useState<string[]>([]);
@@ -289,12 +290,14 @@ export default function AdminExamQuestions() {
               {
                 parts: [
                   { text: systemPrompt },
+                  { text: "Here is the Question Paper PDF:" },
                   {
                     inlineData: {
                       mimeType: "application/pdf",
                       data: qPdfBase64
                     }
                   },
+                  { text: "Here is the Answer Key PDF:" },
                   {
                     inlineData: {
                       mimeType: "application/pdf",
@@ -305,6 +308,7 @@ export default function AdminExamQuestions() {
               }
             ],
             generationConfig: {
+              temperature: 0.0,
               responseMimeType: "application/json",
               responseSchema: {
                 type: "OBJECT",
@@ -362,12 +366,14 @@ export default function AdminExamQuestions() {
               {
                 parts: [
                   { text: systemPrompt },
+                  { text: "Here is the Question Paper PDF:" },
                   {
                     inlineData: {
                       mimeType: "application/pdf",
                       data: qPdfBase64
                     }
                   },
+                  { text: "Here is the Answer Key PDF:" },
                   {
                     inlineData: {
                       mimeType: "application/pdf",
@@ -378,6 +384,7 @@ export default function AdminExamQuestions() {
               }
             ],
             generationConfig: {
+              temperature: 0.0,
               responseMimeType: "application/json",
               responseSchema: {
                 type: "OBJECT",
@@ -543,6 +550,18 @@ export default function AdminExamQuestions() {
       return next;
     });
 
+    // Generate object URLs for previewing and merge them
+    const previewUrlsMap = new Map<string, string>();
+    imageMap.forEach((file, filename) => {
+      previewUrlsMap.set(filename, URL.createObjectURL(file));
+    });
+
+    setBulkImagesPreviewMap(prev => {
+      const next = new Map(prev);
+      previewUrlsMap.forEach((v, k) => next.set(k, v));
+      return next;
+    });
+
     // Run duplicate check on the processed questions
     let existingMap = new Map<string, string>();
     try {
@@ -567,6 +586,21 @@ export default function AdminExamQuestions() {
     });
 
     return processed;
+  };
+
+  const clearBulkState = () => {
+    bulkImagesPreviewMap.forEach(url => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error("Failed to revoke URL:", e);
+      }
+    });
+    setBulkQuestions([]);
+    setBulkImagesMap(new Map());
+    setBulkImagesPreviewMap(new Map());
+    setBulkSelectedIds([]);
+    setBulkPreviewOpen(false);
   };
 
   const extractRegionAsFile = async (pdfDoc: any, pageNum: number, bbox: number[], filename: string): Promise<File | null> => {
@@ -1142,9 +1176,7 @@ export default function AdminExamQuestions() {
       }
 
       toast({ title: "Bulk Upload Successful", description: `${approved.length} questions saved.` });
-      setBulkPreviewOpen(false);
-      setBulkQuestions([]);
-      setBulkImagesMap(new Map());
+      clearBulkState();
       fetchQuestions();
     } catch (err: any) {
       toast({ title: "Bulk Upload Failed", description: err.message, variant: "destructive" });
@@ -1585,7 +1617,7 @@ export default function AdminExamQuestions() {
       </Dialog>
 
       {/* BULK UPLOAD PREVIEW MODAL */}
-      <Dialog open={bulkPreviewOpen} onOpenChange={setBulkPreviewOpen}>
+      <Dialog open={bulkPreviewOpen} onOpenChange={(open) => { if (!open) clearBulkState(); }}>
         <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl rounded-2xl">
           <DialogHeader className="p-6 border-b border-black/5 shrink-0">
             <DialogTitle className="flex items-center gap-2"><Upload className="w-5 h-5 text-primary" /> Bulk Upload Preview</DialogTitle>
@@ -1705,14 +1737,16 @@ export default function AdminExamQuestions() {
                   {/* Inline Question Image Preview & Warning */}
                   {bq.media_filename && (
                     <div className="mt-2">
-                      {bq.media_exists ? (
+                      {bq.media_exists && bulkImagesPreviewMap.has(bq.media_filename) ? (
                         <div className="inline-block border rounded-lg overflow-hidden bg-background">
-                          <LocalImagePreview 
-                            file={bulkImagesMap.get(bq.media_filename)!} 
+                          <img 
+                            src={bulkImagesPreviewMap.get(bq.media_filename)} 
                             alt="Question Image Preview" 
                             className="max-h-32 object-contain" 
                           />
                         </div>
+                      ) : bq.media_exists ? (
+                        <div className="text-xs text-foreground/40">Loading image...</div>
                       ) : (
                         <div className="text-xs font-semibold text-red-500 bg-red-50 border border-red-100 rounded-lg p-2 flex items-center gap-1.5 w-fit">
                           <span>⚠️ Missing question image file:</span>
@@ -1748,11 +1782,11 @@ export default function AdminExamQuestions() {
                               </span>
                             )}
                           </div>
-                          {opt.media_filename && opt.media_exists && (
+                          {opt.media_filename && opt.media_exists && bulkImagesPreviewMap.has(opt.media_filename) && (
                             <div className="pl-5">
                               <div className="inline-block border rounded-md overflow-hidden bg-background">
-                                <LocalImagePreview 
-                                  file={bulkImagesMap.get(opt.media_filename)!} 
+                                <img 
+                                  src={bulkImagesPreviewMap.get(opt.media_filename)} 
                                   alt="Option Image Preview" 
                                   className="max-h-20 object-contain" 
                                 />
@@ -1769,7 +1803,7 @@ export default function AdminExamQuestions() {
           </div>
 
           <DialogFooter className="p-6 border-t border-black/5 shrink-0 flex items-center justify-end gap-2">
-             <Button variant="outline" onClick={() => setBulkPreviewOpen(false)} disabled={isUploadingBulk}>Cancel</Button>
+             <Button variant="outline" onClick={clearBulkState} disabled={isUploadingBulk}>Cancel</Button>
              <Button 
                onClick={saveApprovedBulkQuestions} 
                disabled={
