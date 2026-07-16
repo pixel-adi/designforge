@@ -63,6 +63,10 @@ function LocalImagePreview({ file, alt, className }: { file: File; alt: string; 
   return <img src={src} alt={alt} className={className} />;
 }
 
+const normalizeText = (text: string) => {
+  return text.replace(/<[^>]*>/g, '').replace(/(?:&nbsp;|\u00A0|\s)+/g, ' ').trim().toLowerCase();
+};
+
 export default function AdminExamQuestions() {
   const { toast } = useToast();
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -298,11 +302,25 @@ export default function AdminExamQuestions() {
     link.remove();
   };
 
-  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCSVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setBulkImagesMap(new Map()); // Reset images map since this is text-only CSV upload
+
+    // Fetch existing questions to check for duplicates
+    let existingMap = new Map<string, string>();
+    try {
+      const { data, error } = await supabase.from("exam_questions").select("id, content_text");
+      if (error) throw error;
+      if (data) {
+        data.forEach(q => {
+          existingMap.set(normalizeText(q.content_text || ""), q.id);
+        });
+      }
+    } catch (err: any) {
+      toast({ title: "Failed to check duplicates", description: err.message, variant: "destructive" });
+    }
 
     Papa.parse(file, {
       header: true,
@@ -325,17 +343,25 @@ export default function AdminExamQuestions() {
           if (rawDiff === 'easy' || rawDiff === 'low') finalDiff = 'Low';
           if (rawDiff === 'hard' || rawDiff === 'high') finalDiff = 'High';
           
+          const content = row['Content Text'] || '';
+          const norm = normalizeText(content);
+          const existingId = existingMap.get(norm);
+          const isDuplicate = !!existingId;
+
           return {
             _tempId: `bulk-${index}`,
             part: row['Part'] || 'A',
             type: row['Type'] || 'MCQ',
             difficulty: finalDiff,
-            content_text: row['Content Text'] || '',
+            content_text: content,
             topics: row['Topics (comma separated)'] ? row['Topics (comma separated)'].split(',').map((t:string) => t.trim()) : [],
             pyq_tag: row['PYQ Tag'] || '',
             options: opts,
             media_filename: "",
             media_exists: true,
+            is_duplicate: isDuplicate,
+            existing_id: existingId || null,
+            duplicate_action: isDuplicate ? 'skip' : 'create', // 'skip', 'overwrite', 'create'
             status: 'pending' // 'pending', 'approved', 'rejected'
           };
         });
@@ -376,6 +402,20 @@ export default function AdminExamQuestions() {
 
     setBulkImagesMap(imageMap);
 
+    // Fetch existing questions to check for duplicates
+    let existingMap = new Map<string, string>();
+    try {
+      const { data, error } = await supabase.from("exam_questions").select("id, content_text");
+      if (error) throw error;
+      if (data) {
+        data.forEach(q => {
+          existingMap.set(normalizeText(q.content_text || ""), q.id);
+        });
+      }
+    } catch (err: any) {
+      toast({ title: "Failed to check duplicates", description: err.message, variant: "destructive" });
+    }
+
     // Parse the folder's CSV file
     Papa.parse(csvFile, {
       header: true,
@@ -410,17 +450,25 @@ export default function AdminExamQuestions() {
           if (rawDiff === 'easy' || rawDiff === 'low') finalDiff = 'Low';
           if (rawDiff === 'hard' || rawDiff === 'high') finalDiff = 'High';
           
+          const content = row['Content Text'] || '';
+          const norm = normalizeText(content);
+          const existingId = existingMap.get(norm);
+          const isDuplicate = !!existingId;
+
           return {
             _tempId: `bulk-${index}`,
             part: row['Part'] || 'A',
             type: row['Type'] || 'MCQ',
             difficulty: finalDiff,
-            content_text: row['Content Text'] || '',
+            content_text: content,
             topics: row['Topics (comma separated)'] ? row['Topics (comma separated)'].split(',').map((t:string) => t.trim()) : [],
             pyq_tag: row['PYQ Tag'] || '',
             options: opts,
             media_filename: qImage.name,
             media_exists: qImage.exists,
+            is_duplicate: isDuplicate,
+            existing_id: existingId || null,
+            duplicate_action: isDuplicate ? 'skip' : 'create', // 'skip', 'overwrite', 'create'
             status: 'pending' // 'pending', 'approved', 'rejected'
           };
         });
@@ -444,13 +492,18 @@ export default function AdminExamQuestions() {
     setBulkSelectedIds([]); // clear selection after action
   };
 
+  const updateDuplicateAction = (id: string, action: 'skip' | 'overwrite' | 'create') => {
+    setBulkQuestions(bulkQuestions.map(q => q._tempId === id ? { ...q, duplicate_action: action } : q));
+  };
+
   const filteredBulkQuestions = bulkQuestions.filter(q => bulkFilterType === "ALL" || q.type === bulkFilterType);
 
   const saveApprovedBulkQuestions = async () => {
     setIsUploadingBulk(true);
-    const approved = bulkQuestions.filter(q => q.status === 'approved');
+    // Filter questions that are approved AND NOT marked as duplicate-skip
+    const approved = bulkQuestions.filter(q => q.status === 'approved' && q.duplicate_action !== 'skip');
     if (approved.length === 0) {
-      toast({ title: "Nothing to save", description: "No questions were approved." });
+      toast({ title: "Nothing to save", description: "No approved questions to save (or duplicates were skipped)." });
       setIsUploadingBulk(false);
       return;
     }
@@ -497,13 +550,26 @@ export default function AdminExamQuestions() {
         uploadResults.forEach(r => uploadedUrls.set(r.filename, r.publicUrl));
       }
 
-      // 3. Generate client-side UUIDs and prepare questions for batch insert
-      const approvedWithIds = approved.map(q => ({
-        ...q,
-        db_id: crypto.randomUUID()
-      }));
+      // 3. Separate questions into inserts and overwrites (upserts)
+      const approvedWithIds = approved.map(q => {
+        const dbId = q.duplicate_action === 'overwrite' ? q.existing_id : crypto.randomUUID();
+        return {
+          ...q,
+          db_id: dbId
+        };
+      });
 
-      const questionsToInsert = approvedWithIds.map(q => ({
+      const idsToOverwrite = approvedWithIds
+        .filter(q => q.duplicate_action === 'overwrite')
+        .map(q => q.db_id);
+
+      // 4. Delete old options for overridden questions (1 DB call)
+      if (idsToOverwrite.length > 0) {
+        const { error: optDelErr } = await supabase.from('exam_options').delete().in('question_id', idsToOverwrite);
+        if (optDelErr) throw optDelErr;
+      }
+
+      const questionsToUpsert = approvedWithIds.map(q => ({
         id: q.db_id,
         part: q.part,
         type: q.type,
@@ -514,11 +580,11 @@ export default function AdminExamQuestions() {
         media_url: q.media_filename ? (uploadedUrls.get(q.media_filename) || null) : null
       }));
 
-      // 4. Batch insert questions (1 DB call)
-      const { error: qErr } = await supabase.from('exam_questions').insert(questionsToInsert);
+      // 5. Bulk upsert questions (inserts new ones and updates overwriting ones in 1 DB call)
+      const { error: qErr } = await supabase.from('exam_questions').upsert(questionsToUpsert);
       if (qErr) throw qErr;
 
-      // 5. Flatten options with matched question_id and prepare for batch insert
+      // 6. Flatten new options with matched question_id and prepare for insert
       const optionsToInsert: any[] = [];
       approvedWithIds.forEach(q => {
         if ((q.type === 'MCQ' || q.type === 'MSQ') && q.options.length > 0) {
@@ -533,7 +599,7 @@ export default function AdminExamQuestions() {
         }
       });
 
-      // 6. Batch insert options (1 DB call)
+      // 7. Bulk insert options (1 DB call)
       if (optionsToInsert.length > 0) {
         const { error: optErr } = await supabase.from('exam_options').insert(optionsToInsert);
         if (optErr) throw optErr;
@@ -1040,6 +1106,27 @@ export default function AdminExamQuestions() {
                   </div>
                   
                   <p className="text-sm text-foreground/80 font-medium">{bq.content_text}</p>
+
+                  {/* Duplicate warning and conflict resolution selection */}
+                  {bq.is_duplicate && (
+                    <div className="mt-2 text-xs border border-amber-200 bg-amber-50 text-amber-800 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        <span>⚠️ Existing duplicate detected in repository.</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-foreground/60">Resolve conflict:</span>
+                        <select
+                          value={bq.duplicate_action}
+                          onChange={(e) => updateDuplicateAction(bq._tempId, e.target.value as any)}
+                          className="bg-white border border-amber-300 rounded px-2 py-0.5 text-xs text-foreground/80 outline-none focus:ring-1 focus:ring-amber-500 font-medium cursor-pointer"
+                        >
+                          <option value="skip">Skip Import</option>
+                          <option value="overwrite">Overwrite & Replace</option>
+                          <option value="create">Create New Copy</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Inline Question Image Preview & Warning */}
                   {bq.media_filename && (
@@ -1103,8 +1190,8 @@ export default function AdminExamQuestions() {
                onClick={saveApprovedBulkQuestions} 
                disabled={
                  isUploadingBulk || 
-                 !bulkQuestions.some(q => q.status === 'approved') ||
-                 bulkQuestions.some(q => q.status === 'approved' && ((!q.media_exists) || q.options.some((opt: any) => !opt.media_exists)))
+                 !bulkQuestions.some(q => q.status === 'approved' && q.duplicate_action !== 'skip') ||
+                 bulkQuestions.some(q => q.status === 'approved' && q.duplicate_action !== 'skip' && ((!q.media_exists) || q.options.some((opt: any) => !opt.media_exists)))
                } 
                className="bg-primary hover:bg-primary/90 gap-2"
              >
