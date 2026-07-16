@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { FileQuestion, Trash2, PlusCircle, Save, Loader2, Image as ImageIcon, X, CheckCircle2, Download, Upload, Filter } from "lucide-react";
+import { FileQuestion, Trash2, PlusCircle, Save, Loader2, Image as ImageIcon, X, CheckCircle2, Download, Upload, Filter, Settings, Sparkles } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -103,7 +103,393 @@ export default function AdminExamQuestions() {
   const [bulkSelectedIds, setBulkSelectedIds] = useState<string[]>([]);
   const [bulkFilterType, setBulkFilterType] = useState<string>("ALL");
 
-  useEffect(() => { fetchQuestions(); }, []);
+  // AI Importer State
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [geminiKey, setGeminiKey] = useState("");
+  const [aiImporterOpen, setAiImporterOpen] = useState(false);
+  const [questionPdfFile, setQuestionPdfFile] = useState<File | null>(null);
+  const [answerKeyPdfFile, setAnswerKeyPdfFile] = useState<File | null>(null);
+  const [aiPyqTag, setAiPyqTag] = useState("");
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
+  const [aiProcessingStatus, setAiProcessingStatus] = useState("");
+
+
+  useEffect(() => { 
+    fetchQuestions(); 
+    checkAdminRole();
+    fetchGeminiKey();
+  }, []);
+
+  const checkAdminRole = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const email = session.user?.email || "";
+    if (email.toLowerCase().endsWith("@designforge.co.in")) {
+      setIsAdmin(true);
+      return;
+    }
+    const { data: staff } = await supabase
+      .from("staff_users")
+      .select("role")
+      .eq("auth_user_id", session.user.id)
+      .maybeSingle();
+    if (staff && staff.role === "admin") {
+      setIsAdmin(true);
+    }
+  };
+
+  const fetchGeminiKey = async () => {
+    try {
+      const { data } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "gemini_api_key")
+        .maybeSingle();
+      if (data) {
+        setGeminiKey(data.value);
+      }
+    } catch (err) {
+      console.error("Failed to fetch API key:", err);
+    }
+  };
+
+  const saveGeminiKey = async () => {
+    try {
+      const { error } = await supabase
+        .from("system_settings")
+        .upsert({ key: "gemini_api_key", value: geminiKey });
+      if (error) throw error;
+      toast({ title: "Settings Saved", description: "Gemini API Key has been updated successfully." });
+      setShowSettings(false);
+    } catch (err: any) {
+      toast({ title: "Failed to save settings", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const fetchGeminiApiKey = async () => {
+    const { data } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", "gemini_api_key")
+      .maybeSingle();
+    return data?.value || "";
+  };
+
+  const processAIImporter = async () => {
+    if (!questionPdfFile || !answerKeyPdfFile) {
+      toast({ title: "Files required", description: "Please upload both the Question Paper and Answer Key PDFs.", variant: "destructive" });
+      return;
+    }
+
+    setAiProcessingStatus("Fetching API credentials...");
+    const apiKey = await fetchGeminiApiKey();
+    if (!apiKey) {
+      toast({ title: "API Key Missing", description: "Please click the gear icon to set your Gemini API key first.", variant: "destructive" });
+      return;
+    }
+
+    setIsProcessingAI(true);
+    try {
+      setAiProcessingStatus("Reading PDF documents...");
+      const qPdfBase64 = await fileToBase64(questionPdfFile);
+      const aPdfBase64 = await fileToBase64(answerKeyPdfFile);
+
+      setAiProcessingStatus("Analyzing exam paper with Gemini AI...");
+      
+      const systemPrompt = `You are an expert exam extraction AI. Your task is to extract all questions (Part A and Part B) and their corresponding correct answers from the provided Question Paper PDF and Answer Key PDF.
+      
+      Return a structured JSON object containing a "questions" array.
+      
+      For each question, extract:
+      1. part: "A" or "B"
+      2. type: "MCQ", "MSQ", "NAT", or "SUBJECTIVE"
+      3. difficulty: Make a reasonable guess of "Low", "Medium", or "High"
+      4. content_text: The complete question text. Keep HTML formatting if there are paragraphs (<p>), bullet lists (<ul>/<li>), or bold text (<b>).
+      5. topics: Guess relevant design/theory topics (array of strings, e.g. ["Perspective", "Color Theory", "Visualization"])
+      6. pyq_tag: Use the provided PYQ Tag: "${aiPyqTag}"
+      7. has_diagram: true if the question body contains a diagram, sketch, drawing, photo, or visual illustration. Otherwise false.
+      8. diagram_page: The 1-based page number in the Question Paper PDF where the diagram is located. Null if has_diagram is false.
+      9. diagram_bbox: If has_diagram is true, detect the bounding box of the diagram on that page. Bounding box coordinates must be [ymin, xmin, ymax, xmax] normalized from 0 to 1000 (where [0, 0, 1000, 1000] is the entire page: ymin is top, xmin is left, ymax is bottom, xmax is right). Ensure you capture the full illustration but exclude text labels.
+      10. options: For MCQ/MSQ/NAT, provide options. (For NAT, specify the correct answer as the first option and set it as correct, or specify options as empty. MCQ/MSQ must have 4 options).
+          Each option has:
+          - content_text: Option text (e.g. "Option A" or "42.5" for NAT)
+          - is_correct: true or false (resolve correctness from the Answer Key PDF!)
+          - has_diagram: true if the option itself is an image/diagram.
+          - diagram_page: The page number where the option diagram is located.
+          - diagram_bbox: Bounding box coordinates [ymin, xmin, ymax, xmax] for the option image, normalized 0 to 1000.
+          
+      Ensure the output is valid JSON matching the specified schema. Output ONLY the JSON block. Do not include markdown code block quotes.`;
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: systemPrompt },
+                {
+                  inlineData: {
+                    mimeType: "application/pdf",
+                    data: qPdfBase64
+                  }
+                },
+                {
+                  inlineData: {
+                    mimeType: "application/pdf",
+                    data: aPdfBase64
+                  }
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                questions: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      part: { type: "STRING", enum: ["A", "B"] },
+                      type: { type: "STRING", enum: ["MCQ", "MSQ", "NAT", "SUBJECTIVE"] },
+                      difficulty: { type: "STRING", enum: ["Low", "Medium", "High"] },
+                      content_text: { type: "STRING" },
+                      topics: { type: "ARRAY", items: { type: "STRING" } },
+                      pyq_tag: { type: "STRING" },
+                      has_diagram: { type: "BOOLEAN" },
+                      diagram_page: { type: "INTEGER" },
+                      diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } },
+                      options: {
+                        type: "ARRAY",
+                        items: {
+                          type: "OBJECT",
+                          properties: {
+                            content_text: { type: "STRING" },
+                            is_correct: { type: "BOOLEAN" },
+                            has_diagram: { type: "BOOLEAN" },
+                            diagram_page: { type: "INTEGER" },
+                            diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
+                          },
+                          required: ["content_text", "is_correct", "has_diagram"]
+                        }
+                      }
+                    },
+                    required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "options"]
+                  }
+                }
+              },
+              required: ["questions"]
+            }
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini API Error: ${response.status} - ${errorText}`);
+      }
+
+      const resData = await response.json();
+      const extractedText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!extractedText) throw new Error("No data returned from Gemini AI.");
+
+      const extractedJson = JSON.parse(extractedText);
+      const rawQuestions = extractedJson.questions || [];
+
+      setAiProcessingStatus(`Extracted ${rawQuestions.length} questions. Cropping diagrams...`);
+
+      // 3. Render and crop PDF images
+      const processedQuestions = await cropDiagramsFromPDF(rawQuestions);
+
+      setBulkQuestions(processedQuestions);
+      setBulkPreviewOpen(true);
+      setAiImporterOpen(false);
+      toast({ title: "AI Extraction Complete", description: `Successfully processed ${rawQuestions.length} questions.` });
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "AI Importer Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsProcessingAI(false);
+    }
+  };
+
+  const cropDiagramsFromPDF = async (rawQuestions: any[]) => {
+    if (!questionPdfFile) return rawQuestions;
+
+    const arrayBuffer = await questionPdfFile.arrayBuffer();
+    const pdfjsLib = await import("pdfjs-dist");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdfDoc = await loadingTask.promise;
+
+    const imageMap = new Map<string, File>();
+    const processed = [];
+
+    for (let index = 0; index < rawQuestions.length; index++) {
+      const q = rawQuestions[index];
+      const opts = [];
+
+      let qMediaFilename = "";
+      let qMediaExists = true;
+
+      // Crop Question Image
+      if (q.has_diagram && q.diagram_page && q.diagram_bbox && q.diagram_page <= pdfDoc.numPages) {
+        try {
+          const filename = `ai_q_${index}_main.png`;
+          const file = await extractRegionAsFile(pdfDoc, q.diagram_page, q.diagram_bbox, filename);
+          if (file) {
+            imageMap.set(filename, file);
+            qMediaFilename = filename;
+            qMediaExists = true;
+          }
+        } catch (err) {
+          console.error("Failed to crop question diagram:", err);
+          qMediaExists = false;
+        }
+      }
+
+      // Crop Option Images
+      if (q.options && q.options.length > 0) {
+        for (let oIdx = 0; oIdx < q.options.length; oIdx++) {
+          const opt = q.options[oIdx];
+          let optMediaFilename = "";
+          let optMediaExists = true;
+
+          if (opt.has_diagram && opt.diagram_page && opt.diagram_bbox && opt.diagram_page <= pdfDoc.numPages) {
+            try {
+              const filename = `ai_q_${index}_opt_${oIdx}.png`;
+              const file = await extractRegionAsFile(pdfDoc, opt.diagram_page, opt.diagram_bbox, filename);
+              if (file) {
+                imageMap.set(filename, file);
+                optMediaFilename = filename;
+                optMediaExists = true;
+              }
+            } catch (err) {
+              console.error("Failed to crop option diagram:", err);
+              optMediaExists = false;
+            }
+          }
+
+          opts.push({
+            content_text: opt.content_text,
+            is_correct: opt.is_correct,
+            media_filename: optMediaFilename,
+            media_exists: optMediaExists
+          });
+        }
+      }
+
+      processed.push({
+        _tempId: `bulk-ai-${index}`,
+        part: q.part,
+        type: q.type,
+        difficulty: q.difficulty,
+        content_text: q.content_text,
+        topics: q.topics || [],
+        pyq_tag: q.pyq_tag || "",
+        options: opts,
+        media_filename: qMediaFilename,
+        media_exists: qMediaExists,
+        is_duplicate: false,
+        existing_id: null,
+        duplicate_action: 'create',
+        status: 'pending'
+      });
+    }
+
+    // Merge generated images into bulkImagesMap
+    setBulkImagesMap(prev => {
+      const next = new Map(prev);
+      imageMap.forEach((v, k) => next.set(k, v));
+      return next;
+    });
+
+    // Run duplicate check on the processed questions
+    let existingMap = new Map<string, string>();
+    try {
+      const { data } = await supabase.from("exam_questions").select("id, content_text");
+      if (data) {
+        data.forEach(q => {
+          existingMap.set(normalizeText(q.content_text || ""), q.id);
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
+    processed.forEach(q => {
+      const norm = normalizeText(q.content_text || "");
+      const existingId = existingMap.get(norm);
+      if (existingId) {
+        q.is_duplicate = true;
+        q.existing_id = existingId;
+        q.duplicate_action = 'skip';
+      }
+    });
+
+    return processed;
+  };
+
+  const extractRegionAsFile = async (pdfDoc: any, pageNum: number, bbox: number[], filename: string): Promise<File | null> => {
+    const page = await pdfDoc.getPage(pageNum);
+    const scale = 2.0; 
+    const viewport = page.getViewport({ scale });
+    
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d")!;
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    
+    await page.render({ canvasContext: context, viewport }).promise;
+
+    const yMinPx = (bbox[0] / 1000) * canvas.height;
+    const xMinPx = (bbox[1] / 1000) * canvas.width;
+    const yMaxPx = (bbox[2] / 1000) * canvas.height;
+    const xMaxPx = (bbox[3] / 1000) * canvas.width;
+
+    let width = xMaxPx - xMinPx;
+    let height = yMaxPx - yMinPx;
+
+    // Apply 5% padding to each side to avoid cuts (10% extra space overall)
+    const padX = width * 0.05;
+    const padY = height * 0.05;
+
+    const xMinFinal = Math.max(0, xMinPx - padX);
+    const yMinFinal = Math.max(0, yMinPx - padY);
+    const xMaxFinal = Math.min(canvas.width, xMaxPx + padX);
+    const yMaxFinal = Math.min(canvas.height, yMaxPx + padY);
+
+    const finalWidth = xMaxFinal - xMinFinal;
+    const finalHeight = yMaxFinal - yMinFinal;
+
+    if (finalWidth <= 0 || finalHeight <= 0) return null;
+
+    const cropCanvas = document.createElement("canvas");
+    const cropCtx = cropCanvas.getContext("2d")!;
+    cropCanvas.width = finalWidth;
+    cropCanvas.height = finalHeight;
+    cropCtx.drawImage(canvas, xMinFinal, yMinFinal, finalWidth, finalHeight, 0, 0, finalWidth, finalHeight);
+
+    const blob = await new Promise<Blob>((res) => cropCanvas.toBlob((b) => res(b!), "image/png"));
+    return new File([blob], filename, { type: "image/png" });
+  };
 
   const fetchQuestions = async () => {
     const { data, error } = await supabase.from("exam_questions").select("*").order("created_at", { ascending: false });
@@ -667,6 +1053,14 @@ export default function AdminExamQuestions() {
               <Upload className="w-4 h-4" /> Bulk Upload Folder
             </Button>
           </div>
+          <Button variant="outline" size="sm" onClick={() => setAiImporterOpen(true)} className="gap-2 text-xs h-9 bg-primary/5 border-primary/20 text-primary hover:bg-primary/10">
+            <Sparkles className="w-4 h-4" /> AI Paper Importer
+          </Button>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="gap-2 text-xs h-9 hover:bg-black/5">
+              <Settings className="w-4 h-4" /> AI Settings
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1227,6 +1621,116 @@ export default function AdminExamQuestions() {
                Save Approved Questions
              </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* SETTINGS MODAL FOR GEMINI KEY */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="max-w-md shadow-2xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Settings className="w-5 h-5 text-primary" /> AI Importer Settings</DialogTitle>
+            <DialogDescription>Configure the Google Gemini API key to enable AI PDF extraction.</DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="gemini-key">Google Gemini API Key</Label>
+              <Input 
+                id="gemini-key"
+                type="password"
+                placeholder="AIzaSy..."
+                value={geminiKey}
+                onChange={(e) => setGeminiKey(e.target.value)}
+              />
+              <p className="text-xs text-foreground/40 leading-normal">
+                You can obtain a free API key by visiting <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-primary hover:underline">Google AI Studio</a>. No billing setup or credit cards are required.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-black/5 pt-4">
+            <Button variant="outline" onClick={() => setShowSettings(false)}>Cancel</Button>
+            <Button onClick={saveGeminiKey} className="bg-primary hover:bg-primary/90">Save Settings</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI IMPORTER MODAL */}
+      <Dialog open={aiImporterOpen} onOpenChange={setAiImporterOpen}>
+        <DialogContent className="max-w-xl shadow-2xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> AI Paper Importer</DialogTitle>
+            <DialogDescription>Extract text, options, correct answers, and diagrams automatically using Google Gemini 1.5 Pro.</DialogDescription>
+          </DialogHeader>
+          
+          {!isProcessingAI ? (
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="ai-pyq-tag">PYQ Tag / Exam Label</Label>
+                <Input 
+                  id="ai-pyq-tag"
+                  placeholder="e.g. CEED 2024"
+                  value={aiPyqTag}
+                  onChange={(e) => setAiPyqTag(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Question Paper PDF</Label>
+                  <div className="border border-dashed border-black/10 rounded-xl p-4 text-center hover:bg-black/5 cursor-pointer relative transition-colors">
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setQuestionPdfFile(e.target.files?.[0] || null)}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    <Upload className="w-6 h-6 text-foreground/30 mx-auto mb-2" />
+                    <span className="text-xs font-medium block truncate">
+                      {questionPdfFile ? questionPdfFile.name : "Select PDF"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Answer Key PDF</Label>
+                  <div className="border border-dashed border-black/10 rounded-xl p-4 text-center hover:bg-black/5 cursor-pointer relative transition-colors">
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setAnswerKeyPdfFile(e.target.files?.[0] || null)}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    <Upload className="w-6 h-6 text-foreground/30 mx-auto mb-2" />
+                    <span className="text-xs font-medium block truncate">
+                      {answerKeyPdfFile ? answerKeyPdfFile.name : "Select PDF"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 flex flex-col items-center justify-center space-y-4">
+              <Loader2 className="w-10 h-10 animate-spin text-primary" />
+              <p className="text-sm font-semibold">{aiProcessingStatus}</p>
+              <p className="text-xs text-foreground/40 text-center max-w-sm">
+                Processing high-resolution pages and running AI vision layout extraction. This may take up to a minute.
+              </p>
+            </div>
+          )}
+
+          {!isProcessingAI && (
+            <DialogFooter className="border-t border-black/5 pt-4">
+              <Button variant="outline" onClick={() => setAiImporterOpen(false)}>Cancel</Button>
+              <Button 
+                onClick={processAIImporter} 
+                disabled={!questionPdfFile || !answerKeyPdfFile || !aiPyqTag}
+                className="bg-primary hover:bg-primary/90 gap-2"
+              >
+                <Sparkles className="w-4 h-4" /> Start Extraction
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>
