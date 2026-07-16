@@ -472,48 +472,73 @@ export default function AdminExamQuestions() {
     }
     
     try {
-      for (const q of approved) {
-        let qMediaUrl = undefined;
-        
-        // Upload Question Image if referenced and found
+      // 1. Gather all unique files that need to be uploaded
+      const filesToUpload = new Set<string>();
+      approved.forEach(q => {
         if (q.media_filename && bulkImagesMap.has(q.media_filename)) {
-          const imgFile = bulkImagesMap.get(q.media_filename)!;
-          qMediaUrl = await uploadFileToSupabase(imgFile);
+          filesToUpload.add(q.media_filename);
         }
+        q.options.forEach((opt: any) => {
+          if (opt.media_filename && bulkImagesMap.has(opt.media_filename)) {
+            filesToUpload.add(opt.media_filename);
+          }
+        });
+      });
 
-        const { data: qData, error: qErr } = await supabase.from('exam_questions').insert({
-          part: q.part,
-          type: q.type,
-          difficulty: q.difficulty,
-          content_text: q.content_text,
-          topics: q.topics,
-          pyq_tag: q.pyq_tag,
-          media_url: qMediaUrl
-        }).select().single();
-        
-        if (qErr) throw qErr;
+      // 2. Upload all files in parallel
+      const uploadedUrls = new Map<string, string>();
+      if (filesToUpload.size > 0) {
+        const uploadPromises = Array.from(filesToUpload).map(async (filename) => {
+          const file = bulkImagesMap.get(filename)!;
+          const publicUrl = await uploadFileToSupabase(file);
+          return { filename, publicUrl };
+        });
+        const uploadResults = await Promise.all(uploadPromises);
+        uploadResults.forEach(r => uploadedUrls.set(r.filename, r.publicUrl));
+      }
 
+      // 3. Generate client-side UUIDs and prepare questions for batch insert
+      const approvedWithIds = approved.map(q => ({
+        ...q,
+        db_id: crypto.randomUUID()
+      }));
+
+      const questionsToInsert = approvedWithIds.map(q => ({
+        id: q.db_id,
+        part: q.part,
+        type: q.type,
+        difficulty: q.difficulty,
+        content_text: q.content_text,
+        topics: q.topics,
+        pyq_tag: q.pyq_tag,
+        media_url: q.media_filename ? (uploadedUrls.get(q.media_filename) || null) : null
+      }));
+
+      // 4. Batch insert questions (1 DB call)
+      const { error: qErr } = await supabase.from('exam_questions').insert(questionsToInsert);
+      if (qErr) throw qErr;
+
+      // 5. Flatten options with matched question_id and prepare for batch insert
+      const optionsToInsert: any[] = [];
+      approvedWithIds.forEach(q => {
         if ((q.type === 'MCQ' || q.type === 'MSQ') && q.options.length > 0) {
-          const optionsToInsert = [];
-          for (const opt of q.options) {
-            let optMediaUrl = undefined;
-            
-            // Upload Option Image if referenced and found
-            if (opt.media_filename && bulkImagesMap.has(opt.media_filename)) {
-              const imgFile = bulkImagesMap.get(opt.media_filename)!;
-              optMediaUrl = await uploadFileToSupabase(imgFile);
-            }
-            
+          q.options.forEach((opt: any) => {
             optionsToInsert.push({
-              question_id: qData.id,
+              question_id: q.db_id,
               content_text: opt.content_text,
               is_correct: opt.is_correct,
-              media_url: optMediaUrl
+              media_url: opt.media_filename ? (uploadedUrls.get(opt.media_filename) || null) : null
             });
-          }
-          await supabase.from('exam_options').insert(optionsToInsert);
+          });
         }
+      });
+
+      // 6. Batch insert options (1 DB call)
+      if (optionsToInsert.length > 0) {
+        const { error: optErr } = await supabase.from('exam_options').insert(optionsToInsert);
+        if (optErr) throw optErr;
       }
+
       toast({ title: "Bulk Upload Successful", description: `${approved.length} questions saved.` });
       setBulkPreviewOpen(false);
       setBulkQuestions([]);
@@ -951,42 +976,42 @@ export default function AdminExamQuestions() {
 
       {/* BULK UPLOAD PREVIEW MODAL */}
       <Dialog open={bulkPreviewOpen} onOpenChange={setBulkPreviewOpen}>
-        <DialogContent className="max-w-[75vw] w-[75vw] max-h-[75vh] overflow-y-auto shadow-2xl rounded-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl rounded-2xl">
+          <DialogHeader className="p-6 border-b border-black/5 shrink-0">
             <DialogTitle className="flex items-center gap-2"><Upload className="w-5 h-5 text-primary" /> Bulk Upload Preview</DialogTitle>
             <DialogDescription>Review the parsed questions. Select questions to approve or reject them.</DialogDescription>
-          </DialogHeader>
-          
-          {/* Filters & Bulk Actions */}
-          <div className="flex flex-col md:flex-row justify-between gap-4 border-b border-black/5 pb-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-foreground/50 mr-2">Filter:</span>
-              {['ALL', 'MCQ', 'MSQ', 'NAT', 'SUBJECTIVE'].map(type => (
-                <button
-                  key={type}
-                  onClick={() => setBulkFilterType(type)}
-                  className={`px-3 py-1 text-xs font-bold rounded-full border transition-colors ${bulkFilterType === type ? 'bg-primary text-white border-primary' : 'bg-white border-black/10 text-foreground/70 hover:bg-black/5'}`}
-                >
-                  {type}
-                </button>
-              ))}
-            </div>
             
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-foreground/50 mr-2">{bulkSelectedIds.length} selected</span>
-              <Button size="sm" variant="outline" onClick={() => setBulkSelectedIds(bulkSelectedIds.length === filteredBulkQuestions.length ? [] : filteredBulkQuestions.map(q => q._tempId))}>
-                {bulkSelectedIds.length === filteredBulkQuestions.length ? 'Deselect All' : 'Select All'}
-              </Button>
-              <Button size="sm" onClick={() => handleBulkAction('approved')} disabled={bulkSelectedIds.length === 0} className="bg-green-600 hover:bg-green-700 text-white">
-                Approve Selected
-              </Button>
-              <Button size="sm" variant="destructive" onClick={() => handleBulkAction('rejected')} disabled={bulkSelectedIds.length === 0}>
-                Reject Selected
-              </Button>
+            {/* Filters & Bulk Actions */}
+            <div className="flex flex-col md:flex-row justify-between gap-4 pt-4 border-t mt-4 border-black/5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-foreground/50 mr-2">Filter:</span>
+                {['ALL', 'MCQ', 'MSQ', 'NAT', 'SUBJECTIVE'].map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setBulkFilterType(type)}
+                    className={`px-3 py-1 text-xs font-bold rounded-full border transition-colors ${bulkFilterType === type ? 'bg-primary text-white border-primary' : 'bg-white border-black/10 text-foreground/70 hover:bg-black/5'}`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-foreground/50 mr-2">{bulkSelectedIds.length} selected</span>
+                <Button size="sm" variant="outline" onClick={() => setBulkSelectedIds(bulkSelectedIds.length === filteredBulkQuestions.length ? [] : filteredBulkQuestions.map(q => q._tempId))}>
+                  {bulkSelectedIds.length === filteredBulkQuestions.length ? 'Deselect All' : 'Select All'}
+                </Button>
+                <Button size="sm" onClick={() => handleBulkAction('approved')} disabled={bulkSelectedIds.length === 0} className="bg-green-600 hover:bg-green-700 text-white">
+                  Approve Selected
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => handleBulkAction('rejected')} disabled={bulkSelectedIds.length === 0}>
+                  Reject Selected
+                </Button>
+              </div>
             </div>
-          </div>
+          </DialogHeader>
 
-          <div className="py-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {filteredBulkQuestions.map((bq, idx) => (
               <div key={bq._tempId} className={`p-4 rounded-xl border flex gap-4 ${bq.status === 'approved' ? 'border-green-400 bg-green-50/50' : bq.status === 'rejected' ? 'border-red-200 bg-red-50/50 opacity-60' : 'border-black/10 bg-white'}`}>
                 <div className="pt-1">
@@ -1072,7 +1097,7 @@ export default function AdminExamQuestions() {
             ))}
           </div>
 
-          <DialogFooter className="border-t border-black/5 pt-4">
+          <DialogFooter className="p-6 border-t border-black/5 shrink-0 flex items-center justify-end gap-2">
              <Button variant="outline" onClick={() => setBulkPreviewOpen(false)} disabled={isUploadingBulk}>Cancel</Button>
              <Button 
                onClick={saveApprovedBulkQuestions} 
