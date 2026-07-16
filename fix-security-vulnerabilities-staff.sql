@@ -2,9 +2,6 @@
 -- Remediation: storage.objects policies (SME/Admin Access)
 -- ========================================================
 
--- 1. Enable RLS on storage.objects if not already done
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
 -- 2. Clean up hardcoded email policies for content-uploads
 DROP POLICY IF EXISTS "Admin upload content" ON storage.objects;
 DROP POLICY IF EXISTS "Admin update content" ON storage.objects;
