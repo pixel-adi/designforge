@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabaseClient";
-import { LayoutDashboard, Trophy, Calendar, BookOpen, Users, Mail, LogOut, Loader2, Menu, X, FileQuestion, ClipboardList, PenTool, Lightbulb, ClipboardCheck, FileText } from "lucide-react";
+import { LayoutDashboard, Trophy, Calendar, BookOpen, Users, Mail, LogOut, Loader2, Menu, X, FileQuestion, ClipboardList, PenTool, Lightbulb, ClipboardCheck, FileText, Shield } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 
-const navItems = [
+const allNavItems = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Ranks", href: "/admin/ranks", icon: Trophy },
   { label: "Workshops", href: "/admin/workshops", icon: Calendar },
@@ -16,35 +16,131 @@ const navItems = [
   { label: "Assignments", href: "/admin/assignments", icon: ClipboardCheck },
   { label: "Class Notes", href: "/admin/class-notes", icon: FileText },
   { label: "User Portal", href: "/admin/users", icon: Users },
+  { label: "Staff Management", href: "/admin/staff", icon: Shield },
   { label: "Registrations", href: "/admin/registrations", icon: Users },
   { label: "Subscribers", href: "/admin/subscribers", icon: Mail },
+  { label: "Evaluations", href: "/admin/mentors-placeholder", icon: ClipboardList },
 ];
+
+const roleNavPermissions: Record<string, string[]> = {
+  admin: [
+    "/admin/dashboard",
+    "/admin/ranks",
+    "/admin/workshops",
+    "/admin/programs",
+    "/admin/exam-questions",
+    "/admin/exam-tests",
+    "/admin/part-b-evaluations",
+    "/admin/study-materials",
+    "/admin/assignments",
+    "/admin/class-notes",
+    "/admin/users",
+    "/admin/staff",
+    "/admin/registrations",
+    "/admin/subscribers",
+  ],
+  sme: [
+    "/admin/exam-questions",
+    "/admin/study-materials",
+    "/admin/assignments",
+    "/admin/class-notes",
+  ],
+  mentor: [
+    "/admin/mentors-placeholder",
+    "/admin/part-b-evaluations",
+  ],
+};
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
   const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        if (!session) setLocation("/admin");
-        setLoading(false);
-      })
-      .catch(() => {
-        // Session fetch failed (network error etc.) — redirect to login
-        setLocation("/admin");
-        setLoading(false);
-      });
+    let active = true;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    async function checkSessionAndRole() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setLocation("/admin");
+          return;
+        }
+
+        const email = session.user?.email || "";
+        const lowerEmail = email.toLowerCase();
+
+        // 1. Root admin domain fallback
+        if (lowerEmail.endsWith("@designforge.co.in")) {
+          if (active) {
+            setRole("admin");
+            setLoading(false);
+          }
+          return;
+        }
+
+        // 2. Lookup in staff_users table
+        const { data: staff, error } = await supabase
+          .from("staff_users")
+          .select("role")
+          .eq("auth_user_id", session.user.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!staff) {
+          // If they aren't registered, log them out and redirect
+          await supabase.auth.signOut();
+          setLocation("/admin");
+          return;
+        }
+
+        if (active) {
+          setRole(staff.role);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("Auth check failed:", err);
+        setLocation("/admin");
+      }
+    }
+
+    checkSessionAndRole();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!session) {
         setLocation("/admin");
+      } else if (event === "SIGNED_IN") {
+        checkSessionAndRole();
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, [setLocation]);
+
+  // Route shielding
+  useEffect(() => {
+    if (loading || !role) return;
+
+    const allowedRoutes = roleNavPermissions[role] || [];
+    const isAllowed = allowedRoutes.includes(location);
+
+    if (!isAllowed) {
+      if (role === "admin") {
+        setLocation("/admin/dashboard");
+      } else if (role === "sme") {
+        setLocation("/admin/exam-questions");
+      } else if (role === "mentor") {
+        setLocation("/admin/mentors-placeholder");
+      } else {
+        setLocation("/admin");
+      }
+    }
+  }, [location, role, loading, setLocation]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -59,6 +155,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     );
   }
 
+  // Filter navigation items based on role permissions
+  const allowedRoutes = roleNavPermissions[role || ""] || [];
+  const visibleNavItems = allNavItems.filter((item) => allowedRoutes.includes(item.href));
+
   return (
     <div className="min-h-screen bg-background flex font-sans text-foreground">
       {/* Mobile overlay */}
@@ -71,7 +171,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         <div className="p-6 border-b border-black/5 flex items-center justify-between">
           <div className="flex flex-col items-start gap-1">
             <img src={logoImg} alt="Designforge Logo" className="h-6 md:h-8 object-contain" />
-            <span className="text-[10px] font-bold tracking-widest text-foreground/40 uppercase ml-1">Admin Panel</span>
+            <span className="text-[10px] font-bold tracking-widest text-foreground/40 uppercase ml-1">
+              {role === "sme" ? "Content Portal" : role === "mentor" ? "Mentors Portal" : "Admin Panel"}
+            </span>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1.5 rounded-lg hover:bg-black/5 transition-colors">
             <X className="w-5 h-5 text-foreground/60" />
@@ -79,7 +181,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = location === item.href;
             return (
               <a

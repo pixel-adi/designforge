@@ -17,25 +17,61 @@ export default function AdminLogin() {
     setLoading(true);
     setError(null);
 
-    // Domain lock — only @designforge.co.in accounts can access admin
-    if (!email.toLowerCase().endsWith("@designforge.co.in")) {
-      setError("Access restricted. Only authorized Designforge accounts can log in.");
-      setLoading(false);
-      return;
-    }
-
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (authError) {
+    if (authError || !data?.user) {
       setError("Invalid credentials. Please try again.");
       setLoading(false);
       return;
     }
 
-    window.location.href = "/admin/dashboard";
+    const lowerEmail = email.toLowerCase();
+
+    // 1. If it's a domain admin email, let them in immediately
+    if (lowerEmail.endsWith("@designforge.co.in")) {
+      window.location.href = "/admin/dashboard";
+      return;
+    }
+
+    // 2. Query staff_users database for other staff roles
+    try {
+      const { data: staff, error: staffError } = await supabase
+        .from("staff_users")
+        .select("role")
+        .eq("auth_user_id", data.user.id)
+        .maybeSingle();
+
+      if (staffError) throw staffError;
+
+      if (!staff) {
+        // Not a staff member — log them out immediately
+        await supabase.auth.signOut();
+        setError("Access restricted. Only authorized staff accounts can log in.");
+        setLoading(false);
+        return;
+      }
+
+      // Redirect based on staff role
+      if (staff.role === "admin") {
+        window.location.href = "/admin/dashboard";
+      } else if (staff.role === "sme") {
+        window.location.href = "/admin/exam-questions";
+      } else if (staff.role === "mentor") {
+        window.location.href = "/admin/part-b-evaluations"; // Or mentors placeholder page
+      } else {
+        await supabase.auth.signOut();
+        setError("Access restricted. Invalid account role.");
+        setLoading(false);
+      }
+    } catch (err: any) {
+      console.error("Staff lookup failed:", err);
+      await supabase.auth.signOut();
+      setError("An error occurred during verification. Please contact support.");
+      setLoading(false);
+    }
   };
 
   return (
