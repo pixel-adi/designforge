@@ -107,6 +107,7 @@ export default function AdminExamQuestions() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [geminiKey, setGeminiKey] = useState("");
+  const [geminiModel, setGeminiModel] = useState("gemini-1.5-flash");
   const [aiImporterOpen, setAiImporterOpen] = useState(false);
   const [questionPdfFile, setQuestionPdfFile] = useState<File | null>(null);
   const [answerKeyPdfFile, setAnswerKeyPdfFile] = useState<File | null>(null);
@@ -143,11 +144,12 @@ export default function AdminExamQuestions() {
     try {
       const { data } = await supabase
         .from("system_settings")
-        .select("value")
-        .eq("key", "gemini_api_key")
-        .maybeSingle();
+        .select("key, value");
       if (data) {
-        setGeminiKey(data.value);
+        const keyItem = data.find(d => d.key === "gemini_api_key");
+        const modelItem = data.find(d => d.key === "gemini_api_model");
+        if (keyItem) setGeminiKey(keyItem.value);
+        if (modelItem) setGeminiModel(modelItem.value);
       }
     } catch (err) {
       console.error("Failed to fetch API key:", err);
@@ -156,11 +158,14 @@ export default function AdminExamQuestions() {
 
   const saveGeminiKey = async () => {
     try {
-      const { error } = await supabase
+      const { error: err1 } = await supabase
         .from("system_settings")
         .upsert({ key: "gemini_api_key", value: geminiKey });
-      if (error) throw error;
-      toast({ title: "Settings Saved", description: "Gemini API Key has been updated successfully." });
+      const { error: err2 } = await supabase
+        .from("system_settings")
+        .upsert({ key: "gemini_api_model", value: geminiModel });
+      if (err1 || err2) throw err1 || err2;
+      toast({ title: "Settings Saved", description: "Gemini API configurations updated successfully." });
       setShowSettings(false);
     } catch (err: any) {
       toast({ title: "Failed to save settings", description: err.message, variant: "destructive" });
@@ -179,13 +184,13 @@ export default function AdminExamQuestions() {
     });
   };
 
-  const fetchGeminiApiKey = async () => {
+  const fetchGeminiSettings = async () => {
     const { data } = await supabase
       .from("system_settings")
-      .select("value")
-      .eq("key", "gemini_api_key")
-      .maybeSingle();
-    return data?.value || "";
+      .select("key, value");
+    const key = data?.find(d => d.key === "gemini_api_key")?.value || "";
+    const model = data?.find(d => d.key === "gemini_api_model")?.value || "gemini-1.5-flash";
+    return { key, model };
   };
 
   const processAIImporter = async () => {
@@ -195,8 +200,8 @@ export default function AdminExamQuestions() {
     }
 
     setAiProcessingStatus("Fetching API credentials...");
-    const apiKey = await fetchGeminiApiKey();
-    if (!apiKey) {
+    const { key, model } = await fetchGeminiSettings();
+    if (!key) {
       toast({ title: "API Key Missing", description: "Please click the gear icon to set your Gemini API key first.", variant: "destructive" });
       return;
     }
@@ -233,7 +238,7 @@ export default function AdminExamQuestions() {
           
       Ensure the output is valid JSON matching the specified schema. Output ONLY the JSON block. Do not include markdown code block quotes.`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1629,7 +1634,7 @@ export default function AdminExamQuestions() {
         <DialogContent className="max-w-md shadow-2xl rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Settings className="w-5 h-5 text-primary" /> AI Importer Settings</DialogTitle>
-            <DialogDescription>Configure the Google Gemini API key to enable AI PDF extraction.</DialogDescription>
+            <DialogDescription>Configure the Google Gemini API key and model selection.</DialogDescription>
           </DialogHeader>
           
           <div className="py-4 space-y-4">
@@ -1645,6 +1650,20 @@ export default function AdminExamQuestions() {
               <p className="text-xs text-foreground/40 leading-normal">
                 You can obtain a free API key by visiting <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-primary hover:underline">Google AI Studio</a>. No billing setup or credit cards are required.
               </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="gemini-model">Gemini Model Selection</Label>
+              <Select value={geminiModel} onValueChange={setGeminiModel}>
+                <SelectTrigger id="gemini-model">
+                  <SelectValue placeholder="Select model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash (Recommended — Free & Very Fast)</SelectItem>
+                  <SelectItem value="gemini-1.5-pro-latest">Gemini 1.5 Pro Latest (Best Quality — Free with limits)</SelectItem>
+                  <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro Stable (Alternative)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
