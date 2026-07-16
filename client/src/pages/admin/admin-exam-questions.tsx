@@ -50,6 +50,19 @@ const sampleQuestion: Question = {
   pyq_tag: 'CEED 2023',
 };
 
+function LocalImagePreview({ file, alt, className }: { file: File; alt: string; className?: string }) {
+  const [src, setSrc] = useState<string>("");
+  
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setSrc(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  
+  if (!src) return null;
+  return <img src={src} alt={alt} className={className} />;
+}
+
 export default function AdminExamQuestions() {
   const { toast } = useToast();
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -79,6 +92,8 @@ export default function AdminExamQuestions() {
 
   // Bulk Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const [bulkImagesMap, setBulkImagesMap] = useState<Map<string, File>>(new Map());
   const [bulkQuestions, setBulkQuestions] = useState<any[]>([]);
   const [isUploadingBulk, setIsUploadingBulk] = useState(false);
   const [bulkSelectedIds, setBulkSelectedIds] = useState<string[]>([]);
@@ -270,9 +285,9 @@ export default function AdminExamQuestions() {
 
   // Bulk Upload Logic
   const downloadSampleCSV = () => {
-    const headers = "Part,Type,Difficulty,Content Text,Topics (comma separated),PYQ Tag,Option 1,Is Correct 1,Option 2,Is Correct 2,Option 3,Is Correct 3,Option 4,Is Correct 4\n";
-    const row1 = 'A,MCQ,Medium,"What is the primary color?","Color Theory",CEED 2022,"Red",TRUE,"Green",FALSE,"Blue",FALSE,"Yellow",FALSE\n';
-    const row2 = 'B,SUBJECTIVE,High,"Sketch a tea stall scene.","Sketching, Observation",NID 2021,,,,,,,,\n';
+    const headers = "Part,Type,Difficulty,Content Text,Topics (comma separated),PYQ Tag,Question Image,Option 1,Is Correct 1,Option Image 1,Option 2,Is Correct 2,Option Image 2,Option 3,Is Correct 3,Option Image 3,Option 4,Is Correct 4,Option Image 4\n";
+    const row1 = 'A,MCQ,Medium,"What perspective is shown here?","Perspective, Spatial Theory",CEED 2024,perspective_q1.png,"Option A",FALSE,, "Option B",TRUE,opt_b.jpg,"Option C",FALSE,,"Option D",FALSE,\n';
+    const row2 = 'B,SUBJECTIVE,High,"Sketch a traditional kitchen scene showing perspective.","Sketching, Drawing",NID 2023,,,,,,,,,,,,,\n';
     const csvContent = "data:text/csv;charset=utf-8," + headers + row1 + row2;
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -287,6 +302,8 @@ export default function AdminExamQuestions() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setBulkImagesMap(new Map()); // Reset images map since this is text-only CSV upload
+
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
@@ -297,7 +314,9 @@ export default function AdminExamQuestions() {
             if (row[`Option ${i}`]) {
               opts.push({
                 content_text: row[`Option ${i}`],
-                is_correct: row[`Is Correct ${i}`]?.toUpperCase() === 'TRUE'
+                is_correct: row[`Is Correct ${i}`]?.toUpperCase() === 'TRUE',
+                media_filename: "",
+                media_exists: true
               });
             }
           }
@@ -315,12 +334,99 @@ export default function AdminExamQuestions() {
             topics: row['Topics (comma separated)'] ? row['Topics (comma separated)'].split(',').map((t:string) => t.trim()) : [],
             pyq_tag: row['PYQ Tag'] || '',
             options: opts,
+            media_filename: "",
+            media_exists: true,
             status: 'pending' // 'pending', 'approved', 'rejected'
           };
         });
         setBulkQuestions(parsed);
         setBulkPreviewOpen(true);
         if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    });
+  };
+
+  const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileArray = Array.from(files);
+    
+    // Find the single CSV file inside the folder
+    const csvFile = fileArray.find(f => f.name.toLowerCase().endsWith(".csv"));
+    if (!csvFile) {
+      toast({ 
+        title: "CSV File Not Found", 
+        description: "Please make sure your folder contains a single .csv file with the question data.", 
+        variant: "destructive" 
+      });
+      if (folderInputRef.current) folderInputRef.current.value = '';
+      return;
+    }
+
+    // Build the strictly matched images map (png, jpg, jpeg, webp, gif)
+    const allowedExtensions = ["png", "jpg", "jpeg", "webp", "gif"];
+    const imageMap = new Map<string, File>();
+    fileArray.forEach(f => {
+      const ext = f.name.split('.').pop()?.toLowerCase() || "";
+      if (allowedExtensions.includes(ext)) {
+        imageMap.set(f.name, f);
+      }
+    });
+
+    setBulkImagesMap(imageMap);
+
+    // Parse the folder's CSV file
+    Papa.parse(csvFile, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const parsed = results.data.map((row: any, index) => {
+          const opts = [];
+          
+          const checkImage = (filename?: string) => {
+            if (!filename) return { name: "", exists: true }; // blank is fine (no image)
+            const cleanName = filename.trim();
+            if (!cleanName) return { name: "", exists: true };
+            const exists = imageMap.has(cleanName);
+            return { name: cleanName, exists };
+          };
+
+          const qImage = checkImage(row['Question Image']);
+          
+          for (let i = 1; i <= 4; i++) {
+            if (row[`Option ${i}`]) {
+              const optImage = checkImage(row[`Option Image ${i}`]);
+              opts.push({
+                content_text: row[`Option ${i}`],
+                is_correct: row[`Is Correct ${i}`]?.toUpperCase() === 'TRUE',
+                media_filename: optImage.name,
+                media_exists: optImage.exists
+              });
+            }
+          }
+          const rawDiff = (row['Difficulty'] || 'Medium').toLowerCase().trim();
+          let finalDiff = 'Medium';
+          if (rawDiff === 'easy' || rawDiff === 'low') finalDiff = 'Low';
+          if (rawDiff === 'hard' || rawDiff === 'high') finalDiff = 'High';
+          
+          return {
+            _tempId: `bulk-${index}`,
+            part: row['Part'] || 'A',
+            type: row['Type'] || 'MCQ',
+            difficulty: finalDiff,
+            content_text: row['Content Text'] || '',
+            topics: row['Topics (comma separated)'] ? row['Topics (comma separated)'].split(',').map((t:string) => t.trim()) : [],
+            pyq_tag: row['PYQ Tag'] || '',
+            options: opts,
+            media_filename: qImage.name,
+            media_exists: qImage.exists,
+            status: 'pending' // 'pending', 'approved', 'rejected'
+          };
+        });
+        setBulkQuestions(parsed);
+        setBulkPreviewOpen(true);
+        if (folderInputRef.current) folderInputRef.current.value = '';
       }
     });
   };
@@ -348,32 +454,70 @@ export default function AdminExamQuestions() {
       setIsUploadingBulk(false);
       return;
     }
+
+    // Block saving if any approved question contains referenced but missing images
+    const hasMissingImages = approved.some(q => 
+      (!q.media_exists) || 
+      q.options.some((opt: any) => !opt.media_exists)
+    );
+
+    if (hasMissingImages) {
+      toast({ 
+        title: "Validation Error", 
+        description: "Some approved questions reference missing images. Please reject them or upload the correct files before saving.", 
+        variant: "destructive" 
+      });
+      setIsUploadingBulk(false);
+      return;
+    }
     
     try {
       for (const q of approved) {
+        let qMediaUrl = undefined;
+        
+        // Upload Question Image if referenced and found
+        if (q.media_filename && bulkImagesMap.has(q.media_filename)) {
+          const imgFile = bulkImagesMap.get(q.media_filename)!;
+          qMediaUrl = await uploadFileToSupabase(imgFile);
+        }
+
         const { data: qData, error: qErr } = await supabase.from('exam_questions').insert({
           part: q.part,
           type: q.type,
           difficulty: q.difficulty,
           content_text: q.content_text,
           topics: q.topics,
-          pyq_tag: q.pyq_tag
+          pyq_tag: q.pyq_tag,
+          media_url: qMediaUrl
         }).select().single();
         
         if (qErr) throw qErr;
 
         if ((q.type === 'MCQ' || q.type === 'MSQ') && q.options.length > 0) {
-          const optionsToInsert = q.options.map((opt: any) => ({
-            question_id: qData.id,
-            content_text: opt.content_text,
-            is_correct: opt.is_correct
-          }));
+          const optionsToInsert = [];
+          for (const opt of q.options) {
+            let optMediaUrl = undefined;
+            
+            // Upload Option Image if referenced and found
+            if (opt.media_filename && bulkImagesMap.has(opt.media_filename)) {
+              const imgFile = bulkImagesMap.get(opt.media_filename)!;
+              optMediaUrl = await uploadFileToSupabase(imgFile);
+            }
+            
+            optionsToInsert.push({
+              question_id: qData.id,
+              content_text: opt.content_text,
+              is_correct: opt.is_correct,
+              media_url: optMediaUrl
+            });
+          }
           await supabase.from('exam_options').insert(optionsToInsert);
         }
       }
       toast({ title: "Bulk Upload Successful", description: `${approved.length} questions saved.` });
       setBulkPreviewOpen(false);
       setBulkQuestions([]);
+      setBulkImagesMap(new Map());
       fetchQuestions();
     } catch (err: any) {
       toast({ title: "Bulk Upload Failed", description: err.message, variant: "destructive" });
@@ -400,7 +544,7 @@ export default function AdminExamQuestions() {
           <h1 className="text-2xl font-semibold text-[#262626]">Exam Questions Repository</h1>
           <p className="text-sm text-[#262626]/50 mt-1">Manage Part A and Part B questions, media, and bulk uploads.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={downloadSampleCSV} className="gap-2 text-xs h-9">
             <Download className="w-4 h-4" /> Sample CSV
           </Button>
@@ -408,6 +552,20 @@ export default function AdminExamQuestions() {
             <input type="file" accept=".csv" ref={fileInputRef} onChange={handleCSVUpload} className="hidden" />
             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2 text-xs h-9 bg-primary/5 border-primary/20 text-primary hover:bg-primary/10">
               <Upload className="w-4 h-4" /> Bulk Upload CSV
+            </Button>
+          </div>
+          <div className="relative">
+            <input 
+              type="file" 
+              accept=".csv,image/*" 
+              webkitdirectory="" 
+              directory="" 
+              ref={folderInputRef} 
+              onChange={handleFolderUpload} 
+              className="hidden" 
+            />
+            <Button variant="outline" size="sm" onClick={() => folderInputRef.current?.click()} className="gap-2 text-xs h-9 bg-primary/5 border-primary/20 text-primary hover:bg-primary/10">
+              <Upload className="w-4 h-4" /> Bulk Upload Folder
             </Button>
           </div>
         </div>
@@ -855,18 +1013,60 @@ export default function AdminExamQuestions() {
                       </Button>
                     </div>
                   </div>
-                <p className="text-sm text-foreground/80 font-medium">{bq.content_text}</p>
-                
-                {bq.options && bq.options.length > 0 && (
-                  <div className="mt-3 pl-4 border-l-2 border-black/10 space-y-1">
-                    {bq.options.map((opt: any, oIdx: number) => (
-                      <div key={oIdx} className="text-xs flex items-center gap-2">
-                        {opt.is_correct ? <CheckCircle2 className="w-3 h-3 text-green-600" /> : <div className="w-3 h-3" />}
-                        <span className={opt.is_correct ? 'font-bold text-green-700' : 'text-foreground/60'}>{opt.content_text}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                  
+                  <p className="text-sm text-foreground/80 font-medium">{bq.content_text}</p>
+                  
+                  {/* Inline Question Image Preview & Warning */}
+                  {bq.media_filename && (
+                    <div className="mt-2">
+                      {bq.media_exists ? (
+                        <div className="inline-block border rounded-lg overflow-hidden bg-background">
+                          <LocalImagePreview 
+                            file={bulkImagesMap.get(bq.media_filename)!} 
+                            alt="Question Image Preview" 
+                            className="max-h-32 object-contain" 
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-xs font-semibold text-red-500 bg-red-50 border border-red-100 rounded-lg p-2 flex items-center gap-1.5 w-fit">
+                          <span>⚠️ Missing question image file:</span>
+                          <code className="bg-red-100 px-1 py-0.5 rounded font-mono">{bq.media_filename}</code>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Options List with Option Images & Warnings */}
+                  {bq.options && bq.options.length > 0 && (
+                    <div className="mt-3 pl-4 border-l-2 border-black/10 space-y-2">
+                      {bq.options.map((opt: any, oIdx: number) => (
+                        <div key={oIdx} className="text-xs space-y-1">
+                          <div className="flex items-center gap-2">
+                            {opt.is_correct ? <CheckCircle2 className="w-3 h-3 text-green-600" /> : <div className="w-3 h-3" />}
+                            <span className={opt.is_correct ? 'font-bold text-green-700' : 'text-foreground/60'}>
+                              {opt.content_text || "(No text)"}
+                            </span>
+                            {opt.media_filename && !opt.media_exists && (
+                              <span className="text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-100 font-mono ml-2">
+                                ⚠️ Missing image: {opt.media_filename}
+                              </span>
+                            )}
+                          </div>
+                          {opt.media_filename && opt.media_exists && (
+                            <div className="pl-5">
+                              <div className="inline-block border rounded-md overflow-hidden bg-background">
+                                <LocalImagePreview 
+                                  file={bulkImagesMap.get(opt.media_filename)!} 
+                                  alt="Option Image Preview" 
+                                  className="max-h-20 object-contain" 
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -874,7 +1074,15 @@ export default function AdminExamQuestions() {
 
           <DialogFooter className="border-t border-black/5 pt-4">
              <Button variant="outline" onClick={() => setBulkPreviewOpen(false)} disabled={isUploadingBulk}>Cancel</Button>
-             <Button onClick={saveApprovedBulkQuestions} disabled={isUploadingBulk || !bulkQuestions.some(q => q.status === 'approved')} className="bg-primary hover:bg-primary/90 gap-2">
+             <Button 
+               onClick={saveApprovedBulkQuestions} 
+               disabled={
+                 isUploadingBulk || 
+                 !bulkQuestions.some(q => q.status === 'approved') ||
+                 bulkQuestions.some(q => q.status === 'approved' && ((!q.media_exists) || q.options.some((opt: any) => !opt.media_exists)))
+               } 
+               className="bg-primary hover:bg-primary/90 gap-2"
+             >
                {isUploadingBulk && <Loader2 className="w-4 h-4 animate-spin" />}
                Save Approved Questions
              </Button>
