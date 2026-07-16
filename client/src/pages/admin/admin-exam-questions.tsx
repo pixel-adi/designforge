@@ -496,6 +496,14 @@ export default function AdminExamQuestions() {
     setBulkQuestions(bulkQuestions.map(q => q._tempId === id ? { ...q, duplicate_action: action } : q));
   };
 
+  const setAllDuplicateActions = (action: 'skip' | 'overwrite' | 'create') => {
+    setBulkQuestions(bulkQuestions.map(q => q.is_duplicate ? { ...q, duplicate_action: action } : q));
+    toast({ 
+      title: `Bulk Resolution Updated`, 
+      description: `All duplicate questions have been set to "${action === 'skip' ? 'Skip Import' : action === 'overwrite' ? 'Overwrite & Replace' : 'Create New Copy'}"` 
+    });
+  };
+
   const filteredBulkQuestions = bulkQuestions.filter(q => bulkFilterType === "ALL" || q.type === bulkFilterType);
 
   const saveApprovedBulkQuestions = async () => {
@@ -1048,32 +1056,52 @@ export default function AdminExamQuestions() {
             <DialogDescription>Review the parsed questions. Select questions to approve or reject them.</DialogDescription>
             
             {/* Filters & Bulk Actions */}
-            <div className="flex flex-col md:flex-row justify-between gap-4 pt-4 border-t mt-4 border-black/5">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm text-foreground/50 mr-2">Filter:</span>
-                {['ALL', 'MCQ', 'MSQ', 'NAT', 'SUBJECTIVE'].map(type => (
-                  <button
-                    key={type}
-                    onClick={() => setBulkFilterType(type)}
-                    className={`px-3 py-1 text-xs font-bold rounded-full border transition-colors ${bulkFilterType === type ? 'bg-primary text-white border-primary' : 'bg-white border-black/10 text-foreground/70 hover:bg-black/5'}`}
-                  >
-                    {type}
-                  </button>
-                ))}
+            <div className="flex flex-col gap-4 pt-4 border-t mt-4 border-black/5">
+              <div className="flex flex-col md:flex-row justify-between gap-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-foreground/50 mr-2">Filter:</span>
+                  {['ALL', 'MCQ', 'MSQ', 'NAT', 'SUBJECTIVE'].map(type => (
+                    <button
+                      key={type}
+                      onClick={() => setBulkFilterType(type)}
+                      className={`px-3 py-1 text-xs font-bold rounded-full border transition-colors ${bulkFilterType === type ? 'bg-primary text-white border-primary' : 'bg-white border-black/10 text-foreground/70 hover:bg-black/5'}`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-foreground/50 mr-2">{bulkSelectedIds.length} selected</span>
+                  <Button size="sm" variant="outline" onClick={() => setBulkSelectedIds(bulkSelectedIds.length === filteredBulkQuestions.length ? [] : filteredBulkQuestions.map(q => q._tempId))}>
+                    {bulkSelectedIds.length === filteredBulkQuestions.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                  <Button size="sm" onClick={() => handleBulkAction('approved')} disabled={bulkSelectedIds.length === 0} className="bg-green-600 hover:bg-green-700 text-white">
+                    Approve Selected
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => handleBulkAction('rejected')} disabled={bulkSelectedIds.length === 0}>
+                    Reject Selected
+                  </Button>
+                </div>
               </div>
-              
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-foreground/50 mr-2">{bulkSelectedIds.length} selected</span>
-                <Button size="sm" variant="outline" onClick={() => setBulkSelectedIds(bulkSelectedIds.length === filteredBulkQuestions.length ? [] : filteredBulkQuestions.map(q => q._tempId))}>
-                  {bulkSelectedIds.length === filteredBulkQuestions.length ? 'Deselect All' : 'Select All'}
-                </Button>
-                <Button size="sm" onClick={() => handleBulkAction('approved')} disabled={bulkSelectedIds.length === 0} className="bg-green-600 hover:bg-green-700 text-white">
-                  Approve Selected
-                </Button>
-                <Button size="sm" variant="destructive" onClick={() => handleBulkAction('rejected')} disabled={bulkSelectedIds.length === 0}>
-                  Reject Selected
-                </Button>
-              </div>
+
+              {/* Global Duplicate Actions */}
+              {bulkQuestions.some(q => q.is_duplicate) && (
+                <div className="flex items-center gap-2 border-t pt-3 border-black/5 flex-wrap">
+                  <span className="text-xs text-foreground/60 font-semibold bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-md">
+                    ⚠️ Duplicate Resolution for All:
+                  </span>
+                  <Button size="sm" variant="outline" className="text-xs border-amber-200 bg-amber-50/50 hover:bg-amber-50 text-amber-800 h-8" onClick={() => setAllDuplicateActions('skip')}>
+                    Skip All
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-xs border-amber-200 bg-amber-50/50 hover:bg-amber-50 text-amber-800 h-8" onClick={() => setAllDuplicateActions('overwrite')}>
+                    Overwrite & Replace All
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-xs border-amber-200 bg-amber-50/50 hover:bg-amber-50 text-amber-800 h-8" onClick={() => setAllDuplicateActions('create')}>
+                    Create Copy All
+                  </Button>
+                </div>
+              )}
             </div>
           </DialogHeader>
 
