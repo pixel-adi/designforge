@@ -107,7 +107,7 @@ export default function AdminExamQuestions() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [geminiKey, setGeminiKey] = useState("");
-  const [geminiModel, setGeminiModel] = useState("gemini-1.5-flash");
+  const [geminiModel, setGeminiModel] = useState("gemini-2.5-flash");
   const [aiImporterOpen, setAiImporterOpen] = useState(false);
   const [questionPdfFile, setQuestionPdfFile] = useState<File | null>(null);
   const [answerKeyPdfFile, setAnswerKeyPdfFile] = useState<File | null>(null);
@@ -221,9 +221,9 @@ export default function AdminExamQuestions() {
       .from("system_settings")
       .select("key, value");
     const key = data?.find(d => d.key === "gemini_api_key")?.value || "";
-    let model = data?.find(d => d.key === "gemini_api_model")?.value || "gemini-1.5-flash";
-    if (model === "gemini-1.5-pro") {
-      model = "gemini-1.5-flash";
+    let model = data?.find(d => d.key === "gemini_api_model")?.value || "gemini-2.5-flash";
+    if (model.startsWith("gemini-1.5")) {
+      model = "gemini-2.5-flash";
     }
     return { key, model };
   };
@@ -345,10 +345,10 @@ export default function AdminExamQuestions() {
         console.error("First fetch failed", e);
       }
 
-      if ((!response || !response.ok) && model !== "gemini-1.5-flash") {
-        console.warn(`Model ${model} failed, trying fallback to gemini-1.5-flash...`);
-        setAiProcessingStatus("Falling back to Gemini 1.5 Flash...");
-        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+      if ((!response || !response.ok) && model !== "gemini-2.5-flash") {
+        console.warn(`Model ${model} failed, trying fallback to gemini-2.5-flash...`);
+        setAiProcessingStatus("Falling back to Gemini 2.5 Flash...");
+        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1770,9 +1770,10 @@ export default function AdminExamQuestions() {
                   <SelectValue placeholder="Select model" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash (Recommended — Free & Very Fast)</SelectItem>
-                  <SelectItem value="gemini-1.5-pro-latest">Gemini 1.5 Pro Latest (Best Quality — Free with limits)</SelectItem>
-                  <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro Stable (Alternative)</SelectItem>
+                  <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended — Free & Very Fast)</SelectItem>
+                  <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro (Best Quality — Free with limits)</SelectItem>
+                  <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash (Fast Alternative)</SelectItem>
+                  <SelectItem value="gemini-flash-latest">Gemini Flash Latest (Stable fallback)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
