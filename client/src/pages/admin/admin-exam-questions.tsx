@@ -189,7 +189,10 @@ export default function AdminExamQuestions() {
       .from("system_settings")
       .select("key, value");
     const key = data?.find(d => d.key === "gemini_api_key")?.value || "";
-    const model = data?.find(d => d.key === "gemini_api_model")?.value || "gemini-1.5-flash";
+    let model = data?.find(d => d.key === "gemini_api_model")?.value || "gemini-1.5-flash";
+    if (model === "gemini-1.5-pro") {
+      model = "gemini-1.5-flash";
+    }
     return { key, model };
   };
 
@@ -238,76 +241,152 @@ export default function AdminExamQuestions() {
           
       Ensure the output is valid JSON matching the specified schema. Output ONLY the JSON block. Do not include markdown code block quotes.`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: systemPrompt },
-                {
-                  inlineData: {
-                    mimeType: "application/pdf",
-                    data: qPdfBase64
+      let response;
+      try {
+        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: systemPrompt },
+                  {
+                    inlineData: {
+                      mimeType: "application/pdf",
+                      data: qPdfBase64
+                    }
+                  },
+                  {
+                    inlineData: {
+                      mimeType: "application/pdf",
+                      data: aPdfBase64
+                    }
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "OBJECT",
+                properties: {
+                  questions: {
+                    type: "ARRAY",
+                    items: {
+                      type: "OBJECT",
+                      properties: {
+                        part: { type: "STRING", enum: ["A", "B"] },
+                        type: { type: "STRING", enum: ["MCQ", "MSQ", "NAT", "SUBJECTIVE"] },
+                        difficulty: { type: "STRING", enum: ["Low", "Medium", "High"] },
+                        content_text: { type: "STRING" },
+                        topics: { type: "ARRAY", items: { type: "STRING" } },
+                        pyq_tag: { type: "STRING" },
+                        has_diagram: { type: "BOOLEAN" },
+                        diagram_page: { type: "INTEGER" },
+                        diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } },
+                        options: {
+                          type: "ARRAY",
+                          items: {
+                            type: "OBJECT",
+                            properties: {
+                              content_text: { type: "STRING" },
+                              is_correct: { type: "BOOLEAN" },
+                              has_diagram: { type: "BOOLEAN" },
+                              diagram_page: { type: "INTEGER" },
+                              diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
+                            },
+                            required: ["content_text", "is_correct", "has_diagram"]
+                          }
+                        }
+                      },
+                      required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "options"]
+                    }
                   }
                 },
-                {
-                  inlineData: {
-                    mimeType: "application/pdf",
-                    data: aPdfBase64
-                  }
-                }
-              ]
+                required: ["questions"]
+              }
             }
-          ],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                questions: {
-                  type: "ARRAY",
-                  items: {
-                    type: "OBJECT",
-                    properties: {
-                      part: { type: "STRING", enum: ["A", "B"] },
-                      type: { type: "STRING", enum: ["MCQ", "MSQ", "NAT", "SUBJECTIVE"] },
-                      difficulty: { type: "STRING", enum: ["Low", "Medium", "High"] },
-                      content_text: { type: "STRING" },
-                      topics: { type: "ARRAY", items: { type: "STRING" } },
-                      pyq_tag: { type: "STRING" },
-                      has_diagram: { type: "BOOLEAN" },
-                      diagram_page: { type: "INTEGER" },
-                      diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } },
-                      options: {
-                        type: "ARRAY",
-                        items: {
-                          type: "OBJECT",
-                          properties: {
-                            content_text: { type: "STRING" },
-                            is_correct: { type: "BOOLEAN" },
-                            has_diagram: { type: "BOOLEAN" },
-                            diagram_page: { type: "INTEGER" },
-                            diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
-                          },
-                          required: ["content_text", "is_correct", "has_diagram"]
-                        }
-                      }
-                    },
-                    required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "options"]
-                  }
-                }
-              },
-              required: ["questions"]
-            }
-          }
-        })
-      });
+          })
+        });
+      } catch (e) {
+        console.error("First fetch failed", e);
+      }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini API Error: ${response.status} - ${errorText}`);
+      if ((!response || !response.ok) && model !== "gemini-1.5-flash") {
+        console.warn(`Model ${model} failed, trying fallback to gemini-1.5-flash...`);
+        setAiProcessingStatus("Falling back to Gemini 1.5 Flash...");
+        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: systemPrompt },
+                  {
+                    inlineData: {
+                      mimeType: "application/pdf",
+                      data: qPdfBase64
+                    }
+                  },
+                  {
+                    inlineData: {
+                      mimeType: "application/pdf",
+                      data: aPdfBase64
+                    }
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "OBJECT",
+                properties: {
+                  questions: {
+                    type: "ARRAY",
+                    items: {
+                      type: "OBJECT",
+                      properties: {
+                        part: { type: "STRING", enum: ["A", "B"] },
+                        type: { type: "STRING", enum: ["MCQ", "MSQ", "NAT", "SUBJECTIVE"] },
+                        difficulty: { type: "STRING", enum: ["Low", "Medium", "High"] },
+                        content_text: { type: "STRING" },
+                        topics: { type: "ARRAY", items: { type: "STRING" } },
+                        pyq_tag: { type: "STRING" },
+                        has_diagram: { type: "BOOLEAN" },
+                        diagram_page: { type: "INTEGER" },
+                        diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } },
+                        options: {
+                          type: "ARRAY",
+                          items: {
+                            type: "OBJECT",
+                            properties: {
+                              content_text: { type: "STRING" },
+                              is_correct: { type: "BOOLEAN" },
+                              has_diagram: { type: "BOOLEAN" },
+                              diagram_page: { type: "INTEGER" },
+                              diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
+                            },
+                            required: ["content_text", "is_correct", "has_diagram"]
+                          }
+                        }
+                      },
+                      required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "options"]
+                    }
+                  }
+                },
+                required: ["questions"]
+              }
+            }
+          })
+        });
+      }
+
+      if (!response || !response.ok) {
+        const errorText = response ? await response.text() : "Network Error";
+        throw new Error(`Gemini API Error: ${response ? response.status : 'Fetch Failed'} - ${errorText}`);
       }
 
       const resData = await response.json();
