@@ -1742,13 +1742,13 @@ export default function AdminExamQuestions() {
 
       {/* SETTINGS MODAL FOR GEMINI KEY */}
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
-        <DialogContent className="max-w-md shadow-2xl rounded-2xl">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[480px] w-[90vw] flex flex-col p-6 gap-0 shadow-2xl rounded-2xl overflow-hidden">
+          <DialogHeader className="mb-4">
             <DialogTitle className="flex items-center gap-2"><Settings className="w-5 h-5 text-primary" /> AI Importer Settings</DialogTitle>
             <DialogDescription>Configure the Google Gemini API key and model selection.</DialogDescription>
           </DialogHeader>
           
-          <div className="py-4 space-y-4">
+          <div className="flex-1 space-y-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="gemini-key">Google Gemini API Key</Label>
               <Input 
@@ -1762,7 +1762,7 @@ export default function AdminExamQuestions() {
                 You can obtain a free API key by visiting <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-primary hover:underline">Google AI Studio</a>. No billing setup or credit cards are required.
               </p>
             </div>
-
+ 
             <div className="space-y-2">
               <Label htmlFor="gemini-model">Gemini Model Selection</Label>
               <Select value={geminiModel} onValueChange={setGeminiModel}>
@@ -1777,7 +1777,7 @@ export default function AdminExamQuestions() {
                 </SelectContent>
               </Select>
             </div>
-
+ 
             <div className="pt-2 flex flex-col gap-2">
               <Button 
                 type="button" 
@@ -1790,14 +1790,14 @@ export default function AdminExamQuestions() {
                 {testingKey ? "Testing..." : "Test API Key Connection"}
               </Button>
               {testResult && (
-                <div className="text-xs p-3 rounded-lg border bg-black/5 leading-relaxed break-all font-mono">
+                <div className="text-[11px] p-3 rounded-xl border border-black/5 bg-black/5 leading-relaxed break-words whitespace-pre-wrap font-mono max-h-[150px] overflow-y-auto text-foreground/80 w-full">
                   {testResult}
                 </div>
               )}
             </div>
           </div>
-
-          <DialogFooter className="border-t border-black/5 pt-4">
+ 
+          <DialogFooter className="border-t border-black/5 pt-4 mt-4">
             <Button variant="outline" onClick={() => setShowSettings(false)}>Cancel</Button>
             <Button onClick={saveGeminiKey} className="bg-primary hover:bg-primary/90">Save Settings</Button>
           </DialogFooter>
