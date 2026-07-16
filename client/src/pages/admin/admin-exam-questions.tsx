@@ -233,6 +233,30 @@ export default function AdminExamQuestions() {
     return { key, model };
   };
 
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const fetchWithRetry = async (url: string, options: RequestInit, retries = 3, delay = 2000): Promise<Response> => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await fetch(url, options);
+        if (response.status === 429 || response.status === 503) {
+          console.warn(`Request failed with status ${response.status}. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
+          setAiProcessingStatus(`Server busy (${response.status}). Retrying attempt ${i + 1} of ${retries}...`);
+          await sleep(delay);
+          delay *= 1.5;
+          continue;
+        }
+        return response;
+      } catch (err) {
+        if (i === retries - 1) throw err;
+        console.warn(`Fetch error occurred. Retrying in ${delay}ms...`, err);
+        await sleep(delay);
+        delay *= 1.5;
+      }
+    }
+    throw new Error("API call failed after maximum retries.");
+  };
+
   const processAIImporter = async () => {
     if (!questionPdfFile || !answerKeyPdfFile) {
       toast({ title: "Files required", description: "Please upload both the Question Paper and Answer Key PDFs.", variant: "destructive" });
@@ -288,7 +312,7 @@ export default function AdminExamQuestions() {
 
       let response;
       try {
-        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+        response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -364,75 +388,79 @@ export default function AdminExamQuestions() {
       if ((!response || !response.ok) && model !== "gemini-flash-latest") {
         console.warn(`Model ${model} failed, trying fallback to gemini-flash-latest...`);
         setAiProcessingStatus("Falling back to Gemini Flash Latest...");
-        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: systemPrompt },
-                  { text: "Here is the Question Paper PDF:" },
-                  {
-                    inlineData: {
-                      mimeType: "application/pdf",
-                      data: qPdfBase64
+        try {
+          response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    { text: systemPrompt },
+                    { text: "Here is the Question Paper PDF:" },
+                    {
+                      inlineData: {
+                        mimeType: "application/pdf",
+                        data: qPdfBase64
+                      }
+                    },
+                    { text: "Here is the Answer Key PDF:" },
+                    {
+                      inlineData: {
+                        mimeType: "application/pdf",
+                        data: aPdfBase64
+                      }
+                    }
+                  ]
+                }
+              ],
+              generationConfig: {
+                temperature: 0.0,
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: "OBJECT",
+                  properties: {
+                    questions: {
+                      type: "ARRAY",
+                      items: {
+                        type: "OBJECT",
+                        properties: {
+                          part: { type: "STRING", enum: ["A", "B"] },
+                          type: { type: "STRING", enum: ["MCQ", "MSQ", "NAT", "SUBJECTIVE"] },
+                          difficulty: { type: "STRING", enum: ["Low", "Medium", "High"] },
+                          content_text: { type: "STRING" },
+                          topics: { type: "ARRAY", items: { type: "STRING" } },
+                          pyq_tag: { type: "STRING" },
+                          has_diagram: { type: "BOOLEAN" },
+                          diagram_page: { type: "INTEGER" },
+                          diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } },
+                          options: {
+                            type: "ARRAY",
+                            items: {
+                              type: "OBJECT",
+                              properties: {
+                                content_text: { type: "STRING" },
+                                is_correct: { type: "BOOLEAN" },
+                                has_diagram: { type: "BOOLEAN" },
+                                diagram_page: { type: "INTEGER" },
+                                diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
+                              },
+                              required: ["content_text", "is_correct", "has_diagram"]
+                            }
+                          }
+                        },
+                        required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "options"]
+                      }
                     }
                   },
-                  { text: "Here is the Answer Key PDF:" },
-                  {
-                    inlineData: {
-                      mimeType: "application/pdf",
-                      data: aPdfBase64
-                    }
-                  }
-                ]
+                  required: ["questions"]
+                }
               }
-            ],
-            generationConfig: {
-              temperature: 0.0,
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: "OBJECT",
-                properties: {
-                  questions: {
-                    type: "ARRAY",
-                    items: {
-                      type: "OBJECT",
-                      properties: {
-                        part: { type: "STRING", enum: ["A", "B"] },
-                        type: { type: "STRING", enum: ["MCQ", "MSQ", "NAT", "SUBJECTIVE"] },
-                        difficulty: { type: "STRING", enum: ["Low", "Medium", "High"] },
-                        content_text: { type: "STRING" },
-                        topics: { type: "ARRAY", items: { type: "STRING" } },
-                        pyq_tag: { type: "STRING" },
-                        has_diagram: { type: "BOOLEAN" },
-                        diagram_page: { type: "INTEGER" },
-                        diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } },
-                        options: {
-                          type: "ARRAY",
-                          items: {
-                            type: "OBJECT",
-                            properties: {
-                              content_text: { type: "STRING" },
-                              is_correct: { type: "BOOLEAN" },
-                              has_diagram: { type: "BOOLEAN" },
-                              diagram_page: { type: "INTEGER" },
-                              diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
-                            },
-                            required: ["content_text", "is_correct", "has_diagram"]
-                          }
-                        }
-                      },
-                      required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "options"]
-                    }
-                  }
-                },
-                required: ["questions"]
-              }
-            }
-          })
-        });
+            })
+          });
+        } catch (fallbackErr) {
+          console.error("Fallback fetch failed", fallbackErr);
+        }
       }
 
       if (!response || !response.ok) {
