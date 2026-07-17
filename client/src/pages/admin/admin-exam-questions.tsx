@@ -75,7 +75,35 @@ export default function AdminExamQuestions() {
   const [newQuestion, setNewQuestion] = useState<Omit<Question, "id">>(emptyQuestion);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingNew, setSavingNew] = useState(false);
-  const [topicsInput, setTopicsInput] = useState("");
+  const [newQuestionTopics, setNewQuestionTopics] = useState<string[]>([]);
+  const [currentTopicInput, setCurrentTopicInput] = useState<string>("");
+
+  const addTopicTag = (val: string) => {
+    const tagsToAdd = val.split(",")
+      .map(t => t.trim())
+      .filter(t => t.length > 0 && !newQuestionTopics.includes(t));
+    if (tagsToAdd.length > 0) {
+      setNewQuestionTopics([...newQuestionTopics, ...tagsToAdd]);
+    }
+    setCurrentTopicInput("");
+  };
+
+  const removeTopicTag = (tag: string) => {
+    setNewQuestionTopics(newQuestionTopics.filter(t => t !== tag));
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addTopicTag(currentTopicInput);
+    }
+  };
+
+  const handleTagBlur = () => {
+    if (currentTopicInput.trim()) {
+      addTopicTag(currentTopicInput);
+    }
+  };
   
   // Media State
   const [questionMediaFile, setQuestionMediaFile] = useState<File | null>(null);
@@ -804,10 +832,9 @@ export default function AdminExamQuestions() {
         finalQuestionMediaUrl = await uploadFileToSupabase(questionMediaFile, newQuestion.pyq_tag);
       }
 
-      const formattedTopics = topicsInput.split(',').map(t => t.trim()).filter(t => t.length > 0);
       const questionToSave = { 
         ...newQuestion, 
-        topics: formattedTopics,
+        topics: newQuestionTopics,
         media_url: finalQuestionMediaUrl
       };
       
@@ -861,7 +888,8 @@ export default function AdminExamQuestions() {
       topics: q.topics,
       pyq_tag: q.pyq_tag
     });
-    setTopicsInput(q.topics ? q.topics.join(', ') : '');
+    setNewQuestionTopics(q.topics || []);
+    setCurrentTopicInput("");
     setQuestionMediaPreview(q.media_url || null);
     setQuestionMediaFile(null);
     if (q.id !== 'sample-123') {
@@ -875,7 +903,8 @@ export default function AdminExamQuestions() {
   const cancelEdit = () => {
     setEditingId(null);
     setNewQuestion(emptyQuestion);
-    setTopicsInput("");
+    setNewQuestionTopics([]);
+    setCurrentTopicInput("");
     setOptions([]);
     setQuestionMediaFile(null);
     setQuestionMediaPreview(null);
@@ -1466,13 +1495,30 @@ export default function AdminExamQuestions() {
               </div>
 
               <div>
-                <Label className="text-xs text-[#262626]/60 font-medium">Topics (Comma separated)</Label>
-                <Input 
-                  value={topicsInput} 
-                  onChange={(e) => setTopicsInput(e.target.value)}
-                  placeholder="e.g. Color Theory, Perspective"
-                  className="h-10 mt-1 bg-white" 
-                />
+                <Label className="text-xs text-[#262626]/60 font-medium">Topics / Tags</Label>
+                <div className="mt-1 flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-black/10 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all min-h-[40px]">
+                  {newQuestionTopics.map((tag) => (
+                    <span key={tag} className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-lg font-medium border border-primary/25">
+                      {tag}
+                      <button 
+                        type="button" 
+                        onClick={() => removeTopicTag(tag)} 
+                        className="text-primary/70 hover:text-primary hover:bg-primary/20 rounded-full p-0.5 transition-colors shrink-0"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    placeholder={newQuestionTopics.length === 0 ? "Type tag & press Enter..." : ""}
+                    value={currentTopicInput}
+                    onChange={(e) => setCurrentTopicInput(e.target.value)}
+                    onKeyDown={handleTagKeyDown}
+                    onBlur={handleTagBlur}
+                    className="flex-1 bg-transparent border-0 outline-none text-xs px-1 min-w-[120px] h-6 text-foreground placeholder:text-muted-foreground/50"
+                  />
+                </div>
               </div>
             </div>
 
