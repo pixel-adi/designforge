@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,8 +91,16 @@ export default function AdminExamQuestions() {
   // Filters & State
   const [filterPart, setFilterPart] = useState<string>("ALL");
   const [filterType, setFilterType] = useState<string>("ALL");
+  const [filterPyq, setFilterPyq] = useState<string>("ALL");
   const [searchTopic, setSearchTopic] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 20;
   const [hideSample, setHideSample] = useState<boolean>(false);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterPart, filterType, filterPyq, searchTopic, searchQuery]);
 
   // Bulk Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -286,7 +294,7 @@ export default function AdminExamQuestions() {
       CRITICAL SEGREGATION & FORMATTING RULES:
       * MCQ: If a question has EXACTLY ONE correct option in the Answer Key, type MUST be "MCQ".
       * MSQ: If a question has MORE THAN ONE correct option in the Answer Key, type MUST be "MSQ".
-      * NAT: If the question requires a numerical input (no options are shown in the paper), type MUST be "NAT". Options array MUST be empty [].
+      * NAT: If the question requires a numerical input (no options are shown in the paper), type MUST be "NAT". The options array MUST contain exactly one option, where content_text is the correct numerical answer (value or range, e.g., "14.5" or "14-15") resolved from the Answer Key PDF, and is_correct MUST be true.
       * SUBJECTIVE: If the question is a drawing, sketching, or design-based descriptive question (Part B), type MUST be "SUBJECTIVE". Options array MUST be empty [].
       
       For each question, extract:
@@ -302,7 +310,7 @@ export default function AdminExamQuestions() {
       7. has_diagram: true if the question body contains a diagram, sketch, drawing, photo, table, or visual illustration. Otherwise false.
       8. diagram_page: The 1-based page number in the Question Paper PDF where the diagram is located. If has_diagram is false, this MUST be -1.
       9. diagram_bbox: Bounding box coordinates [ymin, xmin, ymax, xmax] normalized from 0 to 1000. If has_diagram is false, this MUST be an empty array [].
-      10. options: MCQ and MSQ questions MUST have exactly 4 options. NAT and SUBJECTIVE questions MUST have 0 options (empty array []).
+      10. options: MCQ and MSQ questions MUST have exactly 4 options. NAT questions MUST have exactly 1 option (the correct answer key/value where is_correct is true). SUBJECTIVE questions MUST have 0 options (empty array []).
           Each option has:
           - content_text: Option text.
             * Output clean plain text.
@@ -1288,14 +1296,27 @@ export default function AdminExamQuestions() {
     }
   };
 
+  const uniquePyqTags = useMemo(() => {
+    const tags = new Set<string>();
+    questions.forEach(q => {
+      if (q.pyq_tag) tags.add(q.pyq_tag.trim());
+    });
+    return Array.from(tags).sort();
+  }, [questions]);
+
   const filteredQuestions = questions.filter(q => {
     if (filterPart !== "ALL" && q.part !== filterPart) return false;
     if (filterType !== "ALL" && q.type !== filterType) return false;
+    if (filterPyq !== "ALL" && q.pyq_tag !== filterPyq) return false;
     if (searchTopic && !q.topics?.some(t => t.toLowerCase().includes(searchTopic.toLowerCase()))) return false;
+    if (searchQuery && !q.content_text?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
-  const displayQuestions = questions.length > 0 ? filteredQuestions : (hideSample ? [] : [sampleQuestion]);
+  const totalQuestionPages = Math.ceil(filteredQuestions.length / itemsPerPage);
+  const displayQuestions = filteredQuestions.length > 0 
+    ? filteredQuestions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+    : (hideSample ? [] : [sampleQuestion]);
 
   if (loading) return <div className="flex items-center justify-center py-20 text-foreground/40"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
@@ -1306,17 +1327,25 @@ export default function AdminExamQuestions() {
           <h1 className="text-2xl font-semibold text-[#262626]">Exam Questions Repository</h1>
           <p className="text-sm text-[#262626]/50 mt-1">Manage Part A and Part B questions, media, and bulk uploads.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={downloadSampleCSV} className="gap-2 text-xs h-9">
-            <Download className="w-4 h-4" /> Sample CSV
-          </Button>
-          <div className="relative">
-            <input type="file" accept=".csv" ref={fileInputRef} onChange={handleCSVUpload} className="hidden" />
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2 text-xs h-9 bg-primary/5 border-primary/20 text-primary hover:bg-primary/10">
-              <Upload className="w-4 h-4" /> Bulk Upload CSV
+      </div>
+
+      {/* RESTRUCTURED TOP PORTAL ACTION BAR */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 bg-white border border-primary/10 rounded-2xl shadow-sm">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground/80">Bulk Upload & AI Importer</h2>
+          <p className="text-xs text-muted-foreground">Import questions via CSV files, directory folders, or Gemini AI extraction.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Standard Bulk Upload Pills */}
+          <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-black/5">
+            <Button variant="ghost" size="sm" onClick={downloadSampleCSV} className="text-xs h-8 px-3 gap-1.5 hover:bg-white rounded-lg text-muted-foreground hover:text-foreground">
+              <Download className="w-3.5 h-3.5" /> Sample CSV
             </Button>
-          </div>
-          <div className="relative">
+            <div className="w-[1px] h-4 bg-border/80" />
+            <input type="file" accept=".csv" ref={fileInputRef} onChange={handleCSVUpload} className="hidden" />
+            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} className="text-xs h-8 px-3 gap-1.5 hover:bg-white rounded-lg">
+              <Upload className="w-3.5 h-3.5" /> CSV Upload
+            </Button>
             <input 
               type="file" 
               accept=".csv,image/*" 
@@ -1326,25 +1355,34 @@ export default function AdminExamQuestions() {
               onChange={handleFolderUpload} 
               className="hidden" 
             />
-            <Button variant="outline" size="sm" onClick={() => folderInputRef.current?.click()} className="gap-2 text-xs h-9 bg-primary/5 border-primary/20 text-primary hover:bg-primary/10">
-              <Upload className="w-4 h-4" /> Bulk Upload Folder
+            <Button variant="ghost" size="sm" onClick={() => folderInputRef.current?.click()} className="text-xs h-8 px-3 gap-1.5 hover:bg-white rounded-lg">
+              <Upload className="w-3.5 h-3.5" /> Folder Upload
             </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setAiImporterOpen(true)} className="gap-2 text-xs h-9 bg-primary/5 border-primary/20 text-primary hover:bg-primary/10">
-            <Sparkles className="w-4 h-4" /> AI Paper Importer
-          </Button>
-          {isAdmin && (
-            <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="gap-2 text-xs h-9 hover:bg-black/5">
-              <Settings className="w-4 h-4" /> AI Settings
+
+          {/* Premium AI Actions */}
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={() => setAiImporterOpen(true)} 
+              className="gap-2 text-xs h-9 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-medium shadow-md shadow-indigo-100/50 rounded-xl"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> AI Paper Importer
             </Button>
-          )}
+            {isAdmin && (
+              <Button variant="outline" size="icon" onClick={() => setShowSettings(true)} className="h-9 w-9 rounded-xl border-primary/20 text-muted-foreground hover:text-foreground hover:bg-muted">
+                <Settings className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* FIXED TOP SECTION: ADD/EDIT */}
-      <div className={`bg-white rounded-xl border ${editingId ? 'border-orange-200 shadow-md ring-1 ring-orange-100' : 'border-primary/20 shadow-sm'} p-6 space-y-6 transition-all duration-300`}>
+      <div className={`bg-white rounded-2xl border ${editingId ? 'border-orange-200 shadow-md ring-1 ring-orange-100' : 'border-primary/10 shadow-sm'} p-6 space-y-6 transition-all duration-300`}>
         <div className="flex items-center justify-between border-b border-black/5 pb-4">
-          <h2 className="text-lg font-medium text-[#262626] flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-[#262626] flex items-center gap-2">
             {editingId ? <FileQuestion className="w-5 h-5 text-orange-500" /> : <PlusCircle className="w-5 h-5 text-primary" />} 
             {editingId ? "Edit Question" : "Add New Question"}
           </h2>
@@ -1355,201 +1393,221 @@ export default function AdminExamQuestions() {
           )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Metadata Row */}
-          <div>
-            <Label className="text-xs text-[#262626]/60">Part</Label>
-            <Select 
-              value={newQuestion.part} 
-              onValueChange={(val: any) => {
-                if (val === 'B') {
-                  setNewQuestion({...newQuestion, part: val, type: 'SUBJECTIVE'});
-                } else if (val === 'A' && newQuestion.type === 'SUBJECTIVE') {
-                  setNewQuestion({...newQuestion, part: val, type: 'MCQ'});
-                } else {
-                  setNewQuestion({...newQuestion, part: val});
-                }
-              }}
-            >
-              <SelectTrigger className="h-10 bg-white"><SelectValue placeholder="Select Part" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="A">Part A (Objective)</SelectItem>
-                <SelectItem value="B">Part B (Subjective/Sketching)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs text-[#262626]/60">Type</Label>
-            <Select 
-              value={newQuestion.type} 
-              onValueChange={(val: any) => setNewQuestion({...newQuestion, type: val})}
-              disabled={newQuestion.part === 'B'}
-            >
-              <SelectTrigger className="h-10 bg-white"><SelectValue placeholder="Select Type" /></SelectTrigger>
-              <SelectContent>
-                {newQuestion.part === 'A' ? (
-                  <>
-                    <SelectItem value="MCQ">Multiple Choice (MCQ)</SelectItem>
-                    <SelectItem value="MSQ">Multiple Select (MSQ)</SelectItem>
-                    <SelectItem value="NAT">Numerical Answer (NAT)</SelectItem>
-                  </>
-                ) : (
-                  <SelectItem value="SUBJECTIVE">Subjective</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs text-[#262626]/60">Difficulty</Label>
-            <Select value={newQuestion.difficulty} onValueChange={(val: any) => setNewQuestion({...newQuestion, difficulty: val})}>
-              <SelectTrigger className="h-10 bg-white"><SelectValue placeholder="Select Difficulty" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Low">Low</SelectItem>
-                <SelectItem value="Medium">Medium</SelectItem>
-                <SelectItem value="High">High</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs text-[#262626]/60">PYQ Tag (Optional)</Label>
-            <Input 
-              value={newQuestion.pyq_tag || ''} 
-              onChange={(e) => setNewQuestion({...newQuestion, pyq_tag: e.target.value})}
-              placeholder="e.g. CEED 2022"
-              className="h-10" 
-            />
-          </div>
-          
-          {/* Content & Media Row */}
-          <div className="md:col-span-2 lg:col-span-3">
-            <Label className="text-xs text-[#262626]/60 mb-1 block">Question Content</Label>
-            <div className="bg-white rounded-md border-0">
-              <ReactQuill 
-                theme="snow" 
-                value={newQuestion.content_text} 
-                onChange={(content) => setNewQuestion({...newQuestion, content_text: content})}
-                placeholder="Enter the question text here..."
-                className="h-[140px] mb-12"
-                modules={{
-                  toolbar: [
-                    ['bold', 'italic', 'underline'],
-                    [{'list': 'bullet'}, {'list': 'ordered'}],
-                  ],
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="md:col-span-2 lg:col-span-1">
-            <Label className="text-xs text-[#262626]/60 mb-1 block">Question Media (Optional)</Label>
-            <div className="border-2 border-dashed border-black/10 rounded-xl p-4 flex flex-col items-center justify-center text-center h-[140px] relative overflow-hidden bg-background/50 hover:bg-background transition-colors">
-              {questionMediaPreview ? (
-                <>
-                  <img src={questionMediaPreview} alt="Preview" className="absolute inset-0 w-full h-full object-contain p-2" />
-                  <button onClick={() => { setQuestionMediaFile(null); setQuestionMediaPreview(null); setNewQuestion({...newQuestion, media_url: undefined}); }} className="absolute top-1 right-1 bg-white rounded-full p-1 shadow-md hover:bg-red-50 text-red-500">
-                    <X className="w-4 h-4" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <ImageIcon className="w-6 h-6 text-foreground/40 mb-2" />
-                  <span className="text-xs text-foreground/60">Click to upload image</span>
-                  <input type="file" accept="image/*,video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleQuestionFileChange} />
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Options Management (Only for MCQ/MSQ/NAT) */}
-          {(newQuestion.type === 'MCQ' || newQuestion.type === 'MSQ' || newQuestion.type === 'NAT') && (
-            <div className="md:col-span-2 lg:col-span-4 border rounded-xl p-4 bg-background/30">
-              <div className="flex items-center justify-between mb-4">
-                <Label className="text-sm font-medium text-[#262626]">
-                  {newQuestion.type === 'NAT' ? "Acceptable Answers (Exact Matches)" : "Answer Options"}
-                </Label>
-                <Button size="sm" variant="outline" onClick={addOption} className="h-8 gap-2">
-                  <PlusCircle className="w-4 h-4" /> 
-                  {newQuestion.type === 'NAT' ? "Add Answer" : "Add Option"}
-                </Button>
-              </div>
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left Column / Sidebar (Selection, Tag Options, Save) */}
+          <div className="w-full lg:w-1/3 bg-background/30 p-5 rounded-2xl border border-black/5 space-y-4 flex flex-col justify-between">
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 border-b border-black/5 pb-2">Question Parameters</h3>
               
-              <div className="space-y-3">
-                {options.map((opt, idx) => (
-                  <div key={idx} className={`flex items-start gap-3 p-3 rounded-lg border ${opt.is_correct ? 'border-green-300 bg-green-50' : 'border-black/5 bg-white'}`}>
-                    {/* Correct Checkbox (Hidden for NAT) */}
-                    {newQuestion.type !== 'NAT' && (
-                      <button 
-                        onClick={() => {
-                          if (newQuestion.type === 'MCQ') {
-                            // Uncheck all others
-                            const newOpts = options.map((o, i) => ({ ...o, is_correct: i === idx ? !o.is_correct : false }));
-                            setOptions(newOpts);
-                          } else {
-                            updateOption(idx, 'is_correct', !opt.is_correct);
-                          }
-                        }}
-                        className={`mt-2 shrink-0 w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${opt.is_correct ? 'bg-green-500 border-green-600 text-white' : 'border-black/20 text-transparent hover:border-black/40'}`}
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
+              <div>
+                <Label className="text-xs text-[#262626]/60 font-medium">Part</Label>
+                <Select 
+                  value={newQuestion.part} 
+                  onValueChange={(val: any) => {
+                    if (val === 'B') {
+                      setNewQuestion({...newQuestion, part: val, type: 'SUBJECTIVE'});
+                    } else if (val === 'A' && newQuestion.type === 'SUBJECTIVE') {
+                      setNewQuestion({...newQuestion, part: val, type: 'MCQ'});
+                    } else {
+                      setNewQuestion({...newQuestion, part: val});
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-10 bg-white mt-1"><SelectValue placeholder="Select Part" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A">Part A (Objective)</SelectItem>
+                    <SelectItem value="B">Part B (Subjective/Sketching)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs text-[#262626]/60 font-medium">Type</Label>
+                <Select 
+                  value={newQuestion.type} 
+                  onValueChange={(val: any) => setNewQuestion({...newQuestion, type: val})}
+                  disabled={newQuestion.part === 'B'}
+                >
+                  <SelectTrigger className="h-10 bg-white mt-1"><SelectValue placeholder="Select Type" /></SelectTrigger>
+                  <SelectContent>
+                    {newQuestion.part === 'A' ? (
+                      <>
+                        <SelectItem value="MCQ">Multiple Choice (MCQ)</SelectItem>
+                        <SelectItem value="MSQ">Multiple Select (MSQ)</SelectItem>
+                        <SelectItem value="NAT">Numerical Answer (NAT)</SelectItem>
+                      </>
+                    ) : (
+                      <SelectItem value="SUBJECTIVE">Subjective</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs text-[#262626]/60 font-medium">Difficulty</Label>
+                <Select value={newQuestion.difficulty} onValueChange={(val: any) => setNewQuestion({...newQuestion, difficulty: val})}>
+                  <SelectTrigger className="h-10 bg-white mt-1"><SelectValue placeholder="Select Difficulty" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Low">Low</SelectItem>
+                    <SelectItem value="Medium">Medium</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs text-[#262626]/60 font-medium">PYQ Tag (Optional)</Label>
+                <Input 
+                  value={newQuestion.pyq_tag || ''} 
+                  onChange={(e) => setNewQuestion({...newQuestion, pyq_tag: e.target.value})}
+                  placeholder="e.g. CEED 2022"
+                  className="h-10 mt-1 bg-white" 
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs text-[#262626]/60 font-medium">Topics (Comma separated)</Label>
+                <Input 
+                  value={topicsInput} 
+                  onChange={(e) => setTopicsInput(e.target.value)}
+                  placeholder="e.g. Color Theory, Perspective"
+                  className="h-10 mt-1 bg-white" 
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-black/5 mt-4">
+              <Button 
+                variant="default" 
+                onClick={triggerPreview} 
+                disabled={savingNew} 
+                className={`w-full h-11 gap-2 font-medium text-sm transition-all shadow-sm ${editingId ? 'bg-orange-500 hover:bg-orange-600 border-orange-500 text-white' : 'bg-primary hover:bg-primary/95 text-white'}`}
+              >
+                {editingId ? "Preview & Save Changes" : "Preview & Save Question"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Right Column (Main Form Content & Options) */}
+          <div className="w-full lg:w-2/3 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Question Content */}
+              <div className="md:col-span-2">
+                <Label className="text-xs text-[#262626]/60 font-medium mb-1 block">Question Content</Label>
+                <div className="bg-white rounded-md border border-black/10 overflow-hidden">
+                  <ReactQuill 
+                    theme="snow" 
+                    value={newQuestion.content_text} 
+                    onChange={(content) => setNewQuestion({...newQuestion, content_text: content})}
+                    placeholder="Enter the question text here..."
+                    className="h-[140px] mb-12"
+                    modules={{
+                      toolbar: [
+                        ['bold', 'italic', 'underline'],
+                        [{'list': 'bullet'}, {'list': 'ordered'}],
+                      ],
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Question Media */}
+              <div className="md:col-span-1">
+                <Label className="text-xs text-[#262626]/60 font-medium mb-1 block">Question Media (Optional)</Label>
+                <div className="border border-dashed border-black/10 rounded-xl p-4 flex flex-col items-center justify-center text-center h-[184px] relative overflow-hidden bg-background/50 hover:bg-background transition-colors mt-0.5">
+                  {questionMediaPreview ? (
+                    <>
+                      <img src={questionMediaPreview} alt="Preview" className="absolute inset-0 w-full h-full object-contain p-2 z-0" />
+                      <button onClick={() => { setQuestionMediaFile(null); setQuestionMediaPreview(null); setNewQuestion({...newQuestion, media_url: undefined}); }} className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-md hover:bg-red-50 text-red-500 z-10 border">
+                        <X className="w-4 h-4" />
                       </button>
-                    )}
-                    
-                    {/* NAT specific icon indicator */}
-                    {newQuestion.type === 'NAT' && (
-                      <div className="mt-2 shrink-0 w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center">
-                        <CheckCircle2 className="w-4 h-4" />
-                      </div>
-                    )}
-                    
-                    <div className="flex-1 space-y-2">
-                      <Input 
-                        value={opt.content_text} 
-                        onChange={(e) => updateOption(idx, 'content_text', e.target.value)} 
-                        placeholder={newQuestion.type === 'NAT' ? `Valid answer ${idx + 1} (e.g., 14.5 or 14)` : `Option ${idx + 1} text...`}
-                        className="h-9 bg-transparent"
-                      />
-                      {/* Option Media Upload (Hide for NAT) */}
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon className="w-6 h-6 text-foreground/40 mb-2" />
+                      <span className="text-xs text-foreground/60">Click to upload image</span>
+                      <input type="file" accept="image/*,video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleQuestionFileChange} />
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Options Management (Only for MCQ/MSQ/NAT) */}
+            {(newQuestion.type === 'MCQ' || newQuestion.type === 'MSQ' || newQuestion.type === 'NAT') && (
+              <div className="border border-black/5 rounded-2xl p-5 bg-background/40">
+                <div className="flex items-center justify-between mb-4">
+                  <Label className="text-sm font-semibold text-[#262626]">
+                    {newQuestion.type === 'NAT' ? "Acceptable Answers (Exact Matches)" : "Answer Options"}
+                  </Label>
+                  <Button size="sm" variant="outline" onClick={addOption} className="h-8 gap-2 bg-white border-black/10 hover:bg-muted text-xs">
+                    <PlusCircle className="w-4 h-4 text-primary" /> 
+                    {newQuestion.type === 'NAT' ? "Add Answer" : "Add Option"}
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {options.map((opt, idx) => (
+                    <div key={idx} className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${opt.is_correct ? 'border-green-300 bg-green-50/50 shadow-sm shadow-green-50' : 'border-black/5 bg-white'}`}>
+                      {/* Correct Checkbox (Hidden for NAT) */}
                       {newQuestion.type !== 'NAT' && (
-                        <div className="flex items-center gap-2">
-                          <Label className="text-[10px] text-foreground/50 border border-dashed border-black/20 rounded px-2 py-1 cursor-pointer hover:bg-black/5 flex items-center gap-1">
-                            <ImageIcon className="w-3 h-3" /> 
-                            {opt.file ? opt.file.name : (opt.media_url ? "Media Attached" : "Attach Media")}
-                            <input type="file" accept="image/*" className="hidden" onChange={(e) => updateOptionFile(idx, e.target.files ? e.target.files[0] : null)} />
-                          </Label>
-                          {(opt.file || opt.media_url) && (
-                            <button onClick={() => { updateOptionFile(idx, null); updateOption(idx, 'media_url', undefined); }} className="text-[10px] text-red-500 hover:underline">Remove Media</button>
-                          )}
+                        <button 
+                          onClick={() => {
+                            if (newQuestion.type === 'MCQ') {
+                              const newOpts = options.map((o, i) => ({ ...o, is_correct: i === idx ? !o.is_correct : false }));
+                              setOptions(newOpts);
+                            } else {
+                              updateOption(idx, 'is_correct', !opt.is_correct);
+                            }
+                          }}
+                          className={`mt-1.5 shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${opt.is_correct ? 'bg-green-500 border-green-600 text-white' : 'border-black/20 text-transparent hover:border-black/40'}`}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      
+                      {/* NAT specific icon indicator */}
+                      {newQuestion.type === 'NAT' && (
+                        <div className="mt-1.5 shrink-0 w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
                         </div>
                       )}
+                      
+                      <div className="flex-1 space-y-2">
+                        <Input 
+                          value={opt.content_text} 
+                          onChange={(e) => updateOption(idx, 'content_text', e.target.value)} 
+                          placeholder={newQuestion.type === 'NAT' ? `Answer ${idx + 1} (e.g. 14.5)` : `Option ${idx + 1}...`}
+                          className="h-8 bg-transparent text-xs"
+                        />
+                        {/* Option Media Upload (Hide for NAT) */}
+                        {newQuestion.type !== 'NAT' && (
+                          <div className="flex items-center gap-2">
+                            <Label className="text-[9px] text-foreground/50 border border-dashed border-black/20 rounded px-2 py-0.5 cursor-pointer hover:bg-black/5 flex items-center gap-1">
+                              <ImageIcon className="w-2.5 h-2.5" /> 
+                              {opt.file ? opt.file.name : (opt.media_url ? "Attached" : "Attach Image")}
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => updateOptionFile(idx, e.target.files ? e.target.files[0] : null)} />
+                            </Label>
+                            {(opt.file || opt.media_url) && (
+                              <button onClick={() => { updateOptionFile(idx, null); updateOption(idx, 'media_url', undefined); }} className="text-[9px] text-red-500 hover:underline">Remove</button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <button onClick={() => removeOption(idx)} className="mt-1.5 shrink-0 p-1 text-foreground/30 hover:text-red-500 transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-
-                    <button onClick={() => removeOption(idx)} className="mt-2 shrink-0 p-1 text-foreground/30 hover:text-red-500 transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  ))}
+                </div>
+                {options.length === 0 && (
+                  <div className="text-xs text-foreground/40 italic text-center py-4 bg-white/50 rounded-xl border border-dashed border-black/5 mt-2">
+                    {newQuestion.type === 'NAT' ? 'No acceptable answers added. Click "Add Answer".' : 'No options added yet. Click "Add Option".'}
                   </div>
-                ))}
-                {options.length === 0 && <div className="text-xs text-foreground/40 italic">
-                  {newQuestion.type === 'NAT' ? 'No acceptable answers added. Click "Add Answer".' : 'No options added yet. Click "Add Option".'}
-                </div>}
+                )}
               </div>
-            </div>
-          )}
-
-          {/* Topics & Save */}
-          <div className="md:col-span-2 lg:col-span-3">
-            <Label className="text-xs text-[#262626]/60">Topics (Comma separated)</Label>
-            <Input 
-              value={topicsInput} 
-              onChange={(e) => setTopicsInput(e.target.value)}
-              placeholder="e.g. Color Theory, Perspective, Spatial Ability"
-              className="h-10" 
-            />
-          </div>
-
-          <div className="flex items-end lg:col-span-1">
-            <Button variant="outline" onClick={triggerPreview} disabled={savingNew} className={`w-full h-10 gap-2 ${editingId ? 'bg-orange-500 hover:bg-orange-600 border-orange-500' : ''}`}>
-               Preview & Save
-            </Button>
+            )}
           </div>
         </div>
       </div>
@@ -1558,40 +1616,75 @@ export default function AdminExamQuestions() {
 
       {/* BOTTOM SECTION: EXISTING LIST & FILTERS */}
       <div>
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-4">
-          <h3 className="text-lg font-medium text-[#262626]">Question Bank ({questions.length})</h3>
-          
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center border border-black/10 rounded-md bg-white px-2 h-9">
-              <Filter className="w-3 h-3 text-foreground/40 mr-2" />
-              <select className="text-xs bg-transparent outline-none pr-2" value={filterPart} onChange={(e) => setFilterPart(e.target.value)}>
-                <option value="ALL">All Parts</option>
-                <option value="A">Part A</option>
-                <option value="B">Part B</option>
-              </select>
-            </div>
-            
-            <div className="flex items-center border border-black/10 rounded-md bg-white px-2 h-9">
-              <Filter className="w-3 h-3 text-foreground/40 mr-2" />
-              <select className="text-xs bg-transparent outline-none pr-2" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-                <option value="ALL">All Types</option>
-                <option value="MCQ">MCQ</option>
-                <option value="MSQ">MSQ</option>
-                <option value="NAT">NAT</option>
-                <option value="SUBJECTIVE">SUBJECTIVE</option>
-              </select>
-            </div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-[#262626]">Question Bank ({filteredQuestions.length} of {questions.length})</h3>
+        </div>
 
+        {/* RESTRUCTURED FILTERS GRID */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 mb-6 bg-white p-4 rounded-2xl border border-black/5 shadow-sm">
+          {/* Search Content Word */}
+          <div className="sm:col-span-2 md:col-span-2">
+            <Label className="text-[10px] text-foreground/50 font-bold uppercase tracking-wider mb-1 block">Search Question Text</Label>
             <Input 
-              placeholder="Search topics..." 
+              placeholder="Type to search question text..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 text-xs bg-white border-black/10 rounded-xl"
+            />
+          </div>
+          {/* Search Topics */}
+          <div>
+            <Label className="text-[10px] text-foreground/50 font-bold uppercase tracking-wider mb-1 block">Search Topics</Label>
+            <Input 
+              placeholder="e.g. Perspective..." 
               value={searchTopic}
               onChange={(e) => setSearchTopic(e.target.value)}
-              className="h-9 w-40 text-xs bg-white"
+              className="h-9 text-xs bg-white border-black/10 rounded-xl"
             />
+          </div>
+          {/* PYQ Tag Selector */}
+          <div>
+            <Label className="text-[10px] text-foreground/50 font-bold uppercase tracking-wider mb-1 block">Year / PYQ Tag</Label>
+            <Select value={filterPyq} onValueChange={(val) => setFilterPyq(val)}>
+              <SelectTrigger className="h-9 text-xs bg-white border-black/10 rounded-xl"><SelectValue placeholder="All PYQs" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All PYQs</SelectItem>
+                {uniquePyqTags.map(tag => (
+                  <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Part & Type Segmented */}
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Label className="text-[10px] text-foreground/50 font-bold uppercase tracking-wider mb-1 block">Part</Label>
+              <Select value={filterPart} onValueChange={(val) => setFilterPart(val)}>
+                <SelectTrigger className="h-9 text-xs bg-white border-black/10 rounded-xl"><SelectValue placeholder="All" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All</SelectItem>
+                  <SelectItem value="A">A</SelectItem>
+                  <SelectItem value="B">B</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1">
+              <Label className="text-[10px] text-foreground/50 font-bold uppercase tracking-wider mb-1 block">Type</Label>
+              <Select value={filterType} onValueChange={(val) => setFilterType(val)}>
+                <SelectTrigger className="h-9 text-xs bg-white border-black/10 rounded-xl"><SelectValue placeholder="All" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All</SelectItem>
+                  <SelectItem value="MCQ">MCQ</SelectItem>
+                  <SelectItem value="MSQ">MSQ</SelectItem>
+                  <SelectItem value="NAT">NAT</SelectItem>
+                  <SelectItem value="SUBJECTIVE">SUB</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
         
-        <div className="bg-white rounded-xl border border-black/5 overflow-hidden shadow-sm">
+        <div className="bg-white rounded-2xl border border-black/5 overflow-hidden shadow-sm">
           {/* List Header */}
           <div className="grid grid-cols-12 gap-4 border-b border-black/5 p-4 bg-background/50 text-xs font-semibold text-foreground/50 uppercase tracking-widest hidden md:grid">
             <div className="col-span-1">Part</div>
@@ -1655,6 +1748,56 @@ export default function AdminExamQuestions() {
             {displayQuestions.length === 0 && (
               <div className="p-12 text-center text-[#262626]/30 text-sm">
                 No questions found matching the filters.
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalQuestionPages > 1 && (
+              <div className="flex items-center justify-between border-t border-black/5 p-4 bg-background/30">
+                <span className="text-xs text-foreground/50">
+                  Showing {Math.min(filteredQuestions.length, (currentPage - 1) * itemsPerPage + 1)}-{Math.min(filteredQuestions.length, currentPage * itemsPerPage)} of {filteredQuestions.length} questions
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 text-xs gap-1 border-black/10"
+                  >
+                    Previous
+                  </Button>
+                  {Array.from({ length: totalQuestionPages }).map((_, i) => {
+                    const page = i + 1;
+                    // Show only pages close to currentPage if totalQuestionPages is large
+                    if (totalQuestionPages > 6 && Math.abs(page - currentPage) > 1 && page !== 1 && page !== totalQuestionPages) {
+                      if (page === 2 || page === totalQuestionPages - 1) {
+                        return <span key={page} className="px-1 text-foreground/30 text-xs">...</span>;
+                      }
+                      return null;
+                    }
+                    return (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className={`h-8 w-8 text-xs border-black/10 ${currentPage === page ? 'bg-primary text-white hover:bg-primary/90' : ''}`}
+                      >
+                        {page}
+                      </Button>
+                    );
+                  })}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setCurrentPage(prev => Math.min(totalQuestionPages, prev + 1))}
+                    disabled={currentPage === totalQuestionPages}
+                    className="h-8 text-xs gap-1 border-black/10"
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             )}
           </div>
