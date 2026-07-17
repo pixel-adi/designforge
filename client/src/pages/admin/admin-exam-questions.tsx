@@ -1437,7 +1437,7 @@ export default function AdminExamQuestions() {
                   }}
                 >
                   <SelectTrigger className="h-8 text-xs bg-white mt-1"><SelectValue placeholder="Select Part" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-52 overflow-y-auto">
                     <SelectItem value="A">Part A (Objective)</SelectItem>
                     <SelectItem value="B">Part B (Subjective)</SelectItem>
                   </SelectContent>
@@ -1452,7 +1452,7 @@ export default function AdminExamQuestions() {
                   disabled={newQuestion.part === 'B'}
                 >
                   <SelectTrigger className="h-8 text-xs bg-white mt-1"><SelectValue placeholder="Select Type" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-52 overflow-y-auto">
                     {newQuestion.part === 'A' ? (
                       <>
                         <SelectItem value="MCQ">MCQ</SelectItem>
@@ -1470,7 +1470,7 @@ export default function AdminExamQuestions() {
                 <Label className="text-[10px] text-[#262626]/60 font-semibold">Difficulty</Label>
                 <Select value={newQuestion.difficulty} onValueChange={(val: any) => setNewQuestion({...newQuestion, difficulty: val})}>
                   <SelectTrigger className="h-8 text-xs bg-white mt-1"><SelectValue placeholder="Select Difficulty" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-52 overflow-y-auto">
                     <SelectItem value="Low">Low</SelectItem>
                     <SelectItem value="Medium">Medium</SelectItem>
                     <SelectItem value="High">High</SelectItem>
@@ -1656,64 +1656,51 @@ export default function AdminExamQuestions() {
 
       {/* BOTTOM SECTION: EXISTING LIST & FILTERS */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-[#262626]">Question Bank ({filteredQuestions.length} of {questions.length})</h3>
-        </div>
-
-        {/* RESTRUCTURED FILTERS GRID */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 mb-6 bg-white p-4 rounded-2xl border border-black/5 shadow-sm">
-          {/* Search Content Word */}
-          <div className="sm:col-span-2 md:col-span-2">
-            <Label className="text-[10px] text-foreground/50 font-bold uppercase tracking-wider mb-1 block">Search Question Text</Label>
-            <Input 
-              placeholder="Type to search question text..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 text-xs bg-white border-black/10 rounded-xl"
-            />
-          </div>
-          {/* Search Topics */}
-          <div>
-            <Label className="text-[10px] text-foreground/50 font-bold uppercase tracking-wider mb-1 block">Search Topics</Label>
-            <Input 
-              placeholder="e.g. Perspective..." 
-              value={searchTopic}
-              onChange={(e) => setSearchTopic(e.target.value)}
-              className="h-9 text-xs bg-white border-black/10 rounded-xl"
-            />
-          </div>
-          {/* PYQ Tag Selector */}
-          <div>
-            <Label className="text-[10px] text-foreground/50 font-bold uppercase tracking-wider mb-1 block">Year / PYQ Tag</Label>
-            <Select value={filterPyq} onValueChange={(val) => setFilterPyq(val)}>
-              <SelectTrigger className="h-9 text-xs bg-white border-black/10 rounded-xl"><SelectValue placeholder="All PYQs" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All PYQs</SelectItem>
-                {uniquePyqTags.map(tag => (
-                  <SelectItem key={tag} value={tag}>{tag}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {/* Part & Type Segmented */}
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Label className="text-[10px] text-foreground/50 font-bold uppercase tracking-wider mb-1 block">Part</Label>
-              <Select value={filterPart} onValueChange={(val) => setFilterPart(val)}>
-                <SelectTrigger className="h-9 text-xs bg-white border-black/10 rounded-xl"><SelectValue placeholder="All" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All</SelectItem>
-                  <SelectItem value="A">A</SelectItem>
-                  <SelectItem value="B">B</SelectItem>
+        <div className="bg-white rounded-2xl border border-black/5 overflow-hidden shadow-sm">
+          {/* COMBINED MINIMAL TOOLBAR & FILTER HEADER */}
+          <div className="p-3 bg-muted/40 border-b border-black/5 flex flex-col xl:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 shrink-0 self-start xl:self-auto">
+              <h3 className="text-sm font-semibold text-[#262626]">Question Bank</h3>
+              <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
+                {filteredQuestions.length} of {questions.length}
+              </span>
+            </div>
+            
+            {/* Integrated Compact Filters */}
+            <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto xl:justify-end">
+              <Input 
+                placeholder="Search text..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 text-xs bg-white border-black/10 rounded-lg w-full sm:w-44"
+              />
+              <Input 
+                placeholder="Search topics..." 
+                value={searchTopic}
+                onChange={(e) => setSearchTopic(e.target.value)}
+                className="h-8 text-xs bg-white border-black/10 rounded-lg w-full sm:w-36"
+              />
+              <Select value={filterPyq} onValueChange={(val) => setFilterPyq(val)}>
+                <SelectTrigger className="h-8 text-xs bg-white border-black/10 rounded-lg min-w-[130px] w-full sm:w-auto"><SelectValue placeholder="All PYQs" /></SelectTrigger>
+                <SelectContent className="max-h-52 overflow-y-auto">
+                  <SelectItem value="ALL">All PYQs</SelectItem>
+                  {uniquePyqTags.map(tag => (
+                    <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex-1">
-              <Label className="text-[10px] text-foreground/50 font-bold uppercase tracking-wider mb-1 block">Type</Label>
+              <Select value={filterPart} onValueChange={(val) => setFilterPart(val)}>
+                <SelectTrigger className="h-8 text-xs bg-white border-black/10 rounded-lg w-full sm:w-20"><SelectValue placeholder="Part" /></SelectTrigger>
+                <SelectContent className="max-h-52 overflow-y-auto">
+                  <SelectItem value="ALL">Part (All)</SelectItem>
+                  <SelectItem value="A">Part A</SelectItem>
+                  <SelectItem value="B">Part B</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={filterType} onValueChange={(val) => setFilterType(val)}>
-                <SelectTrigger className="h-9 text-xs bg-white border-black/10 rounded-xl"><SelectValue placeholder="All" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All</SelectItem>
+                <SelectTrigger className="h-8 text-xs bg-white border-black/10 rounded-lg w-full sm:w-24"><SelectValue placeholder="Type" /></SelectTrigger>
+                <SelectContent className="max-h-52 overflow-y-auto">
+                  <SelectItem value="ALL">Type (All)</SelectItem>
                   <SelectItem value="MCQ">MCQ</SelectItem>
                   <SelectItem value="MSQ">MSQ</SelectItem>
                   <SelectItem value="NAT">NAT</SelectItem>
@@ -1722,9 +1709,7 @@ export default function AdminExamQuestions() {
               </Select>
             </div>
           </div>
-        </div>
-        
-        <div className="bg-white rounded-2xl border border-black/5 overflow-hidden shadow-sm">
+
           {/* List Header */}
           <div className="grid grid-cols-12 gap-4 border-b border-black/5 p-4 bg-background/50 text-xs font-semibold text-foreground/50 uppercase tracking-widest hidden md:grid">
             <div className="col-span-1">Part</div>
@@ -2135,7 +2120,7 @@ export default function AdminExamQuestions() {
                 <SelectTrigger id="gemini-model">
                   <SelectValue placeholder="Select model" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-52 overflow-y-auto">
                   <SelectItem value="gemini-flash-latest">Gemini Flash Latest (Recommended — Always Active & Free)</SelectItem>
                   <SelectItem value="gemini-pro-latest">Gemini Pro Latest (Best Quality — Free with limits)</SelectItem>
                   <SelectItem value="gemini-3.5-flash">Gemini 3.5 Flash (Newest Release)</SelectItem>
