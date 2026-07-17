@@ -280,9 +280,14 @@ export default function AdminExamQuestions() {
       
       const systemPrompt = `You are an expert exam extraction AI. Your task is to extract all questions (Part A and Part B) and their corresponding correct answers from the provided Question Paper PDF and Answer Key PDF.
       
-      CRITICAL: You must ONLY extract questions that are located between page ${startPage} and page ${endPage} (inclusive) of the Question Paper PDF. Do not extract questions from any other pages. If no questions are found on these pages, return an empty array.
+      CRITICAL PAGE RANGE RULE:
+      You must ONLY extract questions that are located between page ${startPage} and page ${endPage} (inclusive) of the Question Paper PDF. Do not extract questions from any other pages. If no questions are found on these pages, return an empty array.
       
-      Return a structured JSON object containing a "questions" array.
+      CRITICAL SEGREGATION & FORMATTING RULES:
+      * MCQ: If a question has EXACTLY ONE correct option in the Answer Key, type MUST be "MCQ".
+      * MSQ: If a question has MORE THAN ONE correct option in the Answer Key, type MUST be "MSQ".
+      * NAT: If the question requires a numerical input (no options are shown in the paper), type MUST be "NAT". Options array MUST be empty [].
+      * SUBJECTIVE: If the question is a drawing, sketching, or design-based descriptive question (Part B), type MUST be "SUBJECTIVE". Options array MUST be empty [].
       
       For each question, extract:
       1. part: "A" or "B"
@@ -291,22 +296,22 @@ export default function AdminExamQuestions() {
       4. content_text: The complete question text.
          * Output clean plain text.
          * DO NOT include any HTML tags (such as <p>, <b>, <i>, <ul>, <li>, span, etc.).
-         * Strip off any question numbering or index prefix (e.g. strip "Q1.", "Question 1:", "12.", "15.", etc. from the beginning so the question text starts directly with the content).
+         * Strip off any question numbering or index prefix (e.g. strip "Q1.", "Question 1:", "12.", "15.", etc. from the beginning so the question text starts directly with the content). If a question spans across page boundaries, merge the text completely.
       5. topics: Guess relevant design/theory topics (array of strings, e.g. ["Perspective", "Color Theory", "Visualization"])
       6. pyq_tag: Use the provided PYQ Tag: "${aiPyqTag}"
-      7. has_diagram: true if the question body contains a diagram, sketch, drawing, photo, or visual illustration. Otherwise false.
-      8. diagram_page: The 1-based page number in the Question Paper PDF where the diagram is located. Null if has_diagram is false.
-      9. diagram_bbox: If has_diagram is true, detect the bounding box of the diagram on that page. Bounding box coordinates must be [ymin, xmin, ymax, xmax] normalized from 0 to 1000 (where [0, 0, 1000, 1000] is the entire page: ymin is top, xmin is left, ymax is bottom, xmax is right). Ensure you capture the full illustration but exclude text labels.
-      10. options: For MCQ/MSQ/NAT, provide options. (For NAT, specify the correct answer as the first option and set it as correct, or specify options as empty. MCQ/MSQ must have 4 options).
+      7. has_diagram: true if the question body contains a diagram, sketch, drawing, photo, table, or visual illustration. Otherwise false.
+      8. diagram_page: The 1-based page number in the Question Paper PDF where the diagram is located. If has_diagram is false, this MUST be -1.
+      9. diagram_bbox: Bounding box coordinates [ymin, xmin, ymax, xmax] normalized from 0 to 1000. If has_diagram is false, this MUST be an empty array [].
+      10. options: MCQ and MSQ questions MUST have exactly 4 options. NAT and SUBJECTIVE questions MUST have 0 options (empty array []).
           Each option has:
           - content_text: Option text.
             * Output clean plain text.
             * DO NOT include any HTML tags.
             * Strip option prefix labels (e.g. strip "A.", "B.", "a)", "b)", "(a)", "(b)", etc. from the beginning so only the option content remains).
-          - is_correct: true or false (resolve correctness from the Answer Key PDF!)
-          - has_diagram: true if the option itself is an image/diagram.
-          - diagram_page: The page number where the option diagram is located.
-          - diagram_bbox: Bounding box coordinates [ymin, xmin, ymax, xmax] for the option image, normalized 0 to 1000.
+          - is_correct: true or false (resolve correctness strictly from the Answer Key PDF!)
+          - has_diagram: true if the option itself is an image/diagram. Otherwise false.
+          - diagram_page: The page number where the option diagram is located. If has_diagram is false, this MUST be -1.
+          - diagram_bbox: Bounding box coordinates [ymin, xmin, ymax, xmax] for the option image, normalized 0 to 1000. If has_diagram is false, this MUST be an empty array [].
           
       Ensure the output is valid JSON matching the specified schema. Output ONLY the JSON block. Do not include markdown code block quotes.`;
 
@@ -368,11 +373,11 @@ export default function AdminExamQuestions() {
                               diagram_page: { type: "INTEGER" },
                               diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
                             },
-                            required: ["content_text", "is_correct", "has_diagram"]
+                            required: ["content_text", "is_correct", "has_diagram", "diagram_page", "diagram_bbox"]
                           }
                         }
                       },
-                      required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "options"]
+                      required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "diagram_page", "diagram_bbox", "options"]
                     }
                   }
                 },
@@ -445,11 +450,11 @@ export default function AdminExamQuestions() {
                                 diagram_page: { type: "INTEGER" },
                                 diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
                               },
-                              required: ["content_text", "is_correct", "has_diagram"]
+                              required: ["content_text", "is_correct", "has_diagram", "diagram_page", "diagram_bbox"]
                             }
                           }
                         },
-                        required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "options"]
+                        required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "diagram_page", "diagram_bbox", "options"]
                       }
                     }
                   },
@@ -1027,6 +1032,15 @@ export default function AdminExamQuestions() {
       return path.replace(/\\/g, "/").split("/").pop() || "";
     };
 
+    const getValueIgnoreCase = (row: any, keys: string[]) => {
+      const rowKeys = Object.keys(row);
+      for (const k of keys) {
+        const matchedKey = rowKeys.find(rk => rk.toLowerCase().trim() === k.toLowerCase().trim());
+        if (matchedKey) return row[matchedKey];
+      }
+      return undefined;
+    };
+
     // Parse the folder's CSV file
     Papa.parse(csvFile, {
       header: true,
@@ -1045,37 +1059,48 @@ export default function AdminExamQuestions() {
             return { name: originalName || baseName, exists };
           };
 
-          const qImage = checkImage(row['Question Image']);
+          const qImageVal = getValueIgnoreCase(row, ['Question Image', 'QuestionImage', 'Image', 'Media']);
+          const qImage = checkImage(qImageVal);
           
           for (let i = 1; i <= 4; i++) {
-            if (row[`Option ${i}`]) {
-              const optImage = checkImage(row[`Option Image ${i}`]);
+            const optVal = getValueIgnoreCase(row, [`Option ${i}`, `Option${i}`]);
+            if (optVal) {
+              const optImageVal = getValueIgnoreCase(row, [`Option Image ${i}`, `OptionImage${i}`, `Option ${i} Image`]);
+              const optImage = checkImage(optImageVal);
+              const isCorrectVal = getValueIgnoreCase(row, [`Is Correct ${i}`, `IsCorrect${i}`, `Correct ${i}`]);
+              
               opts.push({
-                content_text: row[`Option ${i}`],
-                is_correct: row[`Is Correct ${i}`]?.toUpperCase() === 'TRUE',
+                content_text: optVal,
+                is_correct: isCorrectVal?.toString().toUpperCase() === 'TRUE',
                 media_filename: optImage.name,
                 media_exists: optImage.exists
               });
             }
           }
-          const rawDiff = (row['Difficulty'] || 'Medium').toLowerCase().trim();
+          const diffVal = getValueIgnoreCase(row, ['Difficulty']) || 'Medium';
+          const rawDiff = diffVal.toLowerCase().trim();
           let finalDiff = 'Medium';
           if (rawDiff === 'easy' || rawDiff === 'low') finalDiff = 'Low';
           if (rawDiff === 'hard' || rawDiff === 'high') finalDiff = 'High';
           
-          const content = row['Content Text'] || '';
+          const content = getValueIgnoreCase(row, ['Content Text', 'Question', 'ContentText', 'Text']) || '';
           const norm = normalizeText(content);
           const existingId = existingMap.get(norm);
           const isDuplicate = !!existingId;
 
+          const partVal = getValueIgnoreCase(row, ['Part']) || 'A';
+          const typeVal = getValueIgnoreCase(row, ['Type']) || 'MCQ';
+          const topicsVal = getValueIgnoreCase(row, ['Topics (comma separated)', 'Topics', 'Topic']);
+          const pyqVal = getValueIgnoreCase(row, ['PYQ Tag', 'PYQTag', 'Tag']) || '';
+
           return {
             _tempId: `bulk-${index}`,
-            part: row['Part'] || 'A',
-            type: row['Type'] || 'MCQ',
+            part: partVal,
+            type: typeVal,
             difficulty: finalDiff,
             content_text: content,
-            topics: row['Topics (comma separated)'] ? row['Topics (comma separated)'].split(',').map((t:string) => t.trim()) : [],
-            pyq_tag: row['PYQ Tag'] || '',
+            topics: topicsVal ? topicsVal.split(',').map((t:string) => t.trim()) : [],
+            pyq_tag: pyqVal,
             options: opts,
             media_filename: qImage.name,
             media_exists: qImage.exists,
