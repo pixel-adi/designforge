@@ -1658,7 +1658,7 @@ export default function AdminExamQuestions() {
       <div>
         <div className="bg-white rounded-2xl border border-black/5 overflow-hidden shadow-sm">
           {/* COMBINED MINIMAL TOOLBAR & FILTER HEADER */}
-          <div className="p-3 bg-muted/40 border-b border-black/5 flex flex-col xl:flex-row items-center justify-between gap-3">
+          <div className="p-3.5 bg-muted/40 border-b border-black/5 flex flex-col xl:flex-row items-center justify-between gap-3.5">
             <div className="flex items-center gap-2 shrink-0 self-start xl:self-auto">
               <h3 className="text-sm font-semibold text-[#262626]">Question Bank</h3>
               <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
@@ -1672,17 +1672,17 @@ export default function AdminExamQuestions() {
                 placeholder="Search text..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 text-xs bg-white border-black/10 rounded-lg w-full sm:w-44"
+                className="h-8 text-xs bg-white border-black/10 rounded-lg w-full sm:w-48"
               />
               <Input 
                 placeholder="Search topics..." 
                 value={searchTopic}
                 onChange={(e) => setSearchTopic(e.target.value)}
-                className="h-8 text-xs bg-white border-black/10 rounded-lg w-full sm:w-36"
+                className="h-8 text-xs bg-white border-black/10 rounded-lg w-full sm:w-40"
               />
               <Select value={filterPyq} onValueChange={(val) => setFilterPyq(val)}>
-                <SelectTrigger className="h-8 text-xs bg-white border-black/10 rounded-lg min-w-[130px] w-full sm:w-auto"><SelectValue placeholder="All PYQs" /></SelectTrigger>
-                <SelectContent className="max-h-52 overflow-y-auto">
+                <SelectTrigger className="h-8 text-xs bg-white border-black/10 rounded-lg min-w-[140px] w-full sm:w-auto"><SelectValue placeholder="All PYQs" /></SelectTrigger>
+                <SelectContent className="max-h-52 overflow-y-auto min-w-[180px] whitespace-nowrap">
                   <SelectItem value="ALL">All PYQs</SelectItem>
                   {uniquePyqTags.map(tag => (
                     <SelectItem key={tag} value={tag}>{tag}</SelectItem>
@@ -1690,16 +1690,16 @@ export default function AdminExamQuestions() {
                 </SelectContent>
               </Select>
               <Select value={filterPart} onValueChange={(val) => setFilterPart(val)}>
-                <SelectTrigger className="h-8 text-xs bg-white border-black/10 rounded-lg w-full sm:w-20"><SelectValue placeholder="Part" /></SelectTrigger>
-                <SelectContent className="max-h-52 overflow-y-auto">
+                <SelectTrigger className="h-8 text-xs bg-white border-black/10 rounded-lg w-full sm:w-28"><SelectValue placeholder="Part" /></SelectTrigger>
+                <SelectContent className="max-h-52 overflow-y-auto min-w-[130px] whitespace-nowrap">
                   <SelectItem value="ALL">Part (All)</SelectItem>
                   <SelectItem value="A">Part A</SelectItem>
                   <SelectItem value="B">Part B</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={filterType} onValueChange={(val) => setFilterType(val)}>
-                <SelectTrigger className="h-8 text-xs bg-white border-black/10 rounded-lg w-full sm:w-24"><SelectValue placeholder="Type" /></SelectTrigger>
-                <SelectContent className="max-h-52 overflow-y-auto">
+                <SelectTrigger className="h-8 text-xs bg-white border-black/10 rounded-lg w-full sm:w-32"><SelectValue placeholder="Type" /></SelectTrigger>
+                <SelectContent className="max-h-52 overflow-y-auto min-w-[140px] whitespace-nowrap">
                   <SelectItem value="ALL">Type (All)</SelectItem>
                   <SelectItem value="MCQ">MCQ</SelectItem>
                   <SelectItem value="MSQ">MSQ</SelectItem>
