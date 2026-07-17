@@ -989,14 +989,24 @@ export default function AdminExamQuestions() {
     // Build the strictly matched images map (png, jpg, jpeg, webp, gif)
     const allowedExtensions = ["png", "jpg", "jpeg", "webp", "gif"];
     const imageMap = new Map<string, File>();
+    const lookupMap = new Map<string, string>(); // lowercase base filename -> original file.name
+
     fileArray.forEach(f => {
       const ext = f.name.split('.').pop()?.toLowerCase() || "";
       if (allowedExtensions.includes(ext)) {
         imageMap.set(f.name, f);
+        lookupMap.set(f.name.toLowerCase().trim(), f.name);
       }
     });
 
     setBulkImagesMap(imageMap);
+
+    // Generate object URLs for previewing and merge them
+    const previewUrlsMap = new Map<string, string>();
+    imageMap.forEach((file, filename) => {
+      previewUrlsMap.set(filename, URL.createObjectURL(file));
+    });
+    setBulkImagesPreviewMap(previewUrlsMap);
 
     // Fetch existing questions to check for duplicates
     let existingMap = new Map<string, string>();
@@ -1012,6 +1022,11 @@ export default function AdminExamQuestions() {
       toast({ title: "Failed to check duplicates", description: err.message, variant: "destructive" });
     }
 
+    const getBaseName = (path: string) => {
+      if (!path) return "";
+      return path.replace(/\\/g, "/").split("/").pop() || "";
+    };
+
     // Parse the folder's CSV file
     Papa.parse(csvFile, {
       header: true,
@@ -1022,10 +1037,12 @@ export default function AdminExamQuestions() {
           
           const checkImage = (filename?: string) => {
             if (!filename) return { name: "", exists: true }; // blank is fine (no image)
-            const cleanName = filename.trim();
-            if (!cleanName) return { name: "", exists: true };
-            const exists = imageMap.has(cleanName);
-            return { name: cleanName, exists };
+            const baseName = getBaseName(filename).toLowerCase().trim();
+            if (!baseName) return { name: "", exists: true };
+            
+            const originalName = lookupMap.get(baseName);
+            const exists = !!originalName;
+            return { name: originalName || baseName, exists };
           };
 
           const qImage = checkImage(row['Question Image']);
