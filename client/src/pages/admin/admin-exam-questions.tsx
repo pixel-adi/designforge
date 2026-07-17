@@ -1350,30 +1350,24 @@ export default function AdminExamQuestions() {
   if (loading) return <div className="flex items-center justify-center py-20 text-foreground/40"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   return (
-    <div className="space-y-8 pb-12">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    <div className="space-y-4 pb-8">
+      {/* COMPACT HEADER AND ACTIONS IN SAME ROW */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-black/5 pb-4">
         <div>
-          <h1 className="text-2xl font-semibold text-[#262626]">Exam Questions Repository</h1>
-          <p className="text-sm text-[#262626]/50 mt-1">Manage Part A and Part B questions, media, and bulk uploads.</p>
+          <h1 className="text-xl font-bold text-[#262626] tracking-tight">Exam Questions Repository</h1>
+          <p className="text-xs text-[#262626]/50">Manage Part A & B questions, media, and bulk uploads.</p>
         </div>
-      </div>
-
-      {/* RESTRUCTURED TOP PORTAL ACTION BAR */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 bg-white border border-primary/10 rounded-2xl shadow-sm">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground/80">Bulk Upload & AI Importer</h2>
-          <p className="text-xs text-muted-foreground">Import questions via CSV files, directory folders, or Gemini AI extraction.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
+        
+        <div className="flex flex-wrap items-center gap-2">
           {/* Standard Bulk Upload Pills */}
-          <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-black/5">
-            <Button variant="ghost" size="sm" onClick={downloadSampleCSV} className="text-xs h-8 px-3 gap-1.5 hover:bg-white rounded-lg text-muted-foreground hover:text-foreground">
-              <Download className="w-3.5 h-3.5" /> Sample CSV
+          <div className="flex items-center gap-1 bg-muted/65 p-0.5 rounded-lg border border-black/5">
+            <Button variant="ghost" size="sm" onClick={downloadSampleCSV} className="text-[11px] h-7 px-2.5 gap-1 hover:bg-white rounded text-muted-foreground hover:text-foreground">
+              <Download className="w-3 h-3" /> Sample CSV
             </Button>
-            <div className="w-[1px] h-4 bg-border/80" />
+            <div className="w-[1px] h-3 bg-border/60" />
             <input type="file" accept=".csv" ref={fileInputRef} onChange={handleCSVUpload} className="hidden" />
-            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} className="text-xs h-8 px-3 gap-1.5 hover:bg-white rounded-lg">
-              <Upload className="w-3.5 h-3.5" /> CSV Upload
+            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} className="text-[11px] h-7 px-2.5 gap-1 hover:bg-white rounded">
+              <Upload className="w-3 h-3" /> CSV Upload
             </Button>
             <input 
               type="file" 
@@ -1384,52 +1378,52 @@ export default function AdminExamQuestions() {
               onChange={handleFolderUpload} 
               className="hidden" 
             />
-            <Button variant="ghost" size="sm" onClick={() => folderInputRef.current?.click()} className="text-xs h-8 px-3 gap-1.5 hover:bg-white rounded-lg">
-              <Upload className="w-3.5 h-3.5" /> Folder Upload
+            <Button variant="ghost" size="sm" onClick={() => folderInputRef.current?.click()} className="text-[11px] h-7 px-2.5 gap-1 hover:bg-white rounded">
+              <Upload className="w-3 h-3" /> Folder Upload
             </Button>
           </div>
 
           {/* Premium AI Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <Button 
               variant="default" 
               size="sm" 
               onClick={() => setAiImporterOpen(true)} 
-              className="gap-2 text-xs h-9 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-medium shadow-md shadow-indigo-100/50 rounded-xl"
+              className="gap-1.5 text-[11px] h-7.5 px-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold shadow-sm shadow-indigo-100/50 rounded-lg"
             >
-              <Sparkles className="w-3.5 h-3.5" /> AI Paper Importer
+              <Sparkles className="w-3 h-3" /> AI Importer
             </Button>
             {isAdmin && (
-              <Button variant="outline" size="icon" onClick={() => setShowSettings(true)} className="h-9 w-9 rounded-xl border-primary/20 text-muted-foreground hover:text-foreground hover:bg-muted">
-                <Settings className="w-4 h-4" />
+              <Button variant="outline" size="icon" onClick={() => setShowSettings(true)} className="h-7.5 w-7.5 rounded-lg border-primary/20 text-muted-foreground hover:text-foreground hover:bg-muted">
+                <Settings className="w-3.5 h-3.5" />
               </Button>
             )}
           </div>
         </div>
       </div>
 
-      {/* FIXED TOP SECTION: ADD/EDIT */}
-      <div className={`bg-white rounded-2xl border ${editingId ? 'border-orange-200 shadow-md ring-1 ring-orange-100' : 'border-primary/10 shadow-sm'} p-6 space-y-6 transition-all duration-300`}>
-        <div className="flex items-center justify-between border-b border-black/5 pb-4">
-          <h2 className="text-lg font-semibold text-[#262626] flex items-center gap-2">
-            {editingId ? <FileQuestion className="w-5 h-5 text-orange-500" /> : <PlusCircle className="w-5 h-5 text-primary" />} 
+      {/* COMPACT TOP SECTION: ADD/EDIT */}
+      <div className={`bg-white rounded-2xl border ${editingId ? 'border-orange-200 shadow-md ring-1 ring-orange-100' : 'border-primary/10 shadow-sm'} p-4 space-y-4 transition-all duration-300`}>
+        <div className="flex items-center justify-between border-b border-black/5 pb-2">
+          <h2 className="text-sm font-semibold text-[#262626] flex items-center gap-1.5">
+            {editingId ? <FileQuestion className="w-4 h-4 text-orange-500" /> : <PlusCircle className="w-4 h-4 text-primary" />} 
             {editingId ? "Edit Question" : "Add New Question"}
           </h2>
           {editingId && (
-            <Button variant="ghost" size="sm" onClick={cancelEdit} className="text-foreground/50 hover:text-foreground h-8 px-3">
+            <Button variant="ghost" size="sm" onClick={cancelEdit} className="text-foreground/50 hover:text-foreground h-7 px-2 text-xs">
               Cancel Edit
             </Button>
           )}
         </div>
         
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left Column / Sidebar (Selection, Tag Options, Save) */}
-          <div className="w-full lg:w-1/3 bg-background/30 p-5 rounded-2xl border border-black/5 space-y-4 flex flex-col justify-between">
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 border-b border-black/5 pb-2">Question Parameters</h3>
+        <div className="flex flex-col lg:flex-row gap-5">
+          {/* Left Column / Sidebar (Selection, Tag Options, Save) - Smaller width */}
+          <div className="w-full lg:w-[26%] bg-background/30 p-4 rounded-xl border border-black/5 space-y-3.5 flex flex-col justify-between">
+            <div className="space-y-3">
+              <h3 className="text-[10px] font-bold uppercase tracking-wider text-foreground/55 border-b border-black/5 pb-1.5">Parameters</h3>
               
               <div>
-                <Label className="text-xs text-[#262626]/60 font-medium">Part</Label>
+                <Label className="text-[10px] text-[#262626]/60 font-semibold">Part</Label>
                 <Select 
                   value={newQuestion.part} 
                   onValueChange={(val: any) => {
@@ -1442,28 +1436,28 @@ export default function AdminExamQuestions() {
                     }
                   }}
                 >
-                  <SelectTrigger className="h-10 bg-white mt-1"><SelectValue placeholder="Select Part" /></SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs bg-white mt-1"><SelectValue placeholder="Select Part" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="A">Part A (Objective)</SelectItem>
-                    <SelectItem value="B">Part B (Subjective/Sketching)</SelectItem>
+                    <SelectItem value="B">Part B (Subjective)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
-                <Label className="text-xs text-[#262626]/60 font-medium">Type</Label>
+                <Label className="text-[10px] text-[#262626]/60 font-semibold">Type</Label>
                 <Select 
                   value={newQuestion.type} 
                   onValueChange={(val: any) => setNewQuestion({...newQuestion, type: val})}
                   disabled={newQuestion.part === 'B'}
                 >
-                  <SelectTrigger className="h-10 bg-white mt-1"><SelectValue placeholder="Select Type" /></SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs bg-white mt-1"><SelectValue placeholder="Select Type" /></SelectTrigger>
                   <SelectContent>
                     {newQuestion.part === 'A' ? (
                       <>
-                        <SelectItem value="MCQ">Multiple Choice (MCQ)</SelectItem>
-                        <SelectItem value="MSQ">Multiple Select (MSQ)</SelectItem>
-                        <SelectItem value="NAT">Numerical Answer (NAT)</SelectItem>
+                        <SelectItem value="MCQ">MCQ</SelectItem>
+                        <SelectItem value="MSQ">MSQ</SelectItem>
+                        <SelectItem value="NAT">NAT</SelectItem>
                       </>
                     ) : (
                       <SelectItem value="SUBJECTIVE">Subjective</SelectItem>
@@ -1473,9 +1467,9 @@ export default function AdminExamQuestions() {
               </div>
 
               <div>
-                <Label className="text-xs text-[#262626]/60 font-medium">Difficulty</Label>
+                <Label className="text-[10px] text-[#262626]/60 font-semibold">Difficulty</Label>
                 <Select value={newQuestion.difficulty} onValueChange={(val: any) => setNewQuestion({...newQuestion, difficulty: val})}>
-                  <SelectTrigger className="h-10 bg-white mt-1"><SelectValue placeholder="Select Difficulty" /></SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs bg-white mt-1"><SelectValue placeholder="Select Difficulty" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Low">Low</SelectItem>
                     <SelectItem value="Medium">Medium</SelectItem>
@@ -1485,68 +1479,68 @@ export default function AdminExamQuestions() {
               </div>
 
               <div>
-                <Label className="text-xs text-[#262626]/60 font-medium">PYQ Tag (Optional)</Label>
+                <Label className="text-[10px] text-[#262626]/60 font-semibold">PYQ Tag</Label>
                 <Input 
                   value={newQuestion.pyq_tag || ''} 
                   onChange={(e) => setNewQuestion({...newQuestion, pyq_tag: e.target.value})}
                   placeholder="e.g. CEED 2022"
-                  className="h-10 mt-1 bg-white" 
+                  className="h-8 text-xs mt-1 bg-white" 
                 />
               </div>
 
               <div>
-                <Label className="text-xs text-[#262626]/60 font-medium">Topics / Tags</Label>
-                <div className="mt-1 flex flex-wrap gap-1.5 p-2 bg-white rounded-xl border border-black/10 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all min-h-[40px]">
+                <Label className="text-[10px] text-[#262626]/60 font-semibold">Topics / Tags</Label>
+                <div className="mt-1 flex flex-wrap gap-1 p-1.5 bg-white rounded-lg border border-black/10 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/10 transition-all min-h-[34px]">
                   {newQuestionTopics.map((tag) => (
-                    <span key={tag} className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-lg font-medium border border-primary/25">
+                    <span key={tag} className="inline-flex items-center gap-0.5 bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-md font-medium border border-primary/20">
                       {tag}
                       <button 
                         type="button" 
                         onClick={() => removeTopicTag(tag)} 
                         className="text-primary/70 hover:text-primary hover:bg-primary/20 rounded-full p-0.5 transition-colors shrink-0"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-2.5 h-2.5" />
                       </button>
                     </span>
                   ))}
                   <input
                     type="text"
-                    placeholder={newQuestionTopics.length === 0 ? "Type tag & press Enter..." : ""}
+                    placeholder={newQuestionTopics.length === 0 ? "Type tag & Enter..." : ""}
                     value={currentTopicInput}
                     onChange={(e) => setCurrentTopicInput(e.target.value)}
                     onKeyDown={handleTagKeyDown}
                     onBlur={handleTagBlur}
-                    className="flex-1 bg-transparent border-0 outline-none text-xs px-1 min-w-[120px] h-6 text-foreground placeholder:text-muted-foreground/50"
+                    className="flex-1 bg-transparent border-0 outline-none text-[11px] px-0.5 min-w-[80px] h-5 text-foreground placeholder:text-muted-foreground/50"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="pt-4 border-t border-black/5 mt-4">
+            <div className="pt-3 border-t border-black/5 mt-3">
               <Button 
                 variant="default" 
                 onClick={triggerPreview} 
                 disabled={savingNew} 
-                className={`w-full h-11 gap-2 font-medium text-sm transition-all shadow-sm ${editingId ? 'bg-orange-500 hover:bg-orange-600 border-orange-500 text-white' : 'bg-primary hover:bg-primary/95 text-white'}`}
+                className={`w-full h-9 gap-1.5 font-medium text-xs transition-all shadow-sm ${editingId ? 'bg-orange-500 hover:bg-orange-600 border-orange-500 text-white' : 'bg-primary hover:bg-primary/95 text-white'}`}
               >
-                {editingId ? "Preview & Save Changes" : "Preview & Save Question"}
+                {editingId ? "Save Changes" : "Save Question"}
               </Button>
             </div>
           </div>
 
-          {/* Right Column (Main Form Content & Options) */}
-          <div className="w-full lg:w-2/3 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Right Column (Main Form Content & Options) - Larger width */}
+          <div className="w-full lg:w-[74%] space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Question Content */}
               <div className="md:col-span-2">
-                <Label className="text-xs text-[#262626]/60 font-medium mb-1 block">Question Content</Label>
+                <Label className="text-xs text-[#262626]/60 font-semibold mb-1 block">Question Content</Label>
                 <div className="bg-white rounded-md border border-black/10 overflow-hidden">
                   <ReactQuill 
                     theme="snow" 
                     value={newQuestion.content_text} 
                     onChange={(content) => setNewQuestion({...newQuestion, content_text: content})}
                     placeholder="Enter the question text here..."
-                    className="h-[140px] mb-12"
+                    className="h-[90px] mb-[45px]"
                     modules={{
                       toolbar: [
                         ['bold', 'italic', 'underline'],
@@ -1559,19 +1553,19 @@ export default function AdminExamQuestions() {
 
               {/* Question Media */}
               <div className="md:col-span-1">
-                <Label className="text-xs text-[#262626]/60 font-medium mb-1 block">Question Media (Optional)</Label>
-                <div className="border border-dashed border-black/10 rounded-xl p-4 flex flex-col items-center justify-center text-center h-[184px] relative overflow-hidden bg-background/50 hover:bg-background transition-colors mt-0.5">
+                <Label className="text-xs text-[#262626]/60 font-semibold mb-1 block">Question Media (Optional)</Label>
+                <div className="border border-dashed border-black/10 rounded-xl p-3 flex flex-col items-center justify-center text-center h-[135px] relative overflow-hidden bg-background/50 hover:bg-background transition-colors mt-0.5">
                   {questionMediaPreview ? (
                     <>
                       <img src={questionMediaPreview} alt="Preview" className="absolute inset-0 w-full h-full object-contain p-2 z-0" />
                       <button onClick={() => { setQuestionMediaFile(null); setQuestionMediaPreview(null); setNewQuestion({...newQuestion, media_url: undefined}); }} className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-md hover:bg-red-50 text-red-500 z-10 border">
-                        <X className="w-4 h-4" />
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </>
                   ) : (
                     <>
-                      <ImageIcon className="w-6 h-6 text-foreground/40 mb-2" />
-                      <span className="text-xs text-foreground/60">Click to upload image</span>
+                      <ImageIcon className="w-5 h-5 text-foreground/40 mb-1" />
+                      <span className="text-[11px] text-foreground/60">Click to upload image</span>
                       <input type="file" accept="image/*,video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleQuestionFileChange} />
                     </>
                   )}
@@ -1581,20 +1575,20 @@ export default function AdminExamQuestions() {
 
             {/* Options Management (Only for MCQ/MSQ/NAT) */}
             {(newQuestion.type === 'MCQ' || newQuestion.type === 'MSQ' || newQuestion.type === 'NAT') && (
-              <div className="border border-black/5 rounded-2xl p-5 bg-background/40">
-                <div className="flex items-center justify-between mb-4">
-                  <Label className="text-sm font-semibold text-[#262626]">
+              <div className="border border-black/5 rounded-xl p-4 bg-background/45">
+                <div className="flex items-center justify-between mb-3">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-foreground/60">
                     {newQuestion.type === 'NAT' ? "Acceptable Answers (Exact Matches)" : "Answer Options"}
                   </Label>
-                  <Button size="sm" variant="outline" onClick={addOption} className="h-8 gap-2 bg-white border-black/10 hover:bg-muted text-xs">
-                    <PlusCircle className="w-4 h-4 text-primary" /> 
+                  <Button size="sm" variant="outline" onClick={addOption} className="h-7 gap-1 bg-white border-black/10 hover:bg-muted text-[10px]">
+                    <PlusCircle className="w-3 h-3 text-primary" /> 
                     {newQuestion.type === 'NAT' ? "Add Answer" : "Add Option"}
                   </Button>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {options.map((opt, idx) => (
-                    <div key={idx} className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${opt.is_correct ? 'border-green-300 bg-green-50/50 shadow-sm shadow-green-50' : 'border-black/5 bg-white'}`}>
+                    <div key={idx} className={`flex items-start gap-2 p-2 rounded-lg border transition-all ${opt.is_correct ? 'border-green-300 bg-green-50/30' : 'border-black/5 bg-white'}`}>
                       {/* Correct Checkbox (Hidden for NAT) */}
                       {newQuestion.type !== 'NAT' && (
                         <button 
@@ -1606,49 +1600,49 @@ export default function AdminExamQuestions() {
                               updateOption(idx, 'is_correct', !opt.is_correct);
                             }
                           }}
-                          className={`mt-1.5 shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${opt.is_correct ? 'bg-green-500 border-green-600 text-white' : 'border-black/20 text-transparent hover:border-black/40'}`}
+                          className={`mt-1 shrink-0 w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${opt.is_correct ? 'bg-green-500 border-green-600 text-white' : 'border-black/20 text-transparent hover:border-black/35'}`}
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <CheckCircle2 className="w-3 h-3" />
                         </button>
                       )}
                       
                       {/* NAT specific icon indicator */}
                       {newQuestion.type === 'NAT' && (
-                        <div className="mt-1.5 shrink-0 w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        <div className="mt-1 shrink-0 w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center">
+                          <CheckCircle2 className="w-3 h-3" />
                         </div>
                       )}
                       
-                      <div className="flex-1 space-y-2">
+                      <div className="flex-1 space-y-1.5">
                         <Input 
                           value={opt.content_text} 
                           onChange={(e) => updateOption(idx, 'content_text', e.target.value)} 
-                          placeholder={newQuestion.type === 'NAT' ? `Answer ${idx + 1} (e.g. 14.5)` : `Option ${idx + 1}...`}
-                          className="h-8 bg-transparent text-xs"
+                          placeholder={newQuestion.type === 'NAT' ? `Answer ${idx + 1}` : `Option ${idx + 1}...`}
+                          className="h-7 bg-transparent text-[11px]"
                         />
                         {/* Option Media Upload (Hide for NAT) */}
                         {newQuestion.type !== 'NAT' && (
-                          <div className="flex items-center gap-2">
-                            <Label className="text-[9px] text-foreground/50 border border-dashed border-black/20 rounded px-2 py-0.5 cursor-pointer hover:bg-black/5 flex items-center gap-1">
-                              <ImageIcon className="w-2.5 h-2.5" /> 
+                          <div className="flex items-center gap-1.5">
+                            <Label className="text-[8px] text-foreground/50 border border-dashed border-black/20 rounded px-1.5 py-0.5 cursor-pointer hover:bg-black/5 flex items-center gap-0.5">
+                              <ImageIcon className="w-2 h-2" /> 
                               {opt.file ? opt.file.name : (opt.media_url ? "Attached" : "Attach Image")}
                               <input type="file" accept="image/*" className="hidden" onChange={(e) => updateOptionFile(idx, e.target.files ? e.target.files[0] : null)} />
                             </Label>
                             {(opt.file || opt.media_url) && (
-                              <button onClick={() => { updateOptionFile(idx, null); updateOption(idx, 'media_url', undefined); }} className="text-[9px] text-red-500 hover:underline">Remove</button>
+                              <button onClick={() => { updateOptionFile(idx, null); updateOption(idx, 'media_url', undefined); }} className="text-[8px] text-red-500 hover:underline font-medium">Remove</button>
                             )}
                           </div>
                         )}
                       </div>
 
-                      <button onClick={() => removeOption(idx)} className="mt-1.5 shrink-0 p-1 text-foreground/30 hover:text-red-500 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
+                      <button onClick={() => removeOption(idx)} className="mt-1 shrink-0 p-0.5 text-foreground/30 hover:text-red-500 transition-colors">
+                        <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
                   ))}
                 </div>
                 {options.length === 0 && (
-                  <div className="text-xs text-foreground/40 italic text-center py-4 bg-white/50 rounded-xl border border-dashed border-black/5 mt-2">
+                  <div className="text-[11px] text-foreground/40 italic text-center py-2.5 bg-white/50 rounded-lg border border-dashed border-black/5 mt-1">
                     {newQuestion.type === 'NAT' ? 'No acceptable answers added. Click "Add Answer".' : 'No options added yet. Click "Add Option".'}
                   </div>
                 )}
@@ -1658,7 +1652,7 @@ export default function AdminExamQuestions() {
         </div>
       </div>
 
-      <div className="border-t border-[#262626]/10 pt-8" />
+    <div className="border-t border-[#262626]/10 pt-8" />
 
       {/* BOTTOM SECTION: EXISTING LIST & FILTERS */}
       <div>
