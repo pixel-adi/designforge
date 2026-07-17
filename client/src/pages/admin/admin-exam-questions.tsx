@@ -736,9 +736,11 @@ export default function AdminExamQuestions() {
     }
   };
 
-  const uploadFileToSupabase = async (file: File) => {
+  const uploadFileToSupabase = async (file: File, pyqPrefix?: string, customFileName?: string) => {
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+    const cleanPrefix = pyqPrefix ? pyqPrefix.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() : "";
+    const prefixSegment = cleanPrefix ? `${cleanPrefix}_` : "";
+    const fileName = customFileName || `${prefixSegment}${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
     const { data, error } = await supabase.storage.from('question-media').upload(fileName, file);
     if (error) throw error;
     const { data: { publicUrl } } = supabase.storage.from('question-media').getPublicUrl(fileName);
@@ -791,7 +793,7 @@ export default function AdminExamQuestions() {
       let finalQuestionMediaUrl = newQuestion.media_url;
 
       if (questionMediaFile) {
-        finalQuestionMediaUrl = await uploadFileToSupabase(questionMediaFile);
+        finalQuestionMediaUrl = await uploadFileToSupabase(questionMediaFile, newQuestion.pyq_tag);
       }
 
       const formattedTopics = topicsInput.split(',').map(t => t.trim()).filter(t => t.length > 0);
@@ -818,7 +820,7 @@ export default function AdminExamQuestions() {
         for (const opt of options) {
           let optMediaUrl = opt.media_url;
           if (opt.file) {
-            optMediaUrl = await uploadFileToSupabase(opt.file);
+            optMediaUrl = await uploadFileToSupabase(opt.file, newQuestion.pyq_tag);
           }
           await supabase.from("exam_options").insert({
             question_id: finalQuestionId,
@@ -1187,9 +1189,34 @@ export default function AdminExamQuestions() {
       // 2. Upload all files in parallel
       const uploadedUrls = new Map<string, string>();
       if (filesToUpload.size > 0) {
+        const customFileNamesMap = new Map<string, string>();
+        const prefixCounters = new Map<string, number>();
+
+        Array.from(filesToUpload).forEach((filename) => {
+          const fileExt = filename.split('.').pop() || "png";
+
+          // Find PYQ tag for this file from the approved questions referencing it
+          const refQ = approved.find(q => 
+            q.media_filename === filename || 
+            q.options.some((opt: any) => opt.media_filename === filename)
+          );
+          
+          const pyqTag = refQ?.pyq_tag || "IMG";
+          const cleanPrefix = pyqTag.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() || "IMG";
+          
+          const currentCount = (prefixCounters.get(cleanPrefix) || 0) + 1;
+          prefixCounters.set(cleanPrefix, currentCount);
+
+          // Format: CEED2020_img_1_abcd.png
+          const uniqueSuffix = Math.random().toString(36).substring(2, 6);
+          const customName = `${cleanPrefix}_img_${currentCount}_${uniqueSuffix}.${fileExt}`;
+          customFileNamesMap.set(filename, customName);
+        });
+
         const uploadPromises = Array.from(filesToUpload).map(async (filename) => {
           const file = bulkImagesMap.get(filename)!;
-          const publicUrl = await uploadFileToSupabase(file);
+          const customName = customFileNamesMap.get(filename);
+          const publicUrl = await uploadFileToSupabase(file, undefined, customName);
           return { filename, publicUrl };
         });
         const uploadResults = await Promise.all(uploadPromises);
