@@ -151,6 +151,7 @@ export default function AdminExamQuestions() {
   const [aiPyqTag, setAiPyqTag] = useState("");
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [aiProcessingStatus, setAiProcessingStatus] = useState("");
+  const [aiProcessingProgress, setAiProcessingProgress] = useState(0);
 
   const [testingKey, setTestingKey] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
@@ -293,6 +294,34 @@ export default function AdminExamQuestions() {
     throw new Error("API call failed after maximum retries.");
   };
 
+  const renderPageToImageBase64 = async (pdfDoc: any, pageNum: number): Promise<string> => {
+    const page = await pdfDoc.getPage(pageNum);
+    const scale = 1.5; 
+    const viewport = page.getViewport({ scale });
+    
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d")!;
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    
+    await page.render({ canvasContext: context, viewport }).promise;
+    return new Promise<string>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error(`Failed to render page ${pageNum} to blob`));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      }, "image/jpeg", 0.85);
+    });
+  };
+
   const processAIImporter = async () => {
     if (!questionPdfFile || !answerKeyPdfFile) {
       toast({ title: "Files required", description: "Please upload both the Question Paper and Answer Key PDFs.", variant: "destructive" });
@@ -300,6 +329,7 @@ export default function AdminExamQuestions() {
     }
 
     setAiProcessingStatus("Fetching API credentials...");
+    setAiProcessingProgress(2);
     const { key, model } = await fetchGeminiSettings();
     if (!key) {
       toast({ title: "API Key Missing", description: "Please click the gear icon to set your Gemini API key first.", variant: "destructive" });
@@ -308,240 +338,316 @@ export default function AdminExamQuestions() {
 
     setIsProcessingAI(true);
     try {
-      setAiProcessingStatus("Reading PDF documents...");
-      const qPdfBase64 = await fileToBase64(questionPdfFile);
+      setAiProcessingStatus("Loading PDF documents...");
+      setAiProcessingProgress(5);
+
+      // Load PDFJS doc for rendering pages
+      const arrayBuffer = await questionPdfFile.arrayBuffer();
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdfDoc = await loadingTask.promise;
+
       const aPdfBase64 = await fileToBase64(answerKeyPdfFile);
 
-      setAiProcessingStatus("Analyzing exam paper with Gemini AI...");
-      
-      const systemPrompt = `You are an expert exam extraction AI. Your task is to extract all questions (Part A and Part B) and their corresponding correct answers from the provided Question Paper PDF and Answer Key PDF.
-      
-      CRITICAL PAGE RANGE RULE:
-      You must ONLY extract questions that are located between page ${startPage} and page ${endPage} (inclusive) of the Question Paper PDF. Do not extract questions from any other pages. If no questions are found on these pages, return an empty array.
-      
-      CRITICAL SEGREGATION & FORMATTING RULES:
-      * MCQ: If a question has EXACTLY ONE correct option in the Answer Key, type MUST be "MCQ".
-      * MSQ: If a question has MORE THAN ONE correct option in the Answer Key, type MUST be "MSQ".
-      * NAT: If the question requires a numerical input (no options are shown in the paper), type MUST be "NAT". The options array MUST contain exactly one option, where content_text is the correct numerical answer (value or range, e.g., "14.5" or "14-15") resolved from the Answer Key PDF, and is_correct MUST be true.
-      * SUBJECTIVE: If the question is a drawing, sketching, or design-based descriptive question (Part B), type MUST be "SUBJECTIVE". Options array MUST be empty [].
-      
-      For each question, extract:
-      1. part: "A" or "B"
-      2. type: "MCQ", "MSQ", "NAT", or "SUBJECTIVE"
-      3. difficulty: Make a reasonable guess of "Low", "Medium", or "High"
-      4. content_text: The complete question text.
-         * Output clean plain text.
-         * DO NOT include any HTML tags (such as <p>, <b>, <i>, <ul>, <li>, span, etc.).
-         * Strip off any question numbering or index prefix (e.g. strip "Q1.", "Question 1:", "12.", "15.", etc. from the beginning so the question text starts directly with the content). If a question spans across page boundaries, merge the text completely.
-      5. topics: Guess relevant design/theory topics (array of strings, e.g. ["Perspective", "Color Theory", "Visualization"])
-      6. pyq_tag: Use the provided PYQ Tag: "${aiPyqTag}"
-      7. has_diagram: true if the question body contains a diagram, sketch, drawing, photo, table, or visual illustration. Otherwise false.
-      8. diagram_page: The 1-based page number in the Question Paper PDF where the diagram is located. If has_diagram is false, this MUST be -1.
-      9. diagram_bbox: Bounding box coordinates [ymin, xmin, ymax, xmax] normalized from 0 to 1000. If has_diagram is false, this MUST be an empty array [].
-      10. options: MCQ and MSQ questions MUST have exactly 4 options. NAT questions MUST have exactly 1 option (the correct answer key/value where is_correct is true). SUBJECTIVE questions MUST have 0 options (empty array []).
-          Each option has:
-          - content_text: Option text.
-            * Output clean plain text.
-            * DO NOT include any HTML tags.
-            * Strip option prefix labels (e.g. strip "A.", "B.", "a)", "b)", "(a)", "(b)", etc. from the beginning so only the option content remains).
-          - is_correct: true or false (resolve correctness strictly from the Answer Key PDF!)
-          - has_diagram: true if the option itself is an image/diagram. Otherwise false.
-          - diagram_page: The page number where the option diagram is located. If has_diagram is false, this MUST be -1.
-          - diagram_bbox: Bounding box coordinates [ymin, xmin, ymax, xmax] for the option image, normalized 0 to 1000. If has_diagram is false, this MUST be an empty array [].
-          
-      Ensure the output is valid JSON matching the specified schema. Output ONLY the JSON block. Do not include markdown code block quotes.`;
+      const actualEndPage = Math.min(endPage, pdfDoc.numPages);
+      const actualStartPage = Math.max(1, Math.min(startPage, actualEndPage));
+      const totalPagesToProcess = actualEndPage - actualStartPage + 1;
 
-      let response;
-      try {
-        response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: systemPrompt },
-                  { text: "Here is the Question Paper PDF:" },
-                  {
-                    inlineData: {
-                      mimeType: "application/pdf",
-                      data: qPdfBase64
+      const BATCH_SIZE = 3;
+      const allRawQuestions: any[] = [];
+
+      // Calculate number of batches
+      const totalBatches = Math.ceil(totalPagesToProcess / BATCH_SIZE);
+      let batchIndex = 0;
+
+      for (let batchStart = actualStartPage; batchStart <= actualEndPage; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, actualEndPage);
+        const batchProgressStart = 10 + Math.floor((batchIndex / totalBatches) * 70);
+        const batchProgressEnd = 10 + Math.floor(((batchIndex + 1) / totalBatches) * 70);
+
+        setAiProcessingStatus(`Rendering pages ${batchStart} to ${batchEnd}...`);
+        setAiProcessingProgress(batchProgressStart);
+
+        // Render each page in the batch
+        const pageImageParts: any[] = [];
+        for (let p = batchStart; p <= batchEnd; p++) {
+          const stepProgress = batchProgressStart + Math.floor(((p - batchStart) / (batchEnd - batchStart + 1)) * (batchProgressEnd - batchProgressStart) * 0.3);
+          setAiProcessingProgress(stepProgress);
+          
+          const base64Image = await renderPageToImageBase64(pdfDoc, p);
+          pageImageParts.push({ text: `This image represents Page ${p} of the Question Paper PDF:` });
+          pageImageParts.push({
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: base64Image
+            }
+          });
+        }
+
+        const currentPrompt = `You are an expert exam extraction AI. Your task is to extract all questions (Part A and Part B) and their corresponding correct answers from the provided Question Paper page images and the Answer Key PDF.
+        
+        CRITICAL PAGE RANGE RULE:
+        We are providing you with page images representing Page ${batchStart} to Page ${batchEnd} of the Question Paper PDF.
+        You must ONLY extract questions that are located on these pages. Do not extract questions from any other pages. If no questions are found on these pages, return an empty array.
+        For any question extracted, make sure the "diagram_page" or options "diagram_page" is set to the correct original page number (between ${batchStart} and ${batchEnd}) where that diagram is located.
+        
+        CRITICAL SEGREGATION & FORMATTING RULES:
+        * MCQ: If a question has EXACTLY ONE correct option in the Answer Key, type MUST be "MCQ".
+        * MSQ: If a question has MORE THAN ONE correct option in the Answer Key, type MUST be "MSQ".
+        * NAT: If the question requires a numerical input (no options are shown in the paper), type MUST be "NAT". The options array MUST contain exactly one option, where content_text is the correct numerical answer (value or range, e.g., "14.5" or "14-15") resolved from the Answer Key PDF, and is_correct MUST be true.
+        * SUBJECTIVE: If the question is a drawing, sketching, or design-based descriptive question (Part B), type MUST be "SUBJECTIVE". Options array MUST be empty [].
+        
+        For each question, extract:
+        1. part: "A" or "B"
+        2. type: "MCQ", "MSQ", "NAT", or "SUBJECTIVE"
+        3. difficulty: Make a reasonable guess of "Low", "Medium", or "High"
+        4. content_text: The complete question text.
+           * Output clean plain text.
+           * DO NOT include any HTML tags (such as <p>, <b>, <i>, <ul>, <li>, span, etc.).
+           * Strip off any question numbering or index prefix (e.g. strip "Q1.", "Question 1:", "12.", "15.", etc. from the beginning so the question text starts directly with the content). If a question spans across page boundaries, merge the text completely.
+        5. topics: Guess relevant design/theory topics (array of strings, e.g. ["Perspective", "Color Theory", "Visualization"])
+        6. pyq_tag: Use the provided PYQ Tag: "${aiPyqTag}"
+        7. has_diagram: true if the question body contains a diagram, sketch, drawing, photo, table, or visual illustration. Otherwise false.
+        8. diagram_page: The 1-based page number (must be between ${batchStart} and ${batchEnd}) where the diagram is located. If has_diagram is false, this MUST be -1.
+        9. diagram_bbox: Bounding box coordinates [ymin, xmin, ymax, xmax] normalized from 0 to 1000. If has_diagram is false, this MUST be an empty array [].
+        10. options: MCQ and MSQ questions MUST have exactly 4 options. NAT questions MUST have exactly 1 option (the correct answer key/value where is_correct is true). SUBJECTIVE questions MUST have 0 options (empty array []).
+            Each option has:
+            - content_text: Option text.
+              * Output clean plain text.
+              * DO NOT include any HTML tags.
+              * Strip option prefix labels (e.g. strip "A.", "B.", "a)", "b)", "(a)", "(b)", etc. from the beginning so only the option content remains).
+            - is_correct: true or false (resolve correctness strictly from the Answer Key PDF!)
+            - has_diagram: true if the option itself is an image/diagram. Otherwise false.
+            - diagram_page: The page number (between ${batchStart} and ${batchEnd}) where the option diagram is located. If has_diagram is false, this MUST be -1.
+            - diagram_bbox: Bounding box coordinates [ymin, xmin, ymax, xmax] for the option image, normalized 0 to 1000. If has_diagram is false, this MUST be an empty array [].
+            
+        Ensure the output is valid JSON matching the specified schema. Output ONLY the JSON block. Do not include markdown code block quotes.`;
+
+        let success = false;
+        let attempts = 0;
+        const maxAttempts = 2;
+        let batchQuestions: any[] = [];
+
+        while (!success && attempts < maxAttempts) {
+          attempts++;
+          setAiProcessingStatus(`Analyzing pages ${batchStart}-${batchEnd} (Attempt ${attempts} of ${maxAttempts})...`);
+          setAiProcessingProgress(batchProgressStart + Math.floor((batchProgressEnd - batchProgressStart) * 0.4));
+
+          try {
+            let response;
+            try {
+              response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contents: [
+                    {
+                      parts: [
+                        { text: currentPrompt },
+                        ...pageImageParts,
+                        { text: "Here is the Answer Key PDF:" },
+                        {
+                          inlineData: {
+                            mimeType: "application/pdf",
+                            data: aPdfBase64
+                          }
+                        }
+                      ]
                     }
-                  },
-                  { text: "Here is the Answer Key PDF:" },
-                  {
-                    inlineData: {
-                      mimeType: "application/pdf",
-                      data: aPdfBase64
-                    }
-                  }
-                ]
-              }
-            ],
-            generationConfig: {
-              temperature: 0.0,
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: "OBJECT",
-                properties: {
-                  questions: {
-                    type: "ARRAY",
-                    items: {
+                  ],
+                  generationConfig: {
+                    temperature: 0.0,
+                    responseMimeType: "application/json",
+                    responseSchema: {
                       type: "OBJECT",
                       properties: {
-                        part: { type: "STRING", enum: ["A", "B"] },
-                        type: { type: "STRING", enum: ["MCQ", "MSQ", "NAT", "SUBJECTIVE"] },
-                        difficulty: { type: "STRING", enum: ["Low", "Medium", "High"] },
-                        content_text: { type: "STRING" },
-                        topics: { type: "ARRAY", items: { type: "STRING" } },
-                        pyq_tag: { type: "STRING" },
-                        has_diagram: { type: "BOOLEAN" },
-                        diagram_page: { type: "INTEGER" },
-                        diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } },
-                        options: {
+                        questions: {
                           type: "ARRAY",
                           items: {
                             type: "OBJECT",
                             properties: {
+                              part: { type: "STRING", enum: ["A", "B"] },
+                              type: { type: "STRING", enum: ["MCQ", "MSQ", "NAT", "SUBJECTIVE"] },
+                              difficulty: { type: "STRING", enum: ["Low", "Medium", "High"] },
                               content_text: { type: "STRING" },
-                              is_correct: { type: "BOOLEAN" },
+                              topics: { type: "ARRAY", items: { type: "STRING" } },
+                              pyq_tag: { type: "STRING" },
                               has_diagram: { type: "BOOLEAN" },
                               diagram_page: { type: "INTEGER" },
-                              diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
+                              diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } },
+                              options: {
+                                type: "ARRAY",
+                                items: {
+                                  type: "OBJECT",
+                                  properties: {
+                                    content_text: { type: "STRING" },
+                                    is_correct: { type: "BOOLEAN" },
+                                    has_diagram: { type: "BOOLEAN" },
+                                    diagram_page: { type: "INTEGER" },
+                                    diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
+                                  },
+                                  required: ["content_text", "is_correct", "has_diagram", "diagram_page", "diagram_bbox"]
+                                }
+                              }
                             },
-                            required: ["content_text", "is_correct", "has_diagram", "diagram_page", "diagram_bbox"]
+                            required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "diagram_page", "diagram_bbox", "options"]
                           }
                         }
                       },
-                      required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "diagram_page", "diagram_bbox", "options"]
+                      required: ["questions"]
                     }
                   }
-                },
-                required: ["questions"]
-              }
+                })
+              });
+            } catch (e) {
+              console.error("First fetch failed for batch", batchStart, e);
             }
-          })
-        });
-      } catch (e) {
-        console.error("First fetch failed", e);
-      }
 
-      if ((!response || !response.ok) && model !== "gemini-flash-latest") {
-        console.warn(`Model ${model} failed, trying fallback to gemini-flash-latest...`);
-        setAiProcessingStatus("Falling back to Gemini Flash Latest...");
-        try {
-          response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    { text: systemPrompt },
-                    { text: "Here is the Question Paper PDF:" },
-                    {
-                      inlineData: {
-                        mimeType: "application/pdf",
-                        data: qPdfBase64
+            if ((!response || !response.ok) && model !== "gemini-flash-latest") {
+              console.warn(`Model ${model} failed for batch ${batchStart}, trying fallback to gemini-flash-latest...`);
+              try {
+                response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    contents: [
+                      {
+                        parts: [
+                          { text: currentPrompt },
+                          ...pageImageParts,
+                          { text: "Here is the Answer Key PDF:" },
+                          {
+                            inlineData: {
+                              mimeType: "application/pdf",
+                              data: aPdfBase64
+                            }
+                          }
+                        ]
                       }
-                    },
-                    { text: "Here is the Answer Key PDF:" },
-                    {
-                      inlineData: {
-                        mimeType: "application/pdf",
-                        data: aPdfBase64
-                      }
-                    }
-                  ]
-                }
-              ],
-              generationConfig: {
-                temperature: 0.0,
-                responseMimeType: "application/json",
-                responseSchema: {
-                  type: "OBJECT",
-                  properties: {
-                    questions: {
-                      type: "ARRAY",
-                      items: {
+                    ],
+                    generationConfig: {
+                      temperature: 0.0,
+                      responseMimeType: "application/json",
+                      responseSchema: {
                         type: "OBJECT",
                         properties: {
-                          part: { type: "STRING", enum: ["A", "B"] },
-                          type: { type: "STRING", enum: ["MCQ", "MSQ", "NAT", "SUBJECTIVE"] },
-                          difficulty: { type: "STRING", enum: ["Low", "Medium", "High"] },
-                          content_text: { type: "STRING" },
-                          topics: { type: "ARRAY", items: { type: "STRING" } },
-                          pyq_tag: { type: "STRING" },
-                          has_diagram: { type: "BOOLEAN" },
-                          diagram_page: { type: "INTEGER" },
-                          diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } },
-                          options: {
+                          questions: {
                             type: "ARRAY",
                             items: {
                               type: "OBJECT",
                               properties: {
+                                part: { type: "STRING", enum: ["A", "B"] },
+                                type: { type: "STRING", enum: ["MCQ", "MSQ", "NAT", "SUBJECTIVE"] },
+                                difficulty: { type: "STRING", enum: ["Low", "Medium", "High"] },
                                 content_text: { type: "STRING" },
-                                is_correct: { type: "BOOLEAN" },
+                                topics: { type: "ARRAY", items: { type: "STRING" } },
+                                pyq_tag: { type: "STRING" },
                                 has_diagram: { type: "BOOLEAN" },
                                 diagram_page: { type: "INTEGER" },
-                                diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
+                                diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } },
+                                options: {
+                                  type: "ARRAY",
+                                  items: {
+                                    type: "OBJECT",
+                                    properties: {
+                                      content_text: { type: "STRING" },
+                                      is_correct: { type: "BOOLEAN" },
+                                      has_diagram: { type: "BOOLEAN" },
+                                      diagram_page: { type: "INTEGER" },
+                                      diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
+                                    },
+                                    required: ["content_text", "is_correct", "has_diagram", "diagram_page", "diagram_bbox"]
+                                  }
+                                }
                               },
-                              required: ["content_text", "is_correct", "has_diagram", "diagram_page", "diagram_bbox"]
+                              required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "diagram_page", "diagram_bbox", "options"]
                             }
                           }
                         },
-                        required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "diagram_page", "diagram_bbox", "options"]
+                        required: ["questions"]
                       }
                     }
-                  },
-                  required: ["questions"]
-                }
+                  })
+                });
+              } catch (fallbackErr) {
+                console.error("Fallback fetch failed for batch", batchStart, fallbackErr);
               }
-            })
-          });
-        } catch (fallbackErr) {
-          console.error("Fallback fetch failed", fallbackErr);
+            }
+
+            if (!response || !response.ok) {
+              const errorText = response ? await response.text() : "Network Error";
+              throw new Error(`Gemini API Error: ${response ? response.status : 'Fetch Failed'} - ${errorText}`);
+            }
+
+            const resData = await response.json();
+            const extractedText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!extractedText) throw new Error("No data returned from Gemini AI.");
+
+            const extractedJson = JSON.parse(extractedText);
+            batchQuestions = extractedJson.questions || [];
+            success = true;
+          } catch (batchErr: any) {
+            console.error(`Batch ${batchStart}-${batchEnd} error:`, batchErr);
+            if (attempts >= maxAttempts) {
+              throw new Error(`Failed to extract pages ${batchStart}-${batchEnd}: ${batchErr.message}`);
+            }
+            await sleep(2000);
+          }
+        }
+
+        allRawQuestions.push(...batchQuestions);
+        batchIndex++;
+        setAiProcessingProgress(batchProgressEnd);
+      }
+
+      setAiProcessingStatus(`Deduplicating questions...`);
+      setAiProcessingProgress(82);
+
+      // Deduplicate questions from batches on content_text
+      const seenContents = new Set<string>();
+      const uniqueRawQuestions: any[] = [];
+      for (const q of allRawQuestions) {
+        const norm = normalizeText(q.content_text || "");
+        if (!seenContents.has(norm)) {
+          seenContents.add(norm);
+          uniqueRawQuestions.push(q);
         }
       }
 
-      if (!response || !response.ok) {
-        const errorText = response ? await response.text() : "Network Error";
-        throw new Error(`Gemini API Error: ${response ? response.status : 'Fetch Failed'} - ${errorText}`);
-      }
+      setAiProcessingStatus(`Extracted ${uniqueRawQuestions.length} unique questions. Cropping diagrams...`);
+      setAiProcessingProgress(85);
 
-      const resData = await response.json();
-      const extractedText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!extractedText) throw new Error("No data returned from Gemini AI.");
+      // Crop diagrams using our already loaded pdfDoc to avoid double loading
+      const processedQuestions = await cropDiagramsFromPDF(uniqueRawQuestions, pdfDoc);
 
-      const extractedJson = JSON.parse(extractedText);
-      const rawQuestions = extractedJson.questions || [];
-
-      setAiProcessingStatus(`Extracted ${rawQuestions.length} questions. Cropping diagrams...`);
-
-      // 3. Render and crop PDF images
-      const processedQuestions = await cropDiagramsFromPDF(rawQuestions);
-
+      setAiProcessingProgress(100);
       setBulkQuestions(processedQuestions);
       setBulkPreviewOpen(true);
       setAiImporterOpen(false);
-      toast({ title: "AI Extraction Complete", description: `Successfully processed ${rawQuestions.length} questions.` });
+      toast({ title: "AI Extraction Complete", description: `Successfully processed ${uniqueRawQuestions.length} questions.` });
     } catch (err: any) {
       console.error(err);
       toast({ title: "AI Importer Failed", description: err.message, variant: "destructive" });
     } finally {
       setIsProcessingAI(false);
+      setAiProcessingProgress(0);
     }
   };
 
-  const cropDiagramsFromPDF = async (rawQuestions: any[]) => {
+  const cropDiagramsFromPDF = async (rawQuestions: any[], existingPdfDoc?: any) => {
     if (!questionPdfFile) return rawQuestions;
 
-    const arrayBuffer = await questionPdfFile.arrayBuffer();
-    const pdfjsLib = await import("pdfjs-dist");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    let pdfDoc = existingPdfDoc;
+    if (!pdfDoc) {
+      const arrayBuffer = await questionPdfFile.arrayBuffer();
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-    const pdfDoc = await loadingTask.promise;
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      pdfDoc = await loadingTask.promise;
+    }
 
     const imageMap = new Map<string, File>();
     const processed = [];
@@ -549,6 +655,9 @@ export default function AdminExamQuestions() {
     for (let index = 0; index < rawQuestions.length; index++) {
       const q = rawQuestions[index];
       const opts = [];
+
+      const cropProgress = 85 + Math.floor((index / rawQuestions.length) * 13);
+      setAiProcessingProgress(cropProgress);
 
       let qMediaFilename = "";
       let qMediaExists = true;
@@ -612,7 +721,7 @@ export default function AdminExamQuestions() {
         media_filename: qMediaFilename,
         media_exists: qMediaExists,
         is_duplicate: false,
-        existing_id: null,
+        existing_id: null as string | null,
         duplicate_action: 'create',
         status: 'pending'
       });
@@ -1372,8 +1481,7 @@ export default function AdminExamQuestions() {
             <input 
               type="file" 
               accept=".csv,image/*" 
-              webkitdirectory="" 
-              directory="" 
+              {...{ webkitdirectory: "", directory: "" }} 
               ref={folderInputRef} 
               onChange={handleFolderUpload} 
               className="hidden" 
@@ -2238,11 +2346,27 @@ export default function AdminExamQuestions() {
               </p>
             </div>
           ) : (
-            <div className="py-8 flex flex-col items-center justify-center space-y-4">
-              <Loader2 className="w-10 h-10 animate-spin text-primary" />
-              <p className="text-sm font-semibold">{aiProcessingStatus}</p>
+            <div className="py-8 flex flex-col items-center justify-center space-y-6">
+              <div className="relative flex items-center justify-center">
+                <Loader2 className="w-10 h-10 animate-spin text-primary absolute opacity-20" />
+                <span className="text-xs font-bold text-primary">{aiProcessingProgress}%</span>
+              </div>
+              
+              <div className="w-full space-y-2 px-4">
+                <div className="w-full bg-black/5 rounded-full h-2.5 overflow-hidden">
+                  <div 
+                    className="bg-primary h-full transition-all duration-300 ease-out rounded-full" 
+                    style={{ width: `${aiProcessingProgress}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-foreground/40 font-medium">
+                  <span>{aiProcessingStatus}</span>
+                  <span>{aiProcessingProgress}%</span>
+                </div>
+              </div>
+              
               <p className="text-xs text-foreground/40 text-center max-w-sm">
-                Processing high-resolution pages and running AI vision layout extraction. This may take up to a minute.
+                Processing pages in small batches to ensure 100% extraction completeness and crop diagrams accurately. Please keep this modal open.
               </p>
             </div>
           )}
