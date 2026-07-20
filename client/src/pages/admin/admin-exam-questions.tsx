@@ -498,7 +498,13 @@ export default function AdminExamQuestions() {
                       },
                       required: ["questions"]
                     }
-                  }
+                  },
+                  safetySettings: [
+                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                  ]
                 })
               });
             } catch (e) {
@@ -568,7 +574,13 @@ export default function AdminExamQuestions() {
                         },
                         required: ["questions"]
                       }
-                    }
+                    },
+                    safetySettings: [
+                      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                    ]
                   })
                 });
               } catch (fallbackErr) {
@@ -583,7 +595,25 @@ export default function AdminExamQuestions() {
 
             const resData = await response.json();
             const extractedText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!extractedText) throw new Error("No data returned from Gemini AI.");
+            if (!extractedText) {
+              console.error("Gemini Response Data:", resData);
+              const candidate = resData.candidates?.[0];
+              const finishReason = candidate?.finishReason;
+              const safetyRatings = candidate?.safetyRatings;
+              const blockReason = resData.promptFeedback?.blockReason;
+              
+              let details = "";
+              if (finishReason) details += ` Finish reason: ${finishReason}.`;
+              if (blockReason) details += ` Prompt block reason: ${blockReason}.`;
+              if (safetyRatings) {
+                const triggered = safetyRatings.filter((r: any) => r.blocked || r.probability === "HIGH" || r.probability === "MEDIUM");
+                if (triggered.length > 0) {
+                  details += ` Blocked safety categories: ${triggered.map((t: any) => t.category).join(", ")}.`;
+                }
+              }
+              
+              throw new Error(`No data returned from Gemini AI.${details || " Check browser console for full API response."}`);
+            }
 
             const extractedJson = JSON.parse(extractedText);
             batchQuestions = extractedJson.questions || [];
