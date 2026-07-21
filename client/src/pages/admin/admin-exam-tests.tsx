@@ -90,9 +90,20 @@ export default function AdminExamTests() {
     setLoading(false);
   };
 
+  const getOtherTestsQuestionIds = async (): Promise<Set<string>> => {
+    let query = supabase.from('exam_test_questions').select('question_id, test_id');
+    if (editingTestId) {
+      query = query.neq('test_id', editingTestId);
+    }
+    const { data } = await query;
+    return new Set<string>((data || []).map((t: any) => t.question_id));
+  };
+
   const loadQuestionBank = async (part: 'A' | 'B') => {
     const { data } = await supabase.from('exam_questions').select('*').eq('part', part).order('created_at', { ascending: false });
-    setQuestionsBank(data || []);
+    const usedIds = await getOtherTestsQuestionIds();
+    const filtered = (data || []).filter(q => !usedIds.has(q.id));
+    setQuestionsBank(filtered);
   };
 
   // -----------------------------------------------------
@@ -103,15 +114,20 @@ export default function AdminExamTests() {
     let newSelectedQs: any[] = [];
     let allMet = true;
 
+    const usedIds = await getOtherTestsQuestionIds();
+
     for (const sec of template.sections) {
       const { data: qData } = await supabase.from('exam_questions').select('*').eq('part', sec.part);
-      const bank = qData || [];
+      const bank = (qData || []).filter(q => !usedIds.has(q.id));
 
       for (const [type, requiredCount] of Object.entries(sec.requirements)) {
         let available = bank.filter(q => q.type === type);
         if (targetDifficulty !== "ALL") {
           available = available.filter(q => q.difficulty === targetDifficulty);
         }
+
+        // Prevent selecting duplicate questions within the same test
+        available = available.filter(q => !newSelectedQs.some(ns => ns.id === q.id));
 
         // Shuffle
         const shuffled = available.sort(() => 0.5 - Math.random());
@@ -204,6 +220,9 @@ export default function AdminExamTests() {
       if (autoDifficulty !== "ALL") {
         available = available.filter(q => q.difficulty === autoDifficulty);
       }
+      // Prevent selecting duplicate questions within the same test
+      available = available.filter(q => !newSelectedQs.some(ns => ns.id === q.id));
+
       const shuffled = available.sort(() => 0.5 - Math.random());
       const picked = shuffled.slice(0, requiredCount as number);
       if (picked.length < (requiredCount as number)) allMet = false;

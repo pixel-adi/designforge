@@ -802,6 +802,81 @@ export default function PortalDashboard() {
     ];
   };
 
+  const getCognitiveStaminaData = (responses: any[]) => {
+    const partA = responses.filter((r: any) => r.exam_questions?.part === 'A');
+    if (partA.length === 0) {
+      return {
+        firstHalfPacing: 0,
+        secondHalfPacing: 0,
+        firstHalfAccuracy: 0,
+        secondHalfAccuracy: 0,
+        pacingDecay: 1.0,
+        accuracyDrop: 0,
+        staminaScore: 100,
+        state: 'flow',
+        critique: "No telemetry responses to parse. Attempt mock exams to measure your focus endurance."
+      };
+    }
+
+    const sorted = [...partA].sort((a: any, b: any) => {
+      const qA = a.exam_questions?.id || '';
+      const qB = b.exam_questions?.id || '';
+      return qA.localeCompare(qB);
+    });
+
+    const half = Math.ceil(sorted.length / 2);
+    const firstHalf = sorted.slice(0, half);
+    const secondHalf = sorted.slice(half);
+
+    const firstHalfTotalTime = firstHalf.reduce((sum, r) => sum + (r.time_spent || 0), 0);
+    const firstHalfAvgPacing = firstHalf.length > 0 ? Math.round((firstHalfTotalTime / firstHalf.length) * 10) / 10 : 0;
+
+    const secondHalfTotalTime = secondHalf.reduce((sum, r) => sum + (r.time_spent || 0), 0);
+    const secondHalfAvgPacing = secondHalf.length > 0 ? Math.round((secondHalfTotalTime / secondHalf.length) * 10) / 10 : 0;
+
+    const firstHalfCorrect = firstHalf.filter(r => r.isCorrect).length;
+    const firstHalfAccuracy = firstHalf.length > 0 ? Math.round((firstHalfCorrect / firstHalf.length) * 100) : 0;
+
+    const secondHalfCorrect = secondHalf.filter(r => r.isCorrect).length;
+    const secondHalfAccuracy = secondHalf.length > 0 ? Math.round((secondHalfCorrect / secondHalf.length) * 100) : 0;
+
+    const pacingDecay = firstHalfAvgPacing > 0 ? secondHalfAvgPacing / firstHalfAvgPacing : 1.0;
+    const accuracyDrop = firstHalfAccuracy - secondHalfAccuracy;
+
+    let staminaScore = 100;
+    if (accuracyDrop > 0) {
+      staminaScore -= accuracyDrop * 1.5;
+    }
+    staminaScore -= Math.min(40, Math.abs(pacingDecay - 1.0) * 100);
+    staminaScore = Math.max(10, Math.min(100, Math.round(staminaScore)));
+
+    let state = 'flow';
+    let critique = "Superb consistency. You maintained balanced pacing and accuracy across the entire test session. You are ready for peak exam conditions!";
+
+    if (pacingDecay > 1.15 && accuracyDrop > 5) {
+      state = 'exhaustion';
+      critique = `Your speed slowed by ${Math.round((pacingDecay - 1.0) * 100)}% and accuracy fell by ${Math.round(accuracyDrop)}% in the second half. This indicates stamina depletion. We recommend practicing in 90-minute focused sprints to build cognitive tolerance.`;
+    } else if (pacingDecay < 0.85 && accuracyDrop > 5) {
+      state = 'panic';
+      critique = `You sped up by ${Math.round((1.0 - pacingDecay) * 100)}% but accuracy dropped by ${Math.round(accuracyDrop)}% as the test progressed. This suggests rushing under time pressure. Focus on steady pacing distribution and time management.`;
+    } else if (accuracyDrop > 15) {
+      state = 'exhaustion';
+      critique = `Your accuracy dropped sharply by ${Math.round(accuracyDrop)}% in the second half of the exam. Try taking short 30-second breathing pauses every 45 minutes to refresh your focus.`;
+    }
+
+    return {
+      firstHalfPacing: firstHalfAvgPacing,
+      secondHalfPacing: secondHalfAvgPacing,
+      firstHalfAccuracy,
+      secondHalfAccuracy,
+      pacingDecay,
+      accuracyDrop,
+      staminaScore,
+      state,
+      critique
+    };
+  };
+
   const fetchLeaderboard = async () => {
     setLoadingLeaderboard(true);
     try {
@@ -1531,6 +1606,7 @@ export default function PortalDashboard() {
                   const radarData = getConceptMasteryData(responses);
                   const wastage = getTimeWastage(responses);
                   const payoff = getReviewPayoff(responses);
+                  const staminaData = getCognitiveStaminaData(responses);
                   
                   const formatSecs = (s: number) => {
                     const m = Math.floor(s / 60);
@@ -1702,6 +1778,88 @@ export default function PortalDashboard() {
                                   <Bar dataKey="Community" fill="#E5E7EB" radius={[3, 3, 0, 0]} maxBarSize={20} />
                                 </BarChart>
                               </ResponsiveContainer>
+                            </div>
+                          </div>
+
+                          {/* Cognitive Fatigue & Stamina Profile Widget */}
+                          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                              <div>
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-1">Cognitive Fatigue & Stamina Profile</h3>
+                                <p className="text-[10px] text-foreground/40 font-medium">Endurance analysis comparing the first 50% vs final 50% of your mock test attempts.</p>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <div className="text-right">
+                                  <span className="text-[10px] font-bold text-foreground/40 block uppercase tracking-wider">Stamina Score</span>
+                                  <span className={`text-2xl font-black ${staminaData.staminaScore >= 80 ? 'text-green-600' : staminaData.staminaScore >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                                    {staminaData.staminaScore}/100
+                                  </span>
+                                </div>
+                                <div className="w-12 h-12 rounded-full border-4 border-black/5 flex items-center justify-center relative">
+                                  <div className={`absolute inset-0 rounded-full border-4 border-t-transparent ${staminaData.staminaScore >= 80 ? 'border-green-500' : staminaData.staminaScore >= 50 ? 'border-amber-500' : 'border-red-500'} animate-spin-slow`} style={{ transform: `rotate(${staminaData.staminaScore * 3.6}deg)` }} />
+                                  <span className="text-xs font-black text-[#262626]">{staminaData.staminaScore}%</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {/* Stamina metrics comparison chart */}
+                              <div className="h-64">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart 
+                                    data={[
+                                      { name: 'First Half', Pacing: staminaData.firstHalfPacing, Accuracy: staminaData.firstHalfAccuracy },
+                                      { name: 'Second Half', Pacing: staminaData.secondHalfPacing, Accuracy: staminaData.secondHalfAccuracy }
+                                    ]}
+                                    margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                                  >
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6B7280' }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6B7280' }} />
+                                    <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                    <Legend wrapperStyle={{ fontSize: 10, fontWeight: 'bold' }} />
+                                    <Bar dataKey="Pacing" name="Avg Speed (s)" fill="#FF6B6B" radius={[3, 3, 0, 0]} maxBarSize={25} />
+                                    <Bar dataKey="Accuracy" name="Accuracy (%)" fill="#10B981" radius={[3, 3, 0, 0]} maxBarSize={25} />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+
+                              {/* Stamina details and critique panel */}
+                              <div className="flex flex-col justify-between space-y-4">
+                                <div className="grid grid-cols-2 gap-3 text-center">
+                                  <div className="p-3 bg-black/5 rounded-xl">
+                                    <span className="text-[9px] font-bold uppercase text-foreground/40 block">Pacing Decay Index</span>
+                                    <span className={`text-md font-black block mt-0.5 ${staminaData.pacingDecay > 1.15 ? 'text-red-500' : staminaData.pacingDecay < 0.85 ? 'text-amber-600' : 'text-green-600'}`}>
+                                      {staminaData.pacingDecay.toFixed(2)}x
+                                    </span>
+                                    <span className="text-[9px] font-semibold text-foreground/50">
+                                      {staminaData.pacingDecay > 1.0 ? 'Deceleration' : 'Acceleration'}
+                                    </span>
+                                  </div>
+                                  <div className="p-3 bg-black/5 rounded-xl">
+                                    <span className="text-[9px] font-bold uppercase text-foreground/40 block">Accuracy Drop</span>
+                                    <span className={`text-md font-black block mt-0.5 ${staminaData.accuracyDrop > 10 ? 'text-red-500' : staminaData.accuracyDrop > 0 ? 'text-amber-500' : 'text-green-600'}`}>
+                                      {staminaData.accuracyDrop > 0 ? `+${staminaData.accuracyDrop}%` : `${staminaData.accuracyDrop}%`}
+                                    </span>
+                                    <span className="text-[9px] font-semibold text-foreground/50">
+                                      {staminaData.accuracyDrop > 0 ? 'Accuracy Decay' : 'Stamina Growth'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Dynamic alert-style callout critique */}
+                                <div className={`p-4 rounded-xl border flex gap-3 text-xs font-semibold leading-relaxed ${staminaData.state === 'flow' ? 'bg-green-50 border-green-200 text-green-800' : staminaData.state === 'panic' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                                  {staminaData.state === 'flow' ? (
+                                    <Sparkles className="w-5 h-5 text-green-600 shrink-0" />
+                                  ) : (
+                                    <Lightbulb className="w-5 h-5 shrink-0 text-amber-600" />
+                                  )}
+                                  <div>
+                                    <span className="font-bold block mb-0.5">{staminaData.state === 'flow' ? 'Optimal Flow State' : staminaData.state === 'panic' ? 'Rushing Detected' : 'Endurance Exhaustion'}</span>
+                                    {staminaData.critique}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
