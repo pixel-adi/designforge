@@ -562,19 +562,23 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     }
   };
 
-  const handleAutoSubmit = (reason: string) => {
-    finalizeAttempt();
+  const handleAutoSubmit = async (reason: string) => {
+    setLoading(true);
+    await finalizeAttempt();
     setShowSubmitModal(false);
     setTimerRunning(false);
     setTestStep('submitted');
+    setLoading(false);
     toast({ title: "Test Auto-Submitted", description: reason, variant: "destructive", duration: 8000 });
   };
 
-  const confirmSubmit = () => {
-    finalizeAttempt();
+  const confirmSubmit = async () => {
+    setLoading(true);
+    await finalizeAttempt();
     setShowSubmitModal(false);
     setTimerRunning(false);
     setTestStep('submitted');
+    setLoading(false);
     toast({ title: "Test Submitted successfully", description: "Your answers have been securely recorded." });
   };
 

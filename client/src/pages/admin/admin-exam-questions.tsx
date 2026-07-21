@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { FileQuestion, Trash2, PlusCircle, Save, Loader2, Image as ImageIcon, X, CheckCircle2, Download, Upload, Filter, Settings, Sparkles } from "lucide-react";
+import { FileQuestion, Trash2, PlusCircle, Save, Loader2, Image as ImageIcon, X, CheckCircle2, Download, Upload, Filter, Settings, Sparkles, AlertCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -21,6 +21,7 @@ interface Question {
   media_url?: string;
   topics: string[];
   pyq_tag?: string;
+  exam_options?: any[];
 }
 
 interface OptionInput {
@@ -122,13 +123,14 @@ export default function AdminExamQuestions() {
   const [filterPyq, setFilterPyq] = useState<string>("ALL");
   const [searchTopic, setSearchTopic] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [filterInvalidOnly, setFilterInvalidOnly] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 20;
   const [hideSample, setHideSample] = useState<boolean>(false);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterPart, filterType, filterPyq, searchTopic, searchQuery]);
+  }, [filterPart, filterType, filterPyq, searchTopic, searchQuery, filterInvalidOnly]);
 
   // Bulk Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -303,6 +305,10 @@ export default function AdminExamQuestions() {
     const context = canvas.getContext("2d")!;
     canvas.width = viewport.width;
     canvas.height = viewport.height;
+    
+    // Fill canvas background with white to prevent black background transparency issues
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
     
     await page.render({ canvasContext: context, viewport }).promise;
     return new Promise<string>((resolve, reject) => {
@@ -852,6 +858,10 @@ export default function AdminExamQuestions() {
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     
+    // Fill canvas background with white to prevent black background transparency issues
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    
     await page.render({ canvasContext: context, viewport }).promise;
 
     const yMinPx = (bbox[0] / 1000) * canvas.height;
@@ -880,6 +890,10 @@ export default function AdminExamQuestions() {
     const cropCtx = cropCanvas.getContext("2d")!;
     cropCanvas.width = finalWidth;
     cropCanvas.height = finalHeight;
+    
+    // Fill crop canvas with white to be safe
+    cropCtx.fillStyle = "#ffffff";
+    cropCtx.fillRect(0, 0, finalWidth, finalHeight);
     cropCtx.drawImage(canvas, xMinFinal, yMinFinal, finalWidth, finalHeight, 0, 0, finalWidth, finalHeight);
 
     const blob = await new Promise<Blob>((res) => cropCanvas.toBlob((b) => res(b!), "image/png"));
@@ -897,7 +911,7 @@ export default function AdminExamQuestions() {
       while (hasMore) {
         const { data, error } = await supabase
           .from("exam_questions")
-          .select("*")
+          .select("*, exam_options(id, is_correct)")
           .order("created_at", { ascending: false })
           .range(from, from + step - 1);
 
@@ -1485,7 +1499,7 @@ export default function AdminExamQuestions() {
       // 6. Flatten new options with matched question_id and prepare for insert
       const optionsToInsert: any[] = [];
       uniqueApproved.forEach(q => {
-        if ((q.type === 'MCQ' || q.type === 'MSQ') && q.options.length > 0) {
+        if ((q.type === 'MCQ' || q.type === 'MSQ' || q.type === 'NAT') && q.options && q.options.length > 0) {
           q.options.forEach((opt: any) => {
             optionsToInsert.push({
               question_id: q.db_id,
@@ -1521,7 +1535,23 @@ export default function AdminExamQuestions() {
     return Array.from(tags).sort();
   }, [questions]);
 
+  const isQuestionInvalid = (q: Question) => {
+    if (q.part === 'B' || q.type === 'SUBJECTIVE') return false;
+    const opts = q.exam_options || [];
+    if (opts.length === 0) return true;
+    if (q.type === 'MCQ' || q.type === 'MSQ' || q.type === 'NAT') {
+      const hasCorrect = opts.some(opt => opt.is_correct);
+      if (!hasCorrect) return true;
+    }
+    return false;
+  };
+
+  const invalidQuestionsCount = useMemo(() => {
+    return questions.filter(isQuestionInvalid).length;
+  }, [questions]);
+
   const filteredQuestions = questions.filter(q => {
+    if (filterInvalidOnly && !isQuestionInvalid(q)) return false;
     if (filterPart !== "ALL" && q.part !== filterPart) return false;
     if (filterType !== "ALL" && q.type !== filterType) return false;
     if (filterPyq !== "ALL" && q.pyq_tag !== filterPyq) return false;
@@ -1588,6 +1618,28 @@ export default function AdminExamQuestions() {
           </div>
         </div>
       </div>
+
+
+      {/* Audit Warning for Questions Missing Answers */}
+      {invalidQuestionsCount > 0 && (
+        <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs font-semibold leading-relaxed animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold block text-sm mb-0.5">Audit Warning: Missing Answers Detected ⚠️</span>
+              There are <span className="font-black text-red-950 underline">{invalidQuestionsCount}</span> questions in your repository that lack options or correct answers. Candidates will receive 0/empty marks for these items.
+            </div>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setFilterInvalidOnly(!filterInvalidOnly)}
+            className={`border-red-200 text-red-800 hover:bg-red-100/50 shrink-0 font-bold h-8 text-[11px] rounded-lg transition-colors ${filterInvalidOnly ? 'bg-red-100 border-red-300 hover:bg-red-200/50' : 'bg-white'}`}
+          >
+            {filterInvalidOnly ? "Show All Questions" : "Filter Invalid Questions"}
+          </Button>
+        </div>
+      )}
 
       {/* COMPACT TOP SECTION: ADD/EDIT */}
       <div className={`bg-white rounded-2xl border ${editingId ? 'border-orange-200 shadow-md ring-1 ring-orange-100' : 'border-primary/10 shadow-sm'} p-4 space-y-4 transition-all duration-300`}>
