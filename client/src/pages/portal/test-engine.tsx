@@ -27,6 +27,9 @@ interface ResponseData {
   mentorComments?: string;
   mentorImprovements?: string;
   mentorLoomLink?: string;
+  timeSpent?: number;
+  answerChanges?: number;
+  stateTransitions?: Array<{ action: string; timestamp: string }>;
 }
 
 export default function PortalTestEngine({ params }: { params?: { id: string } }) {
@@ -124,7 +127,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             marksAwarded: r.marks_awarded,
             mentorComments: r.mentor_comments,
             mentorImprovements: r.mentor_improvements,
-            mentorLoomLink: r.mentor_loom_link
+            mentorLoomLink: r.mentor_loom_link,
+            timeSpent: r.time_spent || 0,
+            answerChanges: r.answer_changes || 0,
+            stateTransitions: r.state_transitions || []
           };
         });
 
@@ -163,6 +169,35 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [testStep]);
+
+  // Active Question Time Tracker (Isolated from timeLeft countdown to minimize re-renders)
+  useEffect(() => {
+    let timerId: any;
+    if (timerRunning && testStep === 'test' && engineData?.questions?.[activeQuestionIndex]) {
+      const activeQId = engineData.questions[activeQuestionIndex].id;
+      timerId = setInterval(() => {
+        setResponses(prev => {
+          const currentQ = prev[activeQId] || {
+            status: 'unseen',
+            selectedOptions: [],
+            answerText: '',
+            fileUrl: '',
+            timeSpent: 0,
+            answerChanges: 0,
+            stateTransitions: []
+          };
+          return {
+            ...prev,
+            [activeQId]: {
+              ...currentQ,
+              timeSpent: (currentQ.timeSpent || 0) + 1
+            }
+          };
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timerId);
+  }, [timerRunning, testStep, activeQuestionIndex, engineData]);
 
   // Timer Countdown
   useEffect(() => {
@@ -241,7 +276,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             status: 'unseen',
             selectedOptions: [],
             answerText: '',
-            fileUrl: ''
+            fileUrl: '',
+            timeSpent: 0,
+            answerChanges: 0,
+            stateTransitions: []
           };
         });
       }
@@ -315,6 +353,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           selected_options: response.selectedOptions,
           answer_text: response.answerText || null,
           file_url: response.fileUrl || null,
+          time_spent: response.timeSpent || 0,
+          answer_changes: response.answerChanges || 0,
+          state_transitions: response.stateTransitions || []
         }, { onConflict: 'attempt_id,question_id' });
         if (error) throw error;
       } catch (err) {
@@ -476,8 +517,31 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         .filter(q => q.part === 'B')
         .filter(q => responsesToScore[q.id]?.fileUrl || responsesToScore[q.id]?.answerText?.trim()).length;
 
-      // Update attempt with scores
+      // Update attempt with scores and save final telemetry bulk responses
       if (!isReviewOnly) {
+        // Bulk upsert all final responses with their full accumulated telemetry
+        const finalResponsesUpsert = Object.keys(responsesToScore).map(qId => {
+          const resp = responsesToScore[qId];
+          return {
+            attempt_id: currentAttemptId,
+            question_id: qId,
+            status: resp.status,
+            selected_options: resp.selectedOptions,
+            answer_text: resp.answerText || null,
+            file_url: resp.fileUrl || null,
+            time_spent: resp.timeSpent || 0,
+            answer_changes: resp.answerChanges || 0,
+            state_transitions: resp.stateTransitions || []
+          };
+        });
+
+        if (finalResponsesUpsert.length > 0) {
+          const { error: respUpsertErr } = await supabase
+            .from('exam_responses')
+            .upsert(finalResponsesUpsert, { onConflict: 'attempt_id,question_id' });
+          if (respUpsertErr) console.error("Error saving final responses:", respUpsertErr);
+        }
+
         const { error: updateError } = await supabase.from('exam_attempts').update({
           completed_at: new Date().toISOString(),
           status: 'completed',
@@ -539,12 +603,58 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       }
     }
 
+    // Telemetry navigation flush: save previous question response data immediately
+    const prevQ = engineData?.questions[activeQuestionIndex];
+    if (prevQ && attemptId) {
+      const prevQId = prevQ.id;
+      const prevResponse = responses[prevQId];
+      if (prevResponse) {
+        supabase.from('exam_responses').upsert({
+          attempt_id: attemptId,
+          question_id: prevQId,
+          status: prevResponse.status,
+          selected_options: prevResponse.selectedOptions,
+          answer_text: prevResponse.answerText || null,
+          file_url: prevResponse.fileUrl || null,
+          time_spent: prevResponse.timeSpent || 0,
+          answer_changes: prevResponse.answerChanges || 0,
+          state_transitions: prevResponse.stateTransitions || []
+        }, { onConflict: 'attempt_id,question_id' }).then(({ error }) => {
+          if (error) console.error("Navigation telemetry save error:", error);
+        });
+      }
+    }
+
     setActiveQuestionIndex(idx);
     const qId = q.id;
-    setResponses(prev => ({
-      ...prev,
-      [qId]: { ...prev[qId], status: prev[qId].status === 'unseen' ? 'visited' : prev[qId].status }
-    }));
+    setResponses(prev => {
+      const current = prev[qId] || {
+        status: 'unseen',
+        selectedOptions: [],
+        answerText: '',
+        fileUrl: '',
+        timeSpent: 0,
+        answerChanges: 0,
+        stateTransitions: []
+      };
+      
+      const newStatus = current.status === 'unseen' ? 'visited' : current.status;
+      const transitions = current.stateTransitions || [];
+      const lastAction = transitions[transitions.length - 1]?.action;
+      let newTransitions = transitions;
+      if (lastAction !== newStatus) {
+        newTransitions = [...transitions, { action: newStatus, timestamp: new Date().toISOString() }];
+      }
+
+      return {
+        ...prev,
+        [qId]: {
+          ...current,
+          status: newStatus,
+          stateTransitions: newTransitions
+        }
+      };
+    });
   };
 
   const updateResponse = (qId: string, updates: Partial<ResponseData>) => {
@@ -560,8 +670,31 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     }
 
     setResponses(prev => {
-      const current = prev[qId];
-      const newResponse = { ...current, ...updates };
+      const current = prev[qId] || {
+        status: 'unseen',
+        selectedOptions: [],
+        answerText: '',
+        fileUrl: '',
+        timeSpent: 0,
+        answerChanges: 0,
+        stateTransitions: []
+      };
+      
+      let answerChanges = current.answerChanges || 0;
+      if (updates.selectedOptions !== undefined || updates.answerText !== undefined || updates.fileUrl !== undefined) {
+        answerChanges += 1;
+      }
+      
+      const newResponse = { ...current, ...updates, answerChanges };
+
+      // Log transition
+      const transitions = newResponse.stateTransitions || [];
+      const lastAction = transitions[transitions.length - 1]?.action;
+      let newTransitions = transitions;
+      if (lastAction !== newResponse.status) {
+        newTransitions = [...transitions, { action: newResponse.status, timestamp: new Date().toISOString() }];
+        newResponse.stateTransitions = newTransitions;
+      }
 
       // Trigger background auto-save if we have an attempt ID
       if (attemptId) {

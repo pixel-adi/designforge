@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy, BookOpen, Lightbulb, ClipboardList, Lock, CreditCard, ExternalLink, Download, Eye, EyeOff, Upload, AlertCircle, Star, Shield } from "lucide-react";
+import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy, BookOpen, Lightbulb, ClipboardList, Lock, CreditCard, ExternalLink, Download, Eye, EyeOff, Upload, AlertCircle, Star, Shield, Sparkles, ThumbsUp, Plus, HelpCircle, Send } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ScatterChart, Scatter, ZAxis, Cell, Legend } from 'recharts';
 
 export default function PortalDashboard() {
   const [location, setLocation] = useLocation();
@@ -34,6 +34,21 @@ export default function PortalDashboard() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   const [leaderboardFilterTestId, setLeaderboardFilterTestId] = useState<string>('all');
+
+  // Advanced Telemetry & Telemetry Details
+  const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null);
+  const [attemptDetailsMap, setAttemptDetailsMap] = useState<Record<string, any>>({});
+  const [loadingDetailsMap, setLoadingDetailsMap] = useState<Record<string, boolean>>({});
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'part-a' | 'part-b'>('part-a');
+
+  // Feature Requests states
+  const [featureRequests, setFeatureRequests] = useState<any[]>([]);
+  const [loadingFeatures, setLoadingFeatures] = useState(false);
+  const [newFeatureTitle, setNewFeatureTitle] = useState("");
+  const [newFeatureDescription, setNewFeatureDescription] = useState("");
+  const [newFeatureCategory, setNewFeatureCategory] = useState("general");
+  const [showNewFeatureModal, setShowNewFeatureModal] = useState(false);
+  const [submittingFeature, setSubmittingFeature] = useState(false);
 
   // New section states
   const [showPremiumModal, setShowPremiumModal] = useState(false);
@@ -372,12 +387,419 @@ export default function PortalDashboard() {
         .eq('candidate_id', candidateId)
         .eq('status', 'completed')
         .order('completed_at', { ascending: false });
-      if (!error) setPastAttempts(data || []);
+      if (!error && data) {
+        setPastAttempts(data || []);
+        if (data.length > 0) {
+          const firstId = data[0].id;
+          setSelectedAttemptId(firstId);
+          fetchAttemptDetails(firstId);
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setLoadingAttempts(false);
     }
+  };
+
+  const fetchAttemptDetails = async (attemptId: string) => {
+    if (attemptDetailsMap[attemptId]) return;
+    
+    setLoadingDetailsMap(prev => ({ ...prev, [attemptId]: true }));
+    try {
+      const { data: responses, error: respError } = await supabase
+        .from('exam_responses')
+        .select(`
+          *,
+          exam_questions(
+            id,
+            type,
+            part,
+            difficulty,
+            content_text,
+            topics,
+            pyq_tag
+          )
+        `)
+        .eq('attempt_id', attemptId);
+
+      if (respError) throw respError;
+
+      const { data: attemptInfo } = await supabase
+        .from('exam_attempts')
+        .select('test_id')
+        .eq('id', attemptId)
+        .single();
+        
+      if (attemptInfo && responses) {
+        const testId = attemptInfo.test_id;
+        
+        const { data: testQuestions } = await supabase
+          .from('exam_test_questions')
+          .select('question_id')
+          .eq('test_id', testId);
+        
+        const questionIds = (testQuestions || []).map(tq => tq.question_id);
+        
+        const { data: correctOpts } = await supabase
+          .from('exam_options')
+          .select('id, question_id, is_correct, content_text')
+          .in('question_id', questionIds)
+          .eq('is_correct', true);
+
+        const correctMap: Record<string, any[]> = {};
+        (correctOpts || []).forEach(opt => {
+          if (!correctMap[opt.question_id]) correctMap[opt.question_id] = [];
+          correctMap[opt.question_id].push(opt);
+        });
+
+        const { data: commData } = await supabase
+          .from('exam_responses')
+          .select('question_id, time_spent')
+          .in('question_id', questionIds);
+
+        const commAverages: Record<string, { totalTime: number, count: number }> = {};
+        (commData || []).forEach(r => {
+          const t = r.time_spent || 0;
+          if (!commAverages[r.question_id]) commAverages[r.question_id] = { totalTime: 0, count: 0 };
+          commAverages[r.question_id].totalTime += t;
+          commAverages[r.question_id].count += 1;
+        });
+
+        const processedResponses = responses.map(r => {
+          const q = r.exam_questions;
+          if (!q) return r;
+          const correctOptsArr = correctMap[q.id] || [];
+          const selected = r.selected_options || [];
+          let isCorrect = false;
+          let maxMarks = 1;
+          let earnedMarks = 0;
+
+          if (q.type === 'NAT') {
+            const answered = r.answer_text?.trim();
+            const correctText = correctOptsArr[0]?.content_text?.trim();
+            isCorrect = !!(answered && correctText && (
+              !isNaN(parseFloat(answered)) && !isNaN(parseFloat(correctText))
+                ? parseFloat(answered) === parseFloat(correctText)
+                : answered.toLowerCase() === correctText?.toLowerCase()
+            ));
+            earnedMarks = isCorrect ? 4 : 0;
+            maxMarks = 4;
+          } else if (q.type === 'MCQ') {
+            isCorrect = selected.length === 1 && correctOptsArr.some(c => c.id === selected[0]);
+            earnedMarks = isCorrect ? 3 : (selected.length > 0 ? -0.5 : 0);
+            maxMarks = 3;
+          } else if (q.type === 'MSQ') {
+            const correctIds = correctOptsArr.map(c => c.id);
+            const C = correctIds.length;
+            const S = selected.length;
+            const W = selected.filter((s: any) => !correctIds.includes(s)).length;
+            if (selected.length > 0) {
+              if (W > 0) {
+                earnedMarks = -1;
+              } else {
+                if (S === C) {
+                  earnedMarks = 4;
+                  isCorrect = true;
+                } else {
+                  earnedMarks = S;
+                }
+              }
+            }
+            maxMarks = 4;
+          } else if (q.type === 'SUBJECTIVE') {
+            earnedMarks = r.marks_awarded ? Number(r.marks_awarded) : 0;
+            maxMarks = 20;
+            isCorrect = earnedMarks >= (maxMarks * 0.5);
+          }
+
+          const commAvg = commAverages[q.id] 
+            ? Math.round(commAverages[q.id].totalTime / commAverages[q.id].count) 
+            : 45;
+
+          return {
+            ...r,
+            isCorrect,
+            earnedMarks,
+            maxMarks,
+            communityAvgTime: commAvg
+          };
+        });
+
+        setAttemptDetailsMap(prev => ({
+          ...prev,
+          [attemptId]: {
+            responses: processedResponses,
+            testId
+          }
+        }));
+      }
+    } catch (err) {
+      console.error("Error fetching attempt telemetry:", err);
+    } finally {
+      setLoadingDetailsMap(prev => ({ ...prev, [attemptId]: false }));
+    }
+  };
+
+  const fetchFeatureRequests = async () => {
+    setLoadingFeatures(true);
+    try {
+      const { data, error } = await supabase
+        .from('exam_feature_requests')
+        .select('*, exam_candidates(name)')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setFeatureRequests(data);
+      } else if (error) {
+        console.error("Error fetching feature requests:", error);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingFeatures(false);
+    }
+  };
+
+  const handleCreateFeatureRequest = async () => {
+    if (!newFeatureTitle.trim() || !newFeatureDescription.trim()) {
+      toast({ title: "Validation Error", description: "Title and description are required.", variant: "destructive" });
+      return;
+    }
+
+    setSubmittingFeature(true);
+    try {
+      const { error } = await supabase
+        .from('exam_feature_requests')
+        .insert({
+          candidate_id: candidate.id,
+          title: newFeatureTitle,
+          description: newFeatureDescription,
+          category: newFeatureCategory,
+          votes: [candidate.id]
+        });
+
+      if (!error) {
+        toast({ title: "Feature Requested! 🚀", description: "Thank you for your feedback. Other students can upvote this request." });
+        setNewFeatureTitle("");
+        setNewFeatureDescription("");
+        setNewFeatureCategory("general");
+        setShowNewFeatureModal(false);
+        fetchFeatureRequests();
+      } else {
+        throw error;
+      }
+    } catch (err: any) {
+      toast({ title: "Submission Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmittingFeature(false);
+    }
+  };
+
+  const handleVoteFeatureRequest = async (requestId: string, currentVotes: string[]) => {
+    if (!candidate) return;
+    
+    let updatedVotes: string[] = [];
+    const hasVoted = currentVotes.includes(candidate.id);
+    
+    if (hasVoted) {
+      updatedVotes = currentVotes.filter(v => v !== candidate.id);
+    } else {
+      updatedVotes = [...currentVotes, candidate.id];
+    }
+
+    try {
+      const { error } = await supabase
+        .from('exam_feature_requests')
+        .update({ votes: updatedVotes })
+        .eq('id', requestId);
+
+      if (!error) {
+        setFeatureRequests(prev => prev.map(req => {
+          if (req.id === requestId) {
+            return { ...req, votes: updatedVotes };
+          }
+          return req;
+        }));
+        toast({ 
+          title: hasVoted ? "Vote Retracted" : "Voted! 👍", 
+          description: hasVoted ? "Your vote choice has been recorded." : "Thank you for upvoting this suggestion!"
+        });
+      } else {
+        throw error;
+      }
+    } catch (err: any) {
+      toast({ title: "Action Failed", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const getScatterData = (responses: any[]) => {
+    const partA = responses.filter(r => r.exam_questions?.part === 'A');
+    return partA.map((r, i) => {
+      let diffVal = 2;
+      if (r.exam_questions?.difficulty === 'Low') diffVal = 1;
+      if (r.exam_questions?.difficulty === 'High') diffVal = 3;
+      
+      return {
+        qName: `Q${i + 1}`,
+        timeSpent: r.time_spent || 0,
+        difficulty: diffVal + (Math.random() * 0.3 - 0.15),
+        difficultyLabel: r.exam_questions?.difficulty,
+        isCorrect: r.isCorrect,
+        topic: r.exam_questions?.topics?.[0] || 'General',
+        status: r.status
+      };
+    });
+  };
+
+  const getQuadrantCounts = (responses: any[]) => {
+    let sweetSpot = 0, overthinking = 0, rushed = 0, stuck = 0;
+    
+    responses.filter(r => r.exam_questions?.part === 'A').forEach(r => {
+      const isCorrect = r.isCorrect;
+      const speed = r.time_spent || 0;
+      const avg = r.communityAvgTime || 45;
+      
+      if (isCorrect) {
+        if (speed <= avg) sweetSpot++;
+        else overthinking++;
+      } else {
+        if (speed <= avg) rushed++;
+        else stuck++;
+      }
+    });
+
+    return { sweetSpot, overthinking, rushed, stuck };
+  };
+
+  const getConceptMasteryData = (responses: any[]) => {
+    const partA = responses.filter(r => r.exam_questions?.part === 'A');
+    const topicMap: Record<string, { total: number, earned: number }> = {};
+
+    partA.forEach(r => {
+      const q = r.exam_questions;
+      if (!q || !q.topics || q.topics.length === 0) return;
+      
+      let weight = 2;
+      if (q.difficulty === 'Low') weight = 1;
+      if (q.difficulty === 'High') weight = 3;
+
+      q.topics.forEach((t: string) => {
+        const topicName = t.trim();
+        if (!topicMap[topicName]) {
+          topicMap[topicName] = { total: 0, earned: 0 };
+        }
+        topicMap[topicName].total += r.maxMarks * weight;
+        topicMap[topicName].earned += Math.max(0, r.earnedMarks) * weight;
+      });
+    });
+
+    const data = Object.keys(topicMap).map(topic => {
+      const info = topicMap[topic];
+      const percent = info.total > 0 ? Math.round((info.earned / info.total) * 100) : 0;
+      return {
+        subject: topic,
+        A: percent,
+        fullMark: 100
+      };
+    });
+
+    if (data.length === 0) {
+      return [
+        { subject: 'Visualisation', A: 0, fullMark: 100 },
+        { subject: 'Observation', A: 0, fullMark: 100 },
+        { subject: 'Aptitude', A: 0, fullMark: 100 },
+        { subject: 'GK', A: 0, fullMark: 100 },
+        { subject: 'Theory', A: 0, fullMark: 100 }
+      ];
+    }
+
+    return data;
+  };
+
+  const getTimeWastage = (responses: any[]) => {
+    const partA = responses.filter(r => r.exam_questions?.part === 'A');
+    const totalTime = partA.reduce((sum, r) => sum + (r.time_spent || 0), 0);
+    const wastedTime = partA.filter(r => !r.isCorrect).reduce((sum, r) => sum + (r.time_spent || 0), 0);
+    
+    const wastedPercent = totalTime > 0 ? Math.round((wastedTime / totalTime) * 100) : 0;
+    return {
+      totalTime,
+      wastedTime,
+      wastedPercent
+    };
+  };
+
+  const getReviewPayoff = (responses: any[]) => {
+    const partA = responses.filter(r => r.exam_questions?.part === 'A');
+    let markedCount = 0;
+    let marksGained = 0;
+    let marksLost = 0;
+
+    partA.forEach(r => {
+      const transitions = r.state_transitions || [];
+      const wasMarked = transitions.some((t: any) => t.action === 'marked') || r.status === 'marked';
+      if (wasMarked) {
+        markedCount++;
+        const changes = r.answer_changes || 0;
+        if (changes > 1) {
+          if (r.isCorrect) {
+            marksGained += r.earnedMarks;
+          } else {
+            marksLost += Math.abs(r.earnedMarks);
+          }
+        }
+      }
+    });
+
+    return {
+      markedCount,
+      netPayoff: marksGained - marksLost,
+      gained: marksGained,
+      lost: marksLost
+    };
+  };
+
+  const getPartBRubricAverages = (responses: any[]) => {
+    const partB = responses.filter(r => r.exam_questions?.part === 'B');
+    const rubricSums = {
+      critical_thinking: 0,
+      ideation: 0,
+      storytelling: 0,
+      conceptualisation: 0,
+      representation: 0
+    };
+    let count = 0;
+
+    partB.forEach(r => {
+      const rubrics = r.rubric_marks || {};
+      if (Object.keys(rubrics).length > 0) {
+        count++;
+        rubricSums.critical_thinking += parseFloat(rubrics.critical_thinking || 0);
+        rubricSums.ideation += parseFloat(rubrics.ideation || 0);
+        rubricSums.storytelling += parseFloat(rubrics.storytelling || 0);
+        rubricSums.conceptualisation += parseFloat(rubrics.conceptualisation || 0);
+        rubricSums.representation += parseFloat(rubrics.representation || 0);
+      }
+    });
+
+    if (count === 0) {
+      return [
+        { criteria: 'Critical Thinking', value: 0 },
+        { criteria: 'Ideation', value: 0 },
+        { criteria: 'Storytelling', value: 0 },
+        { criteria: 'Conceptualisation', value: 0 },
+        { criteria: 'Representation', value: 0 }
+      ];
+    }
+
+    return [
+      { criteria: 'Critical Thinking', value: Math.round((rubricSums.critical_thinking / (count * 4)) * 100) },
+      { criteria: 'Ideation', value: Math.round((rubricSums.ideation / (count * 4)) * 100) },
+      { criteria: 'Storytelling', value: Math.round((rubricSums.storytelling / (count * 4)) * 100) },
+      { criteria: 'Conceptualisation', value: Math.round((rubricSums.conceptualisation / (count * 4)) * 100) },
+      { criteria: 'Representation', value: Math.round((rubricSums.representation / (count * 4)) * 100) }
+    ];
   };
 
   const fetchLeaderboard = async () => {
@@ -790,6 +1212,12 @@ export default function PortalDashboard() {
             >
               <Trophy className="w-4 h-4" /> Leaderboard
             </button>
+            <button
+              onClick={() => { setActiveTab('features'); fetchFeatureRequests(); }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'features' ? 'bg-primary/10 text-primary' : 'text-foreground/70 hover:bg-black/5 hover:text-foreground'}`}
+            >
+              <Sparkles className="w-4 h-4" /> Feature Board
+            </button>
           </div>
 
           <p className="px-4 text-xs font-semibold uppercase tracking-wider text-foreground/40 mb-2 mt-6">Resources</p>
@@ -974,73 +1402,393 @@ export default function PortalDashboard() {
 
           {activeTab === 'progress' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-[#262626]">Performance Analytics</h2>
-              </div>
-              
-              {/* Summary Stats */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm">
-                  <div className="text-sm font-semibold text-foreground/50 mb-2">Total Tests Attempted</div>
-                  <div className="text-3xl font-bold text-[#262626]">{pastAttempts.length}</div>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-[#262626]">Advanced Performance Analytics</h2>
+                  <p className="text-xs text-foreground/50 font-medium">Deep telemetry metrics, cognitive stamina, pacing analysis and mentor evaluations.</p>
                 </div>
-                <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm">
-                  <div className="text-sm font-semibold text-foreground/50 mb-2">Average Part A Score</div>
-                  <div className="text-3xl font-bold text-green-600">
-                    {pastAttempts.length === 0 ? '—' : 
-                      Math.round(pastAttempts.reduce((acc, a) => acc + (a.total_part_a > 0 ? (a.score_part_a / a.total_part_a) * 100 : 0), 0) / pastAttempts.length) + '%'}
-                  </div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm">
-                  <div className="text-sm font-semibold text-foreground/50 mb-2">Best Part A Score</div>
-                  <div className="text-3xl font-bold text-primary">
-                    {pastAttempts.length === 0 ? '—' :
-                      (() => { const best = pastAttempts.reduce((b, a) => (a.score_part_a > b.score_part_a ? a : b), pastAttempts[0]); return `${best.score_part_a}/${best.total_part_a}`; })()
-                    }
-                  </div>
-                </div>
+                
+                {/* Attempt Selector Dropdown */}
+                {pastAttempts.length > 0 && (
+                  <select 
+                    className="h-10 px-4 rounded-xl border border-black/10 bg-white text-xs font-bold text-[#262626] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm min-w-[240px]"
+                    value={selectedAttemptId || 'overall'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'overall') {
+                        setSelectedAttemptId('overall');
+                      } else {
+                        setSelectedAttemptId(val);
+                        fetchAttemptDetails(val);
+                      }
+                    }}
+                  >
+                    <option value="overall">📊 Overall Profile Summary</option>
+                    {pastAttempts.map((attempt, index) => (
+                      <option key={attempt.id} value={attempt.id}>
+                        📝 {attempt.exam_tests?.title || 'Mock Test'} (Attempt {pastAttempts.length - index})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
-              {pastAttempts.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  {/* Accuracy Bar Chart */}
-                  <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
-                    <h3 className="text-sm font-bold text-[#262626] mb-6">Historical Accuracy Trends</h3>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={pastAttempts.map((a, i) => ({ name: `Attempt ${pastAttempts.length - i}`, accuracy: a.total_part_a > 0 ? Math.round((a.score_part_a / a.total_part_a) * 100) : 0 })).reverse()}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} dy={10} />
-                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} dx={-10} domain={[0, 100]} />
-                          <RechartsTooltip cursor={{ fill: '#F3F4F6' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                          <Bar dataKey="accuracy" fill="#FF6B6B" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                        </BarChart>
-                      </ResponsiveContainer>
+              {/* OVERALL PERFORMANCE PROFILE */}
+              {(selectedAttemptId === 'overall' || !selectedAttemptId || pastAttempts.length === 0) ? (
+                <>
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                    <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm">
+                      <div className="text-xs font-bold uppercase tracking-wider text-foreground/40 mb-2">Total Tests Attempted</div>
+                      <div className="text-3xl font-black text-[#262626]">{pastAttempts.length}</div>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm">
+                      <div className="text-xs font-bold uppercase tracking-wider text-foreground/40 mb-2">Average Part A Score</div>
+                      <div className="text-3xl font-black text-green-600">
+                        {pastAttempts.length === 0 ? '—' : 
+                          Math.round(pastAttempts.reduce((acc, a) => acc + (a.total_part_a > 0 ? (a.score_part_a / a.total_part_a) * 100 : 0), 0) / pastAttempts.length) + '%'}
+                      </div>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm">
+                      <div className="text-xs font-bold uppercase tracking-wider text-foreground/40 mb-2">Best Part A Score</div>
+                      <div className="text-3xl font-black text-primary">
+                        {pastAttempts.length === 0 ? '—' :
+                          (() => { const best = pastAttempts.reduce((b, a) => (a.score_part_a > b.score_part_a ? a : b), pastAttempts[0]); return `${best.score_part_a}/${best.total_part_a}`; })()
+                        }
+                      </div>
                     </div>
                   </div>
 
-                  {/* Skills Radar Chart - Simulated since we don't have granular question tags yet */}
-                  <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
-                    <h3 className="text-sm font-bold text-[#262626] mb-6">Strengths & Weaknesses (Estimated)</h3>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={[
-                          { subject: 'Visualisation', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 110) : 0, fullMark: 100 },
-                          { subject: 'Observation', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 90) : 0, fullMark: 100 },
-                          { subject: 'Aptitude', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 105) : 0, fullMark: 100 },
-                          { subject: 'GK', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 85) : 0, fullMark: 100 },
-                          { subject: 'Creativity', A: pastAttempts[0]?.part_b_answered ? Math.min(100, pastAttempts[0].part_b_answered * 25) : 0, fullMark: 100 },
-                        ]}>
-                          <PolarGrid stroke="#E5E7EB" />
-                          <PolarAngleAxis dataKey="subject" tick={{ fill: '#6B7280', fontSize: 11 }} />
-                          <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                          <Radar name="Skills" dataKey="A" stroke="#FF6B6B" fill="#FF6B6B" fillOpacity={0.4} />
-                          <RechartsTooltip />
-                        </RadarChart>
-                      </ResponsiveContainer>
+                  {pastAttempts.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                      {/* Accuracy Bar Chart */}
+                      <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-6">Historical Accuracy Trends</h3>
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={pastAttempts.map((a, i) => ({ name: `Attempt ${pastAttempts.length - i}`, accuracy: a.total_part_a > 0 ? Math.round((a.score_part_a / a.total_part_a) * 100) : 0 })).reverse()}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6B7280' }} dy={10} />
+                              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6B7280' }} dx={-10} domain={[0, 100]} />
+                              <RechartsTooltip cursor={{ fill: '#F3F4F6' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                              <Bar dataKey="accuracy" fill="#FF6B6B" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      {/* Cumulative Radar Chart */}
+                      <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-6">Estimated Core Design Skills</h3>
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={[
+                              { subject: 'Visualisation', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 110) : 0, fullMark: 100 },
+                              { subject: 'Observation', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 90) : 0, fullMark: 100 },
+                              { subject: 'Aptitude', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 105) : 0, fullMark: 100 },
+                              { subject: 'GK', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 85) : 0, fullMark: 100 },
+                              { subject: 'Creativity', A: pastAttempts[0]?.part_b_answered ? Math.min(100, pastAttempts[0].part_b_answered * 25) : 0, fullMark: 100 },
+                            ]}>
+                              <PolarGrid stroke="#E5E7EB" />
+                              <PolarAngleAxis dataKey="subject" tick={{ fill: '#6B7280', fontSize: 11 }} />
+                              <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                              <Radar name="Skills" dataKey="A" stroke="#FF6B6B" fill="#FF6B6B" fillOpacity={0.4} />
+                              <RechartsTooltip />
+                            </RadarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  ) : (
+                    <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-12 text-center">
+                      <Clock className="w-12 h-12 text-foreground/20 mx-auto mb-4" />
+                      <h4 className="font-bold text-lg text-[#262626] mb-1">No Exam Attempts Logged</h4>
+                      <p className="text-sm text-foreground/50 max-w-md mx-auto">Complete standard mock tests inside the portal. Detailed, millisecond-accurate telemetry dashboards will pop up automatically!</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* DEEP TELEMETRY DRILL DOWN FOR SPECIFIC ATTEMPT */
+                (() => {
+                  const attemptId = selectedAttemptId;
+                  const loadingDetails = loadingDetailsMap[attemptId];
+                  const details = attemptDetailsMap[attemptId];
+                  const attemptObj = pastAttempts.find(a => a.id === attemptId);
+
+                  if (loadingDetails || !details) {
+                    return (
+                      <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-24 flex flex-col items-center justify-center">
+                        <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
+                        <h4 className="font-bold text-[#262626] text-sm">Parsing attempt telemetry data...</h4>
+                        <p className="text-xs text-foreground/40 mt-1">Calculating pacing quotients, difficulty matrices and cognitive curves.</p>
+                      </div>
+                    );
+                  }
+
+                  const responses = details.responses || [];
+                  const scatterData = getScatterData(responses);
+                  const quadCounts = getQuadrantCounts(responses);
+                  const radarData = getConceptMasteryData(responses);
+                  const wastage = getTimeWastage(responses);
+                  const payoff = getReviewPayoff(responses);
+                  
+                  const formatSecs = (s: number) => {
+                    const m = Math.floor(s / 60);
+                    const remSec = s % 60;
+                    return m > 0 ? `${m}m ${remSec}s` : `${remSec}s`;
+                  };
+
+                  return (
+                    <div className="space-y-6">
+                      {/* Split Sub Tabs */}
+                      <div className="flex border-b border-black/10">
+                        <button
+                          onClick={() => setAnalyticsSubTab('part-a')}
+                          className={`px-6 py-3 font-bold text-sm border-b-2 transition-all ${analyticsSubTab === 'part-a' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground'}`}
+                        >
+                          Part A: Objective Pacing & Strategy
+                        </button>
+                        <button
+                          onClick={() => setAnalyticsSubTab('part-b')}
+                          className={`px-6 py-3 font-bold text-sm border-b-2 transition-all ${analyticsSubTab === 'part-b' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground'}`}
+                        >
+                          Part B: Subjective Design Rubrics
+                        </button>
+                      </div>
+
+                      {/* PART A DRILLDOWN */}
+                      {analyticsSubTab === 'part-a' && (
+                        <div className="space-y-6">
+                          {/* Part A Cards Row */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="bg-white p-5 rounded-2xl border border-black/5 shadow-sm">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/40 mb-1">Part A Score</p>
+                              <p className="text-2xl font-black text-[#262626]">{attemptObj?.score_part_a || 0} <span className="text-sm font-semibold text-foreground/40">/ {attemptObj?.total_part_a || 0}</span></p>
+                              <div className="mt-2 text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full inline-block">
+                                {attemptObj?.total_part_a > 0 ? Math.round((attemptObj.score_part_a / attemptObj.total_part_a) * 100) : 0}% Accuracy
+                              </div>
+                            </div>
+                            <div className="bg-white p-5 rounded-2xl border border-black/5 shadow-sm">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/40 mb-1">Time Spent (Part A)</p>
+                              <p className="text-2xl font-black text-[#262626]">{formatSecs(wastage.totalTime)}</p>
+                              <p className="text-xs text-foreground/50 font-medium mt-1">Average Pacing: {formatSecs(Math.round(wastage.totalTime / Math.max(1, responses.filter((r: any) => r.exam_questions?.part === 'A').length)))} / question</p>
+                            </div>
+                            <div className="bg-white p-5 rounded-2xl border border-black/5 shadow-sm">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/40 mb-1">Time Wastage Ratio</p>
+                              <p className="text-2xl font-black text-orange-600">{wastage.wastedPercent}%</p>
+                              <p className="text-xs text-foreground/50 font-medium mt-1">{formatSecs(wastage.wastedTime)} spent on incorrect / skipped q's.</p>
+                            </div>
+                            <div className="bg-white p-5 rounded-2xl border border-black/5 shadow-sm">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/40 mb-1">Review Payoff Index</p>
+                              <p className={`text-2xl font-black ${payoff.netPayoff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {payoff.netPayoff >= 0 ? `+${payoff.netPayoff}` : payoff.netPayoff} Marks
+                              </p>
+                              <p className="text-xs text-foreground/50 font-medium mt-1">From {payoff.markedCount} questions flagged for review.</p>
+                            </div>
+                          </div>
+
+                          {/* Chronological Ribbon */}
+                          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-4">Attempt Strategy Ribbon (Question-by-Question path)</h3>
+                            <div className="flex flex-wrap gap-2.5">
+                              {responses.filter((r: any) => r.exam_questions?.part === 'A').map((resp: any, i: number) => {
+                                const borderClass = resp.answer_changes > 1 ? 'border-amber-400 border-2 animate-pulse' : 'border-black/5 border';
+                                let bgClass = 'bg-gray-100 text-foreground/40';
+                                if (resp.status === 'answered' || resp.status === 'marked') {
+                                  bgClass = resp.isCorrect 
+                                    ? 'bg-green-50 text-green-700 font-bold border-green-200' 
+                                    : 'bg-red-50 text-red-700 font-bold border-red-200';
+                                }
+
+                                const wasMarked = (resp.state_transitions || []).some((t: any) => t.action === 'marked') || resp.status === 'marked';
+
+                                return (
+                                  <div key={resp.id} className="relative group cursor-pointer">
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs ${bgClass} ${borderClass} transition-all hover:scale-105 shadow-sm`}>
+                                      {i + 1}
+                                      {wasMarked && (
+                                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full border border-white" />
+                                      )}
+                                    </div>
+                                    
+                                    {/* Glassmorphic Tooltip */}
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 w-56 p-3 bg-[#1A1A1A] text-white text-xs rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl border border-white/10">
+                                      <p className="font-bold border-b border-white/10 pb-1 mb-1.5 flex justify-between">
+                                        <span>Q{i + 1} ({resp.exam_questions?.type})</span>
+                                        <span className={resp.isCorrect ? 'text-green-400' : 'text-red-400'}>
+                                          {resp.isCorrect ? 'Correct' : 'Incorrect'}
+                                        </span>
+                                      </p>
+                                      <p className="mb-0.5"><span className="text-white/40">Topic:</span> {resp.exam_questions?.topics?.[0] || 'General'}</p>
+                                      <p className="mb-0.5"><span className="text-white/40">Time Spent:</span> {resp.time_spent || 0}s (Avg: {resp.communityAvgTime || 45}s)</p>
+                                      <p className="mb-0.5"><span className="text-white/40">Difficulty:</span> {resp.exam_questions?.difficulty}</p>
+                                      <p><span className="text-white/40">Adjustments:</span> {resp.answer_changes || 0} times</p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-4 mt-4 text-[10px] font-bold text-foreground/50">
+                              <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-green-50 border border-green-200 rounded-md" /> Correct</div>
+                              <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-red-50 border border-red-200 rounded-md" /> Incorrect</div>
+                              <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-gray-100 rounded-md" /> Unattempted</div>
+                              <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-blue-500 rounded-full" /> Marked for Review</div>
+                              <div className="flex items-center gap-1.5"><div className="w-3 h-3 border border-amber-400 rounded-md bg-white" /> Changed (Panic)</div>
+                            </div>
+                          </div>
+
+                          {/* Charts Grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Scatter Speed Quadrants */}
+                            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6 flex flex-col justify-between">
+                              <div>
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-1">Speed vs. Accuracy Quadrants</h3>
+                                <p className="text-[10px] text-foreground/40 font-medium mb-6">Scatter map of time spent (seconds) vs difficulty level.</p>
+                              </div>
+                              <div className="h-64 relative">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 10 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                                    <XAxis type="number" dataKey="timeSpent" name="Time" unit="s" label={{ value: 'Time Spent (s)', position: 'insideBottom', offset: -10, fill: '#6B7280', fontSize: 10 }} />
+                                    <YAxis type="number" dataKey="difficulty" name="Difficulty" domain={[0.5, 3.5]} ticks={[1, 2, 3]} tickFormatter={(val) => val === 1 ? 'Low' : val === 2 ? 'Med' : val === 3 ? 'High' : ''} label={{ value: 'Difficulty Level', angle: -90, position: 'insideLeft', fill: '#6B7280', fontSize: 10 }} />
+                                    <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ borderRadius: '12px', border: 'none', background: '#1A1A1A', color: '#fff', fontSize: 11 }} />
+                                    <Scatter name="Telemetry Questions" data={scatterData}>
+                                      {scatterData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.isCorrect ? '#10B981' : entry.status === 'unseen' ? '#9CA3AF' : '#EF4444'} />
+                                      ))}
+                                    </Scatter>
+                                  </ScatterChart>
+                                </ResponsiveContainer>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 mt-4 text-[10px] font-bold border-t border-black/5 pt-3">
+                                <div className="p-2 bg-green-50/50 rounded-lg"><span className="text-green-700">🎯 Sweet Spot: {quadCounts.sweetSpot}</span> (Correct & Fast)</div>
+                                <div className="p-2 bg-blue-50/50 rounded-lg"><span className="text-blue-700">🧠 Overthinking: {quadCounts.overthinking}</span> (Correct & Slow)</div>
+                                <div className="p-2 bg-yellow-50/50 rounded-lg"><span className="text-amber-700">⚡ Careless/Rushed: {quadCounts.rushed}</span> (Incorrect & Fast)</div>
+                                <div className="p-2 bg-red-50/50 rounded-lg"><span className="text-red-700">⏳ Stuck: {quadCounts.stuck}</span> (Incorrect & Slow)</div>
+                              </div>
+                            </div>
+
+                            {/* Dynamics Concept Mastery Radar */}
+                            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+                              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-6">Topic Mastery Strength (Difficulty-Weighted)</h3>
+                              <div className="h-64">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                                    <PolarGrid stroke="#E5E7EB" />
+                                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#6B7280', fontSize: 10 }} />
+                                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                                    <Radar name="Mastery" dataKey="A" stroke="#FF6B6B" fill="#FF6B6B" fillOpacity={0.4} />
+                                    <RechartsTooltip />
+                                  </RadarChart>
+                                </ResponsiveContainer>
+                              </div>
+                              <p className="text-[10px] font-medium text-foreground/40 mt-4 text-center">Score values are weighted based on question difficulty: Low (1x), Med (2x), High (3x) weight points.</p>
+                            </div>
+                          </div>
+
+                          {/* Community Benchmark Bar Charts */}
+                          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-1">Your Pacing vs. Community Average</h3>
+                            <p className="text-[10px] text-foreground/40 font-medium mb-6">Comparison of your seconds spent per question versus candidate population benchmarks.</p>
+                            <div className="h-64">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={responses.filter((r: any) => r.exam_questions?.part === 'A').map((resp: any, i: number) => ({ name: `Q${i + 1}`, You: resp.time_spent || 0, Community: resp.communityAvgTime || 45 }))}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6B7280' }} />
+                                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6B7280' }} label={{ value: 'Seconds', angle: -90, position: 'insideLeft', fill: '#6B7280', fontSize: 10 }} />
+                                  <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                  <Legend wrapperStyle={{ fontSize: 11, fontWeight: 'bold' }} />
+                                  <Bar dataKey="You" fill="#FF6B6B" radius={[3, 3, 0, 0]} maxBarSize={20} />
+                                  <Bar dataKey="Community" fill="#E5E7EB" radius={[3, 3, 0, 0]} maxBarSize={20} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* PART B DRILLDOWN */}
+                      {analyticsSubTab === 'part-b' && (
+                        <div className="space-y-6">
+                          {attemptObj?.part_b_evaluation_status !== 'completed' ? (
+                            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-16 text-center">
+                              <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4 animate-pulse" />
+                              <h4 className="font-bold text-lg text-[#262626] mb-1">Part B Evaluation Awaiting 🎨</h4>
+                              <p className="text-sm text-foreground/50 max-w-sm mx-auto animate-fadeIn">Your subjective sketches and drawings are currently under review by our design mentors. Rubrics, scoring matrices, and loom recordings will post immediately when published!</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              {/* Rubric metrics chart */}
+                              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6 flex flex-col justify-between">
+                                <div>
+                                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-6">Subjective Rubric Proficiency</h3>
+                                </div>
+                                <div className="h-64">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <RadarChart cx="50%" cy="50%" outerRadius="80%" data={getPartBRubricAverages(responses)}>
+                                      <PolarGrid stroke="#E5E7EB" />
+                                      <PolarAngleAxis dataKey="criteria" tick={{ fill: '#6B7280', fontSize: 10 }} />
+                                      <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                                      <Radar name="Grade Score %" dataKey="value" stroke="#10B981" fill="#10B981" fillOpacity={0.4} />
+                                      <RechartsTooltip />
+                                    </RadarChart>
+                                  </ResponsiveContainer>
+                                </div>
+                                <div className="text-[10px] font-bold text-foreground/50 border-t border-black/5 pt-3 text-center">
+                                  Based on evaluation of {responses.filter((r: any) => r.exam_questions?.part === 'B').length} subjective answers.
+                                </div>
+                              </div>
+
+                              {/* Mentoring Room */}
+                              <div className="space-y-6">
+                                {/* Mentor feedback loop details */}
+                                <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+                                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-4 flex items-center gap-1.5">
+                                    <FileText className="w-4 h-4 text-green-500" /> Mentor Comments & Portfolio Upgrades
+                                  </h3>
+                                  <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+                                    {responses.filter((r: any) => r.exam_questions?.part === 'B').map((r: any, i: number) => (
+                                      <div key={r.id} className="border-b border-black/5 pb-3 last:border-0 last:pb-0">
+                                        <p className="text-xs font-bold text-primary mb-1">Question {i + 1} ({r.exam_questions?.topics?.[0] || 'Subjective Sketching'})</p>
+                                        <p className="text-xs font-semibold text-[#262626]">Marks: <span className="text-green-600">{r.marks_awarded || '—'} / 20</span></p>
+                                        
+                                        {r.mentor_comments && (
+                                          <div className="bg-black/5 p-2 rounded-lg text-xs mt-2 font-medium text-foreground/70">
+                                            <span className="font-bold text-foreground block mb-0.5">Critique:</span>
+                                            {r.mentor_comments}
+                                          </div>
+                                        )}
+                                        {r.mentor_improvements && (
+                                          <div className="bg-green-50/50 p-2 rounded-lg text-xs mt-1.5 font-medium text-green-800">
+                                            <span className="font-bold text-green-900 block mb-0.5">Actions to Improve:</span>
+                                            {r.mentor_improvements}
+                                          </div>
+                                        )}
+                                        
+                                        {r.mentor_loom_link && (
+                                          <div className="mt-2.5">
+                                            <a 
+                                              href={r.mentor_loom_link} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer"
+                                              className="inline-flex items-center gap-1.5 text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-md transition-colors"
+                                            >
+                                              <ExternalLink className="w-3.5 h-3.5" /> Watch Video Critique
+                                            </a>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               )}
 
               {/* Attempts Accordion */}
@@ -1159,6 +1907,149 @@ export default function PortalDashboard() {
                   </Accordion>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* FEATURE REQUESTS BOARD TAB */}
+          {activeTab === 'features' && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-[#262626]">Community Suggestion & Feature Board</h2>
+                  <p className="text-xs text-foreground/50 font-medium">Request upgrades you'd love to see on the portal and upvote ideas from other designers.</p>
+                </div>
+                <Button 
+                  onClick={() => setShowNewFeatureModal(true)} 
+                  className="bg-primary hover:bg-primary/95 text-white font-bold shadow-md rounded-xl flex items-center gap-2 h-10 px-5"
+                >
+                  <Plus className="w-4 h-4" /> Propose Upgrade
+                </Button>
+              </div>
+
+              {loadingFeatures ? (
+                <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-20 flex justify-center items-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : featureRequests.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-16 text-center">
+                  <Sparkles className="w-12 h-12 text-foreground/20 mx-auto mb-4" />
+                  <h3 className="font-bold text-[#262626] mb-1">No suggestions yet</h3>
+                  <p className="text-sm text-foreground/50 max-w-sm mx-auto mb-4">Be the first to suggest an enhancement or new tools for the student workspace!</p>
+                  <Button onClick={() => setShowNewFeatureModal(true)} variant="outline" className="border-primary text-primary font-bold">
+                    Create Suggestion
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {featureRequests.map((req: any) => {
+                    const votesArray = req.votes || [];
+                    const upvoteCount = votesArray.length;
+                    const hasVoted = candidate && votesArray.includes(candidate.id);
+                    const formattedDate = req.created_at ? new Date(req.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
+                    
+                    let statusColor = "bg-amber-50 text-amber-700 border-amber-200";
+                    let statusLabel = "Under Review";
+                    if (req.status === 'under_review') {
+                      statusColor = "bg-blue-50 text-blue-700 border-blue-200";
+                      statusLabel = "Awaiting Critique";
+                    } else if (req.status === 'planned') {
+                      statusColor = "bg-purple-50 text-purple-700 border-purple-200";
+                      statusLabel = "In Roadmap";
+                    } else if (req.status === 'completed') {
+                      statusColor = "bg-green-50 text-green-700 border-green-200";
+                      statusLabel = "Completed";
+                    }
+
+                    return (
+                      <div key={req.id} className="bg-white rounded-2xl border border-black/5 shadow-sm p-5 flex gap-4 hover:border-black/10 transition-colors">
+                        {/* Vote Button */}
+                        <button 
+                          onClick={() => handleVoteFeatureRequest(req.id, votesArray)}
+                          className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center border transition-all shrink-0 hover:scale-102 ${hasVoted ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-black/5 hover:bg-black/8 border-transparent text-foreground/60'}`}
+                        >
+                          <ThumbsUp className={`w-4 h-4 mb-0.5 ${hasVoted ? 'fill-primary' : ''}`} />
+                          <span className="text-xs font-black">{upvoteCount}</span>
+                        </button>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                            <h4 className="font-bold text-[#262626] text-md">{req.title}</h4>
+                            <span className="text-[9px] font-bold uppercase px-2 py-0.5 bg-black/5 rounded-full text-foreground/50 border border-black/5">{req.category}</span>
+                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full border ${statusColor} ml-auto`}>
+                              {statusLabel}
+                            </span>
+                          </div>
+                          <p className="text-xs font-medium text-foreground/60 mb-2 leading-relaxed whitespace-pre-wrap">{req.description}</p>
+                          <div className="text-[10px] text-foreground/40 font-semibold">
+                            By {req.exam_candidates?.name || 'Student'} on {formattedDate}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Create Request Modal Dialog */}
+              <Dialog open={showNewFeatureModal} onOpenChange={setShowNewFeatureModal}>
+                <DialogContent className="sm:max-w-[480px] rounded-2xl">
+                  <DialogHeader>
+                    <DialogTitle className="font-black text-xl text-[#262626] flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-primary" /> Propose Workspace Upgrade
+                    </DialogTitle>
+                    <DialogDescription className="text-xs">Suggest features or resources that would elevate your design exam preparation portal.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="title" className="text-xs font-bold text-foreground/70 uppercase">Suggestion Title</Label>
+                      <Input 
+                        id="title" 
+                        value={newFeatureTitle}
+                        onChange={(e) => setNewFeatureTitle(e.target.value)}
+                        placeholder="Ex: Add perspective sketching video guides"
+                        className="rounded-xl border-black/10 focus:border-primary text-sm font-semibold h-10"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="category" className="text-xs font-bold text-foreground/70 uppercase">Category</Label>
+                      <select 
+                        id="category"
+                        value={newFeatureCategory}
+                        onChange={(e) => setNewFeatureCategory(e.target.value)}
+                        className="w-full h-10 px-3.5 text-sm font-semibold rounded-xl border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        <option value="general">General Upgrades</option>
+                        <option value="analytics">Performance Analytics</option>
+                        <option value="materials">Study Materials</option>
+                        <option value="practice">Practice Tests</option>
+                        <option value="ui">User Interface & Design</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="desc" className="text-xs font-bold text-foreground/70 uppercase">Explanation / Rationale</Label>
+                      <textarea
+                        id="desc" 
+                        value={newFeatureDescription}
+                        onChange={(e) => setNewFeatureDescription(e.target.value)}
+                        placeholder="Describe how this feature will help you or other candidates prepare better..."
+                        rows={4}
+                        className="w-full text-sm font-medium border border-black/10 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none leading-relaxed"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter className="gap-2">
+                    <Button variant="outline" onClick={() => setShowNewFeatureModal(false)} className="font-bold border-black/10 rounded-xl h-10">Cancel</Button>
+                    <Button 
+                      onClick={handleCreateFeatureRequest} 
+                      disabled={submittingFeature} 
+                      className="bg-primary hover:bg-primary/95 text-white font-bold rounded-xl h-10 px-5"
+                    >
+                      {submittingFeature ? <Loader2 className="w-4 h-4 animate-spin" /> : "Submit Proposal"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           )}
 
