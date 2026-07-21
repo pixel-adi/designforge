@@ -666,6 +666,36 @@ export default function AdminExamQuestions() {
     }
   };
 
+  const fetchAllExistingQuestions = async (): Promise<Map<string, string>> => {
+    const existingMap = new Map<string, string>();
+    let from = 0;
+    const step = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from("exam_questions")
+        .select("id, content_text")
+        .range(from, from + step - 1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        data.forEach(q => {
+          existingMap.set(normalizeText(q.content_text || ""), q.id);
+        });
+        if (data.length < step) {
+          hasMore = false;
+        } else {
+          from += step;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+    return existingMap;
+  };
+
   const cropDiagramsFromPDF = async (rawQuestions: any[], existingPdfDoc?: any) => {
     if (!questionPdfFile) return rawQuestions;
 
@@ -779,14 +809,9 @@ export default function AdminExamQuestions() {
     // Run duplicate check on the processed questions
     let existingMap = new Map<string, string>();
     try {
-      const { data } = await supabase.from("exam_questions").select("id, content_text");
-      if (data) {
-        data.forEach(q => {
-          existingMap.set(normalizeText(q.content_text || ""), q.id);
-        });
-      }
+      existingMap = await fetchAllExistingQuestions();
     } catch (err) {
-      console.error(err);
+      console.error("Failed to check duplicates in cropDiagramsFromPDF:", err);
     }
 
     processed.forEach(q => {
@@ -862,13 +887,39 @@ export default function AdminExamQuestions() {
   };
 
   const fetchQuestions = async () => {
-    const { data, error } = await supabase.from("exam_questions").select("*").order("created_at", { ascending: false });
-    if (error) {
+    try {
+      setLoading(true);
+      let allData: Question[] = [];
+      let from = 0;
+      const step = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("exam_questions")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(from, from + step - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allData.push(...data);
+          if (data.length < step) {
+            hasMore = false;
+          } else {
+            from += step;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+      setQuestions(allData);
+    } catch (error: any) {
       toast({ title: "Error fetching questions", description: error.message, variant: "destructive" });
-    } else {
-      setQuestions(data || []);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const fetchOptionsForEdit = async (questionId: string) => {
@@ -1090,13 +1141,7 @@ export default function AdminExamQuestions() {
     // Fetch existing questions to check for duplicates
     let existingMap = new Map<string, string>();
     try {
-      const { data, error } = await supabase.from("exam_questions").select("id, content_text");
-      if (error) throw error;
-      if (data) {
-        data.forEach(q => {
-          existingMap.set(normalizeText(q.content_text || ""), q.id);
-        });
-      }
+      existingMap = await fetchAllExistingQuestions();
     } catch (err: any) {
       toast({ title: "Failed to check duplicates", description: err.message, variant: "destructive" });
     }
@@ -1194,13 +1239,7 @@ export default function AdminExamQuestions() {
     // Fetch existing questions to check for duplicates
     let existingMap = new Map<string, string>();
     try {
-      const { data, error } = await supabase.from("exam_questions").select("id, content_text");
-      if (error) throw error;
-      if (data) {
-        data.forEach(q => {
-          existingMap.set(normalizeText(q.content_text || ""), q.id);
-        });
-      }
+      existingMap = await fetchAllExistingQuestions();
     } catch (err: any) {
       toast({ title: "Failed to check duplicates", description: err.message, variant: "destructive" });
     }
