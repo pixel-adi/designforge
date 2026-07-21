@@ -1408,7 +1408,17 @@ export default function AdminExamQuestions() {
         };
       });
 
-      const idsToOverwrite = approvedWithIds
+      // Deduplicate the list by db_id to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
+      const uniqueApprovedMap = new Map<string, any>();
+      approvedWithIds.forEach(q => {
+        if (q.db_id) {
+          // In case of duplicates in the batch, the later one in the list wins
+          uniqueApprovedMap.set(q.db_id, q);
+        }
+      });
+      const uniqueApproved = Array.from(uniqueApprovedMap.values());
+
+      const idsToOverwrite = uniqueApproved
         .filter(q => q.duplicate_action === 'overwrite')
         .map(q => q.db_id);
 
@@ -1418,7 +1428,7 @@ export default function AdminExamQuestions() {
         if (optDelErr) throw optDelErr;
       }
 
-      const questionsToUpsert = approvedWithIds.map(q => ({
+      const questionsToUpsert = uniqueApproved.map(q => ({
         id: q.db_id,
         part: q.part,
         type: q.type,
@@ -1435,7 +1445,7 @@ export default function AdminExamQuestions() {
 
       // 6. Flatten new options with matched question_id and prepare for insert
       const optionsToInsert: any[] = [];
-      approvedWithIds.forEach(q => {
+      uniqueApproved.forEach(q => {
         if ((q.type === 'MCQ' || q.type === 'MSQ') && q.options.length > 0) {
           q.options.forEach((opt: any) => {
             optionsToInsert.push({
