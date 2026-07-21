@@ -1664,6 +1664,7 @@ export default function AdminExamQuestions() {
               <div>
                 <Label className="text-[10px] text-[#262626]/60 font-semibold">Part</Label>
                 <Select 
+                  key={`${editingId}-${newQuestion.part}`}
                   value={newQuestion.part} 
                   onValueChange={(val: any) => {
                     if (val === 'B') {
@@ -1686,6 +1687,7 @@ export default function AdminExamQuestions() {
               <div>
                 <Label className="text-[10px] text-[#262626]/60 font-semibold">Type</Label>
                 <Select 
+                  key={`${editingId}-${newQuestion.type}`}
                   value={newQuestion.type} 
                   onValueChange={(val: any) => setNewQuestion({...newQuestion, type: val})}
                   disabled={newQuestion.part === 'B'}
@@ -1707,7 +1709,11 @@ export default function AdminExamQuestions() {
 
               <div>
                 <Label className="text-[10px] text-[#262626]/60 font-semibold">Difficulty</Label>
-                <Select value={newQuestion.difficulty} onValueChange={(val: any) => setNewQuestion({...newQuestion, difficulty: val})}>
+                <Select 
+                  key={`${editingId}-${newQuestion.difficulty}`}
+                  value={newQuestion.difficulty} 
+                  onValueChange={(val: any) => setNewQuestion({...newQuestion, difficulty: val})}
+                >
                   <SelectTrigger className="h-8 text-xs bg-white mt-1"><SelectValue placeholder="Select Difficulty" /></SelectTrigger>
                   <SelectContent className="max-h-52 overflow-y-auto">
                     <SelectItem value="Low">Low</SelectItem>
