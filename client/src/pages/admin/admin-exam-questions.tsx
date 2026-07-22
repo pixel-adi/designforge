@@ -174,6 +174,29 @@ export default function AdminExamQuestions() {
   const [isSavingFix, setIsSavingFix] = useState(false);
   const [isLoadingFixOptions, setIsLoadingFixOptions] = useState(false);
 
+  // Bulk Item Editor Modal State
+  const [bulkEditingItem, setBulkEditingItem] = useState<any | null>(null);
+  const [bulkEditData, setBulkEditData] = useState<{
+    type: 'MCQ' | 'MSQ' | 'NAT' | 'SUBJECTIVE';
+    part: 'A' | 'B';
+    difficulty: 'Low' | 'Medium' | 'High';
+    content_text: string;
+    media_filename?: string;
+    media_exists?: boolean;
+    pyq_tag?: string;
+  }>({
+    type: 'MCQ',
+    part: 'A',
+    difficulty: 'Medium',
+    content_text: '',
+    pyq_tag: ''
+  });
+  const [bulkEditTopics, setBulkEditTopics] = useState<string[]>([]);
+  const [bulkEditCurrentTopicInput, setBulkEditCurrentTopicInput] = useState<string>("");
+  const [bulkEditOptions, setBulkEditOptions] = useState<any[]>([]);
+  const [bulkEditMediaFile, setBulkEditMediaFile] = useState<File | null>(null);
+  const [bulkEditMediaPreview, setBulkEditMediaPreview] = useState<string | null>(null);
+
 
   useEffect(() => { 
     fetchQuestions(); 
@@ -1767,6 +1790,139 @@ export default function AdminExamQuestions() {
     }
   };
 
+  const openBulkItemEditor = (bq: any) => {
+    setBulkEditingItem(bq);
+    setBulkEditData({
+      type: bq.type || 'MCQ',
+      part: bq.part || 'A',
+      difficulty: bq.difficulty || 'Medium',
+      content_text: bq.content_text || '',
+      media_filename: bq.media_filename,
+      media_exists: bq.media_exists,
+      pyq_tag: bq.pyq_tag || ''
+    });
+    setBulkEditTopics(bq.topics || []);
+    setBulkEditCurrentTopicInput("");
+    setBulkEditOptions((bq.options || []).map((opt: any) => ({
+      content_text: opt.content_text || '',
+      is_correct: !!opt.is_correct,
+      media_filename: opt.media_filename,
+      media_exists: opt.media_exists
+    })));
+
+    setBulkEditMediaFile(null);
+    if (bq.media_filename && bq.media_exists && bulkImagesPreviewMap.has(bq.media_filename)) {
+      setBulkEditMediaPreview(bulkImagesPreviewMap.get(bq.media_filename) || null);
+    } else {
+      setBulkEditMediaPreview(null);
+    }
+  };
+
+  const closeBulkItemEditor = () => {
+    setBulkEditingItem(null);
+    setBulkEditMediaFile(null);
+    setBulkEditMediaPreview(null);
+  };
+
+  const addBulkEditOption = () => {
+    setBulkEditOptions([...bulkEditOptions, { content_text: '', is_correct: bulkEditData.type === 'NAT' ? true : false }]);
+  };
+
+  const updateBulkEditOption = (index: number, field: string, value: any) => {
+    const newOpts = [...bulkEditOptions];
+    newOpts[index] = { ...newOpts[index], [field]: value };
+    setBulkEditOptions(newOpts);
+  };
+
+  const removeBulkEditOption = (index: number) => {
+    setBulkEditOptions(bulkEditOptions.filter((_, i) => i !== index));
+  };
+
+  const addBulkEditTopicTag = (val: string) => {
+    const tagsToAdd = val.split(",")
+      .map(t => t.trim())
+      .filter(t => t.length > 0 && !bulkEditTopics.includes(t));
+    if (tagsToAdd.length > 0) {
+      setBulkEditTopics([...bulkEditTopics, ...tagsToAdd]);
+    }
+    setBulkEditCurrentTopicInput("");
+  };
+
+  const removeBulkEditTopicTag = (tag: string) => {
+    setBulkEditTopics(bulkEditTopics.filter(t => t !== tag));
+  };
+
+  const saveBulkItemEdits = () => {
+    if (!bulkEditingItem) return;
+
+    if (!bulkEditData.content_text.trim()) {
+      toast({ title: "Validation Error", description: "Question content is required.", variant: "destructive" });
+      return;
+    }
+    if ((bulkEditData.type === 'MCQ' || bulkEditData.type === 'MSQ') && bulkEditOptions.length < 2) {
+      toast({ title: "Validation Error", description: "MCQ/MSQ requires at least 2 options.", variant: "destructive" });
+      return;
+    }
+    if (bulkEditData.type === 'MCQ' && bulkEditOptions.filter(o => o.is_correct).length !== 1) {
+      toast({ title: "Validation Error", description: "MCQ requires exactly 1 correct option.", variant: "destructive" });
+      return;
+    }
+    if (bulkEditData.type === 'MSQ' && !bulkEditOptions.some(o => o.is_correct)) {
+      toast({ title: "Validation Error", description: "MSQ requires at least 1 correct option.", variant: "destructive" });
+      return;
+    }
+    if (bulkEditData.type === 'NAT' && bulkEditOptions.length < 1) {
+      toast({ title: "Validation Error", description: "NAT requires at least 1 acceptable answer.", variant: "destructive" });
+      return;
+    }
+
+    let updatedMediaFilename = bulkEditData.media_filename;
+    let updatedMediaExists = bulkEditData.media_exists;
+
+    if (bulkEditMediaFile) {
+      const newFilename = bulkEditMediaFile.name;
+      const previewUrl = URL.createObjectURL(bulkEditMediaFile);
+      bulkImagesMap.set(newFilename, bulkEditMediaFile);
+      bulkImagesPreviewMap.set(newFilename, previewUrl);
+      updatedMediaFilename = newFilename;
+      updatedMediaExists = true;
+    }
+
+    setBulkQuestions(prev => prev.map(q => {
+      if (q._tempId !== bulkEditingItem._tempId) return q;
+      return {
+        ...q,
+        type: bulkEditData.type,
+        part: bulkEditData.part,
+        difficulty: bulkEditData.difficulty,
+        content_text: bulkEditData.content_text,
+        media_filename: updatedMediaFilename,
+        media_exists: updatedMediaExists,
+        pyq_tag: bulkEditData.pyq_tag,
+        topics: bulkEditTopics,
+        options: bulkEditOptions.map(opt => {
+          let optMediaFilename = opt.media_filename;
+          let optMediaExists = opt.media_exists;
+          if (opt.file) {
+            optMediaFilename = opt.file.name;
+            optMediaExists = true;
+            bulkImagesMap.set(opt.file.name, opt.file);
+            bulkImagesPreviewMap.set(opt.file.name, URL.createObjectURL(opt.file));
+          }
+          return {
+            content_text: opt.content_text,
+            is_correct: opt.is_correct,
+            media_filename: optMediaFilename,
+            media_exists: optMediaExists
+          };
+        })
+      };
+    }));
+
+    toast({ title: "Updated", description: "Question details updated successfully!" });
+    closeBulkItemEditor();
+  };
+
   const invalidQuestionsCount = useMemo(() => {
     return questions.filter(isQuestionInvalid).length;
   }, [questions]);
@@ -2428,7 +2584,15 @@ export default function AdminExamQuestions() {
                       <span className="text-xs font-bold bg-black/5 text-foreground/70 px-2 py-1 rounded">{bq.type}</span>
                       <span className="text-xs font-bold bg-black/5 text-foreground/70 px-2 py-1 rounded capitalize">{bq.difficulty}</span>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => openBulkItemEditor(bq)} 
+                        className="h-8 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/5 font-bold rounded-lg shadow-sm"
+                      >
+                        <FileQuestion className="w-3.5 h-3.5" /> Edit Details
+                      </Button>
                       <Button size="sm" variant={bq.status === 'approved' ? 'default' : 'outline'} className={bq.status === 'approved' ? 'bg-green-600 hover:bg-green-700' : ''} onClick={() => toggleBulkStatus(bq._tempId, 'approved')}>
                         Approve
                       </Button>
@@ -3077,6 +3241,297 @@ export default function AdminExamQuestions() {
                 </Button>
               </div>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* BULK ITEM FULL-SCREEN EDITOR MODAL */}
+      <Dialog open={bulkEditingItem !== null} onOpenChange={(open) => { if (!open) closeBulkItemEditor(); }}>
+        <DialogContent className="max-w-[95vw] w-[95vw] lg:max-w-[1100px] h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl rounded-2xl">
+          <DialogHeader className="px-6 py-4 border-b border-black/5 shrink-0 bg-primary/5 flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="flex items-center gap-2 text-base font-bold text-primary">
+                <FileQuestion className="w-5 h-5 text-primary" /> Edit Parsed Bulk Question
+              </DialogTitle>
+              <DialogDescription className="text-xs text-foreground/60 mt-0.5">
+                Modify categorization, question text, media, options, and correct answers before uploading.
+              </DialogDescription>
+            </div>
+            {bulkEditingItem && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold bg-primary/10 text-primary px-3 py-1 rounded-full">
+                  Part {bulkEditData.part} • {bulkEditData.type}
+                </span>
+              </div>
+            )}
+          </DialogHeader>
+
+          {/* Dialog Body */}
+          {bulkEditingItem && (
+            <div className="flex-1 flex flex-col overflow-y-auto p-6 bg-white space-y-4">
+              {/* Parameters Row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-muted/20 p-3 rounded-xl border border-black/5">
+                <div>
+                  <Label className="text-[10px] text-[#262626]/60 font-semibold">Part</Label>
+                  <Select 
+                    value={bulkEditData.part} 
+                    onValueChange={(val: any) => {
+                      if (val === 'B') {
+                        setBulkEditData({...bulkEditData, part: val, type: 'SUBJECTIVE'});
+                      } else if (val === 'A' && bulkEditData.type === 'SUBJECTIVE') {
+                        setBulkEditData({...bulkEditData, part: val, type: 'MCQ'});
+                      } else {
+                        setBulkEditData({...bulkEditData, part: val});
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-8 text-xs bg-white mt-1"><SelectValue placeholder="Select Part" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="A">Part A (Objective)</SelectItem>
+                      <SelectItem value="B">Part B (Subjective)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-[10px] text-[#262626]/60 font-semibold">Type</Label>
+                  <Select 
+                    value={bulkEditData.type} 
+                    onValueChange={(val: any) => setBulkEditData({...bulkEditData, type: val})}
+                    disabled={bulkEditData.part === 'B'}
+                  >
+                    <SelectTrigger className="h-8 text-xs bg-white mt-1"><SelectValue placeholder="Select Type" /></SelectTrigger>
+                    <SelectContent>
+                      {bulkEditData.part === 'A' ? (
+                        <>
+                          <SelectItem value="MCQ">MCQ</SelectItem>
+                          <SelectItem value="MSQ">MSQ</SelectItem>
+                          <SelectItem value="NAT">NAT</SelectItem>
+                        </>
+                      ) : (
+                        <SelectItem value="SUBJECTIVE">Subjective</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-[10px] text-[#262626]/60 font-semibold">Difficulty</Label>
+                  <Select 
+                    value={bulkEditData.difficulty} 
+                    onValueChange={(val: any) => setBulkEditData({...bulkEditData, difficulty: val})}
+                  >
+                    <SelectTrigger className="h-8 text-xs bg-white mt-1"><SelectValue placeholder="Select Difficulty" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Low">Low</SelectItem>
+                      <SelectItem value="Medium">Medium</SelectItem>
+                      <SelectItem value="High">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-[10px] text-[#262626]/60 font-semibold">PYQ Tag</Label>
+                  <Input 
+                    value={bulkEditData.pyq_tag || ''} 
+                    onChange={(e) => setBulkEditData({...bulkEditData, pyq_tag: e.target.value})}
+                    placeholder="e.g. CEED 2023"
+                    className="h-8 text-xs mt-1 bg-white" 
+                  />
+                </div>
+              </div>
+
+              {/* Topics / Tags Row */}
+              <div>
+                <Label className="text-xs text-[#262626]/60 font-semibold mb-1 block">Topics / Tags</Label>
+                <div className="flex flex-wrap gap-1 p-1.5 bg-white rounded-lg border border-black/10 min-h-[36px]">
+                  {bulkEditTopics.map((tag) => (
+                    <span key={tag} className="inline-flex items-center gap-0.5 bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded-md font-semibold border border-primary/20">
+                      {tag}
+                      <button type="button" onClick={() => removeBulkEditTopicTag(tag)} className="text-primary/70 hover:text-primary p-0.5">
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    placeholder="Type tag & press Enter or comma..."
+                    value={bulkEditCurrentTopicInput}
+                    onChange={(e) => setBulkEditCurrentTopicInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ',') {
+                        e.preventDefault();
+                        addBulkEditTopicTag(bulkEditCurrentTopicInput);
+                      }
+                    }}
+                    onBlur={() => { if (bulkEditCurrentTopicInput.trim()) addBulkEditTopicTag(bulkEditCurrentTopicInput); }}
+                    className="flex-1 bg-transparent border-0 outline-none text-xs px-1 min-w-[120px] h-6"
+                  />
+                </div>
+              </div>
+
+              {/* Question Content & Media */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2">
+                  <Label className="text-xs text-[#262626]/60 font-semibold mb-1 block">Question Content</Label>
+                  <Textarea 
+                    value={bulkEditData.content_text} 
+                    onChange={(e) => setBulkEditData({...bulkEditData, content_text: e.target.value})}
+                    placeholder="Enter question content text..."
+                    className="h-[120px] text-sm font-medium bg-white border border-black/10 rounded-xl p-3"
+                  />
+                </div>
+
+                <div className="lg:col-span-1">
+                  <Label className="text-xs text-[#262626]/60 font-semibold mb-1 block">Question Media (Image)</Label>
+                  <div className="border border-dashed border-black/10 rounded-xl p-3 flex flex-col items-center justify-center text-center h-[120px] relative overflow-hidden bg-background/50 hover:bg-background transition-colors">
+                    {bulkEditMediaPreview ? (
+                      <>
+                        <img src={bulkEditMediaPreview} alt="Question Media Preview" className="absolute inset-0 w-full h-full object-contain p-2 z-0" />
+                        <button 
+                          onClick={() => {
+                            setBulkEditMediaFile(null);
+                            setBulkEditMediaPreview(null);
+                            setBulkEditData({...bulkEditData, media_filename: undefined, media_exists: false});
+                          }} 
+                          className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-md hover:bg-red-50 text-red-500 z-10 border"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <ImageIcon className="w-5 h-5 text-foreground/40 mb-1" />
+                        <span className="text-[11px] text-foreground/60">Upload Question Image</span>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              setBulkEditMediaFile(file);
+                              setBulkEditMediaPreview(URL.createObjectURL(file));
+                            }
+                          }}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Options & Answers Section */}
+              {(bulkEditData.type === 'MCQ' || bulkEditData.type === 'MSQ' || bulkEditData.type === 'NAT') && (
+                <div className="border border-black/10 rounded-xl p-4 bg-muted/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-bold uppercase tracking-wider text-foreground/70 block">
+                        {bulkEditData.type === 'NAT' ? "Acceptable Numerical Answers" : "Options & Correct Answer"}
+                      </Label>
+                      <p className="text-[10px] text-foreground/50">
+                        {bulkEditData.type === 'MCQ' ? "Check the radio button for the single correct answer." : bulkEditData.type === 'MSQ' ? "Check boxes for all correct options." : "Provide acceptable numerical values."}
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={addBulkEditOption} className="h-7 gap-1 bg-white border-black/10 hover:bg-muted text-[11px] font-semibold">
+                      <PlusCircle className="w-3.5 h-3.5 text-primary" /> 
+                      {bulkEditData.type === 'NAT' ? "Add Answer" : "Add Option"}
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {bulkEditOptions.map((opt, idx) => (
+                      <div key={idx} className={`flex items-start gap-2 p-2.5 rounded-lg border transition-all ${opt.is_correct ? 'border-green-400 bg-green-50/60 shadow-sm' : 'border-black/10 bg-white'}`}>
+                        {/* Correct Checkbox / Toggle */}
+                        {bulkEditData.type !== 'NAT' && (
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              if (bulkEditData.type === 'MCQ') {
+                                const newOpts = bulkEditOptions.map((o, i) => ({ ...o, is_correct: i === idx ? !o.is_correct : false }));
+                                setBulkEditOptions(newOpts);
+                              } else {
+                                updateBulkEditOption(idx, 'is_correct', !opt.is_correct);
+                              }
+                            }}
+                            className={`mt-1.5 shrink-0 w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${opt.is_correct ? 'bg-green-600 border-green-600 text-white' : 'border-black/20 text-transparent hover:border-black/40'}`}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        
+                        {bulkEditData.type === 'NAT' && (
+                          <div className="mt-1.5 shrink-0 w-4 h-4 rounded-full bg-green-600 text-white flex items-center justify-center">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          </div>
+                        )}
+
+                        <div className="flex-1 space-y-1.5">
+                          <Input 
+                            value={opt.content_text} 
+                            onChange={(e) => updateBulkEditOption(idx, 'content_text', e.target.value)} 
+                            placeholder={bulkEditData.type === 'NAT' ? `Numerical Answer ${idx + 1}` : `Option ${idx + 1}...`}
+                            className="h-8 bg-white text-xs font-medium"
+                          />
+
+                          {/* Option image upload / preview */}
+                          {bulkEditData.type !== 'NAT' && (
+                            <div className="flex items-center gap-2">
+                              {opt.media_filename && opt.media_exists && bulkImagesPreviewMap.has(opt.media_filename) ? (
+                                <div className="flex items-center gap-1 bg-black/5 px-2 py-0.5 rounded text-[10px]">
+                                  <ImageIcon className="w-3 h-3 text-primary" />
+                                  <span className="truncate max-w-[100px]">{opt.media_filename}</span>
+                                </div>
+                              ) : opt.file ? (
+                                <div className="flex items-center gap-1 bg-black/5 px-2 py-0.5 rounded text-[10px]">
+                                  <ImageIcon className="w-3 h-3 text-primary" />
+                                  <span className="truncate max-w-[100px]">{opt.file.name}</span>
+                                  <button type="button" onClick={() => updateBulkEditOption(idx, 'file', null)} className="text-red-500 hover:text-red-700">
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <label className="text-[10px] text-primary font-semibold flex items-center gap-1 cursor-pointer hover:underline">
+                                  <ImageIcon className="w-3 h-3" /> Attach Image
+                                  <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    className="hidden" 
+                                    onChange={(e) => {
+                                      if (e.target.files && e.target.files[0]) {
+                                        updateBulkEditOption(idx, 'file', e.target.files[0]);
+                                      }
+                                    }} 
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <button type="button" onClick={() => removeBulkEditOption(idx)} className="mt-1 text-foreground/40 hover:text-red-600 p-1">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Dialog Footer */}
+          <DialogFooter className="px-6 py-3 border-t border-black/5 shrink-0 bg-white flex items-center justify-between">
+            <Button variant="outline" size="sm" onClick={closeBulkItemEditor}>
+              Cancel
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={saveBulkItemEdits}
+              className="bg-primary hover:bg-primary/90 text-white font-bold h-9 px-4 gap-1.5 shadow-sm"
+            >
+              <CheckCircle2 className="w-4 h-4" /> Save Item Changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
