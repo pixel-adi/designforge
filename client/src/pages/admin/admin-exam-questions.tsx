@@ -162,6 +162,18 @@ export default function AdminExamQuestions() {
   const [endPage, setEndPage] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number | null>(null);
 
+  // Fix Invalid Questions Modal State
+  const [fixModalOpen, setFixModalOpen] = useState(false);
+  const [fixSelectedQuestionId, setFixSelectedQuestionId] = useState<string | null>(null);
+  const [fixQuestionData, setFixQuestionData] = useState<Omit<Question, "id">>(emptyQuestion);
+  const [fixTopics, setFixTopics] = useState<string[]>([]);
+  const [fixCurrentTopicInput, setFixCurrentTopicInput] = useState<string>("");
+  const [fixOptions, setFixOptions] = useState<OptionInput[]>([]);
+  const [fixMediaFile, setFixMediaFile] = useState<File | null>(null);
+  const [fixMediaPreview, setFixMediaPreview] = useState<string | null>(null);
+  const [isSavingFix, setIsSavingFix] = useState(false);
+  const [isLoadingFixOptions, setIsLoadingFixOptions] = useState(false);
+
 
   useEffect(() => { 
     fetchQuestions(); 
@@ -1538,12 +1550,221 @@ export default function AdminExamQuestions() {
   const isQuestionInvalid = (q: Question) => {
     if (q.part === 'B' || q.type === 'SUBJECTIVE') return false;
     const opts = q.exam_options || [];
-    if (opts.length === 0) return true;
+        if (opts.length === 0) return true;
     if (q.type === 'MCQ' || q.type === 'MSQ' || q.type === 'NAT') {
       const hasCorrect = opts.some(opt => opt.is_correct);
       if (!hasCorrect) return true;
     }
     return false;
+  };
+
+  const flaggedQuestionsList = useMemo(() => {
+    return questions.filter(isQuestionInvalid);
+  }, [questions]);
+
+  const loadQuestionOptionsForFix = async (q: Question) => {
+    setIsLoadingFixOptions(true);
+    try {
+      const { data } = await supabase.from("exam_options").select("*").eq("question_id", q.id);
+      if (data && data.length > 0) {
+        setFixOptions(data.map(opt => ({
+          id: opt.id,
+          content_text: opt.content_text || '',
+          media_url: opt.media_url,
+          is_correct: opt.is_correct
+        })));
+      } else {
+        if (q.type === 'NAT') {
+          setFixOptions([{ content_text: '', is_correct: true }]);
+        } else if (q.type === 'SUBJECTIVE') {
+          setFixOptions([]);
+        } else {
+          setFixOptions([
+            { content_text: '', is_correct: false },
+            { content_text: '', is_correct: false },
+            { content_text: '', is_correct: false },
+            { content_text: '', is_correct: false },
+          ]);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading options for fix:", err);
+    } finally {
+      setIsLoadingFixOptions(false);
+    }
+  };
+
+  const selectQuestionForFix = (q: Question) => {
+    setFixSelectedQuestionId(q.id);
+    setFixQuestionData({
+      type: q.type,
+      part: q.part,
+      difficulty: q.difficulty,
+      content_text: q.content_text || '',
+      media_url: q.media_url,
+      topics: q.topics || [],
+      pyq_tag: q.pyq_tag || ''
+    });
+    setFixTopics(q.topics || []);
+    setFixCurrentTopicInput("");
+    setFixMediaPreview(q.media_url || null);
+    setFixMediaFile(null);
+    loadQuestionOptionsForFix(q);
+  };
+
+  const openFixModal = () => {
+    const invalidList = questions.filter(isQuestionInvalid);
+    if (invalidList.length > 0) {
+      selectQuestionForFix(invalidList[0]);
+    } else {
+      setFixSelectedQuestionId(null);
+    }
+    setFixModalOpen(true);
+  };
+
+  const closeFixModal = () => {
+    setFixModalOpen(false);
+    setFixSelectedQuestionId(null);
+    setFixOptions([]);
+  };
+
+  const addFixOption = () => {
+    setFixOptions([...fixOptions, { content_text: '', is_correct: fixQuestionData.type === 'NAT' ? true : false }]);
+  };
+
+  const updateFixOption = (index: number, field: keyof OptionInput, value: any) => {
+    const newOpts = [...fixOptions];
+    newOpts[index] = { ...newOpts[index], [field]: value };
+    setFixOptions(newOpts);
+  };
+
+  const updateFixOptionFile = (index: number, file: File | null) => {
+    const newOpts = [...fixOptions];
+    newOpts[index].file = file;
+    setFixOptions(newOpts);
+  };
+
+  const removeFixOption = (index: number) => {
+    setFixOptions(fixOptions.filter((_, i) => i !== index));
+  };
+
+  const saveFixAndResolve = async () => {
+    if (!fixSelectedQuestionId) return;
+
+    if (!fixQuestionData.content_text.trim()) {
+      toast({ title: "Validation Error", description: "Question content is required.", variant: "destructive" });
+      return;
+    }
+    if ((fixQuestionData.type === 'MCQ' || fixQuestionData.type === 'MSQ') && fixOptions.length < 2) {
+      toast({ title: "Validation Error", description: "MCQ/MSQ requires at least 2 options.", variant: "destructive" });
+      return;
+    }
+    if (fixQuestionData.type === 'MCQ' && fixOptions.filter(o => o.is_correct).length !== 1) {
+      toast({ title: "Validation Error", description: "MCQ requires exactly 1 correct option.", variant: "destructive" });
+      return;
+    }
+    if (fixQuestionData.type === 'MSQ' && !fixOptions.some(o => o.is_correct)) {
+      toast({ title: "Validation Error", description: "MSQ requires at least 1 correct option.", variant: "destructive" });
+      return;
+    }
+    if (fixQuestionData.type === 'NAT' && fixOptions.length < 1) {
+      toast({ title: "Validation Error", description: "NAT requires at least 1 acceptable answer.", variant: "destructive" });
+      return;
+    }
+
+    setIsSavingFix(true);
+    try {
+      let finalMediaUrl = fixQuestionData.media_url;
+      if (fixMediaFile) {
+        finalMediaUrl = await uploadFileToSupabase(fixMediaFile, fixQuestionData.pyq_tag);
+      }
+
+      const questionToSave = {
+        type: fixQuestionData.type,
+        part: fixQuestionData.part,
+        difficulty: fixQuestionData.difficulty,
+        content_text: fixQuestionData.content_text,
+        media_url: finalMediaUrl,
+        topics: fixTopics,
+        pyq_tag: fixQuestionData.pyq_tag
+      };
+
+      const { error: qErr } = await supabase.from("exam_questions").update(questionToSave).eq("id", fixSelectedQuestionId);
+      if (qErr) throw qErr;
+
+      await supabase.from("exam_options").delete().eq("question_id", fixSelectedQuestionId);
+
+      const newSavedOpts: any[] = [];
+      if (fixQuestionData.type === 'MCQ' || fixQuestionData.type === 'MSQ' || fixQuestionData.type === 'NAT') {
+        for (const opt of fixOptions) {
+          let optMediaUrl = opt.media_url;
+          if (opt.file) {
+            optMediaUrl = await uploadFileToSupabase(opt.file, fixQuestionData.pyq_tag);
+          }
+          const { data: optData, error: optErr } = await supabase.from("exam_options").insert({
+            question_id: fixSelectedQuestionId,
+            content_text: opt.content_text,
+            media_url: optMediaUrl,
+            is_correct: opt.is_correct
+          }).select().single();
+          if (optErr) throw optErr;
+          if (optData) newSavedOpts.push(optData);
+        }
+      }
+
+      const updatedQuestions = questions.map(q => {
+        if (q.id === fixSelectedQuestionId) {
+          return {
+            ...q,
+            ...questionToSave,
+            exam_options: newSavedOpts.map(o => ({ id: o.id, is_correct: o.is_correct }))
+          };
+        }
+        return q;
+      });
+
+      setQuestions(updatedQuestions);
+      toast({ title: "Question Resolved", description: "Options saved and question removed from audit warning!" });
+
+      const remainingInvalid = updatedQuestions.filter(isQuestionInvalid);
+      if (remainingInvalid.length > 0) {
+        const nextQ = remainingInvalid.find(q => q.id !== fixSelectedQuestionId) || remainingInvalid[0];
+        selectQuestionForFix(nextQ);
+      } else {
+        closeFixModal();
+        toast({ title: "Audit Complete! 🎉", description: "All flagged questions have been resolved." });
+      }
+    } catch (err: any) {
+      toast({ title: "Error resolving question", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSavingFix(false);
+    }
+  };
+
+  const deleteFixQuestion = async () => {
+    if (!fixSelectedQuestionId) return;
+    if (!confirm("Are you sure you want to delete this question?")) return;
+
+    setIsSavingFix(true);
+    try {
+      const { error } = await supabase.from("exam_questions").delete().eq("id", fixSelectedQuestionId);
+      if (error) throw error;
+
+      const updatedQuestions = questions.filter(q => q.id !== fixSelectedQuestionId);
+      setQuestions(updatedQuestions);
+      toast({ title: "Deleted", description: "Question deleted and removed from audit." });
+
+      const remainingInvalid = updatedQuestions.filter(isQuestionInvalid);
+      if (remainingInvalid.length > 0) {
+        selectQuestionForFix(remainingInvalid[0]);
+      } else {
+        closeFixModal();
+      }
+    } catch (err: any) {
+      toast({ title: "Error deleting question", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSavingFix(false);
+    }
   };
 
   const invalidQuestionsCount = useMemo(() => {
@@ -1627,16 +1848,16 @@ export default function AdminExamQuestions() {
             <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold block text-sm mb-0.5">Audit Warning: Missing Answers Detected ⚠️</span>
-              There are <span className="font-black text-red-950 underline">{invalidQuestionsCount}</span> questions in your repository that lack options or correct answers. Candidates will receive 0/empty marks for these items.
+              There are <span className="font-black text-red-950 underline cursor-pointer hover:text-red-700 transition-colors" onClick={openFixModal}>{invalidQuestionsCount}</span> questions in your repository that lack options or correct answers. Candidates will receive 0/empty marks for these items.
             </div>
           </div>
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => setFilterInvalidOnly(!filterInvalidOnly)}
-            className={`border-red-200 text-red-800 hover:bg-red-100/50 shrink-0 font-bold h-8 text-[11px] rounded-lg transition-colors ${filterInvalidOnly ? 'bg-red-100 border-red-300 hover:bg-red-200/50' : 'bg-white'}`}
+            onClick={openFixModal}
+            className="border-red-200 text-red-800 hover:bg-red-100/50 shrink-0 font-bold h-8 text-[11px] rounded-lg transition-colors bg-white shadow-sm"
           >
-            {filterInvalidOnly ? "Show All Questions" : "Filter Invalid Questions"}
+            Fix Now
           </Button>
         </div>
       )}
@@ -2520,6 +2741,343 @@ export default function AdminExamQuestions() {
               </Button>
             </DialogFooter>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* AUDIT RESOLUTION / FIX INVALID QUESTIONS MODAL */}
+      <Dialog open={fixModalOpen} onOpenChange={(open) => { if (!open) closeFixModal(); }}>
+        <DialogContent className="max-w-[95vw] w-[95vw] lg:max-w-[1150px] h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl rounded-2xl">
+          <DialogHeader className="px-6 py-4 border-b border-black/5 shrink-0 bg-red-50/50 flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="flex items-center gap-2 text-base font-bold text-red-950">
+                <AlertCircle className="w-5 h-5 text-red-600" /> Audit Resolution: Fix Missing Answers
+              </DialogTitle>
+              <DialogDescription className="text-xs text-red-800/80 mt-0.5">
+                Resolve questions lacking options or correct answers directly.
+              </DialogDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold bg-red-100 border border-red-200 text-red-800 px-3 py-1 rounded-full shadow-sm">
+                {invalidQuestionsCount} Flagged Question{invalidQuestionsCount === 1 ? '' : 's'} Left
+              </span>
+            </div>
+          </DialogHeader>
+
+          {/* Modal Main Content (Split view: Flagged Questions List on Left, Editor on Right) */}
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-background/30">
+            {/* Left Sidebar: Flagged Question List */}
+            <div className="w-full md:w-[320px] border-r border-black/5 flex flex-col bg-white shrink-0">
+              <div className="p-3 border-b border-black/5 bg-muted/30 text-xs font-bold text-foreground/70 flex justify-between items-center">
+                <span>Flagged Questions ({flaggedQuestionsList.length})</span>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                {flaggedQuestionsList.map((q, index) => {
+                  const isSelected = fixSelectedQuestionId === q.id;
+                  const hasNoOptions = !q.exam_options || q.exam_options.length === 0;
+                  const hasNoCorrect = !hasNoOptions && (q.type === 'MCQ' || q.type === 'MSQ' || q.type === 'NAT') && !q.exam_options?.some(o => o.is_correct);
+
+                  return (
+                    <div 
+                      key={q.id}
+                      onClick={() => selectQuestionForFix(q)}
+                      className={`p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                        isSelected 
+                          ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20' 
+                          : 'border-black/5 bg-white hover:bg-black/5'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-[10px] bg-black/5 text-foreground/70 px-1.5 py-0.5 rounded">#{index + 1}</span>
+                          <span className="font-bold text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">Part {q.part}</span>
+                          <span className="font-bold text-[10px] bg-black/5 text-foreground/70 px-1.5 py-0.5 rounded">{q.type}</span>
+                        </div>
+                        {hasNoOptions ? (
+                          <span className="text-[10px] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded border border-red-200">No Options</span>
+                        ) : hasNoCorrect ? (
+                          <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">No Correct Answer</span>
+                        ) : null}
+                      </div>
+                      <p className="text-[11px] font-medium text-foreground/80 line-clamp-2 leading-relaxed">
+                        {normalizeText(q.content_text || '') || "(No text content)"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right Pane: Question Editor */}
+            {fixSelectedQuestionId ? (
+              <div className="flex-1 flex flex-col overflow-y-auto p-5 bg-white space-y-4">
+                {isLoadingFixOptions ? (
+                  <div className="flex-1 flex items-center justify-center text-muted-foreground py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" /> Loading question details...
+                  </div>
+                ) : (
+                  <>
+                    {/* Header bar inside editor */}
+                    <div className="flex items-center justify-between border-b pb-3 border-black/5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold bg-primary/10 text-primary px-2.5 py-1 rounded-md">Part {fixQuestionData.part}</span>
+                        <span className="text-xs font-bold bg-black/5 text-foreground/70 px-2.5 py-1 rounded-md">{fixQuestionData.type}</span>
+                        <span className="text-xs text-foreground/50">ID: {fixSelectedQuestionId.substring(0, 8)}...</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={deleteFixQuestion}
+                          disabled={isSavingFix}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 text-xs gap-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Delete Question
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Parameters Row */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-muted/20 p-3 rounded-xl border border-black/5">
+                      <div>
+                        <Label className="text-[10px] text-[#262626]/60 font-semibold">Part</Label>
+                        <Select 
+                          value={fixQuestionData.part} 
+                          onValueChange={(val: any) => {
+                            if (val === 'B') {
+                              setFixQuestionData({...fixQuestionData, part: val, type: 'SUBJECTIVE'});
+                            } else if (val === 'A' && fixQuestionData.type === 'SUBJECTIVE') {
+                              setFixQuestionData({...fixQuestionData, part: val, type: 'MCQ'});
+                            } else {
+                              setFixQuestionData({...fixQuestionData, part: val});
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-white mt-1"><SelectValue placeholder="Select Part" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="A">Part A (Objective)</SelectItem>
+                            <SelectItem value="B">Part B (Subjective)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-[10px] text-[#262626]/60 font-semibold">Type</Label>
+                        <Select 
+                          value={fixQuestionData.type} 
+                          onValueChange={(val: any) => setFixQuestionData({...fixQuestionData, type: val})}
+                          disabled={fixQuestionData.part === 'B'}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-white mt-1"><SelectValue placeholder="Select Type" /></SelectTrigger>
+                          <SelectContent>
+                            {fixQuestionData.part === 'A' ? (
+                              <>
+                                <SelectItem value="MCQ">MCQ</SelectItem>
+                                <SelectItem value="MSQ">MSQ</SelectItem>
+                                <SelectItem value="NAT">NAT</SelectItem>
+                              </>
+                            ) : (
+                              <SelectItem value="SUBJECTIVE">Subjective</SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-[10px] text-[#262626]/60 font-semibold">Difficulty</Label>
+                        <Select 
+                          value={fixQuestionData.difficulty} 
+                          onValueChange={(val: any) => setFixQuestionData({...fixQuestionData, difficulty: val})}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-white mt-1"><SelectValue placeholder="Select Difficulty" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Low">Low</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="High">High</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-[10px] text-[#262626]/60 font-semibold">PYQ Tag</Label>
+                        <Input 
+                          value={fixQuestionData.pyq_tag || ''} 
+                          onChange={(e) => setFixQuestionData({...fixQuestionData, pyq_tag: e.target.value})}
+                          placeholder="e.g. CEED 2022"
+                          className="h-8 text-xs mt-1 bg-white" 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Question Content & Media */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      <div className="lg:col-span-2">
+                        <Label className="text-xs text-[#262626]/60 font-semibold mb-1 block">Question Content</Label>
+                        <div className="bg-white rounded-md border border-black/10 overflow-hidden">
+                          <ReactQuill 
+                            theme="snow" 
+                            value={fixQuestionData.content_text} 
+                            onChange={(content) => setFixQuestionData({...fixQuestionData, content_text: content})}
+                            placeholder="Enter the question text here..."
+                            className="h-[80px] mb-[45px]"
+                            modules={{
+                              toolbar: [
+                                ['bold', 'italic', 'underline'],
+                                [{'list': 'bullet'}, {'list': 'ordered'}],
+                              ],
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="lg:col-span-1">
+                        <Label className="text-xs text-[#262626]/60 font-semibold mb-1 block">Question Media (Optional)</Label>
+                        <div className="border border-dashed border-black/10 rounded-xl p-3 flex flex-col items-center justify-center text-center h-[125px] relative overflow-hidden bg-background/50 hover:bg-background transition-colors mt-0.5">
+                          {fixMediaPreview ? (
+                            <>
+                              <img src={fixMediaPreview} alt="Preview" className="absolute inset-0 w-full h-full object-contain p-2 z-0" />
+                              <button onClick={() => { setFixMediaFile(null); setFixMediaPreview(null); setFixQuestionData({...fixQuestionData, media_url: undefined}); }} className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-md hover:bg-red-50 text-red-500 z-10 border">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <ImageIcon className="w-5 h-5 text-foreground/40 mb-1" />
+                              <span className="text-[11px] text-foreground/60">Click to upload image</span>
+                              <input 
+                                type="file" 
+                                accept="image/*,video/*" 
+                                className="absolute inset-0 opacity-0 cursor-pointer" 
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    const file = e.target.files[0];
+                                    setFixMediaFile(file);
+                                    setFixMediaPreview(URL.createObjectURL(file));
+                                  }
+                                }} 
+                              />
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Options & Answers Section */}
+                    {(fixQuestionData.type === 'MCQ' || fixQuestionData.type === 'MSQ' || fixQuestionData.type === 'NAT') && (
+                      <div className="border border-black/10 rounded-xl p-4 bg-red-50/20">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <Label className="text-xs font-bold uppercase tracking-wider text-red-900 block">
+                              {fixQuestionData.type === 'NAT' ? "Acceptable Numerical Answers" : "Options & Correct Answer"}
+                            </Label>
+                            <p className="text-[10px] text-red-700/70">
+                              {fixQuestionData.type === 'MCQ' ? "Check the radio button for the single correct answer." : fixQuestionData.type === 'MSQ' ? "Check boxes for all correct options." : "Provide acceptable numerical values."}
+                            </p>
+                          </div>
+                          <Button size="sm" variant="outline" onClick={addFixOption} className="h-7 gap-1 bg-white border-black/10 hover:bg-muted text-[11px] font-semibold">
+                            <PlusCircle className="w-3.5 h-3.5 text-primary" /> 
+                            {fixQuestionData.type === 'NAT' ? "Add Answer" : "Add Option"}
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {fixOptions.map((opt, idx) => (
+                            <div key={idx} className={`flex items-start gap-2 p-2.5 rounded-lg border transition-all ${opt.is_correct ? 'border-green-400 bg-green-50/60 shadow-sm ring-1 ring-green-400/30' : 'border-black/10 bg-white'}`}>
+                              {/* Correct Checkbox (Hidden for NAT) */}
+                              {fixQuestionData.type !== 'NAT' && (
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    if (fixQuestionData.type === 'MCQ') {
+                                      const newOpts = fixOptions.map((o, i) => ({ ...o, is_correct: i === idx ? !o.is_correct : false }));
+                                      setFixOptions(newOpts);
+                                    } else {
+                                      updateFixOption(idx, 'is_correct', !opt.is_correct);
+                                    }
+                                  }}
+                                  className={`mt-1.5 shrink-0 w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${opt.is_correct ? 'bg-green-600 border-green-600 text-white' : 'border-black/20 text-transparent hover:border-black/40'}`}
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              
+                              {fixQuestionData.type === 'NAT' && (
+                                <div className="mt-1.5 shrink-0 w-4 h-4 rounded-full bg-green-600 text-white flex items-center justify-center">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                </div>
+                              )}
+
+                              <div className="flex-1 space-y-1.5">
+                                <Input 
+                                  value={opt.content_text} 
+                                  onChange={(e) => updateFixOption(idx, 'content_text', e.target.value)} 
+                                  placeholder={fixQuestionData.type === 'NAT' ? `Numerical Answer ${idx + 1}` : `Option ${idx + 1}...`}
+                                  className="h-8 bg-white text-xs font-medium"
+                                />
+
+                                {fixQuestionData.type !== 'NAT' && (
+                                  <div className="flex items-center gap-2">
+                                    {opt.media_url || opt.file ? (
+                                      <div className="flex items-center gap-1 bg-black/5 px-2 py-0.5 rounded text-[10px]">
+                                        <ImageIcon className="w-3 h-3 text-primary" />
+                                        <span className="truncate max-w-[100px]">{opt.file ? opt.file.name : "Image attached"}</span>
+                                        <button type="button" onClick={() => { updateFixOption(idx, 'media_url', undefined); updateFixOptionFile(idx, null); }} className="text-red-500 hover:text-red-700">
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <label className="text-[10px] text-primary font-semibold flex items-center gap-1 cursor-pointer hover:underline">
+                                        <ImageIcon className="w-3 h-3" /> Add Option Image
+                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && updateFixOptionFile(idx, e.target.files[0])} />
+                                      </label>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              <button type="button" onClick={() => removeFixOption(idx)} className="mt-1 text-foreground/40 hover:text-red-600 p-1">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center p-8 text-center text-muted-foreground bg-white">
+                <div className="space-y-3 max-w-sm">
+                  <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto animate-bounce" />
+                  <h3 className="text-base font-bold text-foreground">All missing answers resolved!</h3>
+                  <p className="text-xs text-muted-foreground">Every question in your repository now has complete options and correct answers assigned.</p>
+                  <Button onClick={closeFixModal} className="mt-2 bg-green-600 hover:bg-green-700 text-white">Done</Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Modal Footer */}
+          <DialogFooter className="px-6 py-3 border-t border-black/5 shrink-0 bg-white flex items-center justify-between">
+            <Button variant="outline" size="sm" onClick={closeFixModal}>
+              Close
+            </Button>
+
+            {fixSelectedQuestionId && (
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  onClick={saveFixAndResolve} 
+                  disabled={isSavingFix}
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold h-9 px-4 gap-1.5 shadow-sm"
+                >
+                  {isSavingFix ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Save & Resolve
+                </Button>
+              </div>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
