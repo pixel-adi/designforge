@@ -1599,11 +1599,35 @@ export default function AdminExamQuestions() {
     return Array.from(tags).sort();
   }, [questions]);
 
+  const isSubstantialTextForDuplicate = (text: string) => {
+    const norm = normalizeText(text || '');
+    if (!norm || norm.length < 35) return false;
+    
+    const genericPhrases = [
+      "which of the following",
+      "refer to the image",
+      "refer to the figure",
+      "select the correct",
+      "match the following",
+      "identify the correct",
+      "choose the correct",
+      "answer the following",
+      "read the following",
+      "based on the image",
+      "based on the given"
+    ];
+    
+    if (genericPhrases.some(p => norm === p || (norm.length < 45 && norm.startsWith(p)))) {
+      return false;
+    }
+    return true;
+  };
+
   const duplicateQuestionsMap = useMemo(() => {
     const map = new Map<string, Question[]>();
     questions.forEach(q => {
       const norm = normalizeText(q.content_text || '');
-      if (norm && norm.length > 5) {
+      if (isSubstantialTextForDuplicate(norm)) {
         if (!map.has(norm)) map.set(norm, []);
         map.get(norm)!.push(q);
       }
@@ -2010,8 +2034,8 @@ export default function AdminExamQuestions() {
 
   const activeFixDuplicateMatch = useMemo(() => {
     if (!fixSelectedQuestionId || !fixQuestionData.content_text) return null;
+    if (!isSubstantialTextForDuplicate(fixQuestionData.content_text)) return null;
     const norm = normalizeText(fixQuestionData.content_text);
-    if (!norm || norm.length <= 5) return null;
     const matches = duplicateQuestionsMap.get(norm) || [];
     return matches.find(q => q.id !== fixSelectedQuestionId) || null;
   }, [fixSelectedQuestionId, fixQuestionData.content_text, duplicateQuestionsMap]);
