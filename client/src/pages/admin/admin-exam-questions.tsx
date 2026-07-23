@@ -175,6 +175,7 @@ export default function AdminExamQuestions() {
   const [isLoadingFixOptions, setIsLoadingFixOptions] = useState(false);
   const [isBulkMergingDuplicates, setIsBulkMergingDuplicates] = useState(false);
   const [isPurgingDuplicates, setIsPurgingDuplicates] = useState(false);
+  const [fixModalTab, setFixModalTab] = useState<'invalid' | 'duplicate'>('invalid');
 
   // Bulk Item Editor Modal State
   const [bulkEditingItem, setBulkEditingItem] = useState<any | null>(null);
@@ -1874,12 +1875,37 @@ export default function AdminExamQuestions() {
     loadQuestionOptionsForFix(q);
   };
 
-  const openFixModal = () => {
-    const invalidList = questions.filter(isQuestionInvalid);
-    if (invalidList.length > 0) {
-      selectQuestionForFix(invalidList[0]);
+  const duplicateQuestionsList = useMemo(() => {
+    const dups: Question[] = [];
+    const groups = Array.from(duplicateQuestionsMap.values());
+    groups.forEach((list) => {
+      if (list.length > 1) {
+        dups.push(...list);
+      }
+    });
+    return dups;
+  }, [duplicateQuestionsMap]);
+
+  const openFixModal = (initialTab: 'invalid' | 'duplicate' = 'invalid') => {
+    setFixModalTab(initialTab);
+    if (initialTab === 'duplicate') {
+      const duplicateList: Question[] = [];
+      const groups = Array.from(duplicateQuestionsMap.values());
+      groups.forEach(list => {
+        if (list.length > 1) duplicateList.push(...list);
+      });
+      if (duplicateList.length > 0) {
+        selectQuestionForFix(duplicateList[0]);
+      } else {
+        setFixSelectedQuestionId(null);
+      }
     } else {
-      setFixSelectedQuestionId(null);
+      const invalidList = questions.filter(isQuestionInvalid);
+      if (invalidList.length > 0) {
+        selectQuestionForFix(invalidList[0]);
+      } else {
+        setFixSelectedQuestionId(null);
+      }
     }
     setFixModalOpen(true);
   };
@@ -2251,13 +2277,13 @@ export default function AdminExamQuestions() {
             <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold block text-sm mb-0.5">Audit Warning: Missing Answers Detected ⚠️</span>
-              There are <span className="font-black text-red-950 underline cursor-pointer hover:text-red-700 transition-colors" onClick={openFixModal}>{invalidQuestionsCount}</span> questions in your repository that lack options or correct answers. Candidates will receive 0/empty marks for these items.
+              There are <span className="font-black text-red-950 underline cursor-pointer hover:text-red-700 transition-colors" onClick={() => openFixModal('invalid')}>{invalidQuestionsCount}</span> questions in your repository that lack options or correct answers. Candidates will receive 0/empty marks for these items.
             </div>
           </div>
           <Button 
             variant="outline" 
             size="sm"
-            onClick={openFixModal}
+            onClick={() => openFixModal('invalid')}
             className="border-red-200 text-red-800 hover:bg-red-100/50 shrink-0 font-bold h-8 text-[11px] rounded-lg transition-colors bg-white shadow-sm"
           >
             Fix Now
@@ -2296,7 +2322,7 @@ export default function AdminExamQuestions() {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={openFixModal}
+              onClick={() => openFixModal('duplicate')}
               className="border-amber-300 text-amber-900 hover:bg-amber-100 font-bold h-8 text-[11px] rounded-lg transition-colors bg-white shadow-sm"
             >
               Review Duplicates
@@ -3216,17 +3242,44 @@ export default function AdminExamQuestions() {
 
           {/* Modal Main Content (Split view: Flagged Questions List on Left, Editor on Right) */}
           <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-background/30">
-            {/* Left Sidebar: Flagged Question List */}
+            {/* Left Sidebar: Question List */}
             <div className="w-full md:w-[320px] border-r border-black/5 flex flex-col bg-white shrink-0">
-              <div className="p-3 border-b border-black/5 bg-muted/30 text-xs font-bold text-foreground/70 flex justify-between items-center">
-                <span>Flagged Questions ({flaggedQuestionsList.length})</span>
+              <div className="p-2 border-b border-black/5 bg-muted/30 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFixModalTab('invalid');
+                    if (flaggedQuestionsList.length > 0) selectQuestionForFix(flaggedQuestionsList[0]);
+                  }}
+                  className={`flex-1 py-1.5 px-2 text-[11px] font-bold rounded-md transition-all flex items-center justify-center gap-1 ${
+                    fixModalTab === 'invalid'
+                      ? 'bg-white text-red-950 shadow-sm border border-black/10 ring-1 ring-red-200'
+                      : 'text-foreground/60 hover:bg-black/5'
+                  }`}
+                >
+                  <AlertCircle className="w-3.5 h-3.5 text-red-600" /> Missing ({flaggedQuestionsList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFixModalTab('duplicate');
+                    if (duplicateQuestionsList.length > 0) selectQuestionForFix(duplicateQuestionsList[0]);
+                  }}
+                  className={`flex-1 py-1.5 px-2 text-[11px] font-bold rounded-md transition-all flex items-center justify-center gap-1 ${
+                    fixModalTab === 'duplicate'
+                      ? 'bg-white text-amber-950 shadow-sm border border-black/10 ring-1 ring-amber-200'
+                      : 'text-foreground/60 hover:bg-black/5'
+                  }`}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Duplicates ({duplicateQuestionsList.length})
+                </button>
               </div>
               
               <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                {flaggedQuestionsList.map((q, index) => {
+                {(fixModalTab === 'invalid' ? flaggedQuestionsList : duplicateQuestionsList).map((q, index) => {
                   const isSelected = fixSelectedQuestionId === q.id;
                   const hasNoOptions = !q.exam_options || q.exam_options.length === 0;
-                  const hasNoCorrect = !hasNoOptions && (q.type === 'MCQ' || q.type === 'MSQ' || q.type === 'NAT') && !q.exam_options?.some(o => o.is_correct);
+                  const hasNoCorrect = !hasNoOptions && (q.type === 'MCQ' || q.type === 'MSQ' || q.type === 'NAT') && !q.exam_options?.some((o: any) => o.is_correct);
 
                   return (
                     <div 
@@ -3244,11 +3297,15 @@ export default function AdminExamQuestions() {
                           <span className="font-bold text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">Part {q.part}</span>
                           <span className="font-bold text-[10px] bg-black/5 text-foreground/70 px-1.5 py-0.5 rounded">{q.type}</span>
                         </div>
-                        {hasNoOptions ? (
-                          <span className="text-[10px] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded border border-red-200">No Options</span>
-                        ) : hasNoCorrect ? (
-                          <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">No Correct Answer</span>
-                        ) : null}
+                        {fixModalTab === 'invalid' ? (
+                          hasNoOptions ? (
+                            <span className="text-[10px] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded border border-red-200">No Options</span>
+                          ) : hasNoCorrect ? (
+                            <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">No Answer</span>
+                          ) : null
+                        ) : (
+                          <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">Duplicate</span>
+                        )}
                       </div>
                       <p className="text-[11px] font-medium text-foreground/80 line-clamp-2 leading-relaxed">
                         {normalizeText(q.content_text || '') || "(No text content)"}
