@@ -3024,7 +3024,7 @@ export default function AdminExamQuestions() {
 
       {/* AUDIT RESOLUTION / FIX INVALID QUESTIONS MODAL */}
       <Dialog open={fixModalOpen} onOpenChange={(open) => { if (!open) closeFixModal(); }}>
-        <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none inset-0 flex flex-col p-0 overflow-hidden border-0">
+        <DialogContent className="left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-[96vw] max-w-[1450px] h-[92vh] flex flex-col p-0 overflow-hidden shadow-2xl rounded-2xl border border-black/10">
           <DialogHeader className="px-6 py-4 border-b border-black/5 shrink-0 bg-red-50/50 flex flex-row items-center justify-between">
             <div>
               <DialogTitle className="flex items-center gap-2 text-base font-bold text-red-950">
