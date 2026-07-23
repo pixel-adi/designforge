@@ -173,6 +173,8 @@ export default function AdminExamQuestions() {
   const [fixMediaPreview, setFixMediaPreview] = useState<string | null>(null);
   const [isSavingFix, setIsSavingFix] = useState(false);
   const [isLoadingFixOptions, setIsLoadingFixOptions] = useState(false);
+  const [isBulkMergingDuplicates, setIsBulkMergingDuplicates] = useState(false);
+  const [isPurgingDuplicates, setIsPurgingDuplicates] = useState(false);
 
   // Bulk Item Editor Modal State
   const [bulkEditingItem, setBulkEditingItem] = useState<any | null>(null);
@@ -964,26 +966,35 @@ export default function AdminExamQuestions() {
         }
       }
 
-      // Fetch exam_options for all questions in chunks of 500 IDs to avoid PostgREST nested table 1000 row limit
-      const questionIds = allData.map(q => q.id);
+      // Fetch ALL exam_options in steps of 1000 via range pagination to avoid PostgREST row limits
       const optionsMap = new Map<string, any[]>();
-      const chunkSize = 500;
-      for (let i = 0; i < questionIds.length; i += chunkSize) {
-        const chunk = questionIds.slice(i, i + chunkSize);
+      let optsFrom = 0;
+      const optsStep = 1000;
+      let optsHasMore = true;
+
+      while (optsHasMore) {
         const { data: optsData, error: optsErr } = await supabase
           .from("exam_options")
           .select("id, question_id, is_correct, content_text, media_url")
-          .in("question_id", chunk);
+          .range(optsFrom, optsFrom + optsStep - 1);
 
         if (optsErr) {
-          console.error("Error fetching options chunk:", optsErr);
-        } else if (optsData) {
+          console.error("Error fetching options range:", optsErr);
+          optsHasMore = false;
+        } else if (optsData && optsData.length > 0) {
           optsData.forEach(opt => {
             if (!optionsMap.has(opt.question_id)) {
               optionsMap.set(opt.question_id, []);
             }
             optionsMap.get(opt.question_id)!.push(opt);
           });
+          if (optsData.length < optsStep) {
+            optsHasMore = false;
+          } else {
+            optsFrom += optsStep;
+          }
+        } else {
+          optsHasMore = false;
         }
       }
 
@@ -1690,6 +1701,116 @@ export default function AdminExamQuestions() {
     }
   };
 
+  const bulkAutoMergeDuplicates = async () => {
+    if (duplicateQuestionsCount === 0) return;
+    if (!confirm(`Are you sure you want to auto-merge options for duplicate questions? This will copy options from complete questions to empty duplicate questions.`)) return;
+
+    setIsBulkMergingDuplicates(true);
+    try {
+      let mergedCount = 0;
+      const questionsToUpdate = [...questions];
+
+      const duplicateGroups = Array.from(duplicateQuestionsMap.values());
+      for (const list of duplicateGroups) {
+        if (list.length < 2) continue;
+
+        const sourceQuestion = list.find((q: Question) => q.exam_options && q.exam_options.length > 0 && q.exam_options.some((o: any) => o.is_correct));
+        if (!sourceQuestion) continue;
+
+        const { data: sourceOpts } = await supabase.from("exam_options").select("*").eq("question_id", sourceQuestion.id);
+        if (!sourceOpts || sourceOpts.length === 0) continue;
+
+        const targetQuestions = list.filter((q: Question) => q.id !== sourceQuestion.id && (!q.exam_options || q.exam_options.length === 0 || !q.exam_options.some((o: any) => o.is_correct)));
+
+        for (const target of targetQuestions) {
+          await supabase.from("exam_options").delete().eq("question_id", target.id);
+
+          const optionsToInsert = sourceOpts.map(o => ({
+            question_id: target.id,
+            content_text: o.content_text || '',
+            media_url: o.media_url || null,
+            is_correct: o.is_correct
+          }));
+
+          const { data: newInserted, error: insErr } = await supabase.from("exam_options").insert(optionsToInsert).select();
+          if (insErr) {
+            console.error(`Failed to copy options for target question ${target.id}:`, insErr);
+            continue;
+          }
+
+          const targetIdx = questionsToUpdate.findIndex(q => q.id === target.id);
+          if (targetIdx !== -1) {
+            questionsToUpdate[targetIdx] = {
+              ...questionsToUpdate[targetIdx],
+              exam_options: (newInserted || []).map(o => ({ id: o.id, is_correct: o.is_correct, content_text: o.content_text, media_url: o.media_url }))
+            };
+          }
+          mergedCount++;
+        }
+      }
+
+      setQuestions(questionsToUpdate);
+      if (mergedCount > 0) {
+        toast({ title: "Auto-Merge Complete! 🎉", description: `Successfully copied correct options into ${mergedCount} duplicate question(s).` });
+      } else {
+        toast({ title: "No Mergeable Duplicates", description: "No incomplete duplicate questions found that could be populated from a complete question." });
+      }
+    } catch (err: any) {
+      toast({ title: "Bulk Merge Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsBulkMergingDuplicates(false);
+    }
+  };
+
+  const bulkPurgeDuplicates = async () => {
+    if (duplicateQuestionsCount === 0) return;
+    if (!confirm(`Are you sure you want to delete all ${duplicateQuestionsCount} redundant duplicate questions? For each identical question group, 1 complete question will be kept and redundant copies will be deleted.`)) return;
+
+    setIsPurgingDuplicates(true);
+    try {
+      const redundantIds: string[] = [];
+      const duplicateGroups = Array.from(duplicateQuestionsMap.values());
+
+      for (const list of duplicateGroups) {
+        if (list.length < 2) continue;
+
+        const sorted = [...list].sort((a, b) => {
+          const aHasCorrect = a.exam_options?.some((o: any) => o.is_correct) ? 1 : 0;
+          const bHasCorrect = b.exam_options?.some((o: any) => o.is_correct) ? 1 : 0;
+          if (bHasCorrect !== aHasCorrect) return bHasCorrect - aHasCorrect;
+
+          const aOptLen = a.exam_options?.length || 0;
+          const bOptLen = b.exam_options?.length || 0;
+          if (bOptLen !== aOptLen) return bOptLen - aOptLen;
+
+          return a.id.localeCompare(b.id);
+        });
+
+        const toDelete = sorted.slice(1);
+        toDelete.forEach((q: Question) => redundantIds.push(q.id));
+      }
+
+      if (redundantIds.length === 0) {
+        toast({ title: "No Duplicates Found", description: "No redundant duplicate questions to purge." });
+        return;
+      }
+
+      const chunkSize = 200;
+      for (let i = 0; i < redundantIds.length; i += chunkSize) {
+        const chunk = redundantIds.slice(i, i + chunkSize);
+        const { error } = await supabase.from("exam_questions").delete().in("id", chunk);
+        if (error) throw error;
+      }
+
+      setQuestions(prev => prev.filter(q => !redundantIds.includes(q.id)));
+      toast({ title: "Duplicates Purged! 🧹", description: `Deleted ${redundantIds.length} redundant duplicate question(s) from your repository.` });
+    } catch (err: any) {
+      toast({ title: "Purge Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsPurgingDuplicates(false);
+    }
+  };
+
   const flaggedQuestionsList = useMemo(() => {
     return questions.filter(isQuestionInvalid);
   }, [questions]);
@@ -1699,6 +1820,15 @@ export default function AdminExamQuestions() {
     try {
       const { data } = await supabase.from("exam_options").select("*").eq("question_id", q.id);
       if (data && data.length > 0) {
+        setQuestions(prev => prev.map(item => {
+          if (item.id === q.id) {
+            return {
+              ...item,
+              exam_options: data.map(opt => ({ id: opt.id, is_correct: opt.is_correct, content_text: opt.content_text, media_url: opt.media_url }))
+            };
+          }
+          return item;
+        }));
         setFixOptions(data.map(opt => ({
           id: opt.id,
           content_text: opt.content_text || '',
@@ -2137,22 +2267,41 @@ export default function AdminExamQuestions() {
 
       {/* Duplicate Questions Notice */}
       {duplicateQuestionsCount > 0 && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs font-semibold leading-relaxed animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 text-xs font-semibold leading-relaxed animate-in fade-in slide-in-from-top-4 duration-300">
           <div className="flex items-start gap-2.5">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold block text-sm mb-0.5">Duplicate Questions Detected ⚠️</span>
-              Found <span className="font-black text-amber-950 underline">{duplicateQuestionsCount}</span> duplicate question(s) with identical content text in your repository.
+              Found <span className="font-black text-amber-950 underline">{duplicateQuestionsCount}</span> duplicate question(s) with identical content text in your repository. Take bulk action or review item-by-item:
             </div>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={openFixModal}
-            className="border-amber-300 text-amber-900 hover:bg-amber-100 shrink-0 font-bold h-8 text-[11px] rounded-lg transition-colors bg-white shadow-sm"
-          >
-            Review Duplicates
-          </Button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+            <Button
+              size="sm"
+              onClick={bulkAutoMergeDuplicates}
+              disabled={isBulkMergingDuplicates}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold h-8 text-[11px] rounded-lg gap-1.5 shadow-sm"
+            >
+              {isBulkMergingDuplicates ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />} Auto-Merge & Copy Options
+            </Button>
+            <Button
+              size="sm"
+              onClick={bulkPurgeDuplicates}
+              disabled={isPurgingDuplicates}
+              variant="destructive"
+              className="bg-red-600 hover:bg-red-700 text-white font-bold h-8 text-[11px] rounded-lg gap-1.5 shadow-sm"
+            >
+              {isPurgingDuplicates ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />} Purge Redundant Duplicates
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={openFixModal}
+              className="border-amber-300 text-amber-900 hover:bg-amber-100 font-bold h-8 text-[11px] rounded-lg transition-colors bg-white shadow-sm"
+            >
+              Review Duplicates
+            </Button>
+          </div>
         </div>
       )}
 
