@@ -202,7 +202,6 @@ export default function AdminExamQuestions() {
 
 
   useEffect(() => { 
-    fetchQuestions(); 
     checkAdminRole();
     fetchGeminiKey();
   }, []);
@@ -938,77 +937,93 @@ export default function AdminExamQuestions() {
     return new File([blob], filename, { type: "image/png" });
   };
 
+  const [totalServerQuestionsCount, setTotalServerQuestionsCount] = useState<number>(0);
+  const [allAuditQuestions, setAllAuditQuestions] = useState<Question[]>([]);
+
   const fetchQuestions = async () => {
     try {
       setLoading(true);
-      let allData: Question[] = [];
-      let from = 0;
-      const step = 1000;
-      let hasMore = true;
+      const from = (currentPage - 1) * itemsPerPage;
+      const to = currentPage * itemsPerPage - 1;
 
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from("exam_questions")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .range(from, from + step - 1);
+      let query = supabase
+        .from("exam_questions")
+        .select("*, exam_options(id, question_id, is_correct, content_text, media_url)", { count: "exact" });
 
-        if (error) throw error;
+      if (filterPart !== "ALL") query = query.eq("part", filterPart);
+      if (filterType !== "ALL") query = query.eq("type", filterType);
+      if (filterPyq !== "ALL") query = query.eq("pyq_tag", filterPyq);
+      if (searchQuery.trim()) query = query.ilike("content_text", `%${searchQuery.trim()}%`);
 
-        if (data && data.length > 0) {
-          allData.push(...data);
-          if (data.length < step) {
-            hasMore = false;
-          } else {
-            from += step;
-          }
-        } else {
-          hasMore = false;
-        }
-      }
+      const { data, count, error } = await query
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
-      // Fetch ALL exam_options in steps of 1000 via range pagination to avoid PostgREST row limits
-      const optionsMap = new Map<string, any[]>();
+      if (error) throw error;
+
+      setQuestions(data || []);
+      setTotalServerQuestionsCount(count || 0);
+    } catch (error: any) {
+      toast({ title: "Error fetching questions", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAuditSummary = async () => {
+    try {
+      const { data: qData } = await supabase
+        .from("exam_questions")
+        .select("id, content_text, part, type, pyq_tag, created_at, topics");
+      if (!qData) return;
+
+      let allOpts: { question_id: string; is_correct: boolean }[] = [];
       let optsFrom = 0;
       const optsStep = 1000;
       let optsHasMore = true;
 
       while (optsHasMore) {
-        const { data: optsData, error: optsErr } = await supabase
+        const { data: opts } = await supabase
           .from("exam_options")
-          .select("id, question_id, is_correct, content_text, media_url")
+          .select("question_id, is_correct")
           .range(optsFrom, optsFrom + optsStep - 1);
 
-        if (optsErr) {
-          console.error("Error fetching options range:", optsErr);
-          optsHasMore = false;
-        } else if (optsData && optsData.length > 0) {
-          optsData.forEach(opt => {
-            if (!optionsMap.has(opt.question_id)) {
-              optionsMap.set(opt.question_id, []);
-            }
-            optionsMap.get(opt.question_id)!.push(opt);
-          });
-          if (optsData.length < optsStep) {
-            optsHasMore = false;
-          } else {
-            optsFrom += optsStep;
-          }
+        if (opts && opts.length > 0) {
+          allOpts.push(...opts);
+          if (opts.length < optsStep) optsHasMore = false;
+          else optsFrom += optsStep;
         } else {
           optsHasMore = false;
         }
       }
 
-      const questionsWithOpts = allData.map(q => ({
-        ...q,
-        exam_options: optionsMap.get(q.id) || []
-      }));
+      const optionsCountMap = new Map<string, { total: number; hasCorrect: boolean }>();
+      allOpts.forEach(o => {
+        if (!optionsCountMap.has(o.question_id)) {
+          optionsCountMap.set(o.question_id, { total: 0, hasCorrect: false });
+        }
+        const info = optionsCountMap.get(o.question_id)!;
+        info.total += 1;
+        if (o.is_correct) info.hasCorrect = true;
+      });
 
-      setQuestions(questionsWithOpts);
-    } catch (error: any) {
-      toast({ title: "Error fetching questions", description: error.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
+      const fullAuditQuestions: Question[] = qData.map(q => {
+        const optInfo = optionsCountMap.get(q.id);
+        const mockOpts = optInfo
+          ? Array.from({ length: optInfo.total }).map((_, i) => ({
+              id: `${q.id}_${i}`,
+              is_correct: i === 0 ? optInfo.hasCorrect : false
+            }))
+          : [];
+        return {
+          ...q,
+          exam_options: mockOpts
+        } as unknown as Question;
+      });
+
+      setAllAuditQuestions(fullAuditQuestions);
+    } catch (err) {
+      console.error("Error building audit summary:", err);
     }
   };
 
@@ -1603,13 +1618,17 @@ export default function AdminExamQuestions() {
     }
   };
 
+  const auditTargetList = useMemo(() => {
+    return allAuditQuestions.length > 0 ? allAuditQuestions : questions;
+  }, [allAuditQuestions, questions]);
+
   const uniquePyqTags = useMemo(() => {
     const tags = new Set<string>();
-    questions.forEach(q => {
+    auditTargetList.forEach(q => {
       if (q.pyq_tag) tags.add(q.pyq_tag.trim());
     });
     return Array.from(tags).sort();
-  }, [questions]);
+  }, [auditTargetList]);
 
   const isSubstantialTextForDuplicate = (text: string) => {
     const norm = normalizeText(text || '');
@@ -1637,7 +1656,7 @@ export default function AdminExamQuestions() {
 
   const duplicateQuestionsMap = useMemo(() => {
     const map = new Map<string, Question[]>();
-    questions.forEach(q => {
+    auditTargetList.forEach(q => {
       const norm = normalizeText(q.content_text || '');
       if (isSubstantialTextForDuplicate(norm)) {
         if (!map.has(norm)) map.set(norm, []);
@@ -1645,7 +1664,7 @@ export default function AdminExamQuestions() {
       }
     });
     return map;
-  }, [questions]);
+  }, [auditTargetList]);
 
   const duplicateQuestionsCount = useMemo(() => {
     let count = 0;
@@ -1813,8 +1832,8 @@ export default function AdminExamQuestions() {
   };
 
   const flaggedQuestionsList = useMemo(() => {
-    return questions.filter(isQuestionInvalid);
-  }, [questions]);
+    return auditTargetList.filter(isQuestionInvalid);
+  }, [auditTargetList]);
 
   const loadQuestionOptionsForFix = async (q: Question) => {
     setIsLoadingFixOptions(true);
@@ -2209,22 +2228,20 @@ export default function AdminExamQuestions() {
   }, [activeFixDuplicateMatch]);
 
   const invalidQuestionsCount = useMemo(() => {
-    return questions.filter(isQuestionInvalid).length;
-  }, [questions]);
+    return auditTargetList.filter(isQuestionInvalid).length;
+  }, [auditTargetList]);
 
-  const filteredQuestions = questions.filter(q => {
-    if (filterInvalidOnly && !isQuestionInvalid(q)) return false;
-    if (filterPart !== "ALL" && q.part !== filterPart) return false;
-    if (filterType !== "ALL" && q.type !== filterType) return false;
-    if (filterPyq !== "ALL" && q.pyq_tag !== filterPyq) return false;
-    if (searchTopic && !q.topics?.some(t => t.toLowerCase().includes(searchTopic.toLowerCase()))) return false;
-    if (searchQuery && !q.content_text?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
+  useEffect(() => {
+    fetchQuestions();
+  }, [currentPage, filterPart, filterType, filterPyq, searchQuery, filterInvalidOnly]);
 
-  const totalQuestionPages = Math.ceil(filteredQuestions.length / itemsPerPage);
-  const displayQuestions = filteredQuestions.length > 0 
-    ? filteredQuestions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  useEffect(() => {
+    fetchAuditSummary();
+  }, []);
+
+  const totalQuestionPages = Math.max(1, Math.ceil(totalServerQuestionsCount / itemsPerPage));
+  const displayQuestions = questions.length > 0 
+    ? questions
     : (hideSample ? [] : [sampleQuestion]);
 
   if (loading) return <div className="flex items-center justify-center py-20 text-foreground/40"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -2609,7 +2626,7 @@ export default function AdminExamQuestions() {
             <div className="flex items-center gap-2 shrink-0 self-start xl:self-auto">
               <h3 className="text-sm font-semibold text-[#262626]">Question Bank</h3>
               <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
-                {filteredQuestions.length} of {questions.length}
+                {questions.length} of {totalServerQuestionsCount} Items
               </span>
             </div>
             
@@ -2727,7 +2744,7 @@ export default function AdminExamQuestions() {
             {totalQuestionPages > 1 && (
               <div className="flex items-center justify-between border-t border-black/5 p-4 bg-background/30">
                 <span className="text-xs text-foreground/50">
-                  Showing {Math.min(filteredQuestions.length, (currentPage - 1) * itemsPerPage + 1)}-{Math.min(filteredQuestions.length, currentPage * itemsPerPage)} of {filteredQuestions.length} questions
+                  Showing {Math.min(totalServerQuestionsCount, (currentPage - 1) * itemsPerPage + 1)}-{Math.min(totalServerQuestionsCount, currentPage * itemsPerPage)} of {totalServerQuestionsCount} questions
                 </span>
                 <div className="flex items-center gap-1">
                   <Button 
