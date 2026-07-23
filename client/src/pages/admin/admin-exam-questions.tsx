@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { FileQuestion, Trash2, PlusCircle, Save, Loader2, Image as ImageIcon, X, CheckCircle2, Download, Upload, Filter, Settings, Sparkles, AlertCircle } from "lucide-react";
+import { FileQuestion, Trash2, PlusCircle, Save, Loader2, Image as ImageIcon, X, CheckCircle2, Download, Upload, Filter, Settings, Sparkles, AlertCircle, AlertTriangle, Copy } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -946,7 +946,7 @@ export default function AdminExamQuestions() {
       while (hasMore) {
         const { data, error } = await supabase
           .from("exam_questions")
-          .select("*, exam_options(id, is_correct)")
+          .select("*")
           .order("created_at", { ascending: false })
           .range(from, from + step - 1);
 
@@ -963,7 +963,36 @@ export default function AdminExamQuestions() {
           hasMore = false;
         }
       }
-      setQuestions(allData);
+
+      // Fetch exam_options for all questions in chunks of 500 IDs to avoid PostgREST nested table 1000 row limit
+      const questionIds = allData.map(q => q.id);
+      const optionsMap = new Map<string, any[]>();
+      const chunkSize = 500;
+      for (let i = 0; i < questionIds.length; i += chunkSize) {
+        const chunk = questionIds.slice(i, i + chunkSize);
+        const { data: optsData, error: optsErr } = await supabase
+          .from("exam_options")
+          .select("id, question_id, is_correct, content_text, media_url")
+          .in("question_id", chunk);
+
+        if (optsErr) {
+          console.error("Error fetching options chunk:", optsErr);
+        } else if (optsData) {
+          optsData.forEach(opt => {
+            if (!optionsMap.has(opt.question_id)) {
+              optionsMap.set(opt.question_id, []);
+            }
+            optionsMap.get(opt.question_id)!.push(opt);
+          });
+        }
+      }
+
+      const questionsWithOpts = allData.map(q => ({
+        ...q,
+        exam_options: optionsMap.get(q.id) || []
+      }));
+
+      setQuestions(questionsWithOpts);
     } catch (error: any) {
       toast({ title: "Error fetching questions", description: error.message, variant: "destructive" });
     } finally {
@@ -1570,15 +1599,71 @@ export default function AdminExamQuestions() {
     return Array.from(tags).sort();
   }, [questions]);
 
+  const duplicateQuestionsMap = useMemo(() => {
+    const map = new Map<string, Question[]>();
+    questions.forEach(q => {
+      const norm = normalizeText(q.content_text || '');
+      if (norm && norm.length > 5) {
+        if (!map.has(norm)) map.set(norm, []);
+        map.get(norm)!.push(q);
+      }
+    });
+    return map;
+  }, [questions]);
+
+  const duplicateQuestionsCount = useMemo(() => {
+    let count = 0;
+    duplicateQuestionsMap.forEach(list => {
+      if (list.length > 1) {
+        count += list.length - 1;
+      }
+    });
+    return count;
+  }, [duplicateQuestionsMap]);
+
   const isQuestionInvalid = (q: Question) => {
     if (q.part === 'B' || q.type === 'SUBJECTIVE') return false;
     const opts = q.exam_options || [];
-        if (opts.length === 0) return true;
+    if (opts.length === 0) return true;
     if (q.type === 'MCQ' || q.type === 'MSQ' || q.type === 'NAT') {
       const hasCorrect = opts.some(opt => opt.is_correct);
       if (!hasCorrect) return true;
     }
     return false;
+  };
+
+  const copyOptionsFromDuplicate = async (duplicateQ: Question) => {
+    try {
+      setIsLoadingFixOptions(true);
+      const { data } = await supabase.from("exam_options").select("*").eq("question_id", duplicateQ.id);
+      if (data && data.length > 0) {
+        setFixOptions(data.map(opt => ({
+          id: opt.id,
+          content_text: opt.content_text || '',
+          media_url: opt.media_url,
+          is_correct: opt.is_correct
+        })));
+        toast({ title: "Options Copied! 📋", description: "Options copied from duplicate question. Click 'Save & Resolve' to apply." });
+      } else {
+        toast({ title: "No options found", description: "The duplicate question does not have saved options.", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error copying options", description: err.message, variant: "destructive" });
+    } finally {
+      setIsLoadingFixOptions(false);
+    }
+  };
+
+  const deleteDuplicateQuestionFromBank = async (dupId: string) => {
+    if (!confirm("Are you sure you want to delete this duplicate question from the repository?")) return;
+    try {
+      const { error } = await supabase.from("exam_questions").delete().eq("id", dupId);
+      if (error) throw error;
+      setQuestions(prev => prev.filter(q => q.id !== dupId));
+      toast({ title: "Duplicate Deleted", description: "The duplicate question was removed from the question bank." });
+    } catch (err: any) {
+      toast({ title: "Error deleting duplicate", description: err.message, variant: "destructive" });
+    }
   };
 
   const flaggedQuestionsList = useMemo(() => {
@@ -1740,7 +1825,7 @@ export default function AdminExamQuestions() {
           return {
             ...q,
             ...questionToSave,
-            exam_options: newSavedOpts.map(o => ({ id: o.id, is_correct: o.is_correct }))
+            exam_options: newSavedOpts.map(o => ({ id: o.id, is_correct: o.is_correct, content_text: o.content_text, media_url: o.media_url }))
           };
         }
         return q;
@@ -1923,6 +2008,14 @@ export default function AdminExamQuestions() {
     closeBulkItemEditor();
   };
 
+  const activeFixDuplicateMatch = useMemo(() => {
+    if (!fixSelectedQuestionId || !fixQuestionData.content_text) return null;
+    const norm = normalizeText(fixQuestionData.content_text);
+    if (!norm || norm.length <= 5) return null;
+    const matches = duplicateQuestionsMap.get(norm) || [];
+    return matches.find(q => q.id !== fixSelectedQuestionId) || null;
+  }, [fixSelectedQuestionId, fixQuestionData.content_text, duplicateQuestionsMap]);
+
   const invalidQuestionsCount = useMemo(() => {
     return questions.filter(isQuestionInvalid).length;
   }, [questions]);
@@ -2014,6 +2107,27 @@ export default function AdminExamQuestions() {
             className="border-red-200 text-red-800 hover:bg-red-100/50 shrink-0 font-bold h-8 text-[11px] rounded-lg transition-colors bg-white shadow-sm"
           >
             Fix Now
+          </Button>
+        </div>
+      )}
+
+      {/* Duplicate Questions Notice */}
+      {duplicateQuestionsCount > 0 && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs font-semibold leading-relaxed animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold block text-sm mb-0.5">Duplicate Questions Detected ⚠️</span>
+              Found <span className="font-black text-amber-950 underline">{duplicateQuestionsCount}</span> duplicate question(s) with identical content text in your repository.
+            </div>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={openFixModal}
+            className="border-amber-300 text-amber-900 hover:bg-amber-100 shrink-0 font-bold h-8 text-[11px] rounded-lg transition-colors bg-white shadow-sm"
+          >
+            Review Duplicates
           </Button>
         </div>
       )}
@@ -2910,14 +3024,14 @@ export default function AdminExamQuestions() {
 
       {/* AUDIT RESOLUTION / FIX INVALID QUESTIONS MODAL */}
       <Dialog open={fixModalOpen} onOpenChange={(open) => { if (!open) closeFixModal(); }}>
-        <DialogContent className="max-w-[95vw] w-[95vw] lg:max-w-[1150px] h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl rounded-2xl">
+        <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none inset-0 flex flex-col p-0 overflow-hidden border-0">
           <DialogHeader className="px-6 py-4 border-b border-black/5 shrink-0 bg-red-50/50 flex flex-row items-center justify-between">
             <div>
               <DialogTitle className="flex items-center gap-2 text-base font-bold text-red-950">
-                <AlertCircle className="w-5 h-5 text-red-600" /> Audit Resolution: Fix Missing Answers
+                <AlertCircle className="w-5 h-5 text-red-600" /> Audit Resolution: Fix Missing Answers & Duplicates
               </DialogTitle>
               <DialogDescription className="text-xs text-red-800/80 mt-0.5">
-                Resolve questions lacking options or correct answers directly.
+                Resolve questions lacking options or correct answers directly, or copy/merge duplicate questions.
               </DialogDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -3000,6 +3114,48 @@ export default function AdminExamQuestions() {
                         </Button>
                       </div>
                     </div>
+
+                    {/* Duplicate Warning Banner */}
+                    {activeFixDuplicateMatch && (
+                      <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-950 shadow-sm animate-in fade-in duration-200">
+                        <div className="flex items-start gap-2.5">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold text-amber-950 text-xs">
+                              ⚠️ Duplicate Question Found in Repository!
+                            </p>
+                            <p className="text-[11px] text-amber-800/90 mt-0.5">
+                              An identical question exists in the Question Bank (Tag: <span className="font-semibold">{activeFixDuplicateMatch.pyq_tag || 'N/A'}</span>, Part {activeFixDuplicateMatch.part}, {activeFixDuplicateMatch.type}).
+                              {activeFixDuplicateMatch.exam_options && activeFixDuplicateMatch.exam_options.length > 0 && activeFixDuplicateMatch.exam_options.some((o: any) => o.is_correct) ? (
+                                <span className="font-bold text-green-800 ml-1">It already has saved options & correct answer!</span>
+                              ) : (
+                                <span className="text-amber-800 ml-1">(It also lacks options)</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+                          {activeFixDuplicateMatch.exam_options && activeFixDuplicateMatch.exam_options.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => copyOptionsFromDuplicate(activeFixDuplicateMatch)}
+                              className="h-7 text-xs bg-white border-amber-300 hover:bg-amber-100 text-amber-900 font-bold gap-1 shadow-sm"
+                            >
+                              <Copy className="w-3.5 h-3.5 text-amber-700" /> Copy Options from Duplicate
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => deleteDuplicateQuestionFromBank(activeFixDuplicateMatch.id)}
+                            className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white font-bold gap-1 shadow-sm"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Delete Duplicate
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Parameters Row */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-muted/20 p-3 rounded-xl border border-black/5">
