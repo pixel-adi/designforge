@@ -2196,6 +2196,18 @@ export default function AdminExamQuestions() {
     return matches.find(q => q.id !== fixSelectedQuestionId) || null;
   }, [fixSelectedQuestionId, fixQuestionData.content_text, duplicateQuestionsMap]);
 
+  const [duplicateMatchOptions, setDuplicateMatchOptions] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (activeFixDuplicateMatch) {
+      supabase.from("exam_options").select("*").eq("question_id", activeFixDuplicateMatch.id).then(({ data }) => {
+        if (data) setDuplicateMatchOptions(data);
+      });
+    } else {
+      setDuplicateMatchOptions([]);
+    }
+  }, [activeFixDuplicateMatch]);
+
   const invalidQuestionsCount = useMemo(() => {
     return questions.filter(isQuestionInvalid).length;
   }, [questions]);
@@ -3345,44 +3357,118 @@ export default function AdminExamQuestions() {
                       </div>
                     </div>
 
-                    {/* Duplicate Warning Banner */}
+                    {/* Duplicate Side-by-Side Comparison Card */}
                     {activeFixDuplicateMatch && (
-                      <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-950 shadow-sm animate-in fade-in duration-200">
-                        <div className="flex items-start gap-2.5">
-                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                          <div>
-                            <p className="font-bold text-amber-950 text-xs">
-                              ⚠️ Duplicate Question Found in Repository!
-                            </p>
-                            <p className="text-[11px] text-amber-800/90 mt-0.5">
-                              An identical question exists in the Question Bank (Tag: <span className="font-semibold">{activeFixDuplicateMatch.pyq_tag || 'N/A'}</span>, Part {activeFixDuplicateMatch.part}, {activeFixDuplicateMatch.type}).
-                              {activeFixDuplicateMatch.exam_options && activeFixDuplicateMatch.exam_options.length > 0 && activeFixDuplicateMatch.exam_options.some((o: any) => o.is_correct) ? (
-                                <span className="font-bold text-green-800 ml-1">It already has saved options & correct answer!</span>
+                      <div className="p-4 bg-amber-50/90 border border-amber-300 rounded-2xl space-y-3 shadow-sm animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-amber-950 font-bold text-xs">
+                            <AlertTriangle className="w-4.5 h-4.5 text-amber-600 shrink-0" />
+                            <span>⚠️ Duplicate Question Pair Comparison</span>
+                          </div>
+                          <span className="text-[10px] font-bold bg-amber-200/80 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
+                            Side-by-Side Verification
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                          {/* Box 1: Currently Selected Item in Editor */}
+                          <div className="bg-white p-3 rounded-xl border border-black/10 text-xs space-y-2 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between border-b pb-1.5 border-black/5 mb-1.5">
+                                <span className="font-bold text-primary flex items-center gap-1">
+                                  <span>Active Editor Question</span>
+                                </span>
+                                <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded">
+                                  {fixQuestionData.pyq_tag || 'No Tag'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] font-medium text-foreground/80 line-clamp-3 leading-relaxed">
+                                {normalizeText(fixQuestionData.content_text || '') || "(No text content)"}
+                              </p>
+                            </div>
+                            <div className="text-[10px] text-muted-foreground flex items-center justify-between pt-2 border-t border-black/5">
+                              <span>Current Options: {fixOptions.length}</span>
+                              {fixOptions.some(o => o.is_correct) ? (
+                                <span className="font-bold text-green-700 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-green-600" /> Has Correct Answer
+                                </span>
                               ) : (
-                                <span className="text-amber-800 ml-1">(It also lacks options)</span>
+                                <span className="font-bold text-red-600">✗ Missing Answer</span>
                               )}
-                            </p>
+                            </div>
+                          </div>
+
+                          {/* Box 2: Existing Duplicate Twin in Database */}
+                          <div className="bg-white p-3 rounded-xl border border-amber-300 text-xs space-y-2 shadow-sm flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between border-b pb-1.5 border-black/5 mb-1.5">
+                                <span className="font-bold text-amber-900 flex items-center gap-1">
+                                  <span>Existing Database Twin</span>
+                                </span>
+                                <span className="text-[10px] bg-amber-100 text-amber-950 font-bold px-2 py-0.5 rounded border border-amber-300">
+                                  {activeFixDuplicateMatch.pyq_tag || 'No Tag'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] font-medium text-foreground/80 line-clamp-3 leading-relaxed mb-2">
+                                {normalizeText(activeFixDuplicateMatch.content_text || '')}
+                              </p>
+                              
+                              {/* Saved options preview */}
+                              <div className="space-y-1">
+                                <span className="text-[10px] font-bold text-foreground/70 block">Saved Options in Twin:</span>
+                                {duplicateMatchOptions.length > 0 ? (
+                                  <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
+                                    {duplicateMatchOptions.map((opt: any, i: number) => (
+                                      <div 
+                                        key={i} 
+                                        className={`p-1.5 rounded text-[10px] border transition-colors ${
+                                          opt.is_correct 
+                                            ? 'bg-green-50 border-green-400 text-green-950 font-bold flex items-center justify-between' 
+                                            : 'bg-black/5 border-black/5 text-foreground/70'
+                                        }`}
+                                      >
+                                        <span className="truncate max-w-[200px]">{opt.content_text || `Option ${i + 1}`}</span>
+                                        {opt.is_correct && <CheckCircle2 className="w-3 h-3 text-green-600 shrink-0 ml-1" />}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] text-amber-800 italic block">(No options loaded)</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-[10px] text-muted-foreground flex items-center justify-between pt-2 border-t border-black/5 mt-2">
+                              <span>ID: {activeFixDuplicateMatch.id.substring(0, 8)}...</span>
+                              <span className="font-semibold text-foreground/70">Part {activeFixDuplicateMatch.part} • {activeFixDuplicateMatch.type}</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
-                          {activeFixDuplicateMatch.exam_options && activeFixDuplicateMatch.exam_options.length > 0 && (
+
+                        {/* Visual Actions Bar */}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-2 border-t border-amber-300/60">
+                          <p className="text-[11px] text-amber-900/80 leading-normal">
+                            🔒 <b>Merge Safety:</b> Copying options will populate the active item while preserving the original twin question intact in the database.
+                          </p>
+                          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+                            {duplicateMatchOptions.length > 0 && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => copyOptionsFromDuplicate(activeFixDuplicateMatch)}
+                                className="h-8 text-xs bg-white border-amber-300 hover:bg-amber-100 text-amber-950 font-bold gap-1.5 shadow-sm"
+                              >
+                                <Copy className="w-3.5 h-3.5 text-amber-700" /> Copy Options into Editor
+                              </Button>
+                            )}
                             <Button
                               size="sm"
-                              variant="outline"
-                              onClick={() => copyOptionsFromDuplicate(activeFixDuplicateMatch)}
-                              className="h-7 text-xs bg-white border-amber-300 hover:bg-amber-100 text-amber-900 font-bold gap-1 shadow-sm"
+                              variant="destructive"
+                              onClick={() => deleteDuplicateQuestionFromBank(activeFixDuplicateMatch.id)}
+                              className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white font-bold gap-1.5 shadow-sm"
                             >
-                              <Copy className="w-3.5 h-3.5 text-amber-700" /> Copy Options from Duplicate
+                              <Trash2 className="w-3.5 h-3.5" /> Delete Twin ({activeFixDuplicateMatch.pyq_tag || 'Duplicate'})
                             </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => deleteDuplicateQuestionFromBank(activeFixDuplicateMatch.id)}
-                            className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white font-bold gap-1 shadow-sm"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" /> Delete Duplicate
-                          </Button>
+                          </div>
                         </div>
                       </div>
                     )}
