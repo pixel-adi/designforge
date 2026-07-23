@@ -1659,8 +1659,10 @@ export default function AdminExamQuestions() {
     auditTargetList.forEach(q => {
       const norm = normalizeText(q.content_text || '');
       if (isSubstantialTextForDuplicate(norm)) {
-        if (!map.has(norm)) map.set(norm, []);
-        map.get(norm)!.push(q);
+        const pyqKey = (q.pyq_tag || '').trim().toLowerCase();
+        const key = `${pyqKey}:::${norm}`;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(q);
       }
     });
     return map;
@@ -2211,9 +2213,11 @@ export default function AdminExamQuestions() {
     if (!fixSelectedQuestionId || !fixQuestionData.content_text) return null;
     if (!isSubstantialTextForDuplicate(fixQuestionData.content_text)) return null;
     const norm = normalizeText(fixQuestionData.content_text);
-    const matches = duplicateQuestionsMap.get(norm) || [];
+    const pyqKey = (fixQuestionData.pyq_tag || '').trim().toLowerCase();
+    const key = `${pyqKey}:::${norm}`;
+    const matches = duplicateQuestionsMap.get(key) || [];
     return matches.find(q => q.id !== fixSelectedQuestionId) || null;
-  }, [fixSelectedQuestionId, fixQuestionData.content_text, duplicateQuestionsMap]);
+  }, [fixSelectedQuestionId, fixQuestionData.content_text, fixQuestionData.pyq_tag, duplicateQuestionsMap]);
 
   const [duplicateMatchOptions, setDuplicateMatchOptions] = useState<any[]>([]);
 
