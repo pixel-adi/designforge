@@ -397,11 +397,23 @@ export default function AdminExamTests() {
     setSaving(true);
     try {
       let programId = null;
-      const { data: progData } = await supabase.from('exam_programs').select('id').eq('name', selectedTemplate.id).single();
-      if (progData) programId = progData.id;
-      else {
-        const { data: newProg } = await supabase.from('exam_programs').insert({ name: selectedTemplate.id }).select().single();
-        programId = newProg?.id;
+      const targetName = selectedTemplate.name || selectedTemplate.id;
+      let { data: progData } = await supabase.from('exam_programs').select('id').eq('name', targetName).maybeSingle();
+      if (!progData && selectedTemplate.id !== targetName) {
+        const { data: progData2 } = await supabase.from('exam_programs').select('id').eq('name', selectedTemplate.id).maybeSingle();
+        progData = progData2;
+      }
+
+      if (progData) {
+        programId = progData.id;
+      } else {
+        const { data: newProg } = await supabase.from('exam_programs').insert({ name: targetName }).select().maybeSingle();
+        if (newProg) {
+          programId = newProg.id;
+        } else {
+          const { data: firstProg } = await supabase.from('exam_programs').select('id').limit(1).maybeSingle();
+          if (firstProg) programId = firstProg.id;
+        }
       }
 
       let testRecordId = editingTestId;

@@ -1478,8 +1478,8 @@ export default function AdminExamQuestions() {
 
     // Block saving if any approved question contains referenced but missing images
     const hasMissingImages = approved.some(q => 
-      (!q.media_exists) || 
-      q.options.some((opt: any) => !opt.media_exists)
+      Boolean(q.media_filename && !q.media_exists) || 
+      q.options.some((opt: any) => Boolean(opt.media_filename && !opt.media_exists))
     );
 
     if (hasMissingImages) {
@@ -3056,7 +3056,11 @@ export default function AdminExamQuestions() {
                disabled={
                  isUploadingBulk || 
                  !bulkQuestions.some(q => q.status === 'approved' && q.duplicate_action !== 'skip') ||
-                 bulkQuestions.some(q => q.status === 'approved' && q.duplicate_action !== 'skip' && ((!q.media_exists) || q.options.some((opt: any) => !opt.media_exists)))
+                 bulkQuestions.some(q => 
+                   q.status === 'approved' && 
+                   q.duplicate_action !== 'skip' && 
+                   (Boolean(q.media_filename && !q.media_exists) || q.options.some((opt: any) => Boolean(opt.media_filename && !opt.media_exists)))
+                 )
                } 
                className="bg-primary hover:bg-primary/90 gap-2"
              >

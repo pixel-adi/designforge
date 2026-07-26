@@ -41,6 +41,7 @@ const roleNavPermissions: Record<string, string[]> = {
   ],
   sme: [
     "/admin/exam-questions",
+    "/admin/exam-tests",
     "/admin/study-materials",
     "/admin/assignments",
     "/admin/class-notes",
