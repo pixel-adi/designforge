@@ -1,16 +1,37 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Compass, Target, MapPin, Briefcase, GraduationCap, CheckCircle2, ChevronRight } from "lucide-react";
+import { ArrowRight, Compass, Target, MapPin, Briefcase, GraduationCap, CheckCircle2, ChevronRight, Clock, Sparkles } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Link } from "wouter";
+import { supabase } from "@/lib/supabaseClient";
+import { RegistrationSheet } from "@/components/registration-sheet";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export default function Mentorship() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [isRegOpen, setIsRegOpen] = useState(false);
+  const [selectedProgram, setSelectedProgram] = useState("Focus Batch");
+
+  useEffect(() => {
+    async function fetchPrograms() {
+      try {
+        const { data } = await supabase
+          .from("programs")
+          .select("*")
+          .eq("is_active", true)
+          .order("display_order", { ascending: true });
+        if (data) setPrograms(data);
+      } catch (e) {
+        console.error("Error fetching mentorship programs:", e);
+      }
+    }
+    fetchPrograms();
+  }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -492,6 +513,70 @@ export default function Mentorship() {
           </div>
         </section>
 
+        {/* DYNAMIC PROGRAMS SECTION */}
+        {programs.length > 0 && (
+          <section id="available-programs" className="py-24 bg-white animate-section border-t border-black/5">
+            <div className="container mx-auto px-4 max-w-6xl text-center">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-widest mb-6">
+                <Sparkles className="w-4 h-4" /> Live Enrolling Programs
+              </div>
+              <h2 className="text-4xl md:text-5xl font-heading mb-4 text-[#262626]">Available Programs & Batches</h2>
+              <p className="text-xl text-foreground/60 mb-16 max-w-2xl mx-auto">
+                Join structured, mentor-led programs designed for admissions, portfolios, and design skill acceleration.
+              </p>
+
+              <div className={`grid gap-8 text-left ${programs.length === 1 ? 'max-w-xl mx-auto' : programs.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+                {programs.map((prog) => (
+                  <div key={prog.id} className="bg-background rounded-3xl p-8 border border-black/10 flex flex-col justify-between hover:shadow-xl transition-all duration-300 relative group overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform"></div>
+                    
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="px-3 py-1 rounded-full bg-green-100 text-green-800 text-xs font-bold uppercase tracking-wider">
+                          Active Enrollment
+                        </span>
+                        {prog.duration && (
+                          <span className="text-xs font-medium text-foreground/60 flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" /> {prog.duration}
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="text-2xl font-heading text-[#262626] mb-3">{prog.name}</h3>
+                      <p className="text-foreground/70 text-sm leading-relaxed mb-6 font-light">{prog.description}</p>
+                    </div>
+
+                    <div className="pt-6 border-t border-black/5 mt-auto">
+                      <div className="flex items-baseline justify-between mb-6">
+                        <div>
+                          <span className="text-xs uppercase text-foreground/40 font-semibold block mb-0.5">Program Fee</span>
+                          <span className="text-3xl font-heading font-bold text-foreground">₹{prog.price?.toLocaleString('en-IN')}</span>
+                        </div>
+                        {prog.start_date && (
+                          <div className="text-right">
+                            <span className="text-xs text-orange-600 font-semibold block">Starts</span>
+                            <span className="text-xs font-bold text-foreground/80">{new Date(prog.start_date).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <Button
+                        onClick={() => {
+                          setSelectedProgram(prog.name);
+                          setIsRegOpen(true);
+                        }}
+                        className="w-full h-12 rounded-2xl text-base btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] transition-all"
+                      >
+                        Apply Now
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* SECTION 9: FINAL CTA */}
         <section className="py-32 bg-background text-center animate-section relative overflow-hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vw] max-w-4xl max-h-4xl bg-gradient-to-tr from-primary/10 via-pop-2/5 to-pop-3/10 rounded-full blur-[100px] -z-10 pointer-events-none"></div>
@@ -506,14 +591,11 @@ export default function Mentorship() {
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 flex-wrap">
-              <Button size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full text-base btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all">
+              <Button size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full text-base btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] hover:shadow-[0_6px_20px_rgba(255,107,107,0.23)] hover:-translate-y-0.5 transition-all" onClick={() => { setSelectedProgram("Focus Batch"); setIsRegOpen(true); }}>
                 Explore Admissions Mentorship
               </Button>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 rounded-full text-base bg-white border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 rounded-full text-base bg-white border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all" onClick={() => { setSelectedProgram("Job Preparation"); setIsRegOpen(true); }}>
                 Explore Job Preparation
-              </Button>
-              <Button size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 rounded-full text-base text-foreground/70 hover:text-foreground hover:bg-black/5 transition-colors">
-                Talk to Us
               </Button>
             </div>
           </div>
@@ -521,6 +603,7 @@ export default function Mentorship() {
 
       </main>
       
+      <RegistrationSheet open={isRegOpen} onOpenChange={setIsRegOpen} defaultProgram={selectedProgram} />
       <Footer />
     </div>
   );

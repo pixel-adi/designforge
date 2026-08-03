@@ -57,14 +57,35 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [paymentStep, setPaymentStep] = useState<'saving' | 'creating' | 'redirecting' | null>(null);
   const [paymentType, setPaymentType] = useState<'full' | 'installment'>('full');
+  const [activePrograms, setActivePrograms] = useState<string[]>([]);
 
   const { register, formState: { errors }, setValue, watch, trigger, reset } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     mode: "onChange",
     defaultValues: {
-      program: "",
+      program: defaultProgram || "",
     }
   });
+
+  useEffect(() => {
+    if (open && defaultProgram) {
+      setValue("program", defaultProgram, { shouldValidate: true });
+    }
+  }, [open, defaultProgram, setValue]);
+
+  useEffect(() => {
+    async function loadPrograms() {
+      try {
+        const { data } = await supabase.from('programs').select('name').eq('is_active', true).order('display_order');
+        if (data) {
+          setActivePrograms(data.map(p => p.name));
+        }
+      } catch (e) {
+        console.error("Failed to load active programs:", e);
+      }
+    }
+    loadPrograms();
+  }, []);
 
   // Pre-load Razorpay script as soon as the drawer opens
   useEffect(() => {
@@ -344,12 +365,21 @@ export function RegistrationSheet({ open, onOpenChange, defaultProgram = "Focus 
                       <SelectValue placeholder="Select a track" />
                     </SelectTrigger>
                     <SelectContent className="text-base p-1 z-[110] relative">
+                      <SelectItem value="Focus Batch" className="py-3 cursor-pointer">Focus Batch</SelectItem>
                       <SelectItem value="NID B.Des" className="py-3 cursor-pointer">NID B.Des</SelectItem>
                       <SelectItem value="NID M.Des" className="py-3 cursor-pointer">NID M.Des</SelectItem>
                       <SelectItem value="CEED" className="py-3 cursor-pointer">CEED</SelectItem>
                       <SelectItem value="UCEED" className="py-3 cursor-pointer">UCEED</SelectItem>
                       <SelectItem value="Private Colleges" className="py-3 cursor-pointer">Private Colleges</SelectItem>
                       <SelectItem value="Abroad Colleges" className="py-3 cursor-pointer">Abroad Colleges</SelectItem>
+                      {activePrograms.map(progName => (
+                        !["Focus Batch", "NID B.Des", "NID M.Des", "CEED", "UCEED", "Private Colleges", "Abroad Colleges"].includes(progName) && (
+                          <SelectItem key={progName} value={progName} className="py-3 cursor-pointer">{progName}</SelectItem>
+                        )
+                      ))}
+                      {watch("program") && !["Focus Batch", "NID B.Des", "NID M.Des", "CEED", "UCEED", "Private Colleges", "Abroad Colleges", ...activePrograms].includes(watch("program")) && (
+                        <SelectItem value={watch("program")} className="py-3 cursor-pointer">{watch("program")}</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                   {errors.program && <p className="text-sm text-red-500 font-medium mt-1">{errors.program.message}</p>}

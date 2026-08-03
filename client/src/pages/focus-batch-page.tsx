@@ -577,7 +577,7 @@ export default function FocusBatchPage() {
                     <CardHeader className="pb-4 relative z-10">
                       <CardTitle className="text-2xl font-medium text-foreground">{prog.name}</CardTitle>
                       <div className="mt-4 flex items-baseline gap-2">
-                        <span className="text-4xl font-heading font-bold text-foreground">₹{prog.price.toLocaleString('en-IN')}</span>
+                        <span className="text-4xl font-heading font-bold text-foreground">₹{prog.price ? Number(prog.price).toLocaleString('en-IN') : 0}</span>
                       </div>
                       {prog.duration && (
                         <p className="text-sm text-foreground/50 font-medium mt-2 flex items-center gap-1">
@@ -590,7 +590,7 @@ export default function FocusBatchPage() {
                         {prog.description}
                       </p>
 
-                      {prog.start_date && (
+                      {prog.start_date && !isNaN(new Date(prog.start_date).getTime()) && (
                         <div className="mb-6 p-3 rounded-xl bg-orange-50 border border-orange-100 flex items-start gap-3">
                           <Sparkles className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
                           <div>

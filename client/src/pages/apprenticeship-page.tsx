@@ -3,27 +3,31 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ArrowRight, ArrowUpRight, CheckCircle2, CircleDashed, Globe, HeartHandshake, Layers, Lightbulb, MapPin, MonitorPlay, MousePointerClick, Puzzle, Sparkles, TerminalSquare, Users, Calendar } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CheckCircle2, CircleDashed, Globe, HeartHandshake, Layers, Lightbulb, MapPin, MonitorPlay, MousePointerClick, Puzzle, Sparkles, TerminalSquare, Users, Calendar, Clock } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { supabase } from "@/lib/supabaseClient";
+import { RegistrationSheet } from "@/components/registration-sheet";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export default function ApprenticeshipPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [workshops, setWorkshops] = useState<any[]>([]);
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [isRegOpen, setIsRegOpen] = useState(false);
+  const [selectedProgram, setSelectedProgram] = useState("Focus Batch");
 
   useEffect(() => {
-    async function fetchWorkshops() {
-      const { data } = await supabase
-        .from('workshops')
-        .select('*')
-        .eq('is_visible', true)
-        .order('display_order', { ascending: true });
-      if (data) setWorkshops(data);
+    async function fetchData() {
+      const [workshopsRes, programsRes] = await Promise.all([
+        supabase.from('workshops').select('*').eq('is_visible', true).order('display_order', { ascending: true }),
+        supabase.from('programs').select('*').eq('is_active', true).order('display_order', { ascending: true })
+      ]);
+      if (workshopsRes.data) setWorkshops(workshopsRes.data);
+      if (programsRes.data) setPrograms(programsRes.data);
     }
-    fetchWorkshops();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -522,14 +526,70 @@ export default function ApprenticeshipPage() {
                 </div>
               )}
             </div>
-            
-            <div className="md:hidden mt-8 text-center">
-              <Button variant="outline" className="rounded-full px-6 h-14 text-base bg-white w-full border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
-                Join Upcoming Workshops
-              </Button>
-            </div>
           </div>
         </section>
+
+        {/* DYNAMIC PROGRAMS SECTION */}
+        {programs.length > 0 && (
+          <section className="py-20 bg-background border-t border-black/5 animate-section">
+            <div className="container mx-auto px-4 max-w-6xl">
+              <div className="text-center max-w-3xl mx-auto mb-16">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mb-4">
+                  <Sparkles className="w-4 h-4" /> Active Industry Programs
+                </div>
+                <h2 className="text-3xl md:text-5xl font-heading text-[#262626] mb-4">Structured Apprenticeship Tracks</h2>
+                <p className="text-foreground/70 text-lg">In-depth programs with guided projects, critique, and direct mentorship.</p>
+              </div>
+
+              <div className={`grid gap-8 ${programs.length === 1 ? 'max-w-xl mx-auto' : programs.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+                {programs.map((prog) => (
+                  <div key={prog.id} className="bg-white rounded-3xl p-8 border border-black/10 flex flex-col justify-between hover:shadow-xl transition-all duration-300">
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="px-3 py-1 rounded-full bg-green-50 text-green-700 text-xs font-bold uppercase tracking-wider border border-green-100">
+                          Enrolling Now
+                        </span>
+                        {prog.duration && (
+                          <span className="text-xs font-medium text-foreground/60 flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" /> {prog.duration}
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="text-2xl font-heading text-[#262626] mb-3">{prog.name}</h3>
+                      <p className="text-foreground/70 text-sm leading-relaxed mb-6">{prog.description}</p>
+                    </div>
+
+                    <div className="pt-6 border-t border-black/5 mt-auto">
+                      <div className="flex items-baseline justify-between mb-6">
+                        <div>
+                          <span className="text-xs uppercase text-foreground/40 font-semibold block mb-0.5">Program Fee</span>
+                          <span className="text-3xl font-heading font-bold text-foreground">₹{prog.price?.toLocaleString('en-IN')}</span>
+                        </div>
+                        {prog.start_date && (
+                          <div className="text-right">
+                            <span className="text-xs text-orange-600 font-semibold block">Starts</span>
+                            <span className="text-xs font-bold text-foreground/80">{new Date(prog.start_date).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <Button
+                        onClick={() => {
+                          setSelectedProgram(prog.name);
+                          setIsRegOpen(true);
+                        }}
+                        className="w-full h-12 rounded-2xl text-base btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] transition-all"
+                      >
+                        Enroll Now
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* SECTION 9: WHO THIS IS FOR & WHY IT MATTERS */}
         <section className="py-24 md:py-32 bg-white animate-section">
@@ -688,6 +748,7 @@ export default function ApprenticeshipPage() {
 
       </main>
       
+      <RegistrationSheet open={isRegOpen} onOpenChange={setIsRegOpen} defaultProgram={selectedProgram} />
       <Footer />
     </div>
   );

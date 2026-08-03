@@ -61,7 +61,17 @@ export default function AdminPrograms() {
     if (!editing) return;
     setSaving(true);
     const { id, ...data } = editing;
-    const { error } = await supabase.from("programs").upsert({ id, ...data });
+
+    // Sanitize start_date so empty string "" is converted to null for TIMESTAMPTZ column
+    const formattedStartDate = data.start_date && data.start_date.trim() !== "" ? data.start_date : null;
+
+    const payload = {
+      id,
+      ...data,
+      start_date: formattedStartDate,
+    };
+
+    const { error } = await supabase.from("programs").upsert(payload);
 
     if (error) {
       console.error("Supabase Save Error:", error);
