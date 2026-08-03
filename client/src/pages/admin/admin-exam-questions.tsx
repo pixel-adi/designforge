@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { FileQuestion, Trash2, PlusCircle, Save, Loader2, Image as ImageIcon, X, CheckCircle2, Download, Upload, Filter, Settings, Sparkles, AlertCircle, AlertTriangle, Copy } from "lucide-react";
+import { FileQuestion, Trash2, PlusCircle, Save, Loader2, Image as ImageIcon, X, CheckCircle2, Download, Upload, Filter, Settings, Sparkles, AlertCircle, AlertTriangle, Copy, Brain, Eraser } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -154,6 +154,8 @@ export default function AdminExamQuestions() {
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [aiProcessingStatus, setAiProcessingStatus] = useState("");
   const [aiProcessingProgress, setAiProcessingProgress] = useState(0);
+  const [autoSolve, setAutoSolve] = useState(false);
+  const [cleanWatermarks, setCleanWatermarks] = useState(false);
 
   const [testingKey, setTestingKey] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
@@ -333,6 +335,42 @@ export default function AdminExamQuestions() {
     throw new Error("API call failed after maximum retries.");
   };
 
+  // Phase 3: Canvas Watermark Pre-Processor — removes light watermarks via luminance thresholding
+  const cleanWatermarksFromCanvas = (context: CanvasRenderingContext2D, width: number, height: number) => {
+    const imageData = context.getImageData(0, 0, width, height);
+    const d = imageData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      // Calculate perceived luminance (ITU-R BT.601)
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      
+      if (lum > 200) {
+        // Light gray/white watermark pixels → force pure white
+        d[i] = 255; d[i + 1] = 255; d[i + 2] = 255;
+      } else if (lum > 160 && lum <= 200) {
+        // Mid-gray area (likely faint watermark text) → lighten aggressively
+        const factor = (lum - 160) / 40; // 0 at lum=160, 1 at lum=200
+        d[i] = Math.round(r + (255 - r) * factor * 0.8);
+        d[i + 1] = Math.round(g + (255 - g) * factor * 0.8);
+        d[i + 2] = Math.round(b + (255 - b) * factor * 0.8);
+      } else if (lum < 80) {
+        // Dark pixels (real content: text, lines, diagrams) → sharpen/darken slightly
+        d[i] = Math.max(0, r - 20);
+        d[i + 1] = Math.max(0, g - 20);
+        d[i + 2] = Math.max(0, b - 20);
+      }
+      // Colored watermark detection: if a pixel has strong color saturation but is light, whiten it
+      const maxC = Math.max(r, g, b);
+      const minC = Math.min(r, g, b);
+      const saturation = maxC > 0 ? (maxC - minC) / maxC : 0;
+      if (lum > 150 && saturation > 0.15 && saturation < 0.6) {
+        // Light, moderately saturated pixel — likely a colored watermark
+        d[i] = 255; d[i + 1] = 255; d[i + 2] = 255;
+      }
+    }
+    context.putImageData(imageData, 0, 0);
+  };
+
   const renderPageToImageBase64 = async (pdfDoc: any, pageNum: number): Promise<string> => {
     const page = await pdfDoc.getPage(pageNum);
     const scale = 1.5; 
@@ -348,6 +386,12 @@ export default function AdminExamQuestions() {
     context.fillRect(0, 0, canvas.width, canvas.height);
     
     await page.render({ canvasContext: context, viewport }).promise;
+    
+    // Apply watermark cleaning if enabled
+    if (cleanWatermarks) {
+      cleanWatermarksFromCanvas(context, canvas.width, canvas.height);
+    }
+    
     return new Promise<string>((resolve, reject) => {
       canvas.toBlob((blob) => {
         if (!blob) {
@@ -366,8 +410,12 @@ export default function AdminExamQuestions() {
   };
 
   const processAIImporter = async () => {
-    if (!questionPdfFile || !answerKeyPdfFile) {
-      toast({ title: "Files required", description: "Please upload both the Question Paper and Answer Key PDFs.", variant: "destructive" });
+    if (!questionPdfFile) {
+      toast({ title: "Question Paper required", description: "Please upload the Question Paper PDF.", variant: "destructive" });
+      return;
+    }
+    if (!autoSolve && !answerKeyPdfFile) {
+      toast({ title: "Answer Key required", description: "Please upload the Answer Key PDF, or enable Auto-Solve mode.", variant: "destructive" });
       return;
     }
 
@@ -392,7 +440,7 @@ export default function AdminExamQuestions() {
       const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
       const pdfDoc = await loadingTask.promise;
 
-      const aPdfBase64 = await fileToBase64(answerKeyPdfFile);
+      const aPdfBase64 = answerKeyPdfFile ? await fileToBase64(answerKeyPdfFile) : null;
 
       const actualEndPage = Math.min(endPage, pdfDoc.numPages);
       const actualStartPage = Math.max(1, Math.min(startPage, actualEndPage));
@@ -429,17 +477,38 @@ export default function AdminExamQuestions() {
           });
         }
 
-        const currentPrompt = `You are an expert exam extraction AI. Your task is to extract all questions (Part A and Part B) and their corresponding correct answers from the provided Question Paper page images and the Answer Key PDF.
+        const answerKeyInstructions = autoSolve
+          ? `You do NOT have an Answer Key PDF for this paper. You are an expert examiner for NID, UCEED, CEED, and NIFT design entrance exams. You must SOLVE each question independently using your own reasoning.
+
+        For each question:
+        1. Read the text and analyze any diagrams/illustrations carefully.
+        2. For MCQ: Determine the single correct option through reasoning. Set is_correct: true for that option only.
+        3. For MSQ: Determine ALL correct options through reasoning. Set is_correct: true for each correct option.
+        4. For NAT: Perform calculation/reasoning and provide the exact numerical answer or range in options[0].content_text.
+        5. For SUBJECTIVE (Part B): Set options to empty array [].
+        6. Provide a clear step-by-step explanation of your reasoning in the "explanation" field.
+        7. Assign a "confidence_score": "HIGH" (unambiguous, clear answer), "MEDIUM" (probable but not 100% certain), or "LOW" (ambiguous/subjective, needs human review).
+        8. Set "is_ai_solved" to true for all questions.`
+          : `You have an Answer Key PDF provided separately. Use it to resolve the correct option(s) for each question.
+        * is_correct: true or false (resolve correctness strictly from the Answer Key PDF!)
+        * Set "is_ai_solved" to false for all questions.
+        * Set "confidence_score" to "HIGH" for all questions (since answers come from the official key).
+        * Set "explanation" to an empty string.`;
+
+        const currentPrompt = `You are an expert exam extraction AI. Your task is to extract all questions (Part A and Part B) from the provided Question Paper page images.
         
         CRITICAL PAGE RANGE RULE:
         We are providing you with page images representing Page ${batchStart} to Page ${batchEnd} of the Question Paper PDF.
         You must ONLY extract questions that are located on these pages. Do not extract questions from any other pages. If no questions are found on these pages, return an empty array.
         For any question extracted, make sure the "diagram_page" or options "diagram_page" is set to the correct original page number (between ${batchStart} and ${batchEnd}) where that diagram is located.
         
+        ANSWER RESOLUTION:
+        ${answerKeyInstructions}
+        
         CRITICAL SEGREGATION & FORMATTING RULES:
-        * MCQ: If a question has EXACTLY ONE correct option in the Answer Key, type MUST be "MCQ".
-        * MSQ: If a question has MORE THAN ONE correct option in the Answer Key, type MUST be "MSQ".
-        * NAT: If the question requires a numerical input (no options are shown in the paper), type MUST be "NAT". The options array MUST contain exactly one option, where content_text is the correct numerical answer (value or range, e.g., "14.5" or "14-15") resolved from the Answer Key PDF, and is_correct MUST be true.
+        * MCQ: If a question has EXACTLY ONE correct option, type MUST be "MCQ".
+        * MSQ: If a question has MORE THAN ONE correct option, type MUST be "MSQ".
+        * NAT: If the question requires a numerical input (no options are shown in the paper), type MUST be "NAT". The options array MUST contain exactly one option, where content_text is the correct numerical answer (value or range, e.g., "14.5" or "14-15"), and is_correct MUST be true.
         * SUBJECTIVE: If the question is a drawing, sketching, or design-based descriptive question (Part B), type MUST be "SUBJECTIVE". Options array MUST be empty [].
         
         For each question, extract:
@@ -461,12 +530,80 @@ export default function AdminExamQuestions() {
               * Output clean plain text.
               * DO NOT include any HTML tags.
               * Strip option prefix labels (e.g. strip "A.", "B.", "a)", "b)", "(a)", "(b)", etc. from the beginning so only the option content remains).
-            - is_correct: true or false (resolve correctness strictly from the Answer Key PDF!)
+            - is_correct: true or false
             - has_diagram: true if the option itself is an image/diagram. Otherwise false.
             - diagram_page: The page number (between ${batchStart} and ${batchEnd}) where the option diagram is located. If has_diagram is false, this MUST be -1.
             - diagram_bbox: Bounding box coordinates [ymin, xmin, ymax, xmax] for the option image, normalized 0 to 1000. If has_diagram is false, this MUST be an empty array [].
+        11. is_ai_solved: boolean
+        12. confidence_score: "HIGH", "MEDIUM", or "LOW"
+        13. explanation: Step-by-step reasoning for the answer (or empty string if answer key was used)
             
         Ensure the output is valid JSON matching the specified schema. Output ONLY the JSON block. Do not include markdown code block quotes.`;
+
+        // Build content parts — conditionally include answer key
+        const contentParts: any[] = [
+          { text: currentPrompt },
+          ...pageImageParts,
+        ];
+        if (aPdfBase64) {
+          contentParts.push({ text: "Here is the Answer Key PDF:" });
+          contentParts.push({
+            inlineData: {
+              mimeType: "application/pdf",
+              data: aPdfBase64
+            }
+          });
+        }
+
+        // Extended response schema with auto-solve fields
+        const responseSchema = {
+          type: "OBJECT",
+          properties: {
+            questions: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  part: { type: "STRING", enum: ["A", "B"] },
+                  type: { type: "STRING", enum: ["MCQ", "MSQ", "NAT", "SUBJECTIVE"] },
+                  difficulty: { type: "STRING", enum: ["Low", "Medium", "High"] },
+                  content_text: { type: "STRING" },
+                  topics: { type: "ARRAY", items: { type: "STRING" } },
+                  pyq_tag: { type: "STRING" },
+                  has_diagram: { type: "BOOLEAN" },
+                  diagram_page: { type: "INTEGER" },
+                  diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } },
+                  is_ai_solved: { type: "BOOLEAN" },
+                  confidence_score: { type: "STRING", enum: ["HIGH", "MEDIUM", "LOW"] },
+                  explanation: { type: "STRING" },
+                  options: {
+                    type: "ARRAY",
+                    items: {
+                      type: "OBJECT",
+                      properties: {
+                        content_text: { type: "STRING" },
+                        is_correct: { type: "BOOLEAN" },
+                        has_diagram: { type: "BOOLEAN" },
+                        diagram_page: { type: "INTEGER" },
+                        diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
+                      },
+                      required: ["content_text", "is_correct", "has_diagram", "diagram_page", "diagram_bbox"]
+                    }
+                  }
+                },
+                required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "diagram_page", "diagram_bbox", "options", "is_ai_solved", "confidence_score", "explanation"]
+              }
+            }
+          },
+          required: ["questions"]
+        };
+
+        const safetySettings = [
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+        ];
 
         let success = false;
         let attempts = 0;
@@ -475,7 +612,7 @@ export default function AdminExamQuestions() {
 
         while (!success && attempts < maxAttempts) {
           attempts++;
-          setAiProcessingStatus(`Analyzing pages ${batchStart}-${batchEnd} (Attempt ${attempts} of ${maxAttempts})...`);
+          setAiProcessingStatus(`${autoSolve ? '🧠 AI Solving' : 'Analyzing'} pages ${batchStart}-${batchEnd} (Attempt ${attempts} of ${maxAttempts})...`);
           setAiProcessingProgress(batchProgressStart + Math.floor((batchProgressEnd - batchProgressStart) * 0.4));
 
           try {
@@ -485,69 +622,13 @@ export default function AdminExamQuestions() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  contents: [
-                    {
-                      parts: [
-                        { text: currentPrompt },
-                        ...pageImageParts,
-                        { text: "Here is the Answer Key PDF:" },
-                        {
-                          inlineData: {
-                            mimeType: "application/pdf",
-                            data: aPdfBase64
-                          }
-                        }
-                      ]
-                    }
-                  ],
+                  contents: [{ parts: contentParts }],
                   generationConfig: {
-                    temperature: 0.0,
+                    temperature: autoSolve ? 0.1 : 0.0,
                     responseMimeType: "application/json",
-                    responseSchema: {
-                      type: "OBJECT",
-                      properties: {
-                        questions: {
-                          type: "ARRAY",
-                          items: {
-                            type: "OBJECT",
-                            properties: {
-                              part: { type: "STRING", enum: ["A", "B"] },
-                              type: { type: "STRING", enum: ["MCQ", "MSQ", "NAT", "SUBJECTIVE"] },
-                              difficulty: { type: "STRING", enum: ["Low", "Medium", "High"] },
-                              content_text: { type: "STRING" },
-                              topics: { type: "ARRAY", items: { type: "STRING" } },
-                              pyq_tag: { type: "STRING" },
-                              has_diagram: { type: "BOOLEAN" },
-                              diagram_page: { type: "INTEGER" },
-                              diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } },
-                              options: {
-                                type: "ARRAY",
-                                items: {
-                                  type: "OBJECT",
-                                  properties: {
-                                    content_text: { type: "STRING" },
-                                    is_correct: { type: "BOOLEAN" },
-                                    has_diagram: { type: "BOOLEAN" },
-                                    diagram_page: { type: "INTEGER" },
-                                    diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
-                                  },
-                                  required: ["content_text", "is_correct", "has_diagram", "diagram_page", "diagram_bbox"]
-                                }
-                              }
-                            },
-                            required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "diagram_page", "diagram_bbox", "options"]
-                          }
-                        }
-                      },
-                      required: ["questions"]
-                    }
+                    responseSchema
                   },
-                  safetySettings: [
-                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-                  ]
+                  safetySettings
                 })
               });
             } catch (e) {
@@ -561,69 +642,13 @@ export default function AdminExamQuestions() {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    contents: [
-                      {
-                        parts: [
-                          { text: currentPrompt },
-                          ...pageImageParts,
-                          { text: "Here is the Answer Key PDF:" },
-                          {
-                            inlineData: {
-                              mimeType: "application/pdf",
-                              data: aPdfBase64
-                            }
-                          }
-                        ]
-                      }
-                    ],
+                    contents: [{ parts: contentParts }],
                     generationConfig: {
-                      temperature: 0.0,
+                      temperature: autoSolve ? 0.1 : 0.0,
                       responseMimeType: "application/json",
-                      responseSchema: {
-                        type: "OBJECT",
-                        properties: {
-                          questions: {
-                            type: "ARRAY",
-                            items: {
-                              type: "OBJECT",
-                              properties: {
-                                part: { type: "STRING", enum: ["A", "B"] },
-                                type: { type: "STRING", enum: ["MCQ", "MSQ", "NAT", "SUBJECTIVE"] },
-                                difficulty: { type: "STRING", enum: ["Low", "Medium", "High"] },
-                                content_text: { type: "STRING" },
-                                topics: { type: "ARRAY", items: { type: "STRING" } },
-                                pyq_tag: { type: "STRING" },
-                                has_diagram: { type: "BOOLEAN" },
-                                diagram_page: { type: "INTEGER" },
-                                diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } },
-                                options: {
-                                  type: "ARRAY",
-                                  items: {
-                                    type: "OBJECT",
-                                    properties: {
-                                      content_text: { type: "STRING" },
-                                      is_correct: { type: "BOOLEAN" },
-                                      has_diagram: { type: "BOOLEAN" },
-                                      diagram_page: { type: "INTEGER" },
-                                      diagram_bbox: { type: "ARRAY", items: { type: "NUMBER" } }
-                                    },
-                                    required: ["content_text", "is_correct", "has_diagram", "diagram_page", "diagram_bbox"]
-                                  }
-                                }
-                              },
-                              required: ["part", "type", "difficulty", "content_text", "topics", "has_diagram", "diagram_page", "diagram_bbox", "options"]
-                            }
-                          }
-                        },
-                        required: ["questions"]
-                      }
+                      responseSchema
                     },
-                    safetySettings: [
-                      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-                    ]
+                    safetySettings
                   })
                 });
               } catch (fallbackErr) {
@@ -2925,10 +2950,20 @@ export default function AdminExamQuestions() {
                 </div>
                 <div className="flex-1">
                   <div className="flex justify-between items-start mb-2">
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-1 rounded">Part {bq.part}</span>
                       <span className="text-xs font-bold bg-black/5 text-foreground/70 px-2 py-1 rounded">{bq.type}</span>
                       <span className="text-xs font-bold bg-black/5 text-foreground/70 px-2 py-1 rounded capitalize">{bq.difficulty}</span>
+                      {bq.is_ai_solved && (
+                        <span className={`text-xs font-bold px-2 py-1 rounded flex items-center gap-1 ${
+                          bq.confidence_score === 'HIGH' ? 'bg-violet-100 text-violet-800 border border-violet-200' :
+                          bq.confidence_score === 'MEDIUM' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                          'bg-red-100 text-red-700 border border-red-200'
+                        }`}>
+                          <Brain className="w-3 h-3" />
+                          🤖 AI-Solved · {bq.confidence_score}
+                        </span>
+                      )}
                     </div>
                     <div className="flex gap-2 items-center">
                       <Button 
@@ -2959,6 +2994,45 @@ export default function AdminExamQuestions() {
                       className="text-sm font-medium w-full min-h-[60px] bg-background border border-black/10 rounded-xl p-2.5 focus:ring-1 focus:ring-primary focus:border-primary"
                     />
                   </div>
+
+                  {/* AI Explanation & Confidence Warning */}
+                  {bq.is_ai_solved && (
+                    <div className="mt-2 space-y-2">
+                      {/* Confidence warning banner for LOW/MEDIUM */}
+                      {(bq.confidence_score === 'LOW' || bq.confidence_score === 'MEDIUM') && (
+                        <div className={`text-xs rounded-lg p-2.5 flex items-start gap-2 ${
+                          bq.confidence_score === 'LOW' 
+                            ? 'border border-red-200 bg-red-50 text-red-800' 
+                            : 'border border-amber-200 bg-amber-50 text-amber-800'
+                        }`}>
+                          <AlertTriangle className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${bq.confidence_score === 'LOW' ? 'text-red-600' : 'text-amber-600'}`} />
+                          <div>
+                            <span className="font-bold">
+                              {bq.confidence_score === 'LOW' ? '⚠️ Low Confidence — Human Review Needed' : '⚡ Medium Confidence — Verify Answer'}
+                            </span>
+                            <p className="mt-0.5 text-[10px] leading-relaxed opacity-80">
+                              {bq.confidence_score === 'LOW' 
+                                ? 'Gemini is uncertain about this answer. Please verify the correct option manually before approving.'
+                                : 'Gemini is fairly confident but not 100% sure. Consider double-checking the selected answer.'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Collapsible explanation */}
+                      {bq.explanation && (
+                        <details className="text-xs border border-violet-200 bg-violet-50/50 rounded-lg overflow-hidden group">
+                          <summary className="cursor-pointer p-2 font-bold text-violet-800 hover:bg-violet-50 transition-colors flex items-center gap-1.5 select-none">
+                            <Brain className="w-3 h-3 text-violet-600" />
+                            AI Reasoning Explanation
+                          </summary>
+                          <div className="p-3 pt-0 text-[11px] text-violet-900/80 leading-relaxed whitespace-pre-wrap border-t border-violet-200/60">
+                            {bq.explanation}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  )}
 
                   {/* Duplicate warning and conflict resolution selection */}
                   {bq.is_duplicate && (
@@ -3173,21 +3247,97 @@ export default function AdminExamQuestions() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Answer Key PDF</Label>
-                  <div className="border border-dashed border-black/10 rounded-xl p-4 text-center hover:bg-black/5 cursor-pointer relative transition-colors">
+                  <Label className={`${autoSolve ? 'text-foreground/30' : ''} transition-colors`}>Answer Key PDF {autoSolve ? '(Optional)' : ''}</Label>
+                  <div className={`border border-dashed rounded-xl p-4 text-center relative transition-all ${
+                    autoSolve 
+                      ? 'border-black/5 bg-black/[0.02] cursor-default opacity-50' 
+                      : 'border-black/10 hover:bg-black/5 cursor-pointer'
+                  }`}>
                     <input
                       type="file"
                       accept=".pdf"
                       onChange={(e) => setAnswerKeyPdfFile(e.target.files?.[0] || null)}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      className={`absolute inset-0 opacity-0 ${autoSolve ? 'pointer-events-none' : 'cursor-pointer'}`}
+                      disabled={autoSolve}
                     />
                     <Upload className="w-6 h-6 text-foreground/30 mx-auto mb-2" />
                     <span className="text-xs font-medium block truncate">
-                      {answerKeyPdfFile ? answerKeyPdfFile.name : "Select PDF"}
+                      {autoSolve ? 'Not needed' : (answerKeyPdfFile ? answerKeyPdfFile.name : "Select PDF")}
                     </span>
                   </div>
                 </div>
               </div>
+
+              {/* Auto-Solve Toggle */}
+              <div className="border border-black/5 rounded-xl p-3 space-y-3 bg-gradient-to-r from-violet-50/50 to-blue-50/50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !autoSolve;
+                    setAutoSolve(next);
+                    if (next) setAnswerKeyPdfFile(null);
+                  }}
+                  className="w-full flex items-center justify-between gap-3 group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                      autoSolve 
+                        ? 'bg-violet-600 text-white shadow-sm shadow-violet-200' 
+                        : 'bg-black/5 text-foreground/40'
+                    }`}>
+                      <Brain className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <span className="text-xs font-bold block">Auto-Solve with Gemini AI</span>
+                      <span className="text-[10px] text-foreground/50">Let Gemini solve questions when no Answer Key is available</span>
+                    </div>
+                  </div>
+                  <div className={`w-10 h-[22px] rounded-full p-0.5 transition-all ${
+                    autoSolve ? 'bg-violet-600' : 'bg-black/10'
+                  }`}>
+                    <div className={`w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-all ${
+                      autoSolve ? 'translate-x-[18px]' : 'translate-x-0'
+                    }`} />
+                  </div>
+                </button>
+
+                {autoSolve && (
+                  <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200/60">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" />
+                    <p className="text-[10px] text-amber-800 leading-relaxed">
+                      <b>Note:</b> Gemini will reason through each question and provide answers with confidence scores. Low-confidence answers will be flagged for your review before saving.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Watermark Cleaning Toggle */}
+              <button
+                type="button"
+                onClick={() => setCleanWatermarks(!cleanWatermarks)}
+                className="w-full flex items-center justify-between gap-3 border border-black/5 rounded-xl p-3 hover:bg-black/[0.02] transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                    cleanWatermarks 
+                      ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-200' 
+                      : 'bg-black/5 text-foreground/40'
+                  }`}>
+                    <Eraser className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <span className="text-xs font-bold block">Clean Watermarks</span>
+                    <span className="text-[10px] text-foreground/50">Remove light watermarks from page images before AI processing</span>
+                  </div>
+                </div>
+                <div className={`w-10 h-[22px] rounded-full p-0.5 transition-all ${
+                  cleanWatermarks ? 'bg-emerald-600' : 'bg-black/10'
+                }`}>
+                  <div className={`w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-all ${
+                    cleanWatermarks ? 'translate-x-[18px]' : 'translate-x-0'
+                  }`} />
+                </div>
+              </button>
 
               <div className="grid grid-cols-2 gap-4 border-t pt-4 border-black/5">
                 <div className="space-y-2">
@@ -3248,7 +3398,7 @@ export default function AdminExamQuestions() {
               <Button variant="outline" onClick={() => setAiImporterOpen(false)}>Cancel</Button>
               <Button 
                 onClick={processAIImporter} 
-                disabled={!questionPdfFile || !answerKeyPdfFile || !aiPyqTag}
+                disabled={!questionPdfFile || (!autoSolve && !answerKeyPdfFile) || !aiPyqTag}
                 className="bg-primary hover:bg-primary/90 gap-2"
               >
                 <Sparkles className="w-4 h-4" /> Start Extraction
