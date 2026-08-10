@@ -1,5 +1,6 @@
 -- =============================================
 -- Exam Portal Schema (Run in Supabase Dashboard)
+-- Safe to re-run multiple times (Idempotent)
 -- =============================================
 
 -- 1. Programs
@@ -10,11 +11,24 @@ CREATE TABLE IF NOT EXISTS exam_programs (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 2. Questions Repository
-CREATE TYPE question_type AS ENUM ('MCQ', 'MSQ', 'NAT', 'SUBJECTIVE');
-CREATE TYPE question_part AS ENUM ('A', 'B');
-CREATE TYPE difficulty_level AS ENUM ('Low', 'Medium', 'High');
+-- 2. Custom Types (Idempotent creation)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'question_type') THEN
+    CREATE TYPE question_type AS ENUM ('MCQ', 'MSQ', 'NAT', 'SUBJECTIVE');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'question_part') THEN
+    CREATE TYPE question_part AS ENUM ('A', 'B');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'difficulty_level') THEN
+    CREATE TYPE difficulty_level AS ENUM ('Low', 'Medium', 'High');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'response_status') THEN
+    CREATE TYPE response_status AS ENUM ('unseen', 'skipped', 'marked', 'review', 'answered');
+  END IF;
+END $$;
 
+-- 3. Questions Repository
 CREATE TABLE IF NOT EXISTS exam_questions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   type question_type NOT NULL,
@@ -27,7 +41,7 @@ CREATE TABLE IF NOT EXISTS exam_questions (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 3. Options for Questions (Part A)
+-- 4. Options for Questions (Part A)
 CREATE TABLE IF NOT EXISTS exam_options (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   question_id UUID NOT NULL REFERENCES exam_questions(id) ON DELETE CASCADE,
@@ -37,7 +51,7 @@ CREATE TABLE IF NOT EXISTS exam_options (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 4. Tests
+-- 5. Tests
 CREATE TABLE IF NOT EXISTS exam_tests (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   title TEXT NOT NULL,
@@ -46,7 +60,7 @@ CREATE TABLE IF NOT EXISTS exam_tests (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 5. Test Sections (Timing & Structure)
+-- 6. Test Sections (Timing & Structure)
 CREATE TABLE IF NOT EXISTS exam_test_sections (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   test_id UUID NOT NULL REFERENCES exam_tests(id) ON DELETE CASCADE,
@@ -55,14 +69,14 @@ CREATE TABLE IF NOT EXISTS exam_test_sections (
   UNIQUE(test_id, part)
 );
 
--- 6. Link Tests to Questions
+-- 7. Link Tests to Questions
 CREATE TABLE IF NOT EXISTS exam_test_questions (
   test_id UUID NOT NULL REFERENCES exam_tests(id) ON DELETE CASCADE,
   question_id UUID NOT NULL REFERENCES exam_questions(id) ON DELETE CASCADE,
   PRIMARY KEY (test_id, question_id)
 );
 
--- 7. Candidates (Extends Supabase Auth users implicitly, or stores metadata)
+-- 8. Candidates (Extends Supabase Auth users implicitly, or stores metadata)
 CREATE TABLE IF NOT EXISTS exam_candidates (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   auth_user_id UUID UNIQUE, -- Link to Supabase Auth table auth.users
@@ -86,13 +100,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_generate_candidate_id ON exam_candidates;
 CREATE TRIGGER trigger_generate_candidate_id
 BEFORE INSERT ON exam_candidates
 FOR EACH ROW
 WHEN (NEW.unique_id IS NULL)
 EXECUTE FUNCTION generate_candidate_id();
 
--- 8. Test Attempts (supports up to 3 attempts per candidate per test)
+-- 9. Test Attempts (supports up to 3 attempts per candidate per test)
 CREATE TABLE IF NOT EXISTS exam_attempts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   candidate_id UUID NOT NULL REFERENCES exam_candidates(id) ON DELETE CASCADE,
@@ -104,9 +119,7 @@ CREATE TABLE IF NOT EXISTS exam_attempts (
   UNIQUE(candidate_id, test_id, attempt_number)
 );
 
--- 9. Candidate Responses
-CREATE TYPE response_status AS ENUM ('unseen', 'skipped', 'marked', 'review', 'answered');
-
+-- 10. Candidate Responses
 CREATE TABLE IF NOT EXISTS exam_responses (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   attempt_id UUID NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
@@ -118,12 +131,7 @@ CREATE TABLE IF NOT EXISTS exam_responses (
   UNIQUE(attempt_id, question_id)
 );
 
--- Storage buckets instructions:
--- You will need to manually create 2 buckets in Supabase Storage UI:
--- 1. 'question-media' (Public)
--- 2. 'candidate-submissions' (Private, or secured via RLS)
-
--- Enable RLS (Simplified for now)
+-- Enable RLS
 ALTER TABLE exam_programs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exam_questions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exam_options ENABLE ROW LEVEL SECURITY;
@@ -134,8 +142,11 @@ ALTER TABLE exam_candidates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exam_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exam_responses ENABLE ROW LEVEL SECURITY;
 
--- Note: Proper RLS policies need to be defined based on admin roles vs candidate roles.
--- For now, letting authenticated read.
+-- Policies (Idempotent)
+DROP POLICY IF EXISTS "Public programs" ON exam_programs;
 CREATE POLICY "Public programs" ON exam_programs FOR SELECT TO public USING (true);
+
+DROP POLICY IF EXISTS "Authenticated tests" ON exam_tests;
 CREATE POLICY "Authenticated tests" ON exam_tests FOR SELECT TO authenticated USING (status = 'published');
+
 -- More complex RLS omitted for brevity to get the schema running.
