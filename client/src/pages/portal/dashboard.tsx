@@ -115,19 +115,41 @@ export default function PortalDashboard() {
 
   // ===== SINGLE-DEVICE SESSION ENFORCEMENT =====
   const registerSession = useCallback(async (candidateId: string) => {
-    const newSessionId = crypto.randomUUID();
-    sessionIdRef.current = newSessionId;
-    await supabase.from('exam_candidates').update({ active_session_id: newSessionId }).eq('id', candidateId);
-    return newSessionId;
+    try {
+      const newSessionId = crypto.randomUUID();
+      const { error } = await supabase
+        .from('exam_candidates')
+        .update({ active_session_id: newSessionId })
+        .eq('id', candidateId);
+
+      if (!error) {
+        sessionIdRef.current = newSessionId;
+      } else {
+        console.warn("Could not set active_session_id in DB:", error.message);
+      }
+      return newSessionId;
+    } catch (err) {
+      console.warn("Session registration failed:", err);
+    }
   }, []);
 
   const checkSession = useCallback(async (candidateId: string) => {
     if (!sessionIdRef.current) return;
-    const { data } = await supabase.from('exam_candidates').select('active_session_id').eq('id', candidateId).maybeSingle();
-    if (data && data.active_session_id !== sessionIdRef.current) {
-      // Another device logged in
-      setSessionKicked(true);
-      await supabase.auth.signOut();
+    try {
+      const { data, error } = await supabase
+        .from('exam_candidates')
+        .select('active_session_id')
+        .eq('id', candidateId)
+        .maybeSingle();
+
+      // Only kick if database has a valid, non-null active_session_id AND it does not match our local session
+      if (!error && data && data.active_session_id && data.active_session_id !== sessionIdRef.current) {
+        console.warn("Session conflict: Logged in on another device.");
+        setSessionKicked(true);
+        await supabase.auth.signOut();
+      }
+    } catch (err) {
+      console.warn("Session check error:", err);
     }
   }, []);
 
@@ -333,7 +355,7 @@ export default function PortalDashboard() {
         });
 
         // Register this device session
-        registerSession(candidateData.id);
+        await registerSession(candidateData.id);
 
         fetchDashboardData(candidateData.program_ids || [], candidateData.education_level || "bachelors", candidateData.id);
       }
