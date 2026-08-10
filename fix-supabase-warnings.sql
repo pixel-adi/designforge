@@ -77,17 +77,20 @@ DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'is_admin') THEN
     ALTER FUNCTION public.is_admin() SET search_path = public;
-    REVOKE EXECUTE ON FUNCTION public.is_admin() FROM PUBLIC, anon;
+    REVOKE EXECUTE ON FUNCTION public.is_admin() FROM PUBLIC, anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.is_admin() TO postgres, service_role;
   END IF;
 
   IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'is_sme_or_admin') THEN
     ALTER FUNCTION public.is_sme_or_admin() SET search_path = public;
-    REVOKE EXECUTE ON FUNCTION public.is_sme_or_admin() FROM PUBLIC, anon;
+    REVOKE EXECUTE ON FUNCTION public.is_sme_or_admin() FROM PUBLIC, anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.is_sme_or_admin() TO postgres, service_role;
   END IF;
 
   IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'prevent_access_self_modification') THEN
     ALTER FUNCTION public.prevent_access_self_modification() SET search_path = public;
     REVOKE EXECUTE ON FUNCTION public.prevent_access_self_modification() FROM PUBLIC, anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.prevent_access_self_modification() TO postgres, service_role;
   END IF;
 END $$;
 
