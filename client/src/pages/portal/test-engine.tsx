@@ -441,10 +441,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
   // ---------- TASK 4: Score Evaluation + Finalize Attempt ----------
   const finalizeAttempt = async (responsesToScore: Record<string, ResponseData> = responses, currentAttemptId: string | null = attemptId, isReviewOnly: boolean = false) => {
-    if (!currentAttemptId) return;
+    if (!currentAttemptId || !engineData?.questions) return;
     try {
       // Fetch correct answers for all Part A questions in this test
-      const partAQuestionIds = engineData!.questions
+      const partAQuestionIds = (engineData.questions || [])
         .filter(q => q.part === 'A')
         .map(q => q.id);
 
@@ -574,7 +574,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         setCorrectAnswersMap(correctMap);
       }
 
-      const partBAnswered = engineData!.questions
+      const partBAnswered = (engineData?.questions || [])
         .filter(q => q.part === 'B')
         .filter(q => responsesToScore[q.id]?.fileUrl || responsesToScore[q.id]?.answerText?.trim()).length;
 

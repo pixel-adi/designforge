@@ -313,7 +313,7 @@ export default function PortalDashboard() {
   };
 
   const fetchAttemptDetails = async (attemptId: string) => {
-    if (attemptDetailsMap[attemptId]) return;
+    if (!attemptId || attemptDetailsMap[attemptId]) return;
     
     setLoadingDetailsMap(prev => ({ ...prev, [attemptId]: true }));
     try {
@@ -333,13 +333,16 @@ export default function PortalDashboard() {
         `)
         .eq('attempt_id', attemptId);
 
-      if (respError) throw respError;
+      if (respError) {
+        console.warn("Could not fetch attempt responses:", respError.message);
+        return;
+      }
 
       const { data: attemptInfo } = await supabase
         .from('exam_attempts')
         .select('test_id')
         .eq('id', attemptId)
-        .single();
+        .maybeSingle();
         
       if (attemptInfo && responses) {
         const testId = attemptInfo.test_id;
@@ -384,7 +387,7 @@ export default function PortalDashboard() {
           commAverages[r.question_id].count += 1;
         });
 
-        const processedResponses = responses.map(r => {
+        const processedResponses = (responses || []).map(r => {
           const q = r.exam_questions;
           if (!q) return r;
           const correctOptsArr = correctMap[q.id] || [];
@@ -431,7 +434,7 @@ export default function PortalDashboard() {
             isCorrect = earnedMarks >= (maxMarks * 0.5);
           }
 
-          const commAvg = commAverages[q.id] 
+          const commAvg = (commAverages[q.id] && commAverages[q.id].count > 0)
             ? Math.round(commAverages[q.id].totalTime / commAverages[q.id].count) 
             : 45;
 
@@ -453,7 +456,7 @@ export default function PortalDashboard() {
         }));
       }
     } catch (err) {
-      console.error("Error fetching attempt telemetry:", err);
+      console.warn("fetchAttemptDetails error handled:", err);
     } finally {
       setLoadingDetailsMap(prev => ({ ...prev, [attemptId]: false }));
     }
