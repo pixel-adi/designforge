@@ -39,7 +39,7 @@ export default function AdminPartBEvaluations() {
         .select(`
           *,
           exam_candidates(name, unique_id, email, access_level),
-          exam_tests(title)
+          exam_tests(title, program_format, exam_programs(name))
         `, { count: 'exact' })
         .gt('part_b_answered', 0)
         .order('completed_at', { ascending: false })
@@ -406,7 +406,27 @@ export default function AdminPartBEvaluations() {
   
   const currentResponse = responses[currentQIndex];
   const currentQ = questions.find(q => q.id === currentResponse?.question_id);
-  const maxMarksPerQ = questions.length > 0 ? (100 / questions.length) : 0;
+  
+  // Determine max marks per question: UCEED = 50 marks/Q, CEED = 20 marks/Q
+  const testTitleLower = (evaluatingAttempt?.exam_tests?.title || '').toLowerCase();
+  const programNameLower = (evaluatingAttempt?.exam_tests?.exam_programs?.name || '').toLowerCase();
+  const programFormatLower = (evaluatingAttempt?.exam_tests?.program_format || '').toLowerCase();
+
+  const isUceed = testTitleLower.includes('uceed') || programNameLower.includes('uceed') || testTitleLower.includes('b.des') || testTitleLower.includes('bdes') || programFormatLower === 'bachelors';
+  const isCeed = testTitleLower.includes('ceed') || programNameLower.includes('ceed') || testTitleLower.includes('m.des') || testTitleLower.includes('mdes') || programFormatLower === 'masters';
+
+  let maxMarksPerQ = 50; // Default UCEED
+  if (isCeed && !testTitleLower.includes('uceed') && !programNameLower.includes('uceed')) {
+    maxMarksPerQ = 20;
+  } else if (isUceed) {
+    maxMarksPerQ = 50;
+  } else if (questions.length > 0) {
+    maxMarksPerQ = 100 / questions.length;
+  }
+
+  if (currentQ?.marks && typeof currentQ.marks === 'number' && currentQ.marks > 0) {
+    maxMarksPerQ = currentQ.marks;
+  }
   
   // Find current marks sum for the confirmation modal
   let currentSum = 0;
@@ -519,7 +539,7 @@ export default function AdminPartBEvaluations() {
                  <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider">Rubric Evaluation</label>
                  <div className="text-right">
                    <span className="text-lg font-black text-primary">{evalForm.marks_awarded || '0'}</span>
-                   <span className="text-xs font-bold text-foreground/40 ml-1">/ {maxMarksPerQ.toFixed(2)}</span>
+                   <span className="text-xs font-bold text-foreground/40 ml-1">/ {Number.isInteger(maxMarksPerQ) ? maxMarksPerQ : maxMarksPerQ.toFixed(2)}</span>
                  </div>
                </div>
                
@@ -556,7 +576,7 @@ export default function AdminPartBEvaluations() {
                          className="w-full h-9 border-2 border-primary/10 rounded-lg px-2 text-sm font-bold bg-primary/5 focus:outline-none focus:border-primary text-primary text-left [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                          placeholder="0"
                        />
-                       <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-foreground/30 pointer-events-none">/ {(maxMarksPerQ / 5).toFixed(1)}</div>
+                       <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-foreground/30 pointer-events-none">/ {(maxMarksPerQ / 5).toFixed(1).replace(/\.0$/, '')}</div>
                      </div>
                    </div>
                  ))}

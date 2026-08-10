@@ -10,7 +10,22 @@ import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ScatterChart, Scatter, ZAxis, Cell, Legend } from 'recharts';
+const CustomScatterTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-white border border-black/10 p-3 rounded-xl shadow-lg text-xs font-bold space-y-1 z-50">
+        <p className="text-[#262626] font-black">{data.qName} ({data.topic})</p>
+        <p className="text-foreground/70">Time Spent: <span className="text-primary font-extrabold">{Math.round(data.timeSpent)}s</span></p>
+        <p className="text-foreground/70">Difficulty: <span className="text-foreground font-extrabold">{data.difficultyLabel || (data.difficulty <= 1.5 ? 'Low' : data.difficulty <= 2.5 ? 'Med' : 'High')}</span></p>
+        <p className={`font-black pt-1 border-t border-black/5 ${data.isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+          {data.isCorrect ? '✓ Correct' : '✗ Incorrect'}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
 
 export default function PortalDashboard() {
   const [location, setLocation] = useLocation();
@@ -774,6 +789,7 @@ export default function PortalDashboard() {
       representation: 0
     };
     let count = 0;
+    let totalMaxPerCriteriaSum = 0;
 
     partB.forEach(r => {
       const rubrics = r.rubric_marks || {};
@@ -784,10 +800,15 @@ export default function PortalDashboard() {
         rubricSums.storytelling += parseFloat(rubrics.storytelling || 0);
         rubricSums.conceptualisation += parseFloat(rubrics.conceptualisation || 0);
         rubricSums.representation += parseFloat(rubrics.representation || 0);
+
+        const tag = (r.exam_attempts?.exam_tests?.title || r.exam_questions?.pyq_tag || '').toLowerCase();
+        const isUceed = tag.includes('uceed') || tag.includes('b.des') || tag.includes('bdes');
+        const maxPerCriteria = isUceed ? 10 : 4; // UCEED: 50/5 = 10, CEED: 20/5 = 4
+        totalMaxPerCriteriaSum += maxPerCriteria;
       }
     });
 
-    if (count === 0) {
+    if (count === 0 || totalMaxPerCriteriaSum === 0) {
       return [
         { criteria: 'Critical Thinking', value: 0 },
         { criteria: 'Ideation', value: 0 },
@@ -798,11 +819,11 @@ export default function PortalDashboard() {
     }
 
     return [
-      { criteria: 'Critical Thinking', value: Math.round((rubricSums.critical_thinking / (count * 4)) * 100) },
-      { criteria: 'Ideation', value: Math.round((rubricSums.ideation / (count * 4)) * 100) },
-      { criteria: 'Storytelling', value: Math.round((rubricSums.storytelling / (count * 4)) * 100) },
-      { criteria: 'Conceptualisation', value: Math.round((rubricSums.conceptualisation / (count * 4)) * 100) },
-      { criteria: 'Representation', value: Math.round((rubricSums.representation / (count * 4)) * 100) }
+      { criteria: 'Critical Thinking', value: Math.min(100, Math.round((rubricSums.critical_thinking / totalMaxPerCriteriaSum) * 100)) },
+      { criteria: 'Ideation', value: Math.min(100, Math.round((rubricSums.ideation / totalMaxPerCriteriaSum) * 100)) },
+      { criteria: 'Storytelling', value: Math.min(100, Math.round((rubricSums.storytelling / totalMaxPerCriteriaSum) * 100)) },
+      { criteria: 'Conceptualisation', value: Math.min(100, Math.round((rubricSums.conceptualisation / totalMaxPerCriteriaSum) * 100)) },
+      { criteria: 'Representation', value: Math.min(100, Math.round((rubricSums.representation / totalMaxPerCriteriaSum) * 100)) }
     ];
   };
 
@@ -1592,17 +1613,20 @@ export default function PortalDashboard() {
                         <div className="h-64">
                           <ResponsiveContainer width="100%" height="100%">
                             <RadarChart cx="50%" cy="50%" outerRadius="80%" data={[
-                              { subject: 'Visualisation', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 110) : 0, fullMark: 100 },
-                              { subject: 'Observation', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 90) : 0, fullMark: 100 },
-                              { subject: 'Aptitude', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 105) : 0, fullMark: 100 },
-                              { subject: 'GK', A: pastAttempts[0]?.score_part_a ? Math.min(100, (pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 85) : 0, fullMark: 100 },
+                              { subject: 'Visualisation', A: pastAttempts[0]?.score_part_a && pastAttempts[0]?.total_part_a ? Math.min(100, Number(((pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 110).toFixed(2))) : 0, fullMark: 100 },
+                              { subject: 'Observation', A: pastAttempts[0]?.score_part_a && pastAttempts[0]?.total_part_a ? Math.min(100, Number(((pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 90).toFixed(2))) : 0, fullMark: 100 },
+                              { subject: 'Aptitude', A: pastAttempts[0]?.score_part_a && pastAttempts[0]?.total_part_a ? Math.min(100, Number(((pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 105).toFixed(2))) : 0, fullMark: 100 },
+                              { subject: 'GK', A: pastAttempts[0]?.score_part_a && pastAttempts[0]?.total_part_a ? Math.min(100, Number(((pastAttempts[0].score_part_a / pastAttempts[0].total_part_a) * 85).toFixed(2))) : 0, fullMark: 100 },
                               { subject: 'Creativity', A: pastAttempts[0]?.part_b_answered ? Math.min(100, pastAttempts[0].part_b_answered * 25) : 0, fullMark: 100 },
                             ]}>
                               <PolarGrid stroke="#E5E7EB" />
                               <PolarAngleAxis dataKey="subject" tick={{ fill: '#6B7280', fontSize: 11 }} />
                               <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
                               <Radar name="Skills" dataKey="A" stroke="#FF6B6B" fill="#FF6B6B" fillOpacity={0.4} />
-                              <RechartsTooltip />
+                              <RechartsTooltip 
+                                contentStyle={{ borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', background: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 12 }}
+                                formatter={(value: any) => [typeof value === 'number' ? `${Number(value.toFixed(2))}%` : value, 'Skills']}
+                              />
                             </RadarChart>
                           </ResponsiveContainer>
                         </div>
@@ -1761,7 +1785,7 @@ export default function PortalDashboard() {
                                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                                     <XAxis type="number" dataKey="timeSpent" name="Time" unit="s" label={{ value: 'Time Spent (s)', position: 'insideBottom', offset: -10, fill: '#6B7280', fontSize: 10 }} />
                                     <YAxis type="number" dataKey="difficulty" name="Difficulty" domain={[0.5, 3.5]} ticks={[1, 2, 3]} tickFormatter={(val) => val === 1 ? 'Low' : val === 2 ? 'Med' : val === 3 ? 'High' : ''} label={{ value: 'Difficulty Level', angle: -90, position: 'insideLeft', fill: '#6B7280', fontSize: 10 }} />
-                                    <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ borderRadius: '12px', border: 'none', background: '#1A1A1A', color: '#fff', fontSize: 11 }} />
+                                    <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomScatterTooltip />} />
                                     <Scatter name="Telemetry Questions" data={scatterData}>
                                       {scatterData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.isCorrect ? '#10B981' : entry.status === 'unseen' ? '#9CA3AF' : '#EF4444'} />
@@ -1788,7 +1812,10 @@ export default function PortalDashboard() {
                                     <PolarAngleAxis dataKey="subject" tick={{ fill: '#6B7280', fontSize: 10 }} />
                                     <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
                                     <Radar name="Mastery" dataKey="A" stroke="#FF6B6B" fill="#FF6B6B" fillOpacity={0.4} />
-                                    <RechartsTooltip />
+                                    <RechartsTooltip 
+                                      contentStyle={{ borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', background: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 12 }}
+                                      formatter={(value: any) => [typeof value === 'number' ? `${Number(value.toFixed(2))}%` : value, 'Mastery']}
+                                    />
                                   </RadarChart>
                                 </ResponsiveContainer>
                               </div>
@@ -1997,106 +2024,86 @@ export default function PortalDashboard() {
                     <p className="text-sm text-foreground/50">Your results will appear here once you complete a test.</p>
                   </div>
                 ) : (
-                  <Accordion type="single" collapsible className="w-full space-y-4">
+                  <div className="space-y-3">
                     {pastAttempts.map((attempt, i) => {
                       const scoreA = attempt.score_part_a || 0;
                       const totalA = attempt.total_part_a || 0;
                       const partAPercent = totalA > 0 ? Math.round((scoreA / totalA) * 100) : 0;
                       const partBAns = attempt.part_b_answered || 0;
-                      const scoreColor = partAPercent >= 70 ? 'text-green-600' : partAPercent >= 40 ? 'text-orange-600' : 'text-red-600';
-                      const completedDate = attempt.completed_at ? new Date(attempt.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
-                      
+                      const completedDate = attempt.completed_at 
+                        ? new Date(attempt.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) 
+                        : '—';
+                      const attemptNumber = attempt.attempt_number || (pastAttempts.length - i);
+
                       return (
-                        <AccordionItem key={attempt.id} value={attempt.id} className="border border-black/5 rounded-xl px-6 py-2 shadow-sm bg-white data-[state=open]:bg-primary/5 transition-colors">
-                          <AccordionTrigger className="hover:no-underline py-4">
-                            <div className="flex items-center justify-between w-full pr-4 text-left">
-                              <div>
-                                <h4 className="font-bold text-lg text-[#262626]">{attempt.exam_tests?.title || 'Unknown Test'}</h4>
-                                <p className="text-xs text-foreground/50 font-medium mt-1">Completed: {completedDate}</p>
-                              </div>
-                              <div className="flex items-center gap-6">
-                                <div className="text-right hidden sm:block">
-                                  {totalA > 0 && (
-                                    <div className="text-xs font-semibold text-foreground/60 mb-0.5">
-                                      Part A: <span className={`font-bold ${scoreColor}`}>{scoreA}/{totalA}</span>
-                                    </div>
-                                  )}
-                                  {partBAns > 0 && (
-                                    <div className="text-xs font-semibold text-foreground/60 mb-0.5">
-                                      Part B: {attempt.part_b_evaluation_status === 'completed' ? (
-                                        <span className="font-bold text-green-600">{attempt.score_part_b}</span>
-                                      ) : (
-                                        <span className="font-bold text-orange-500">Pending</span>
-                                      )}
-                                    </div>
-                                  )}
-                                  {attempt.total_score !== null && (
-                                    <div className="text-sm font-bold text-primary mt-1 border-t border-black/5 pt-1">
-                                      Total: {attempt.total_score}
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="px-3 py-1 bg-black/5 rounded-full text-xs font-bold text-foreground/70">Attempt {pastAttempts.length - i}</div>
-                              </div>
+                        <div 
+                          key={attempt.id} 
+                          className="bg-white border border-black/5 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col md:flex-row md:items-center justify-between gap-4"
+                        >
+                          {/* Test Info */}
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center font-bold text-xs shrink-0">
+                              #{attemptNumber}
                             </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="pt-4 pb-6">
-                            <div className={`grid grid-cols-1 ${totalA > 0 ? 'sm:grid-cols-2' : ''} gap-4`}>
-                              {totalA > 0 && (
-                                <div className="p-4 rounded-xl bg-white border border-black/5">
-                                  <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
-                                    <span>Part A (Objective)</span>
-                                    <span className="text-primary">{scoreA} / {totalA}</span>
-                                  </h5>
-                                  <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden">
-                                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${partAPercent}%` }} />
-                                  </div>
-                                  <p className="text-xs text-foreground/50 mt-2">{partAPercent}% accuracy on objective questions.</p>
-                                </div>
-                              )}
-                              <div className="p-4 rounded-xl bg-white border border-black/5 flex flex-col justify-between">
-                                  <div>
-                                    <h5 className="font-bold text-sm text-[#262626] mb-2 flex justify-between">
-                                      <span>Part B (Subjective)</span>
-                                      {attempt.part_b_evaluation_status === 'completed' && attempt.score_part_b !== null ? (
-                                        <span className="text-green-600">{attempt.score_part_b} Marks</span>
-                                      ) : (
-                                        <span className="text-orange-600">{partBAns} submitted</span>
-                                      )}
-                                    </h5>
-                                    {attempt.part_b_evaluation_status === 'completed' ? (
-                                      <div className="h-2 w-full bg-green-100 rounded-full overflow-hidden mt-1">
-                                        <div className="h-full bg-green-500 rounded-full w-full" />
-                                      </div>
-                                    ) : (
-                                      <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden mt-1">
-                                        <div className="h-full bg-orange-500 rounded-full" style={{ width: partBAns > 0 ? '100%' : '0%' }} />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <p className="text-xs text-foreground/50 mt-2">
-                                    {attempt.part_b_evaluation_status === 'completed' 
-                                      ? "Evaluated. Click below to view feedback." 
-                                      : "Awaiting manual evaluation by faculty."}
-                                  </p>
-                                </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-base text-[#262626] truncate">{attempt.exam_tests?.title || 'Unknown Test'}</h4>
+                                <span className="bg-black/5 text-foreground/70 text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0">
+                                  Attempt {attemptNumber}
+                                </span>
                               </div>
-                              {attempt.total_score !== null && (
-                                <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20 flex justify-between items-center">
-                                  <span className="font-bold text-[#262626]">Total Final Score</span>
-                                  <span className="text-xl font-black text-primary">{attempt.total_score}</span>
-                                </div>
-                              )}
-                              <div className="mt-4 pt-4 border-t border-black/5 text-right">
-                               <Button variant="outline" onClick={() => setLocation(`/portal/test/${attempt.test_id}?review_attempt=${attempt.id}`)} className="font-bold border-primary text-primary hover:bg-primary/5">
-                                 Review Scorecard & Answers
-                               </Button>
+                              <p className="text-xs text-foreground/40 font-medium mt-0.5">Completed: {completedDate}</p>
                             </div>
-                          </AccordionContent>
-                        </AccordionItem>
+                          </div>
+
+                          {/* Scores & Status (First Level) */}
+                          <div className="flex flex-wrap items-center gap-2.5 sm:gap-4 text-xs shrink-0">
+                            {/* Part A */}
+                            {totalA > 0 && (
+                              <div className="bg-gray-50 border border-black/5 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                                <span className="text-foreground/50 font-bold text-[10px] uppercase tracking-wider">Part A</span>
+                                <span className="font-extrabold text-foreground">{scoreA}/{totalA}</span>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${partAPercent >= 70 ? 'bg-green-100 text-green-700' : partAPercent >= 40 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
+                                  {partAPercent}%
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Part B */}
+                            <div className="bg-gray-50 border border-black/5 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                              <span className="text-foreground/50 font-bold text-[10px] uppercase tracking-wider">Part B</span>
+                              {attempt.part_b_evaluation_status === 'completed' && attempt.score_part_b !== null ? (
+                                <span className="font-extrabold text-green-600">{attempt.score_part_b} Marks</span>
+                              ) : partBAns > 0 ? (
+                                <span className="font-bold text-orange-600 text-[11px] bg-orange-50 px-2 py-0.5 rounded">Pending Eval</span>
+                              ) : (
+                                <span className="font-medium text-foreground/40 text-[11px]">Unanswered</span>
+                              )}
+                            </div>
+
+                            {/* Total Score */}
+                            {attempt.total_score !== null && (
+                              <div className="bg-primary/10 border border-primary/20 px-3.5 py-1.5 rounded-lg flex items-center gap-2">
+                                <span className="text-primary font-bold text-[10px] uppercase tracking-wider">Total</span>
+                                <span className="font-black text-primary text-sm">{attempt.total_score}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Direct Action Button */}
+                          <div className="shrink-0 flex items-center">
+                            <Button 
+                              variant="outline" 
+                              onClick={() => setLocation(`/portal/test/${attempt.test_id}?review_attempt=${attempt.id}`)}
+                              className="w-full md:w-auto font-bold border-primary text-primary hover:bg-primary/5 h-9 text-xs gap-1.5 px-4 shadow-sm"
+                            >
+                              Review Scorecard & Answers <ChevronRight className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
                       );
                     })}
-                  </Accordion>
+                  </div>
                 )}
               </div>
             </div>
