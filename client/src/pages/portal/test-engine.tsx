@@ -465,19 +465,30 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           correctMap[opt.question_id].push(opt);
         });
 
-        const isUceed = engineData!.test.program_format === 'bachelors' || engineData!.test.title?.toUpperCase().includes('UCEED') || engineData!.test.title?.toUpperCase().includes('B.DES') || engineData!.test.exam_programs?.name?.toUpperCase().includes('UCEED');
-        const isCeed = engineData!.test.program_format === 'masters' || engineData!.test.title?.toUpperCase().includes('CEED') || engineData!.test.title?.toUpperCase().includes('M.DES') || engineData!.test.exam_programs?.name?.toUpperCase() === 'CEED';
+        const titleUpper = (engineData!.test.title || '').toUpperCase();
+        const programNameUpper = (engineData!.test.exam_programs?.name || '').toUpperCase();
+        const programFormatUpper = (engineData!.test.program_format || '').toUpperCase();
 
-        let natCorrect = 1, natWrong = 0;
-        let msCorrect = 1, msWrong = 0;
-        let mcqCorrect = 1, mcqWrong = 0;
+        // Check UCEED first
+        const isUceed = titleUpper.includes('UCEED') || 
+                        programNameUpper.includes('UCEED') || 
+                        titleUpper.includes('B.DES') || 
+                        titleUpper.includes('BDES') || 
+                        programFormatUpper === 'BACHELORS';
 
-        if (isUceed || isCeed) {
-          natCorrect = 4; natWrong = 0;
-          msCorrect = 4; msWrong = -1;
-          mcqCorrect = 3;
-          mcqWrong = isCeed ? -0.5 : -0.71;
-        }
+        // CEED check (only if not UCEED, to avoid UCEED matching "CEED")
+        const isCeed = !isUceed && (
+          titleUpper.includes('CEED') || 
+          programNameUpper.includes('CEED') || 
+          titleUpper.includes('M.DES') || 
+          titleUpper.includes('MDES') || 
+          programFormatUpper === 'MASTERS'
+        );
+
+        let natCorrect = 4, natWrong = 0;
+        let msCorrect = 4, msWrong = -1;
+        let mcqCorrect = 3;
+        let mcqWrong = isCeed ? -0.5 : -0.71;
 
         let breakdown: Record<string, number> = { NAT: 0, MSQ: 0, MCQ: 0, NAT_A: 0, MSQ_A: 0, MCQ_A: 0, NAT_T: 0, MSQ_T: 0, MCQ_T: 0 };
         let qScores: Record<string, number> = {};
@@ -964,6 +975,69 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                 <div className="flex items-center gap-3 text-sm font-semibold text-foreground/80"><div className="w-6 h-6 rounded flex items-center justify-center border border-black/20 bg-white">1</div> Not Visited</div>
               </div>
             </div>
+
+            {/* Structure & Marking Scheme Card */}
+            {(() => {
+              const titleUp = (engineData.test.title || '').toUpperCase();
+              const progUp = (engineData.test.exam_programs?.name || '').toUpperCase();
+              const isUceed = titleUp.includes('UCEED') || progUp.includes('UCEED') || titleUp.includes('B.DES') || titleUp.includes('BDES');
+              const isCeed = !isUceed && (titleUp.includes('CEED') || progUp.includes('CEED') || titleUp.includes('M.DES') || titleUp.includes('MDES'));
+              
+              return (
+                <div className="bg-[#F8F9FA] p-6 rounded-2xl border border-black/10 mb-8">
+                  <h3 className="font-bold text-sm text-[#262626] uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <ClipboardList className="w-4 h-4 text-primary" /> Official Exam Structure & Marking Scheme ({isUceed ? 'UCEED 2026' : isCeed ? 'CEED' : 'Standard Exam'})
+                  </h3>
+                  
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left border-collapse bg-white rounded-xl overflow-hidden border border-black/10 shadow-sm">
+                      <thead>
+                        <tr className="bg-primary/5 text-[#262626]">
+                          <th className="p-3 border-b border-black/10 font-bold">Section</th>
+                          <th className="p-3 border-b border-black/10 font-bold">Question Type</th>
+                          <th className="p-3 border-b border-black/10 font-bold text-center">Questions</th>
+                          <th className="p-3 border-b border-black/10 font-bold">Correct Answer</th>
+                          <th className="p-3 border-b border-black/10 font-bold">Wrong Answer</th>
+                          <th className="p-3 border-b border-black/10 font-bold text-center">Section Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-black/5 text-foreground/80 font-medium">
+                        <tr>
+                          <td className="p-3 font-bold text-[#262626]">Section 1</td>
+                          <td className="p-3">NAT (Numerical Answer Type)</td>
+                          <td className="p-3 text-center font-bold">{isUceed ? '14' : isCeed ? '8' : '-'}</td>
+                          <td className="p-3 font-bold text-green-700">+4</td>
+                          <td className="p-3 font-bold text-gray-500">0 <span className="text-[10px] font-normal text-foreground/50">(No negative)</span></td>
+                          <td className="p-3 text-center font-bold text-primary">{isUceed ? '56' : isCeed ? '32' : '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="p-3 font-bold text-[#262626]">Section 2</td>
+                          <td className="p-3">MSQ (Multiple Select Question)</td>
+                          <td className="p-3 text-center font-bold">{isUceed ? '15' : isCeed ? '10' : '-'}</td>
+                          <td className="p-3 font-bold text-green-700">+4 <span className="text-[10px] font-normal text-foreground/60">(Partial: +3, +2, +1)</span></td>
+                          <td className="p-3 font-bold text-red-600">-1</td>
+                          <td className="p-3 text-center font-bold text-primary">{isUceed ? '60' : isCeed ? '40' : '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="p-3 font-bold text-[#262626]">Section 3</td>
+                          <td className="p-3">MCQ (Multiple Choice Question)</td>
+                          <td className="p-3 text-center font-bold">{isUceed ? '28' : isCeed ? '26' : '-'}</td>
+                          <td className="p-3 font-bold text-green-700">+3</td>
+                          <td className="p-3 font-bold text-red-600">{isCeed ? '-0.5' : '-0.71'}</td>
+                          <td className="p-3 text-center font-bold text-primary">{isUceed ? '84' : isCeed ? '78' : '-'}</td>
+                        </tr>
+                        <tr className="bg-primary/5 font-bold text-[#262626]">
+                          <td className="p-3" colSpan={2}>Part-A Total</td>
+                          <td className="p-3 text-center text-primary">{isUceed ? '57' : isCeed ? '44' : '-'}</td>
+                          <td className="p-3" colSpan={2}></td>
+                          <td className="p-3 text-center text-primary text-sm font-black">{isUceed ? '200 Marks' : isCeed ? '150 Marks' : '-'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-start gap-4 mb-8">
               <ShieldAlert className="w-6 h-6 text-primary shrink-0 mt-1" />
