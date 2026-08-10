@@ -896,9 +896,9 @@ export default function PortalDashboard() {
           email: authUser.email,
           name: onboardingData.name,
           phone: onboardingData.phone || null,
-          program_ids: onboardingData.program_ids,
+          program_ids: onboardingData.program_ids || [],
           avatar_url: onboardingData.avatar_url || null,
-          education_level: onboardingData.education_level
+          education_level: onboardingData.education_level || "bachelors"
         }).select().single();
       }
 
@@ -907,7 +907,7 @@ export default function PortalDashboard() {
       setCandidate(result.data);
       setShowOnboarding(false);
       toast({ title: "Success!", description: "Your profile has been saved." });
-      fetchDashboardData(result.data.program_ids, result.data.education_level || onboardingData.education_level, result.data.id);
+      fetchDashboardData(result.data.program_ids || [], result.data.education_level || onboardingData.education_level, result.data.id);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
