@@ -92,15 +92,16 @@ FOR EACH ROW
 WHEN (NEW.unique_id IS NULL)
 EXECUTE FUNCTION generate_candidate_id();
 
--- 8. Test Attempts
+-- 8. Test Attempts (supports up to 3 attempts per candidate per test)
 CREATE TABLE IF NOT EXISTS exam_attempts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   candidate_id UUID NOT NULL REFERENCES exam_candidates(id) ON DELETE CASCADE,
   test_id UUID NOT NULL REFERENCES exam_tests(id) ON DELETE CASCADE,
+  attempt_number INT NOT NULL DEFAULT 1,
   start_time TIMESTAMPTZ DEFAULT now(),
   completed_at TIMESTAMPTZ,
   current_part question_part DEFAULT 'A',
-  UNIQUE(candidate_id, test_id)
+  UNIQUE(candidate_id, test_id, attempt_number)
 );
 
 -- 9. Candidate Responses

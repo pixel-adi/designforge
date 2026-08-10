@@ -325,7 +325,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     }
   };
 
-  // ---------- TASK 1: Create Attempt in DB ----------
+  // ---------- TASK 1: Create Attempt in DB (Multi-Attempt: max 3) ----------
+  const MAX_ATTEMPTS = 3;
+
   const createAttempt = async (): Promise<string | null> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -339,13 +341,44 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         .single();
       if (!candidate) throw new Error('Candidate profile not found');
 
-      // Upsert attempt (handles page refresh - same candidate+test = same row)
+      // Fetch all existing attempts for this candidate + test
+      const { data: existingAttempts } = await supabase
+        .from('exam_attempts')
+        .select('id, status, attempt_number')
+        .eq('candidate_id', candidate.id)
+        .eq('test_id', id)
+        .order('attempt_number', { ascending: true });
+
+      const attempts = existingAttempts || [];
+
+      // Resume an in-progress attempt if one exists (handles page refresh)
+      const inProgress = attempts.find(a => a.status === 'in_progress');
+      if (inProgress) {
+        return inProgress.id;
+      }
+
+      // Check if max attempts reached
+      const completedCount = attempts.filter(a => a.status === 'completed').length;
+      if (completedCount >= MAX_ATTEMPTS) {
+        toast({ title: "Maximum Attempts Reached", description: `You have already completed ${MAX_ATTEMPTS} attempts for this test.`, variant: "destructive", duration: 6000 });
+        setLocation('/portal/dashboard');
+        return null;
+      }
+
+      // Create a new attempt with incremented attempt_number
+      const nextAttemptNumber = attempts.length > 0
+        ? Math.max(...attempts.map(a => a.attempt_number || 1)) + 1
+        : 1;
+
       const { data: attempt, error } = await supabase
         .from('exam_attempts')
-        .upsert(
-          { candidate_id: candidate.id, test_id: id, start_time: new Date().toISOString(), status: 'in_progress' },
-          { onConflict: 'candidate_id,test_id', ignoreDuplicates: false }
-        )
+        .insert({
+          candidate_id: candidate.id,
+          test_id: id,
+          start_time: new Date().toISOString(),
+          status: 'in_progress',
+          attempt_number: nextAttemptNumber
+        })
         .select('id')
         .single();
       if (error) throw error;
@@ -845,6 +878,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           {groups[groupName].map(({ q, idx }) => {
             const status = responses[q.id]?.status || 'unseen';
             const isPartALocked = q.part === 'A' && engineData?.hasPartB && timeLeft <= engineData.partA_TimeThreshold && testStep !== 'review';
+            let bgClass = "bg-white border-black/20 text-foreground/70 hover:bg-black/5"; // unseen default
 
             if (isPartALocked) {
               bgClass = "bg-gray-100 border-gray-200 text-gray-400 opacity-60 cursor-not-allowed";

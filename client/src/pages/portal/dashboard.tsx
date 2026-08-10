@@ -27,7 +27,7 @@ export default function PortalDashboard() {
 
   // Dashboard Data
   const [activeTests, setActiveTests] = useState<any[]>([]);
-  const [candidateAttemptsMap, setCandidateAttemptsMap] = useState<Record<string, any>>({});
+  const [candidateAttemptsMap, setCandidateAttemptsMap] = useState<Record<string, any[]>>({});
   const [activeTab, setActiveTab] = useState('overview');
   const [pastAttempts, setPastAttempts] = useState<any[]>([]);
   const [loadingAttempts, setLoadingAttempts] = useState(false);
@@ -338,7 +338,7 @@ export default function PortalDashboard() {
           .select(`*, exam_test_sections(part, duration_minutes)`)
           .eq('status', 'published')
           .order('created_at', { ascending: false }),
-        supabase.from('exam_attempts').select('id, test_id, status').eq('candidate_id', candidateId),
+        supabase.from('exam_attempts').select('id, test_id, status, attempt_number').eq('candidate_id', candidateId).order('attempt_number', { ascending: true }),
         supabase.from('exam_programs').select('id, name')
       ]);
 
@@ -348,8 +348,12 @@ export default function PortalDashboard() {
       const attempts = attemptsRes.data;
       const allPrograms = programsRes.data;
 
-      const attemptMap: Record<string, any> = {};
-      (attempts || []).forEach(a => { attemptMap[a.test_id] = a; });
+      // Group attempts by test_id as arrays
+      const attemptMap: Record<string, any[]> = {};
+      (attempts || []).forEach(a => {
+        if (!attemptMap[a.test_id]) attemptMap[a.test_id] = [];
+        attemptMap[a.test_id].push(a);
+      });
       setCandidateAttemptsMap(attemptMap);
 
       const programsMap: Record<string, string> = {};
@@ -1399,8 +1403,11 @@ export default function PortalDashboard() {
                       </div>
                     ) : activeTests.map((test: any) => {
                       const isExpired = test.expires_at ? new Date(test.expires_at).getTime() < Date.now() : false;
-                      const attempt = candidateAttemptsMap[test.id];
-                      const hasCompletedAttempt = attempt?.status === 'completed';
+                      const testAttempts = candidateAttemptsMap[test.id] || [];
+                      const completedAttempts = testAttempts.filter((a: any) => a.status === 'completed');
+                      const hasCompletedAttempt = completedAttempts.length > 0;
+                      const canReattempt = completedAttempts.length < 3;
+                      const latestCompleted = completedAttempts[completedAttempts.length - 1];
                       
                       let expiryText = "";
                       if (test.expires_at) {
@@ -1420,6 +1427,11 @@ export default function PortalDashboard() {
                               <FileText className="w-5 h-5" />
                             </div>
                             <div className="flex gap-2">
+                              {hasCompletedAttempt && (
+                                <span className="bg-primary/10 text-primary text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full">
+                                  Attempts: {completedAttempts.length}/3
+                                </span>
+                              )}
                               {test.expires_at && (
                                 <span className={`${isExpired ? 'bg-gray-100 text-gray-600' : 'bg-orange-100 text-orange-700'} text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full`}>
                                   {expiryText}
@@ -1432,7 +1444,7 @@ export default function PortalDashboard() {
                           </div>
                           <h3 className="font-bold text-lg text-[#262626] mb-2">{test.title}</h3>
 
-                          <div className="flex items-center gap-4 text-xs font-medium text-foreground/50 mb-6">
+                          <div className="flex items-center gap-4 text-xs font-medium text-foreground/50 mb-4">
                             <div className="flex items-center gap-1.5">
                               <Clock className="w-3.5 h-3.5" />
                               {test.exam_test_sections?.reduce((acc: number, curr: any) => acc + curr.duration_minutes, 0)} Mins
@@ -1442,15 +1454,37 @@ export default function PortalDashboard() {
                               {test.exam_test_sections?.length} Sections
                             </div>
                           </div>
+
+                          {/* Review buttons for past attempts */}
+                          {completedAttempts.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-4">
+                              {completedAttempts.map((att: any) => (
+                                <button
+                                  key={att.id}
+                                  onClick={() => setLocation(`/portal/test/${test.id}?review_attempt=${att.id}`)}
+                                  className="text-[10px] font-bold bg-primary/5 text-primary border border-primary/20 px-2.5 py-1 rounded-lg hover:bg-primary/10 transition-colors"
+                                >
+                                  Review Attempt {att.attempt_number || completedAttempts.indexOf(att) + 1}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
-                        {hasCompletedAttempt ? (
+                        {hasCompletedAttempt && canReattempt && !isExpired ? (
                           <Button
-                            onClick={() => setLocation(`/portal/test/${test.id}?review_attempt=${attempt.id}`)}
-                            variant="outline"
-                            className="w-full border-primary text-primary hover:bg-primary/5 transition-all"
+                            onClick={() => setLocation(`/portal/test/${test.id}`)}
+                            className="w-full bg-primary hover:bg-primary/90 text-white gap-2 transition-all"
                           >
-                            Review Attempt <ChevronRight className="w-4 h-4 ml-1" />
+                            Reattempt (Attempt {completedAttempts.length + 1}) <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        ) : hasCompletedAttempt && !canReattempt ? (
+                          <Button
+                            disabled
+                            variant="outline"
+                            className="w-full border-black/10 text-foreground/40 cursor-not-allowed"
+                          >
+                            All 3 Attempts Used
                           </Button>
                         ) : isExpired ? (
                           <Button
