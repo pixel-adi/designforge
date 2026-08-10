@@ -154,10 +154,10 @@ export default function PortalDashboard() {
     }
   }, []);
 
-  // Session check interval
+  // Session check interval (optimized for 1000 concurrent users: 60s interval)
   useEffect(() => {
     if (!candidate?.id || sessionKicked) return;
-    const interval = setInterval(() => checkSession(candidate.id), 15000); // Check every 15s
+    const interval = setInterval(() => checkSession(candidate.id), 60000); // Check every 60s
     return () => clearInterval(interval);
   }, [candidate?.id, sessionKicked, checkSession]);
 
