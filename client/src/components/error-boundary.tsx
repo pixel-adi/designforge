@@ -38,11 +38,10 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-sm text-foreground/60 mb-4 leading-relaxed">
               We've encountered an unexpected error. Please try refreshing the page or returning home.
             </p>
-            {isDev && (
-              <pre className="text-left text-xs bg-red-50 text-red-700 rounded-lg p-3 mb-6 overflow-auto max-h-32 whitespace-pre-wrap break-all">
-                {message}
-              </pre>
-            )}
+            <div className="text-left text-xs bg-red-50 text-red-700 rounded-lg p-3 mb-6 overflow-auto max-h-48 whitespace-pre-wrap break-all font-mono">
+              <p className="font-bold mb-1">{message}</p>
+              {this.state.error?.stack && <p className="opacity-80 text-[10px] mt-1">{this.state.error.stack}</p>}
+            </div>
             <div className="flex flex-col gap-3 mt-4">
               <button 
                 onClick={() => window.location.reload()}

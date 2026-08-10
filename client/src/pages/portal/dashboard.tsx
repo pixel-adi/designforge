@@ -1308,7 +1308,7 @@ export default function PortalDashboard() {
               {activeTab === 'overview' ? 'Dashboard Overview' : activeTab === 'progress' ? 'Performance Analytics' : activeTab === 'leaderboard' ? 'Global Leaderboard' : activeTab === 'questions' ? 'Question Bank' : activeTab === 'materials' ? 'Study Materials' : activeTab === 'assignments' ? 'Class Assignments' : activeTab === 'notes' ? 'Class Notes' : 'Profile Settings'}
             </h1>
             <p className="text-foreground/60 mt-1">
-              {candidate?.program_ids?.length > 0 ? `Preparing for ${programs.filter(p => candidate.program_ids.includes(p.id)).map(p => p.name).join(' & ')}` : 'Welcome to the candidate portal'}
+              {Array.isArray(candidate?.program_ids) && candidate.program_ids.length > 0 ? `Preparing for ${programs.filter(p => candidate.program_ids.includes(p.id)).map(p => p.name).join(' & ')}` : 'Welcome to the candidate portal'}
             </p>
           </div>
 
