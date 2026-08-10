@@ -11,12 +11,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
 const CustomScatterTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
+  if (active && payload && payload.length && payload[0] && payload[0].payload) {
     const data = payload[0].payload;
     return (
       <div className="bg-white border border-black/10 p-3 rounded-xl shadow-lg text-xs font-bold space-y-1 z-50">
-        <p className="text-[#262626] font-black">{data.qName} ({data.topic})</p>
-        <p className="text-foreground/70">Time Spent: <span className="text-primary font-extrabold">{Math.round(data.timeSpent)}s</span></p>
+        <p className="text-[#262626] font-black">{data.qName || 'Question'} ({data.topic || 'General'})</p>
+        <p className="text-foreground/70">Time Spent: <span className="text-primary font-extrabold">{Math.round(data.timeSpent || 0)}s</span></p>
         <p className="text-foreground/70">Difficulty: <span className="text-foreground font-extrabold">{data.difficultyLabel || (data.difficulty <= 1.5 ? 'Low' : data.difficulty <= 2.5 ? 'Med' : 'High')}</span></p>
         <p className={`font-black pt-1 border-t border-black/5 ${data.isCorrect ? 'text-green-600' : 'text-red-600'}`}>
           {data.isCorrect ? '✓ Correct' : '✗ Incorrect'}
@@ -653,20 +653,24 @@ export default function PortalDashboard() {
   };
 
   const getScatterData = (responses: any[]) => {
-    const partA = responses.filter(r => r.exam_questions?.part === 'A');
+    const partA = (responses || []).filter(r => r.exam_questions?.part === 'A');
     return partA.map((r, i) => {
       let diffVal = 2;
       if (r.exam_questions?.difficulty === 'Low') diffVal = 1;
       if (r.exam_questions?.difficulty === 'High') diffVal = 3;
       
+      const jitter = Math.random() * 0.3 - 0.15;
+      const difficulty = isFinite(diffVal + jitter) ? diffVal + jitter : 2;
+      const timeSpent = Number(r.time_spent) || 0;
+
       return {
         qName: `Q${i + 1}`,
-        timeSpent: r.time_spent || 0,
-        difficulty: diffVal + (Math.random() * 0.3 - 0.15),
-        difficultyLabel: r.exam_questions?.difficulty,
-        isCorrect: r.isCorrect,
+        timeSpent: isFinite(timeSpent) ? timeSpent : 0,
+        difficulty,
+        difficultyLabel: r.exam_questions?.difficulty || 'Medium',
+        isCorrect: !!r.isCorrect,
         topic: r.exam_questions?.topics?.[0] || 'General',
-        status: r.status
+        status: r.status || 'unseen'
       };
     });
   };
@@ -674,10 +678,10 @@ export default function PortalDashboard() {
   const getQuadrantCounts = (responses: any[]) => {
     let sweetSpot = 0, overthinking = 0, rushed = 0, stuck = 0;
     
-    responses.filter(r => r.exam_questions?.part === 'A').forEach(r => {
-      const isCorrect = r.isCorrect;
-      const speed = r.time_spent || 0;
-      const avg = r.communityAvgTime || 45;
+    (responses || []).filter(r => r.exam_questions?.part === 'A').forEach(r => {
+      const isCorrect = !!r.isCorrect;
+      const speed = Number(r.time_spent) || 0;
+      const avg = Number(r.communityAvgTime) || 45;
       
       if (isCorrect) {
         if (speed <= avg) sweetSpot++;
@@ -692,7 +696,7 @@ export default function PortalDashboard() {
   };
 
   const getConceptMasteryData = (responses: any[]) => {
-    const partA = responses.filter(r => r.exam_questions?.part === 'A');
+    const partA = (responses || []).filter(r => r.exam_questions?.part === 'A');
     const topicMap: Record<string, { total: number, earned: number }> = {};
 
     partA.forEach(r => {
@@ -708,14 +712,17 @@ export default function PortalDashboard() {
         if (!topicMap[topicName]) {
           topicMap[topicName] = { total: 0, earned: 0 };
         }
-        topicMap[topicName].total += r.maxMarks * weight;
-        topicMap[topicName].earned += Math.max(0, r.earnedMarks) * weight;
+        const maxM = Number(r.maxMarks) || 1;
+        const earnedM = Number(r.earnedMarks) || 0;
+        topicMap[topicName].total += maxM * weight;
+        topicMap[topicName].earned += Math.max(0, earnedM) * weight;
       });
     });
 
     const data = Object.keys(topicMap).map(topic => {
       const info = topicMap[topic];
-      const percent = info.total > 0 ? Math.round((info.earned / info.total) * 100) : 0;
+      const rawPercent = info.total > 0 ? (info.earned / info.total) * 100 : 0;
+      const percent = isFinite(rawPercent) ? Math.min(100, Math.round(rawPercent * 100) / 100) : 0;
       return {
         subject: topic,
         A: percent,
@@ -737,14 +744,15 @@ export default function PortalDashboard() {
   };
 
   const getTimeWastage = (responses: any[]) => {
-    const partA = responses.filter(r => r.exam_questions?.part === 'A');
-    const totalTime = partA.reduce((sum, r) => sum + (r.time_spent || 0), 0);
-    const wastedTime = partA.filter(r => !r.isCorrect).reduce((sum, r) => sum + (r.time_spent || 0), 0);
+    const partA = (responses || []).filter(r => r.exam_questions?.part === 'A');
+    const totalTime = partA.reduce((sum, r) => sum + (Number(r.time_spent) || 0), 0);
+    const wastedTime = partA.filter(r => !r.isCorrect).reduce((sum, r) => sum + (Number(r.time_spent) || 0), 0);
     
-    const wastedPercent = totalTime > 0 ? Math.round((wastedTime / totalTime) * 100) : 0;
+    const rawWastedPercent = totalTime > 0 ? (wastedTime / totalTime) * 100 : 0;
+    const wastedPercent = isFinite(rawWastedPercent) ? Math.round(rawWastedPercent) : 0;
     return {
-      totalTime,
-      wastedTime,
+      totalTime: isFinite(totalTime) ? totalTime : 0,
+      wastedTime: isFinite(wastedTime) ? wastedTime : 0,
       wastedPercent
     };
   };
@@ -780,7 +788,7 @@ export default function PortalDashboard() {
   };
 
   const getPartBRubricAverages = (responses: any[]) => {
-    const partB = responses.filter(r => r.exam_questions?.part === 'B');
+    const partB = (responses || []).filter(r => r.exam_questions?.part === 'B');
     const rubricSums = {
       critical_thinking: 0,
       ideation: 0,
@@ -795,15 +803,15 @@ export default function PortalDashboard() {
       const rubrics = r.rubric_marks || {};
       if (Object.keys(rubrics).length > 0) {
         count++;
-        rubricSums.critical_thinking += parseFloat(rubrics.critical_thinking || 0);
-        rubricSums.ideation += parseFloat(rubrics.ideation || 0);
-        rubricSums.storytelling += parseFloat(rubrics.storytelling || 0);
-        rubricSums.conceptualisation += parseFloat(rubrics.conceptualisation || 0);
-        rubricSums.representation += parseFloat(rubrics.representation || 0);
+        rubricSums.critical_thinking += parseFloat(rubrics.critical_thinking || 0) || 0;
+        rubricSums.ideation += parseFloat(rubrics.ideation || 0) || 0;
+        rubricSums.storytelling += parseFloat(rubrics.storytelling || 0) || 0;
+        rubricSums.conceptualisation += parseFloat(rubrics.conceptualisation || 0) || 0;
+        rubricSums.representation += parseFloat(rubrics.representation || 0) || 0;
 
         const tag = (r.exam_attempts?.exam_tests?.title || r.exam_questions?.pyq_tag || '').toLowerCase();
         const isUceed = tag.includes('uceed') || tag.includes('b.des') || tag.includes('bdes');
-        const maxPerCriteria = isUceed ? 10 : 4; // UCEED: 50/5 = 10, CEED: 20/5 = 4
+        const maxPerCriteria = isUceed ? 10 : 4;
         totalMaxPerCriteriaSum += maxPerCriteria;
       }
     });
@@ -818,12 +826,17 @@ export default function PortalDashboard() {
       ];
     }
 
+    const calcVal = (sum: number) => {
+      const ratio = totalMaxPerCriteriaSum > 0 ? (sum / totalMaxPerCriteriaSum) * 100 : 0;
+      return isFinite(ratio) ? Math.min(100, Math.round(ratio * 100) / 100) : 0;
+    };
+
     return [
-      { criteria: 'Critical Thinking', value: Math.min(100, Math.round((rubricSums.critical_thinking / totalMaxPerCriteriaSum) * 100)) },
-      { criteria: 'Ideation', value: Math.min(100, Math.round((rubricSums.ideation / totalMaxPerCriteriaSum) * 100)) },
-      { criteria: 'Storytelling', value: Math.min(100, Math.round((rubricSums.storytelling / totalMaxPerCriteriaSum) * 100)) },
-      { criteria: 'Conceptualisation', value: Math.min(100, Math.round((rubricSums.conceptualisation / totalMaxPerCriteriaSum) * 100)) },
-      { criteria: 'Representation', value: Math.min(100, Math.round((rubricSums.representation / totalMaxPerCriteriaSum) * 100)) }
+      { criteria: 'Critical Thinking', value: calcVal(rubricSums.critical_thinking) },
+      { criteria: 'Ideation', value: calcVal(rubricSums.ideation) },
+      { criteria: 'Storytelling', value: calcVal(rubricSums.storytelling) },
+      { criteria: 'Conceptualisation', value: calcVal(rubricSums.conceptualisation) },
+      { criteria: 'Representation', value: calcVal(rubricSums.representation) }
     ];
   };
 
@@ -865,15 +878,16 @@ export default function PortalDashboard() {
     const secondHalfCorrect = secondHalf.filter(r => r.isCorrect).length;
     const secondHalfAccuracy = secondHalf.length > 0 ? Math.round((secondHalfCorrect / secondHalf.length) * 100) : 0;
 
-    const pacingDecay = firstHalfAvgPacing > 0 ? secondHalfAvgPacing / firstHalfAvgPacing : 1.0;
-    const accuracyDrop = firstHalfAccuracy - secondHalfAccuracy;
+    const rawPacingDecay = firstHalfAvgPacing > 0 ? secondHalfAvgPacing / firstHalfAvgPacing : 1.0;
+    const pacingDecay = isFinite(rawPacingDecay) ? rawPacingDecay : 1.0;
+    const accuracyDrop = isFinite(firstHalfAccuracy - secondHalfAccuracy) ? (firstHalfAccuracy - secondHalfAccuracy) : 0;
 
     let staminaScore = 100;
     if (accuracyDrop > 0) {
       staminaScore -= accuracyDrop * 1.5;
     }
     staminaScore -= Math.min(40, Math.abs(pacingDecay - 1.0) * 100);
-    staminaScore = Math.max(10, Math.min(100, Math.round(staminaScore)));
+    const finalStaminaScore = isFinite(staminaScore) ? Math.max(10, Math.min(100, Math.round(staminaScore))) : 100;
 
     let state = 'flow';
     let critique = "Superb consistency. You maintained balanced pacing and accuracy across the entire test session. You are ready for peak exam conditions!";
@@ -890,13 +904,13 @@ export default function PortalDashboard() {
     }
 
     return {
-      firstHalfPacing: firstHalfAvgPacing,
-      secondHalfPacing: secondHalfAvgPacing,
-      firstHalfAccuracy,
-      secondHalfAccuracy,
+      firstHalfPacing: isFinite(firstHalfAvgPacing) ? firstHalfAvgPacing : 0,
+      secondHalfPacing: isFinite(secondHalfAvgPacing) ? secondHalfAvgPacing : 0,
+      firstHalfAccuracy: isFinite(firstHalfAccuracy) ? firstHalfAccuracy : 0,
+      secondHalfAccuracy: isFinite(secondHalfAccuracy) ? secondHalfAccuracy : 0,
       pacingDecay,
       accuracyDrop,
-      staminaScore,
+      staminaScore: finalStaminaScore,
       state,
       critique
     };
