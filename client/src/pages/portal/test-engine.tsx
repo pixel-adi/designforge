@@ -1,10 +1,24 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert, WifiOff } from "lucide-react";
+import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert, WifiOff, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+
+export const parseFileUrls = (fileUrlString: string | undefined | null): string[] => {
+  if (!fileUrlString) return [];
+  try {
+    const trimmed = fileUrlString.trim();
+    if (trimmed.startsWith('[')) {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.map(s => String(s)).filter(Boolean);
+    }
+  } catch (e) {
+    // Fallback to single URL
+  }
+  return fileUrlString ? [fileUrlString] : [];
+};
 
 interface EngineState {
   test: any;
@@ -146,10 +160,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     }
   };
 
-  // Tab switching detection
+  // Tab switching detection (Only monitored during Part A)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden && testStep === 'test') {
+      const isPartBActive = engineData?.hasPartB && (timeLeft <= engineData.partA_TimeThreshold || testStep === 'part-b-instructions');
+      // If Part B is active or test step is part-b-instructions/submitted, do not flag tab switching for uploading sketches
+      if (document.hidden && testStep === 'test' && !isPartBActive) {
         setWarningsCount(prev => {
           const newCount = prev + 1;
           if (newCount >= MAX_WARNINGS) {
@@ -168,7 +184,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [testStep]);
+  }, [testStep, timeLeft, engineData]);
 
   // Active Question Time Tracker (Isolated from timeLeft countdown to minimize re-renders)
   useEffect(() => {
@@ -211,10 +227,11 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             return 0;
           }
 
-          // Part A to Part B Transition
+          // Part A to Part B Transition: Auto-lock & score Part A
           if (engineData?.hasPartB && prev === engineData.partA_TimeThreshold + 1) {
+            finalizeAttempt(responses, attemptId, false);
             setTestStep('part-b-instructions');
-            toast({ title: "Part A Time Up", description: "Part A is now locked. Please proceed to Part B.", duration: 6000 });
+            toast({ title: "Part A Time Up 🔒", description: "Part A has been auto-submitted and locked. Please proceed to Part B.", duration: 8000 });
           }
 
           return prev - 1;
@@ -222,7 +239,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       }, 1000);
     }
     return () => clearInterval(timerId);
-  }, [timerRunning, timeLeft, engineData]);
+  }, [timerRunning, timeLeft, engineData, responses, attemptId]);
 
   const fetchTestEngineData = async () => {
     setLoading(true);
@@ -751,42 +768,56 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     }
   };
 
-  // ---------- TASK 3: Real Supabase Storage Upload ----------
+  // ---------- TASK 3: Real Supabase Storage Upload (Multi-File Support) ----------
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, qId: string) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    const maxSizeMB = 5;
-    if (file.size > maxSizeMB * 1024 * 1024) {
-      toast({ title: "File too large", description: `Maximum file size is ${maxSizeMB}MB.`, variant: "destructive" });
-      return;
+    const maxSizeMB = 10;
+    const currentUrls = parseFileUrls(responses[qId]?.fileUrl);
+    const newUrls = [...currentUrls];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.size > maxSizeMB * 1024 * 1024) {
+        toast({ title: "File too large", description: `${file.name} exceeds ${maxSizeMB}MB limit.`, variant: "destructive" });
+        continue;
+      }
+
+      toast({ title: "Uploading...", description: `Uploading ${file.name}...` });
+
+      try {
+        const fileExt = file.name.split('.').pop();
+        const uniqueId = crypto.randomUUID().slice(0, 8);
+        const filePath = `submissions/${attemptId || 'draft'}/${qId}_${uniqueId}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('candidate-submissions')
+          .upload(filePath, file, { upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from('candidate-submissions')
+          .getPublicUrl(filePath);
+
+        newUrls.push(urlData.publicUrl);
+        toast({ title: "✅ Uploaded successfully", description: `${file.name} saved.` });
+      } catch (err: any) {
+        console.error('Upload failed:', err);
+        newUrls.push(file.name);
+        toast({ title: "Upload saved locally", description: `${file.name} attached.`, variant: "destructive" });
+      }
     }
 
-    toast({ title: "Uploading...", description: `Uploading ${file.name} to secure storage.` });
+    updateResponse(qId, { fileUrl: JSON.stringify(newUrls) });
+  };
 
-    try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `submissions/${attemptId || 'draft'}/${qId}.${fileExt}`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('candidate-submissions')
-        .upload(filePath, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('candidate-submissions')
-        .getPublicUrl(filePath);
-
-      const publicUrl = urlData.publicUrl;
-      updateResponse(qId, { fileUrl: publicUrl });
-      toast({ title: "✅ Uploaded successfully", description: `${file.name} has been saved to secure storage.` });
-    } catch (err: any) {
-      console.error('Upload failed:', err);
-      // Fallback: store filename locally so UI still responds
-      updateResponse(qId, { fileUrl: file.name });
-      toast({ title: "Upload saved locally", description: `${file.name} attached. Will sync when connection restores.`, variant: "destructive" });
-    }
+  const handleRemoveFile = (qId: string, indexToRemove: number) => {
+    const currentUrls = parseFileUrls(responses[qId]?.fileUrl);
+    const updatedUrls = currentUrls.filter((_, idx) => idx !== indexToRemove);
+    updateResponse(qId, { fileUrl: updatedUrls.length > 0 ? JSON.stringify(updatedUrls) : '' });
+    toast({ title: "File Removed", description: "Attachment removed successfully." });
   };
 
   const formatTime = (seconds: number) => {
@@ -813,8 +844,11 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         <div className="grid grid-cols-5 gap-1.5">
           {groups[groupName].map(({ q, idx }) => {
             const status = responses[q.id]?.status || 'unseen';
-            let bgClass = "bg-white border-black/20 text-foreground/70 hover:bg-black/5"; // unseen
-            if (testStep === 'review') {
+            const isPartALocked = q.part === 'A' && engineData?.hasPartB && timeLeft <= engineData.partA_TimeThreshold && testStep !== 'review';
+
+            if (isPartALocked) {
+              bgClass = "bg-gray-100 border-gray-200 text-gray-400 opacity-60 cursor-not-allowed";
+            } else if (testStep === 'review') {
               const score = questionScores[q.id];
               if (score !== undefined) {
                 if (score > 0) bgClass = "bg-green-100 border-green-300 text-green-700";
@@ -835,9 +869,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               <button
                 key={q.id}
                 onClick={() => handleNavigateQuestion(idx)}
+                title={isPartALocked ? "Part A is locked" : `Question ${idx + 1}`}
                 className={`relative h-8 rounded-lg border flex flex-col items-center justify-center text-xs font-bold transition-all ${bgClass} ${isActive ? 'ring-2 ring-primary ring-offset-1 scale-105 shadow-sm' : ''}`}
               >
-                {testStep === 'review' && q.part === 'A' && questionScores[q.id] !== undefined ? (
+                {isPartALocked ? (
+                  <Lock className="w-3 h-3 text-gray-400" />
+                ) : testStep === 'review' && q.part === 'A' && questionScores[q.id] !== undefined ? (
                   <span className={`text-[10px] leading-none ${questionScores[q.id] > 0 ? 'text-green-700 font-bold' : questionScores[q.id] < 0 ? 'text-red-700 font-bold' : 'text-gray-500 font-bold'}`}>
                     {questionScores[q.id] > 0 ? '+' : ''}{questionScores[q.id]}
                   </span>
@@ -1050,8 +1087,19 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           <h1 className="font-bold text-[#262626]">{engineData.test.title} {testStep === 'review' && <span className="text-primary ml-2 border border-primary/20 bg-primary/5 px-2 py-1 rounded text-sm">Review Mode</span>}</h1>
         </div>
         {testStep !== 'review' ? (
-          <div className="flex items-center gap-6">
-            {warningsCount > 0 && (
+          <div className="flex items-center gap-4 md:gap-6">
+            {engineData?.hasPartB && (
+              timeLeft <= engineData.partA_TimeThreshold ? (
+                <div className="hidden sm:flex items-center gap-1.5 text-green-700 bg-green-50 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
+                  <UploadCloud className="w-3.5 h-3.5" /> Part B: Tab switching enabled for upload
+                </div>
+              ) : (
+                <div className="hidden sm:flex items-center gap-1.5 text-amber-700 bg-amber-50 px-3 py-1 rounded-full text-xs font-bold border border-amber-200">
+                  <ShieldAlert className="w-3.5 h-3.5" /> Part A: Tab switching monitored
+                </div>
+              )
+            )}
+            {warningsCount > 0 && timeLeft > engineData.partA_TimeThreshold && (
               <div className="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-1 rounded-md text-xs font-bold border border-red-200 animate-pulse">
                 <AlertTriangle className="w-4 h-4" /> Warnings: {warningsCount}/{MAX_WARNINGS}
               </div>
@@ -1128,28 +1176,57 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                     )}
                   </div>
                 ) : currentQ.type === 'SUBJECTIVE' ? (
-                  <div className="w-full max-w-2xl">
-                    {currentResponse.fileUrl ? (
-                      <div 
-                        className="h-32 border-2 border-primary/40 rounded-xl bg-primary/5 flex flex-col items-center justify-center text-primary text-sm relative group overflow-hidden cursor-pointer"
-                        onClick={() => testStep === 'review' ? window.open(currentResponse.fileUrl, '_blank') : null}
-                      >
-                        <FileCheck2 className="w-8 h-8 mb-2" />
-                        <p className="font-bold">{currentResponse.fileUrl.split('/').pop() || 'Uploaded File'}</p>
-                        <p className="text-xs mt-1 opacity-70">Successfully attached</p>
-                        <label className="absolute inset-0 bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm cursor-pointer">
-                          <span className="font-bold bg-white px-4 py-2 rounded-lg shadow-sm border border-primary/20 text-[#262626]">
-                            {testStep === 'review' ? 'View Uploaded File ↗' : 'Replace File'}
-                          </span>
-                          {testStep !== 'review' && <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, currentQ.id)} />}
-                        </label>
+                  <div className="w-full max-w-3xl space-y-4">
+                    {/* Header banner showing Part B status */}
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-bold text-green-800">
+                        <UploadCloud className="w-4 h-4 text-green-600" />
+                        <span>Part B Answer Upload Zone (Tab switching is permitted for photo uploads)</span>
                       </div>
-                    ) : (
-                      <label className="h-32 border-2 border-dashed border-black/20 rounded-xl bg-background/50 hover:bg-black/5 flex flex-col items-center justify-center text-foreground/50 text-sm cursor-pointer transition-colors group">
-                        <UploadCloud className="w-8 h-8 mb-2 text-foreground/30 group-hover:text-primary transition-colors" />
-                        <p className="font-bold text-[#262626]">Click to upload sketch/media</p>
-                        <p className="text-xs mt-1 font-medium">Supports JPG, PNG, PDF (Max 10MB)</p>
-                        <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, currentQ.id)} />
+                      <span className="text-[10px] font-bold bg-green-200/60 text-green-900 px-2 py-0.5 rounded">
+                        Multi-page enabled
+                      </span>
+                    </div>
+
+                    {/* Uploaded files gallery */}
+                    {parseFileUrls(currentResponse.fileUrl).length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {parseFileUrls(currentResponse.fileUrl).map((url, imgIdx) => (
+                          <div key={imgIdx} className="border border-primary/30 rounded-xl bg-primary/5 p-3 relative group flex flex-col items-center justify-center min-h-[140px] overflow-hidden shadow-sm">
+                            <span className="absolute top-2 left-2 bg-primary/20 text-primary font-bold text-[10px] px-2 py-0.5 rounded">
+                              Page {imgIdx + 1}
+                            </span>
+                            {testStep !== 'review' && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFile(currentQ.id, imgIdx)}
+                                className="absolute top-2 right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shadow-md hover:bg-red-600 transition-colors z-10"
+                                title="Delete page"
+                              >
+                                ✕
+                              </button>
+                            )}
+                            {url.match(/\.(jpg|jpeg|png|gif|webp)$/i) || url.startsWith('http') ? (
+                              <img src={url} alt={`Submission ${imgIdx + 1}`} className="max-h-24 object-contain rounded my-2 cursor-pointer hover:scale-105 transition-transform" onClick={() => window.open(url, '_blank')} />
+                            ) : (
+                              <FileCheck2 className="w-10 h-10 text-primary my-2" />
+                            )}
+                            <p className="text-xs font-bold text-primary truncate max-w-full px-2">{url.split('/').pop() || `Page ${imgIdx + 1}`}</p>
+                            <a href={url} target="_blank" rel="noreferrer" className="text-[10px] text-primary underline mt-1 font-semibold">View Full Image ↗</a>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* File Upload Dropzone / Button */}
+                    {testStep !== 'review' && (
+                      <label className="border-2 border-dashed border-primary/30 rounded-xl bg-background/50 hover:bg-primary/5 flex flex-col items-center justify-center p-6 text-foreground/50 text-sm cursor-pointer transition-colors group">
+                        <UploadCloud className="w-8 h-8 mb-2 text-primary/60 group-hover:scale-110 transition-transform" />
+                        <p className="font-bold text-[#262626]">
+                          {parseFileUrls(currentResponse.fileUrl).length > 0 ? '+ Add Another Page / Drawing Photo' : 'Click or Drag to Upload Sketches'}
+                        </p>
+                        <p className="text-xs mt-1 font-medium text-foreground/60">Supports JPG, PNG, PDF (Multiple files allowed, Max 10MB per file)</p>
+                        <input type="file" accept="image/*,.pdf" multiple className="hidden" onChange={(e) => handleFileUpload(e, currentQ.id)} />
                       </label>
                     )}
 

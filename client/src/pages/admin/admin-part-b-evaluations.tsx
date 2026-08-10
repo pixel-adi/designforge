@@ -8,6 +8,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 
 const PAGE_SIZE = 100;
 
+const parseFileUrls = (fileUrlString: string | undefined | null): string[] => {
+  if (!fileUrlString) return [];
+  try {
+    const trimmed = fileUrlString.trim();
+    if (trimmed.startsWith('[')) {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.map(s => String(s)).filter(Boolean);
+    }
+  } catch (e) {
+    // Fallback to single URL
+  }
+  return fileUrlString ? [fileUrlString] : [];
+};
+
 export default function AdminPartBEvaluations() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -81,6 +95,7 @@ export default function AdminPartBEvaluations() {
   const [saving, setSaving] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const [selectedFileIndex, setSelectedFileIndex] = useState(0);
 
   // Note: fetchAttempts has been replaced by useQuery above
 
@@ -438,14 +453,47 @@ export default function AdminPartBEvaluations() {
             </div>
           )}
           
-          <h3 className="font-bold text-sm text-foreground/50 uppercase tracking-widest mb-4">Candidate Submission</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-sm text-foreground/50 uppercase tracking-widest">Candidate Submission</h3>
+            {parseFileUrls(currentResponse?.file_url).length > 1 && (
+              <div className="flex items-center gap-1.5 bg-black/5 p-1 rounded-lg">
+                {parseFileUrls(currentResponse?.file_url).map((_, pIdx) => (
+                  <button
+                    key={pIdx}
+                    onClick={() => setSelectedFileIndex(pIdx)}
+                    className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${selectedFileIndex === pIdx ? 'bg-primary text-white shadow-sm' : 'text-foreground/70 hover:bg-black/10'}`}
+                  >
+                    Page {pIdx + 1}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="bg-white p-4 rounded-xl border border-black/5 shadow-sm flex-1 flex flex-col items-center justify-center min-h-[400px] overflow-hidden group relative">
-             {currentResponse?.file_url ? (
+             {parseFileUrls(currentResponse?.file_url).length > 0 ? (
                <>
-                 <img src={currentResponse.file_url} className="max-h-[600px] w-auto object-contain rounded-lg border border-black/10 cursor-pointer" alt="Candidate Submission" onClick={() => setFullscreenImage(currentResponse.file_url)} />
-                 <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                   <Button onClick={() => setFullscreenImage(currentResponse.file_url)} variant="secondary" className="shadow-md bg-white text-black hover:bg-gray-100"><Maximize className="w-4 h-4 mr-2" /> Full Screen</Button>
-                 </div>
+                 {(() => {
+                   const fileUrls = parseFileUrls(currentResponse?.file_url);
+                   const activeUrl = fileUrls[selectedFileIndex] || fileUrls[0];
+                   const isImg = activeUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) || activeUrl.startsWith('http');
+                   return (
+                     <div className="flex flex-col items-center justify-center w-full h-full relative">
+                       {isImg ? (
+                         <img src={activeUrl} className="max-h-[600px] w-auto object-contain rounded-lg border border-black/10 cursor-pointer" alt={`Page ${selectedFileIndex + 1}`} onClick={() => setFullscreenImage(activeUrl)} />
+                       ) : (
+                         <div className="flex flex-col items-center justify-center p-8 bg-gray-50 rounded-xl border border-gray-200">
+                           <FileText className="w-16 h-16 text-primary mb-3" />
+                           <p className="font-bold text-sm mb-2">{activeUrl.split('/').pop()}</p>
+                           <a href={activeUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold text-xs">Open File ↗</a>
+                         </div>
+                       )}
+                       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <Button onClick={() => setFullscreenImage(activeUrl)} variant="secondary" className="shadow-md bg-white text-black hover:bg-gray-100"><Maximize className="w-4 h-4 mr-2" /> Full Screen</Button>
+                       </div>
+                     </div>
+                   );
+                 })()}
                </>
              ) : currentResponse?.answer_text ? (
                <div className="w-full h-full bg-background/50 rounded-lg p-6 border border-black/10 text-lg font-medium">
