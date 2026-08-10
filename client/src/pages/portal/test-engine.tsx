@@ -691,7 +691,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     const q = engineData!.questions[idx];
     const isPartBActive = engineData!.hasPartB && timeLeft <= engineData!.partA_TimeThreshold;
 
-    if (!skipChecks) {
+    if (!skipChecks && testStep !== 'review' && testStep !== 'submitted') {
       // Part Locking Logic: Cannot access Part B if Part A time is still running
       if (q.part === 'B' && !isPartBActive) {
         const minsLeftForA = Math.ceil((timeLeft - engineData!.partA_TimeThreshold) / 60);
@@ -768,7 +768,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     const isPartBActive = engineData!.hasPartB && timeLeft <= engineData!.partA_TimeThreshold;
 
     // Safety check, should be blocked by navigation anyway
-    if (q.part === 'A' && isPartBActive) {
+    if (q.part === 'A' && isPartBActive && testStep !== 'review') {
       toast({ title: "Section Locked", description: "Time for Part A has ended. You cannot modify answers.", variant: "destructive" });
       return;
     }
