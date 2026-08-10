@@ -160,138 +160,7 @@ export default function PortalDashboard() {
     return () => clearInterval(interval);
   }, [candidate?.id, sessionKicked, checkSession]);
 
-  // ===== ANTI-SCREENSHOT: Blur on focus loss =====
-  useEffect(() => {
-    const handleBlur = () => setContentBlurred(true);
-    const handleFocus = () => setContentBlurred(false);
-    const handleVisChange = () => setContentBlurred(document.hidden);
-    window.addEventListener('blur', handleBlur);
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisChange);
-    return () => {
-      window.removeEventListener('blur', handleBlur);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisChange);
-    };
-  }, []);
 
-  // ===== ANTI-COPY + ANTI-DEVTOOLS + ANTI-TAMPERING =====
-  useEffect(() => {
-    // --- 1. Disable right-click, copy, drag, selection ---
-    const handleContextMenu = (e: MouseEvent) => { e.preventDefault(); };
-    const handleCopy = (e: ClipboardEvent) => { e.preventDefault(); };
-    const handleDragStart = (e: DragEvent) => { e.preventDefault(); };
-
-    // --- 2. Block ALL DevTools & copy shortcuts ---
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
-      // Block Ctrl/Cmd + C, A, P, U, S
-      if ((e.ctrlKey || e.metaKey) && ['c', 'a', 'p', 'u', 's'].includes(key)) {
-        e.preventDefault();
-      }
-      // Block Ctrl/Cmd + Shift + I (Inspector), J (Console), C (Element picker)
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && ['i', 'j', 'c'].includes(key)) {
-        e.preventDefault();
-      }
-      // Block F12
-      if (e.key === 'F12' || e.key === 'PrintScreen') {
-        e.preventDefault();
-      }
-    };
-
-    document.addEventListener('contextmenu', handleContextMenu);
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('copy', handleCopy);
-    document.addEventListener('dragstart', handleDragStart);
-
-    // --- 3. DevTools detection via window size (sidebar/bottom DevTools changes dimensions) ---
-    let devToolsOpen = false;
-    const devToolsCheck = setInterval(() => {
-      const widthThreshold = window.outerWidth - window.innerWidth > 160;
-      const heightThreshold = window.outerHeight - window.innerHeight > 160;
-      const isOpen = widthThreshold || heightThreshold;
-      if (isOpen !== devToolsOpen) {
-        devToolsOpen = isOpen;
-        setContentBlurred(isOpen);
-      }
-    }, 1000);
-
-    // --- 4. Console lockdown (prevents useful output in DevTools console) ---
-    const noop = () => {};
-    const originalConsole = {
-      log: console.log,
-      warn: console.warn,
-      error: console.error,
-      info: console.info,
-      debug: console.debug,
-    };
-    console.log = noop;
-    console.warn = noop;
-    console.info = noop;
-    console.debug = noop;
-    // Keep console.error for critical debugging (but override to filter)
-    console.error = (...args: any[]) => {
-      // Only allow React/system errors through, not data leaks
-      if (args[0]?.toString?.().includes?.('React') || args[0]?.toString?.().includes?.('Uncaught')) {
-        originalConsole.error(...args);
-      }
-    };
-
-    // --- 5. Anti-debugging: debugger trap loop ---
-    // When DevTools is open, this pauses execution; when closed, it's instant
-    const debuggerTrap = setInterval(() => {
-      const start = performance.now();
-      // eslint-disable-next-line no-debugger
-      debugger;
-      const end = performance.now();
-      // If debugger took > 100ms, DevTools is likely open
-      if (end - start > 100) {
-        setContentBlurred(true);
-      }
-    }, 5000);
-
-    return () => {
-      document.removeEventListener('contextmenu', handleContextMenu);
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('copy', handleCopy);
-      document.removeEventListener('dragstart', handleDragStart);
-      clearInterval(devToolsCheck);
-      clearInterval(debuggerTrap);
-      // Restore console
-      console.log = originalConsole.log;
-      console.warn = originalConsole.warn;
-      console.error = originalConsole.error;
-      console.info = originalConsole.info;
-      console.debug = originalConsole.debug;
-    };
-  }, []);
-
-  // --- 6. DOM Integrity Monitor: revert CSS/class tampering on locked elements ---
-  useEffect(() => {
-    const portalRoot = document.getElementById('portal-root');
-    if (!portalRoot) return;
-
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === 'attributes') {
-          const el = mutation.target as HTMLElement;
-          // If someone removes blur, opacity, pointer-events on locked content
-          if (el.dataset.locked === 'true') {
-            el.style.filter = 'blur(8px)';
-            el.style.pointerEvents = 'none';
-          }
-        }
-      }
-    });
-
-    observer.observe(portalRoot, {
-      attributes: true,
-      attributeFilter: ['style', 'class'],
-      subtree: true,
-    });
-
-    return () => observer.disconnect();
-  }, [candidate]);
 
   // --- 7. Periodic server-side access re-validation ---
   useEffect(() => {
@@ -482,11 +351,15 @@ export default function PortalDashboard() {
         
         const questionIds = (testQuestions || []).map(tq => tq.question_id);
         
-        const { data: correctOpts } = await supabase
-          .from('exam_options')
-          .select('id, question_id, is_correct, content_text')
-          .in('question_id', questionIds)
-          .eq('is_correct', true);
+        let correctOpts: any[] = [];
+        if (questionIds.length > 0) {
+          const { data: optsData } = await supabase
+            .from('exam_options')
+            .select('id, question_id, is_correct, content_text')
+            .in('question_id', questionIds)
+            .eq('is_correct', true);
+          correctOpts = optsData || [];
+        }
 
         const correctMap: Record<string, any[]> = {};
         (correctOpts || []).forEach(opt => {
@@ -494,10 +367,14 @@ export default function PortalDashboard() {
           correctMap[opt.question_id].push(opt);
         });
 
-        const { data: commData } = await supabase
-          .from('exam_responses')
-          .select('question_id, time_spent')
-          .in('question_id', questionIds);
+        let commData: any[] = [];
+        if (questionIds.length > 0) {
+          const { data: commRes } = await supabase
+            .from('exam_responses')
+            .select('question_id, time_spent')
+            .in('question_id', questionIds);
+          commData = commRes || [];
+        }
 
         const commAverages: Record<string, { totalTime: number, count: number }> = {};
         (commData || []).forEach(r => {
