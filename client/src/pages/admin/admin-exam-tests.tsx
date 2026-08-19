@@ -3,29 +3,33 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ClipboardList, PlusCircle, CheckCircle2, Search, ArrowLeft, Loader2, FileText, Clock, Trash2, Filter, Settings, Wand2, RefreshCw, FileDown } from "lucide-react";
+import { ClipboardList, PlusCircle, CheckCircle2, Search, ArrowLeft, Loader2, FileText, Clock, Trash2, Filter, Settings, Wand2, RefreshCw, FileDown, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const TEMPLATES = [
+  // Full Length Mocks
   {
     id: "NID Bdes",
-    name: "NID B.Des",
-    description: "Duration: 180 Min",
+    name: "NID B.Des Full Mock",
+    category: "full_length",
+    description: "Duration: 180 Min (Full Length)",
     programFormat: "bachelors",
     sections: [{ part: "B", duration: 180, requirements: { SUBJECTIVE: 6 } }]
   },
   {
     id: "NID Mdes",
-    name: "NID M.Des",
-    description: "Duration: 180 Min",
+    name: "NID M.Des Full Mock",
+    category: "full_length",
+    description: "Duration: 180 Min (Full Length)",
     programFormat: "masters",
     sections: [{ part: "B", duration: 180, requirements: { SUBJECTIVE: 6 } }]
   },
   {
     id: "CEED",
-    name: "CEED",
-    description: "Duration: 180 Min",
+    name: "CEED Full Mock",
+    category: "full_length",
+    description: "Duration: 180 Min (Full Length)",
     programFormat: "masters",
     sections: [
       { part: "A", duration: 60, requirements: { NAT: 8, MSQ: 10, MCQ: 26 } },
@@ -34,12 +38,64 @@ const TEMPLATES = [
   },
   {
     id: "UCEED",
-    name: "UCEED",
-    description: "Duration: 180 Min",
+    name: "UCEED Full Mock",
+    category: "full_length",
+    description: "Duration: 180 Min (Full Length)",
     programFormat: "bachelors",
     sections: [
       { part: "A", duration: 120, requirements: { NAT: 14, MSQ: 15, MCQ: 28 } },
       { part: "B", duration: 60, requirements: { SUBJECTIVE: 2 } }
+    ]
+  },
+  // Half Length Mocks
+  {
+    id: "NID Bdes Half",
+    name: "NID B.Des Half Length",
+    category: "half_length",
+    description: "Duration: 90 Min (Half Length)",
+    programFormat: "bachelors",
+    sections: [{ part: "B", duration: 90, requirements: { SUBJECTIVE: 3 } }]
+  },
+  {
+    id: "NID Mdes Half",
+    name: "NID M.Des Half Length",
+    category: "half_length",
+    description: "Duration: 90 Min (Half Length)",
+    programFormat: "masters",
+    sections: [{ part: "B", duration: 90, requirements: { SUBJECTIVE: 3 } }]
+  },
+  {
+    id: "CEED Half",
+    name: "CEED Half Length",
+    category: "half_length",
+    description: "Duration: 90 Min (Part A: 30m, Part B: 60m)",
+    programFormat: "masters",
+    sections: [
+      { part: "A", duration: 30, requirements: { NAT: 4, MSQ: 5, MCQ: 13 } },
+      { part: "B", duration: 60, requirements: { SUBJECTIVE: 3 } }
+    ]
+  },
+  {
+    id: "UCEED Half",
+    name: "UCEED Half Length",
+    category: "half_length",
+    description: "Duration: 90 Min (Part A: 60m, Part B: 30m)",
+    programFormat: "bachelors",
+    sections: [
+      { part: "A", duration: 60, requirements: { NAT: 7, MSQ: 7, MCQ: 14 } },
+      { part: "B", duration: 30, requirements: { SUBJECTIVE: 1 } }
+    ]
+  },
+  // Custom Short Test
+  {
+    id: "Custom Short",
+    name: "Custom Practice Test",
+    category: "custom_short",
+    description: "Configurable duration & custom question rules",
+    programFormat: "both",
+    sections: [
+      { part: "A", duration: 30, requirements: { NAT: 5, MSQ: 5, MCQ: 10 } },
+      { part: "B", duration: 30, requirements: { SUBJECTIVE: 2 } }
     ]
   }
 ];
@@ -55,6 +111,9 @@ export default function AdminExamTests() {
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [testTitle, setTestTitle] = useState("");
   const [programFormat, setProgramFormat] = useState("bachelors");
+  const [testCategory, setTestCategory] = useState<string>("full_length");
+  const [templateCategoryFilter, setTemplateCategoryFilter] = useState<string>("ALL");
+  const [testListCategoryFilter, setTestListCategoryFilter] = useState<string>("ALL");
   const [expiresAt, setExpiresAt] = useState("");
   const [testSections, setTestSections] = useState<any[]>([]); // cloned from template so duration can be edited
   const [selectedQuestions, setSelectedQuestions] = useState<any[]>([]);
@@ -238,6 +297,21 @@ export default function AdminExamTests() {
     setTestSections(testSections.map(s => s.part === part ? { ...s, duration: newDuration } : s));
   };
 
+  const updateRequirementCount = (part: string, type: string, count: number) => {
+    setTestSections(prev => prev.map(s => {
+      if (s.part === part) {
+        return {
+          ...s,
+          requirements: {
+            ...s.requirements,
+            [type]: Math.max(0, count)
+          }
+        };
+      }
+      return s;
+    }));
+  };
+
   // -----------------------------------------------------
   // SAVE / DB LOGIC
   // -----------------------------------------------------
@@ -261,9 +335,6 @@ export default function AdminExamTests() {
       const { data: qData, error: qErr } = await supabase.from('exam_questions').select('*, exam_options(*)').in('id', qIds);
       if (qErr) throw qErr;
 
-      // Ensure consistent order based on the mapping table order if order_index existed, 
-      // but since it doesn't, we just sort them safely or map them as they come.
-      // Filter to Objective Questions only (Part A typically)
       let objectiveQs = (qData || []).filter(q => q.type !== 'SUBJECTIVE');
       
       const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3 };
@@ -292,7 +363,6 @@ export default function AdminExamTests() {
         let ansText = 'N/A';
         
         if (q.exam_options && Array.isArray(q.exam_options)) {
-          // Sort options by ID to naturally shuffle (UUIDs are random) but maintain deterministic order
           const sortedOptions = [...q.exam_options].sort((a, b) => a.id.localeCompare(b.id));
           
           if (q.type === 'NAT') {
@@ -306,13 +376,12 @@ export default function AdminExamTests() {
           }
         }
 
-        // Strip HTML tags and normalize spaces so it looks clean in PDF
         ansText = ansText.replace(/<[^>]*>?/gm, '').replace(/(?:&nbsp;|\u00A0)/g, ' ').trim();
 
         return [
           (idx + 1).toString(),
           q.type,
-          '-', // Marks are currently section-based, so individual marks are implicit
+          '-',
           ansText
         ];
       });
@@ -362,6 +431,7 @@ export default function AdminExamTests() {
       setSelectedTemplate(template);
       setTestTitle(testData.title);
       setProgramFormat(testData.program_format || template.programFormat || "bachelors");
+      setTestCategory(testData.category || template.category || "full_length");
       setExpiresAt(testData.expires_at ? new Date(testData.expires_at).toISOString().slice(0, 16) : "");
       setEditingTestId(testId);
       
@@ -418,20 +488,38 @@ export default function AdminExamTests() {
 
       let testRecordId = editingTestId;
 
+      const testPayload: any = {
+        title: testTitle, 
+        program_id: programId, 
+        status: publish ? 'published' : 'draft', 
+        program_format: programFormat, 
+        expires_at: expiresAt || null,
+        category: testCategory
+      };
+
       if (editingTestId) {
-        const { error: testErr } = await supabase.from('exam_tests').update({
-          title: testTitle, program_id: programId, status: publish ? 'published' : 'draft', program_format: programFormat, expires_at: expiresAt || null
-        }).eq('id', editingTestId);
-        if (testErr) throw testErr;
+        let { error: testErr } = await supabase.from('exam_tests').update(testPayload).eq('id', editingTestId);
+        if (testErr && testErr.message?.includes('category')) {
+          delete testPayload.category;
+          const retry = await supabase.from('exam_tests').update(testPayload).eq('id', editingTestId);
+          if (retry.error) throw retry.error;
+        } else if (testErr) {
+          throw testErr;
+        }
 
         // Clear old sections and questions to replace them
         await supabase.from('exam_test_sections').delete().eq('test_id', editingTestId);
         await supabase.from('exam_test_questions').delete().eq('test_id', editingTestId);
       } else {
-        const { data: testData, error: testErr } = await supabase.from('exam_tests').insert({
-          title: testTitle, program_id: programId, status: publish ? 'published' : 'draft', program_format: programFormat, expires_at: expiresAt || null
-        }).select().single();
-        if (testErr) throw testErr;
+        let { data: testData, error: testErr } = await supabase.from('exam_tests').insert(testPayload).select().single();
+        if (testErr && testErr.message?.includes('category')) {
+          delete testPayload.category;
+          const retry = await supabase.from('exam_tests').insert(testPayload).select().single();
+          if (retry.error) throw retry.error;
+          testData = retry.data;
+        } else if (testErr) {
+          throw testErr;
+        }
         testRecordId = testData.id;
       }
 
@@ -467,7 +555,16 @@ export default function AdminExamTests() {
 
   if (loading) return <div className="flex items-center justify-center py-20 text-foreground/40"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
-  const renderList = () => (
+  const renderList = () => {
+    const filteredTemplates = templateCategoryFilter === "ALL" 
+      ? TEMPLATES 
+      : TEMPLATES.filter(t => t.category === templateCategoryFilter);
+
+    const filteredTests = testListCategoryFilter === "ALL" 
+      ? tests 
+      : tests.filter(t => (t.category || "full_length") === testListCategoryFilter);
+
+    return (
     <div className="space-y-8 pb-12 animate-in fade-in duration-300">
       <div>
         <h1 className="text-2xl font-semibold text-[#262626]">Exam Tests</h1>
@@ -475,22 +572,68 @@ export default function AdminExamTests() {
       </div>
 
       <div>
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground/50 mb-4">Available Templates</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {TEMPLATES.map(t => (
-            <div key={t.id} className="bg-white border border-black/10 p-6 rounded-xl shadow-sm flex flex-col justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground/50">Available Templates</h3>
+          <div className="flex items-center gap-1.5 bg-black/5 p-1 rounded-lg text-xs font-semibold">
+            <button 
+              onClick={() => setTemplateCategoryFilter('ALL')} 
+              className={`px-2.5 py-1 rounded-md transition-all ${templateCategoryFilter === 'ALL' ? 'bg-white shadow-sm text-black' : 'text-foreground/60 hover:text-black'}`}
+            >
+              All Templates
+            </button>
+            <button 
+              onClick={() => setTemplateCategoryFilter('full_length')} 
+              className={`px-2.5 py-1 rounded-md transition-all ${templateCategoryFilter === 'full_length' ? 'bg-white shadow-sm text-black' : 'text-foreground/60 hover:text-black'}`}
+            >
+              Full Length
+            </button>
+            <button 
+              onClick={() => setTemplateCategoryFilter('half_length')} 
+              className={`px-2.5 py-1 rounded-md transition-all ${templateCategoryFilter === 'half_length' ? 'bg-white shadow-sm text-purple-700 font-bold' : 'text-foreground/60 hover:text-black'}`}
+            >
+              ⚡ Half Length
+            </button>
+            <button 
+              onClick={() => setTemplateCategoryFilter('custom_short')} 
+              className={`px-2.5 py-1 rounded-md transition-all ${templateCategoryFilter === 'custom_short' ? 'bg-white shadow-sm text-indigo-700 font-bold' : 'text-foreground/60 hover:text-black'}`}
+            >
+              ⚡ Custom Short
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredTemplates.map(t => (
+            <div key={t.id} className="bg-white border border-black/10 p-6 rounded-xl shadow-sm flex flex-col justify-between hover:border-black/20 transition-all">
               <div>
-                <div className="w-10 h-10 bg-primary/10 text-primary rounded-lg flex items-center justify-center mb-4">
-                  <ClipboardList className="w-5 h-5" />
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-10 h-10 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
+                    <ClipboardList className="w-5 h-5" />
+                  </div>
+                  {t.category === 'half_length' && (
+                    <span className="bg-purple-100 text-purple-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Zap className="w-3 h-3" /> Half Length
+                    </span>
+                  )}
+                  {t.category === 'custom_short' && (
+                    <span className="bg-indigo-100 text-indigo-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Zap className="w-3 h-3" /> Custom Short
+                    </span>
+                  )}
+                  {t.category === 'full_length' && (
+                    <span className="bg-gray-100 text-gray-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
+                      Full Length
+                    </span>
+                  )}
                 </div>
                 <h3 className="font-semibold text-lg mb-1">{t.name}</h3>
                 <p className="text-sm font-medium text-foreground/60 mb-5">{t.description}</p>
               </div>
               <div className="flex flex-col gap-2">
-                <Button variant="outline" onClick={() => { setSelectedTemplate(t); setTestSections(JSON.parse(JSON.stringify(t.sections))); setEditingTestId(null); setTestTitle(""); setExpiresAt(""); setProgramFormat(t.programFormat || "bachelors"); setSelectedQuestions([]); setCurrentStep('BUILDER'); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
+                <Button variant="outline" onClick={() => { setSelectedTemplate(t); setTestCategory(t.category || "full_length"); setTestSections(JSON.parse(JSON.stringify(t.sections))); setEditingTestId(null); setTestTitle(""); setExpiresAt(""); setProgramFormat(t.programFormat || "bachelors"); setSelectedQuestions([]); setCurrentStep('BUILDER'); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
                   <PlusCircle className="w-4 h-4" /> Build Manually
                 </Button>
-                <Button variant="outline" onClick={() => { setSelectedTemplate(t); setQuickGenOpen(true); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
+                <Button variant="outline" onClick={() => { setSelectedTemplate(t); setTestCategory(t.category || "full_length"); setQuickGenOpen(true); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
                   <Wand2 className="w-4 h-4" /> Quick Generate
                 </Button>
               </div>
@@ -502,27 +645,74 @@ export default function AdminExamTests() {
       <div className="border-t border-black/5" />
 
       <div>
-        <h3 className="text-lg font-medium text-[#262626] mb-4">Created Tests ({tests.length})</h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h3 className="text-lg font-medium text-[#262626]">Created Tests ({filteredTests.length})</h3>
+          <div className="flex items-center gap-1.5 bg-black/5 p-1 rounded-lg text-xs font-semibold">
+            <button 
+              onClick={() => setTestListCategoryFilter('ALL')} 
+              className={`px-2.5 py-1 rounded-md transition-all ${testListCategoryFilter === 'ALL' ? 'bg-white shadow-sm text-black' : 'text-foreground/60 hover:text-black'}`}
+            >
+              All Tests
+            </button>
+            <button 
+              onClick={() => setTestListCategoryFilter('full_length')} 
+              className={`px-2.5 py-1 rounded-md transition-all ${testListCategoryFilter === 'full_length' ? 'bg-white shadow-sm text-black' : 'text-foreground/60 hover:text-black'}`}
+            >
+              Full Length
+            </button>
+            <button 
+              onClick={() => setTestListCategoryFilter('half_length')} 
+              className={`px-2.5 py-1 rounded-md transition-all ${testListCategoryFilter === 'half_length' ? 'bg-white shadow-sm text-purple-700 font-bold' : 'text-foreground/60 hover:text-black'}`}
+            >
+              ⚡ Half Length
+            </button>
+            <button 
+              onClick={() => setTestListCategoryFilter('custom_short')} 
+              className={`px-2.5 py-1 rounded-md transition-all ${testListCategoryFilter === 'custom_short' ? 'bg-white shadow-sm text-indigo-700 font-bold' : 'text-foreground/60 hover:text-black'}`}
+            >
+              ⚡ Custom Short
+            </button>
+          </div>
+        </div>
+
         <div className="bg-white rounded-xl border border-black/5 overflow-hidden shadow-sm">
           <div className="grid grid-cols-12 gap-4 border-b border-black/5 p-4 bg-background/50 text-xs font-semibold text-foreground/50 uppercase tracking-widest hidden md:grid">
             <div className="col-span-4">Test Title</div>
+            <div className="col-span-2">Category</div>
             <div className="col-span-3">Program Format</div>
-            <div className="col-span-2">Status</div>
-            <div className="col-span-3 text-right">Actions</div>
+            <div className="col-span-1">Status</div>
+            <div className="col-span-2 text-right">Actions</div>
           </div>
           <div className="divide-y divide-black/5">
-            {tests.map(test => (
+            {filteredTests.map(test => (
               <div key={test.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center hover:bg-background/30 transition-colors text-sm">
-                <div className="col-span-4 font-semibold text-[#262626]">{test.title}</div>
+                <div className="col-span-4 font-semibold text-[#262626] flex items-center gap-2">
+                  {test.title}
+                </div>
+                <div className="col-span-2">
+                  {test.category === 'half_length' ? (
+                    <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                      <Zap className="w-3 h-3" /> Half Length
+                    </span>
+                  ) : test.category === 'custom_short' ? (
+                    <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                      <Zap className="w-3 h-3" /> Custom Short
+                    </span>
+                  ) : (
+                    <span className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                      Full Length
+                    </span>
+                  )}
+                </div>
                 <div className="col-span-3 text-foreground/60 font-medium bg-black/5 inline-block px-2 py-1 rounded w-fit text-xs">
                   {test.program_format === 'both' ? 'Both' : test.program_format === 'masters' ? 'Masters (M.Des/CEED)' : test.program_format === 'bachelors' ? 'Bachelors (B.Des/UCEED)' : 'Unknown'}
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1">
                   <span className={`px-2 py-1 rounded-full text-xs font-bold ${test.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                     {test.status.toUpperCase()}
                   </span>
                 </div>
-                <div className="col-span-3 flex justify-end gap-2">
+                <div className="col-span-2 flex justify-end gap-2">
                   {test.status === 'published' && (
                     <Button variant="outline" size="sm" onClick={() => downloadAnswerKey(test.id, testTitle || test.title)} className="h-8 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200" title="Download Answer Key">
                       <FileDown className="w-4 h-4" />
@@ -537,10 +727,10 @@ export default function AdminExamTests() {
                 </div>
               </div>
             ))}
-            {tests.length === 0 && (
+            {filteredTests.length === 0 && (
               <div className="p-12 text-center text-foreground/40">
                 <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p>No tests created yet. Click a template above to get started.</p>
+                <p>No tests found in this category. Select a template above to create one.</p>
               </div>
             )}
           </div>
@@ -569,7 +759,8 @@ export default function AdminExamTests() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+    );
+  };
 
   const renderBuilder = () => (
     <div className="space-y-8 animate-in fade-in duration-300 pb-12">
@@ -582,10 +773,22 @@ export default function AdminExamTests() {
       </div>
 
       <div className="bg-white p-6 rounded-xl border border-black/10 shadow-sm space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <Label className="text-sm font-semibold">Test Title</Label>
             <Input value={testTitle} onChange={(e) => setTestTitle(e.target.value)} placeholder={`e.g. ${selectedTemplate.name} Mock Test 1`} className="mt-1 h-10" />
+          </div>
+          <div>
+            <Label className="text-sm font-semibold">Test Category</Label>
+            <select 
+              className="w-full h-10 mt-1 border border-black/10 rounded-md px-3 bg-white text-sm font-medium"
+              value={testCategory}
+              onChange={e => setTestCategory(e.target.value)}
+            >
+              <option value="full_length">Full Length Mock (Standard 180 Min)</option>
+              <option value="half_length">⚡ Half Length Test (90 Min practice)</option>
+              <option value="custom_short">⚡ Custom Short Practice Test (15-90 Min drill)</option>
+            </select>
           </div>
           <div>
             <Label className="text-sm font-semibold">Target Program Format</Label>
@@ -599,9 +802,9 @@ export default function AdminExamTests() {
               <option value="both">Both</option>
             </select>
           </div>
-          <div>
+          <div className="md:col-span-3">
             <Label className="text-sm font-semibold">Expiry Date & Time (Optional)</Label>
-            <Input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="mt-1 h-10 bg-white" />
+            <Input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="mt-1 h-10 bg-white max-w-xs" />
           </div>
         </div>
 
@@ -615,22 +818,36 @@ export default function AdminExamTests() {
 
             return (
               <div key={sec.part} className={`border ${isSectionValid ? 'border-green-300' : 'border-black/10'} rounded-xl overflow-hidden`}>
-                <div className={`p-4 flex items-center justify-between border-b ${isSectionValid ? 'bg-green-50 border-green-200' : 'bg-background border-black/10'}`}>
+                <div className={`p-4 flex flex-col md:flex-row md:items-center justify-between border-b gap-4 ${isSectionValid ? 'bg-green-50 border-green-200' : 'bg-background border-black/10'}`}>
                   <div>
                     <h3 className="font-semibold text-[#262626] flex items-center gap-2">
                       Part {sec.part} Section {isSectionValid && <CheckCircle2 className="w-4 h-4 text-green-600" />}
                     </h3>
-                    <div className="flex items-center gap-3 mt-2">
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
                       <div className="flex items-center gap-2 text-xs text-foreground/60 font-medium">
-                        <Clock className="w-3 h-3" /> Duration:
+                        <Clock className="w-3.5 h-3.5 text-primary" /> Duration:
                         <Input type="number" min="1" value={sec.duration} onChange={e => updateSectionDuration(sec.part, parseInt(e.target.value) || 1)} className="w-16 h-7 text-xs px-2 text-center bg-white" />
                         Min
                       </div>
                       <span className="text-black/20">|</span>
-                      <span className="text-xs text-foreground/60 font-medium">Reqs: {Object.entries(sec.requirements).map(([t, c]) => `${c} ${t}`).join(', ')}</span>
+                      <div className="flex items-center gap-2 text-xs text-foreground/60 font-medium flex-wrap">
+                        <span>Requirements:</span>
+                        {Object.entries(sec.requirements).map(([t, count]) => (
+                          <div key={t} className="flex items-center gap-1 bg-white px-2 py-0.5 border border-black/10 rounded shadow-xs">
+                            <span className="font-bold text-primary">{t}:</span>
+                            <input 
+                              type="number" 
+                              min="0" 
+                              value={count as number} 
+                              onChange={e => updateRequirementCount(sec.part, t, parseInt(e.target.value) || 0)} 
+                              className="w-10 h-5 text-xs text-center border-0 focus:outline-none bg-transparent font-semibold"
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <Button size="sm" onClick={() => openPicker(sec)} className="gap-2 bg-primary/10 text-primary hover:bg-primary/20 shadow-none border-0">
+                  <Button size="sm" onClick={() => openPicker(sec)} className="gap-2 bg-primary/10 text-primary hover:bg-primary/20 shadow-none border-0 shrink-0">
                     <PlusCircle className="w-4 h-4" /> Add Questions
                   </Button>
                 </div>

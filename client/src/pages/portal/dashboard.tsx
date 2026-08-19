@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy, BookOpen, Lightbulb, ClipboardList, Lock, CreditCard, ExternalLink, Download, Eye, EyeOff, Upload, AlertCircle, Star, Shield, Sparkles, ThumbsUp, Plus, HelpCircle, Send } from "lucide-react";
+import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy, BookOpen, Lightbulb, ClipboardList, Lock, CreditCard, ExternalLink, Download, Eye, EyeOff, Upload, AlertCircle, Star, Shield, Sparkles, ThumbsUp, Plus, HelpCircle, Send, Zap } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -43,6 +43,7 @@ export default function PortalDashboard() {
 
   // Dashboard Data
   const [activeTests, setActiveTests] = useState<any[]>([]);
+  const [testCategoryFilter, setTestCategoryFilter] = useState<'all' | 'full_length' | 'short'>('all');
   const [candidateAttemptsMap, setCandidateAttemptsMap] = useState<Record<string, any[]>>({});
   const [activeTab, setActiveTab] = useState('overview');
   const [pastAttempts, setPastAttempts] = useState<any[]>([]);
@@ -1329,58 +1330,102 @@ export default function PortalDashboard() {
 
               {candidate && (
                 <section>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-[#262626]">Active Mock Tests</h2>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <h2 className="text-lg font-semibold text-[#262626]">Active Mock & Practice Tests</h2>
+                    <div className="flex items-center gap-1.5 bg-black/5 p-1 rounded-xl text-xs font-semibold self-start sm:self-auto">
+                      <button
+                        onClick={() => setTestCategoryFilter('all')}
+                        className={`px-3 py-1.5 rounded-lg transition-all ${testCategoryFilter === 'all' ? 'bg-white text-black shadow-xs font-bold' : 'text-foreground/60 hover:text-black'}`}
+                      >
+                        All Tests
+                      </button>
+                      <button
+                        onClick={() => setTestCategoryFilter('full_length')}
+                        className={`px-3 py-1.5 rounded-lg transition-all ${testCategoryFilter === 'full_length' ? 'bg-white text-black shadow-xs font-bold' : 'text-foreground/60 hover:text-black'}`}
+                      >
+                        Full Length Mocks
+                      </button>
+                      <button
+                        onClick={() => setTestCategoryFilter('short')}
+                        className={`px-3 py-1.5 rounded-lg transition-all ${testCategoryFilter === 'short' ? 'bg-purple-600 text-white shadow-xs font-bold' : 'text-purple-700 hover:bg-purple-50'}`}
+                      >
+                        ⚡ Short Tests
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {activeTests.length === 0 ? (
-                      <div className="col-span-full p-8 text-center bg-white border border-black/5 rounded-2xl">
-                        <FileText className="w-12 h-12 text-foreground/20 mx-auto mb-3" />
-                        <p className="text-foreground/50 font-medium">No active tests available for your program at the moment.</p>
-                      </div>
-                    ) : activeTests.map((test: any) => {
-                      const isExpired = test.expires_at ? new Date(test.expires_at).getTime() < Date.now() : false;
-                      const testAttempts = candidateAttemptsMap[test.id] || [];
-                      const completedAttempts = testAttempts.filter((a: any) => a.status === 'completed');
-                      const hasCompletedAttempt = completedAttempts.length > 0;
-                      const canReattempt = completedAttempts.length < 3;
-                      const latestCompleted = completedAttempts[completedAttempts.length - 1];
-                      
-                      let expiryText = "";
-                      if (test.expires_at) {
-                        if (isExpired) expiryText = "Expired";
-                        else {
-                          const diffHours = Math.round((new Date(test.expires_at).getTime() - Date.now()) / (1000 * 60 * 60));
-                          if (diffHours > 24) expiryText = `Expires in ${Math.round(diffHours / 24)} days`;
-                          else expiryText = `Expires in ${diffHours} hours`;
-                        }
+                    {(() => {
+                      const displayTests = activeTests.filter((test: any) => {
+                        if (testCategoryFilter === 'all') return true;
+                        if (testCategoryFilter === 'full_length') return test.category === 'full_length' || !test.category;
+                        if (testCategoryFilter === 'short') return test.category === 'half_length' || test.category === 'custom_short' || test.category === 'short';
+                        return true;
+                      });
+
+                      if (displayTests.length === 0) {
+                        return (
+                          <div className="col-span-full p-8 text-center bg-white border border-black/5 rounded-2xl">
+                            <FileText className="w-12 h-12 text-foreground/20 mx-auto mb-3" />
+                            <p className="text-foreground/50 font-medium">No active tests available in this category at the moment.</p>
+                          </div>
+                        );
                       }
 
-                      return (
-                      <div key={test.id} className={`bg-white border border-black/5 p-6 rounded-2xl shadow-sm transition-shadow group flex flex-col justify-between ${isExpired && !hasCompletedAttempt ? 'opacity-70' : 'hover:shadow-md'}`}>
-                        <div>
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
-                              <FileText className="w-5 h-5" />
+                      return displayTests.map((test: any) => {
+                        const isExpired = test.expires_at ? new Date(test.expires_at).getTime() < Date.now() : false;
+                        const testAttempts = candidateAttemptsMap[test.id] || [];
+                        const completedAttempts = testAttempts.filter((a: any) => a.status === 'completed');
+                        const hasCompletedAttempt = completedAttempts.length > 0;
+                        const canReattempt = completedAttempts.length < 3;
+                        const latestCompleted = completedAttempts[completedAttempts.length - 1];
+                        
+                        let expiryText = "";
+                        if (test.expires_at) {
+                          if (isExpired) expiryText = "Expired";
+                          else {
+                            const diffHours = Math.round((new Date(test.expires_at).getTime() - Date.now()) / (1000 * 60 * 60));
+                            if (diffHours > 24) expiryText = `Expires in ${Math.round(diffHours / 24)} days`;
+                            else expiryText = `Expires in ${diffHours} hours`;
+                          }
+                        }
+
+                        const isShortTest = test.category === 'half_length' || test.category === 'custom_short' || test.category === 'short';
+                        const isHalfLength = test.category === 'half_length';
+
+                        return (
+                        <div key={test.id} className={`bg-white border border-black/5 p-6 rounded-2xl shadow-sm transition-shadow group flex flex-col justify-between ${isExpired && !hasCompletedAttempt ? 'opacity-70' : 'hover:shadow-md'}`}>
+                          <div>
+                            <div className="flex justify-between items-start mb-4 flex-wrap gap-2">
+                              <div className={`w-10 h-10 ${isHalfLength ? 'bg-purple-100 text-purple-700' : isShortTest ? 'bg-indigo-100 text-indigo-700' : 'bg-primary/10 text-primary'} rounded-xl flex items-center justify-center`}>
+                                {isShortTest ? <Zap className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+                              </div>
+                              <div className="flex gap-2 flex-wrap items-center">
+                                {isHalfLength ? (
+                                  <span className="bg-purple-100 text-purple-700 text-[10px] uppercase tracking-wider font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1">
+                                    <Zap className="w-3 h-3" /> Half Length
+                                  </span>
+                                ) : isShortTest ? (
+                                  <span className="bg-indigo-100 text-indigo-700 text-[10px] uppercase tracking-wider font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1">
+                                    <Zap className="w-3 h-3" /> Short Test
+                                  </span>
+                                ) : null}
+                                {hasCompletedAttempt && (
+                                  <span className="bg-primary/10 text-primary text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full">
+                                    Attempts: {completedAttempts.length}/3
+                                  </span>
+                                )}
+                                {test.expires_at && (
+                                  <span className={`${isExpired ? 'bg-gray-100 text-gray-600' : 'bg-orange-100 text-orange-700'} text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full`}>
+                                    {expiryText}
+                                  </span>
+                                )}
+                                {!test.expires_at && !hasCompletedAttempt && !isShortTest && (
+                                  <span className="bg-green-100 text-green-700 text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full">New</span>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex gap-2">
-                              {hasCompletedAttempt && (
-                                <span className="bg-primary/10 text-primary text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full">
-                                  Attempts: {completedAttempts.length}/3
-                                </span>
-                              )}
-                              {test.expires_at && (
-                                <span className={`${isExpired ? 'bg-gray-100 text-gray-600' : 'bg-orange-100 text-orange-700'} text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full`}>
-                                  {expiryText}
-                                </span>
-                              )}
-                              {!test.expires_at && !hasCompletedAttempt && (
-                                <span className="bg-green-100 text-green-700 text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full">New</span>
-                              )}
-                            </div>
-                          </div>
-                          <h3 className="font-bold text-lg text-[#262626] mb-2">{test.title}</h3>
+                            <h3 className="font-bold text-lg text-[#262626] mb-2">{test.title}</h3>
 
                           <div className="flex items-center gap-4 text-xs font-medium text-foreground/50 mb-4">
                             <div className="flex items-center gap-1.5">
@@ -1440,7 +1485,8 @@ export default function PortalDashboard() {
                           </Button>
                         )}
                       </div>
-                    )})}
+                    );
+                  })})()}
                   </div>
                 </section>
               )}
