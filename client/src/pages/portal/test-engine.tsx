@@ -100,6 +100,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   // Scoring Details State
   const [scoreBreakdown, setScoreBreakdown] = useState<Record<string, number>>({ NAT: 0, MSQ: 0, MCQ: 0 });
   const [questionScores, setQuestionScores] = useState<Record<string, number>>({});
+  const [questionCorrectness, setQuestionCorrectness] = useState<Record<string, 'correct' | 'incorrect' | 'unattempted'>>({});
   const [correctAnswersMap, setCorrectAnswersMap] = useState<Record<string, any[]>>({});
   const [attemptDetails, setAttemptDetails] = useState<any>(null);
 
@@ -142,10 +143,22 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         setAttemptDetails(attemptInfo);
       }
 
-      if (pastResp) {
-        setAttemptId(attemptIdFromUrl);
+      setAttemptId(attemptIdFromUrl);
 
-        const loadedResponses: Record<string, ResponseData> = { ...responses };
+      const loadedResponses: Record<string, ResponseData> = {};
+      (engineData?.questions || []).forEach(q => {
+        loadedResponses[q.id] = {
+          status: 'unseen',
+          selectedOptions: [],
+          answerText: '',
+          fileUrl: '',
+          timeSpent: 0,
+          answerChanges: 0,
+          stateTransitions: []
+        };
+      });
+
+      if (pastResp) {
         pastResp.forEach(r => {
           loadedResponses[r.question_id] = {
             status: r.status,
@@ -161,12 +174,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             stateTransitions: r.state_transitions || []
           };
         });
-
-        setResponses(loadedResponses);
-        setTestStep('submitted');
-
-        await finalizeAttempt(loadedResponses, attemptIdFromUrl, true);
       }
+
+      setResponses(loadedResponses);
+      setTestStep('submitted');
+
+      await finalizeAttempt(loadedResponses, attemptIdFromUrl, true);
     } catch (err) {
       console.error(err);
     } finally {
@@ -531,6 +544,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
         let breakdown: Record<string, number> = { NAT: 0, MSQ: 0, MCQ: 0, NAT_A: 0, MSQ_A: 0, MCQ_A: 0, NAT_T: 0, MSQ_T: 0, MCQ_T: 0 };
         let qScores: Record<string, number> = {};
+        let qCorrectness: Record<string, 'correct' | 'incorrect' | 'unattempted'> = {};
 
         // Score each Part A question
         partAQuestionIds.forEach(qId => {
@@ -546,15 +560,17 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           totalPartA += maxMarks; // Accumulating total possible marks
 
           const selected = resp?.selectedOptions || [];
+          const answered = resp?.answerText?.trim();
+          const isAttempted = selected.length > 0 || !!answered;
           let earned = 0;
+          let isCorrect = false;
 
           if (qType === 'NAT') {
             breakdown.NAT_T++;
-            const answered = resp?.answerText?.trim();
             if (answered) {
               breakdown.NAT_A++;
               const correctText = correctOptsArr[0]?.content_text?.trim();
-              const isCorrect = !isNaN(parseFloat(answered)) && !isNaN(parseFloat(correctText))
+              isCorrect = !isNaN(parseFloat(answered)) && !isNaN(parseFloat(correctText))
                 ? parseFloat(answered) === parseFloat(correctText)
                 : answered.toLowerCase() === correctText?.toLowerCase();
 
@@ -566,7 +582,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             breakdown.MCQ_T++;
             if (selected.length > 0) {
               breakdown.MCQ_A++;
-              const isCorrect = selected.length === 1 && correctOptsArr.some(c => c.id === selected[0]);
+              isCorrect = selected.length === 1 && correctOptsArr.some(c => c.id === selected[0]);
               if (isCorrect) earned = mcqCorrect;
               else earned = mcqWrong;
             }
@@ -583,22 +599,32 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
                 if (W > 0) {
                   earned = msWrong; // Wrong option selected -> negative marking
+                  isCorrect = false;
                 } else {
                   // No wrong options selected
-                  if (S === C) earned = msCorrect; // All correct chosen -> full marks
-                  else earned = S; // Partial marking -> +S
+                  if (S === C && C > 0) {
+                    earned = msCorrect; // All correct chosen -> full marks
+                    isCorrect = true;
+                  } else if (S > 0) {
+                    earned = S; // Partial marking -> +S
+                    isCorrect = false;
+                  }
                 }
               } else {
                 // Fallback generic MSQ
                 const correctIds = correctOptsArr.map(c => c.id);
                 const allCorrect = correctIds.every(c => selected.includes(c)) && selected.every(s => correctIds.includes(s));
-                if (allCorrect) earned = 1;
+                if (allCorrect) {
+                  earned = 1;
+                  isCorrect = true;
+                }
               }
             }
             breakdown.MSQ += earned;
           }
 
           qScores[qId] = earned;
+          qCorrectness[qId] = isCorrect ? 'correct' : (isAttempted ? 'incorrect' : 'unattempted');
           scorePartA += earned;
         });
 
@@ -610,6 +636,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
         setScoreBreakdown(breakdown);
         setQuestionScores(qScores);
+        setQuestionCorrectness(qCorrectness);
         setCorrectAnswersMap(correctMap);
       }
 
@@ -933,11 +960,11 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             if (isPartALocked) {
               bgClass = "bg-gray-100 border-gray-200 text-gray-400 opacity-60 cursor-not-allowed";
             } else if (testStep === 'review') {
-              const score = questionScores[q.id];
-              if (score !== undefined) {
-                if (score > 0) bgClass = "bg-green-100 border-green-300 text-green-700";
-                else if (score < 0) bgClass = "bg-red-100 border-red-300 text-red-700";
-                else bgClass = "bg-gray-100 border-gray-300 text-gray-500";
+              const qState = questionCorrectness[q.id];
+              if (qState === 'correct') {
+                bgClass = "bg-green-100 border-green-300 text-green-700 font-bold";
+              } else if (qState === 'incorrect') {
+                bgClass = "bg-red-100 border-red-300 text-red-700 font-bold";
               } else {
                 bgClass = "bg-gray-100 border-gray-300 text-gray-500";
               }
@@ -953,15 +980,17 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               <button
                 key={q.id}
                 onClick={() => handleNavigateQuestion(idx)}
-                title={isPartALocked ? "Part A is locked" : `Question ${idx + 1}`}
+                title={
+                  isPartALocked 
+                    ? "Part A is locked" 
+                    : testStep === 'review'
+                    ? `Question ${idx + 1}: ${questionCorrectness[q.id] === 'correct' ? 'Correct (+' + (questionScores[q.id] || 0) + ' Marks)' : questionCorrectness[q.id] === 'incorrect' ? 'Incorrect (' + (questionScores[q.id] || 0) + ' Marks)' : 'Unattempted (0 Marks)'}`
+                    : `Question ${idx + 1}`
+                }
                 className={`relative h-8 rounded-lg border flex flex-col items-center justify-center text-xs font-bold transition-all ${bgClass} ${isActive ? 'ring-2 ring-primary ring-offset-1 scale-105 shadow-sm' : ''}`}
               >
                 {isPartALocked ? (
                   <Lock className="w-3 h-3 text-gray-400" />
-                ) : testStep === 'review' && q.part === 'A' && questionScores[q.id] !== undefined ? (
-                  <span className={`text-[10px] leading-none ${questionScores[q.id] > 0 ? 'text-green-700 font-bold' : questionScores[q.id] < 0 ? 'text-red-700 font-bold' : 'text-gray-500 font-bold'}`}>
-                    {questionScores[q.id] > 0 ? '+' : ''}{questionScores[q.id]}
-                  </span>
                 ) : (
                   <span>{idx + 1}</span>
                 )}
@@ -1282,8 +1311,19 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               </div>
               <div className="flex items-center gap-4">
                 {testStep === 'review' && currentQ.part === 'A' && questionScores[currentQ.id] !== undefined && (
-                  <div className={`text-xs font-bold border px-3 py-1 rounded-md shadow-sm ${questionScores[currentQ.id] > 0 ? 'bg-green-50 text-green-700 border-green-200' : questionScores[currentQ.id] < 0 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-black/5 text-foreground/70 border-black/10'}`}>
-                    Awarded: {questionScores[currentQ.id] > 0 ? '+' : ''}{questionScores[currentQ.id]} Marks
+                  <div className={`text-xs font-bold border px-3.5 py-1.5 rounded-lg shadow-sm flex items-center gap-2 ${
+                    questionCorrectness[currentQ.id] === 'correct' 
+                      ? 'bg-green-50 text-green-700 border-green-200' 
+                      : questionCorrectness[currentQ.id] === 'incorrect' 
+                      ? 'bg-red-50 text-red-700 border-red-200' 
+                      : 'bg-black/5 text-foreground/70 border-black/10'
+                  }`}>
+                    <span>
+                      {questionCorrectness[currentQ.id] === 'correct' ? '✓ Correct' : questionCorrectness[currentQ.id] === 'incorrect' ? '✗ Incorrect' : '⚪ Unattempted'}
+                    </span>
+                    <span className="font-extrabold">
+                      ({questionScores[currentQ.id] > 0 ? '+' : ''}{questionScores[currentQ.id]} Marks)
+                    </span>
                   </div>
                 )}
                 <div className="text-sm font-bold text-foreground/50">
@@ -1307,7 +1347,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               {/* Dynamic Inputs */}
               <div className="space-y-3 mt-2 mb-2">
                 {currentQ.type === 'NAT' ? (
-                  <div className="w-64">
+                  <div className="w-full max-w-md">
                     <input
                       type="number"
                       placeholder="Enter numerical answer..."
@@ -1317,8 +1357,24 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                       onChange={(e) => updateResponse(currentQ.id, { answerText: e.target.value })}
                     />
                     {testStep === 'review' && correctAnswersMap[currentQ.id] && (
-                      <div className="mt-2 text-sm font-bold text-green-600 bg-green-50 border border-green-200 px-3 py-2 rounded">
-                        Correct Answer: {correctAnswersMap[currentQ.id][0]?.content_text}
+                      <div className={`mt-3 text-sm font-bold p-3.5 rounded-xl border flex flex-col gap-1 ${
+                        questionCorrectness[currentQ.id] === 'correct'
+                          ? 'bg-green-50 border-green-200 text-green-800'
+                          : questionCorrectness[currentQ.id] === 'incorrect'
+                          ? 'bg-red-50 border-red-200 text-red-800'
+                          : 'bg-gray-50 border-gray-200 text-gray-800'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <span>Your Answer: <strong className="underline">{currentResponse.answerText?.trim() || '(No answer entered)'}</strong></span>
+                          <span className={`text-xs px-2 py-0.5 rounded font-extrabold uppercase ${
+                            questionCorrectness[currentQ.id] === 'correct' ? 'bg-green-200 text-green-900' : questionCorrectness[currentQ.id] === 'incorrect' ? 'bg-red-200 text-red-900' : 'bg-gray-200 text-gray-800'
+                          }`}>
+                            {questionCorrectness[currentQ.id] === 'correct' ? '✓ Correct' : questionCorrectness[currentQ.id] === 'incorrect' ? '✗ Incorrect' : '⚪ Unattempted'}
+                          </span>
+                        </div>
+                        <div className="text-green-700 font-extrabold mt-0.5">
+                          Correct Answer: {correctAnswersMap[currentQ.id][0]?.content_text}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1454,6 +1510,25 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                             {String.fromCharCode(65 + idx)}
                           </div>
                           <span className={`text-sm font-semibold ${testStep === 'review' && (isCorrectAnswer || isSelectedButWrong) ? 'text-[#262626]' : (isSelected ? 'font-bold text-primary' : 'text-[#262626]')}`}>{opt.content_text}</span>
+                          {testStep === 'review' && (
+                            <>
+                              {isCorrectAnswer && isSelected && (
+                                <span className="ml-auto text-xs font-bold text-green-700 bg-green-100 border border-green-200 px-2 py-0.5 rounded shrink-0">
+                                  ✓ Your Choice (Correct)
+                                </span>
+                              )}
+                              {isCorrectAnswer && !isSelected && (
+                                <span className="ml-auto text-xs font-bold text-green-700 bg-green-100 border border-green-200 px-2 py-0.5 rounded shrink-0">
+                                  ✓ Correct Option
+                                </span>
+                              )}
+                              {isSelectedButWrong && (
+                                <span className="ml-auto text-xs font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded shrink-0">
+                                  ✗ Your Choice (Incorrect)
+                                </span>
+                              )}
+                            </>
+                          )}
                           {opt.media_url && (
                             <img src={opt.media_url} alt="Option Media" className="max-h-20 rounded border border-black/5 ml-auto" />
                           )}

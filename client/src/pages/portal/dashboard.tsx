@@ -229,6 +229,7 @@ export default function PortalDashboard() {
         await registerSession(candidateData.id);
 
         fetchDashboardData(candidateData.program_ids || [], candidateData.education_level || "bachelors", candidateData.id);
+        fetchAttempts(candidateData.id);
       }
     } catch (err: any) {
       console.error(err);
@@ -346,7 +347,7 @@ export default function PortalDashboard() {
         .eq('id', attemptId)
         .maybeSingle();
         
-      if (attemptInfo && responses) {
+      if (attemptInfo) {
         const testId = attemptInfo.test_id;
         
         const { data: testQuestions } = await supabase
@@ -354,7 +355,9 @@ export default function PortalDashboard() {
           .select('question_id')
           .eq('test_id', testId);
         
-        const questionIds = (testQuestions || []).map(tq => tq.question_id);
+        const tqQuestionIds = (testQuestions || []).map(tq => tq.question_id);
+        const respQuestionIds = (responses || []).map(r => r.question_id).filter(Boolean);
+        const questionIds = Array.from(new Set([...tqQuestionIds, ...respQuestionIds]));
         
         let correctOpts: any[] = [];
         if (questionIds.length > 0) {
@@ -389,42 +392,77 @@ export default function PortalDashboard() {
           commAverages[r.question_id].count += 1;
         });
 
-        const processedResponses = (responses || []).map(r => {
-          const q = r.exam_questions;
-          if (!q) return r;
+        const missingQuestionIds = tqQuestionIds.filter(qId => !respQuestionIds.includes(qId));
+        let allQuestionsMap: Record<string, any> = {};
+        (responses || []).forEach(r => {
+          if (r.exam_questions) allQuestionsMap[r.exam_questions.id] = r.exam_questions;
+        });
+
+        if (missingQuestionIds.length > 0) {
+          const { data: missingQs } = await supabase
+            .from('exam_questions')
+            .select('id, type, part, difficulty, content_text, topics, pyq_tag')
+            .in('id', missingQuestionIds);
+          (missingQs || []).forEach(q => {
+            allQuestionsMap[q.id] = q;
+          });
+        }
+
+        const respMap: Record<string, any> = {};
+        (responses || []).forEach(r => {
+          respMap[r.question_id] = r;
+        });
+
+        const allQuestionsList = Object.values(allQuestionsMap);
+
+        const processedResponses = allQuestionsList.map(q => {
+          const r = respMap[q.id] || {
+            question_id: q.id,
+            attempt_id: attemptId,
+            status: 'unseen',
+            selected_options: [],
+            answer_text: '',
+            time_spent: 0,
+            answer_changes: 0,
+            state_transitions: []
+          };
+
           const correctOptsArr = correctMap[q.id] || [];
           const selected = r.selected_options || [];
           let isCorrect = false;
           let maxMarks = 1;
           let earnedMarks = 0;
 
+          const answeredText = r.answer_text?.trim();
+          const hasAnswer = (selected && selected.length > 0) || !!answeredText;
+          const isAttempted = r.status === 'answered' || r.status === 'marked' || hasAnswer;
+
           if (q.type === 'NAT') {
-            const answered = r.answer_text?.trim();
             const correctText = correctOptsArr[0]?.content_text?.trim();
-            isCorrect = !!(answered && correctText && (
-              !isNaN(parseFloat(answered)) && !isNaN(parseFloat(correctText))
-                ? parseFloat(answered) === parseFloat(correctText)
-                : answered.toLowerCase() === correctText?.toLowerCase()
+            isCorrect = !!(answeredText && correctText && (
+              !isNaN(parseFloat(answeredText)) && !isNaN(parseFloat(correctText))
+                ? parseFloat(answeredText) === parseFloat(correctText)
+                : answeredText.toLowerCase() === correctText?.toLowerCase()
             ));
             earnedMarks = isCorrect ? 4 : 0;
             maxMarks = 4;
           } else if (q.type === 'MCQ') {
             isCorrect = selected.length === 1 && correctOptsArr.some(c => c.id === selected[0]);
-            earnedMarks = isCorrect ? 3 : (selected.length > 0 ? -0.5 : 0);
+            earnedMarks = isCorrect ? 3 : (isAttempted ? -0.5 : 0);
             maxMarks = 3;
           } else if (q.type === 'MSQ') {
             const correctIds = correctOptsArr.map(c => c.id);
             const C = correctIds.length;
             const S = selected.length;
             const W = selected.filter((s: any) => !correctIds.includes(s)).length;
-            if (selected.length > 0) {
+            if (isAttempted) {
               if (W > 0) {
                 earnedMarks = -1;
               } else {
-                if (S === C) {
+                if (S === C && C > 0) {
                   earnedMarks = 4;
                   isCorrect = true;
-                } else {
+                } else if (S > 0) {
                   earnedMarks = S;
                 }
               }
@@ -442,11 +480,22 @@ export default function PortalDashboard() {
 
           return {
             ...r,
+            exam_questions: q,
             isCorrect,
+            isAttempted,
             earnedMarks,
             maxMarks,
             communityAvgTime: commAvg
           };
+        });
+
+        const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3, 'SUBJECTIVE': 4 };
+        processedResponses.sort((a, b) => {
+          const qA = a.exam_questions || {};
+          const qB = b.exam_questions || {};
+          if (qA.part !== qB.part) return (qA.part || '').localeCompare(qB.part || '');
+          if (qA.type !== qB.type) return (typeOrder[qA.type] || 5) - (typeOrder[qB.type] || 5);
+          return (qA.id || '').localeCompare(qB.id || '');
         });
 
         setAttemptDetailsMap(prev => ({
@@ -1660,10 +1709,22 @@ export default function PortalDashboard() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div className="bg-white p-5 rounded-2xl border border-black/5 shadow-sm">
                               <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/40 mb-1">Part A Score</p>
-                              <p className="text-2xl font-black text-[#262626]">{attemptObj?.score_part_a || 0} <span className="text-sm font-semibold text-foreground/40">/ {attemptObj?.total_part_a || 0}</span></p>
-                              <div className="mt-2 text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full inline-block">
-                                {attemptObj?.total_part_a > 0 ? Math.round((attemptObj.score_part_a / attemptObj.total_part_a) * 100) : 0}% Accuracy
-                              </div>
+                              {(() => {
+                                const partAResps = responses.filter((r: any) => r.exam_questions?.part === 'A');
+                                const calcScore = Math.round(partAResps.reduce((acc: number, r: any) => acc + (r.earnedMarks || 0), 0) * 100) / 100;
+                                const calcTotal = partAResps.reduce((acc: number, r: any) => acc + (r.maxMarks || 0), 0);
+                                const finalScore = attemptObj?.score_part_a !== undefined && attemptObj?.score_part_a !== null ? attemptObj.score_part_a : calcScore;
+                                const finalTotal = attemptObj?.total_part_a || calcTotal;
+                                const accuracy = finalTotal > 0 ? Math.round((finalScore / finalTotal) * 100) : 0;
+                                return (
+                                  <>
+                                    <p className="text-2xl font-black text-[#262626]">{finalScore} <span className="text-sm font-semibold text-foreground/40">/ {finalTotal}</span></p>
+                                    <div className="mt-2 text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full inline-block">
+                                      {accuracy}% Accuracy
+                                    </div>
+                                  </>
+                                );
+                              })()}
                             </div>
                             <div className="bg-white p-5 rounded-2xl border border-black/5 shadow-sm">
                               <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/40 mb-1">Time Spent (Part A)</p>
@@ -1690,17 +1751,19 @@ export default function PortalDashboard() {
                             <div className="flex flex-wrap gap-2.5">
                               {responses.filter((r: any) => r.exam_questions?.part === 'A').map((resp: any, i: number) => {
                                 const borderClass = resp.answer_changes > 1 ? 'border-amber-400 border-2 animate-pulse' : 'border-black/5 border';
-                                let bgClass = 'bg-gray-100 text-foreground/40';
-                                if (resp.status === 'answered' || resp.status === 'marked') {
+                                const isAttempted = resp.isAttempted ?? (resp.status === 'answered' || resp.status === 'marked' || (resp.selected_options && resp.selected_options.length > 0) || !!(resp.answer_text && resp.answer_text.trim()));
+                                
+                                let bgClass = 'bg-gray-100 text-foreground/40'; // Unattempted
+                                if (isAttempted) {
                                   bgClass = resp.isCorrect 
-                                    ? 'bg-green-50 text-green-700 font-bold border-green-200' 
-                                    : 'bg-red-50 text-red-700 font-bold border-red-200';
+                                    ? 'bg-green-50 text-green-700 font-bold border-green-200 shadow-sm' 
+                                    : 'bg-red-50 text-red-700 font-bold border-red-200 shadow-sm';
                                 }
 
                                 const wasMarked = (resp.state_transitions || []).some((t: any) => t.action === 'marked') || resp.status === 'marked';
 
                                 return (
-                                  <div key={resp.id} className="relative group cursor-pointer">
+                                  <div key={resp.id || resp.question_id || i} className="relative group cursor-pointer">
                                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs ${bgClass} ${borderClass} transition-all hover:scale-105 shadow-sm`}>
                                       {i + 1}
                                       {wasMarked && (
@@ -1712,13 +1775,14 @@ export default function PortalDashboard() {
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 w-56 p-3 bg-[#1A1A1A] text-white text-xs rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl border border-white/10">
                                       <p className="font-bold border-b border-white/10 pb-1 mb-1.5 flex justify-between">
                                         <span>Q{i + 1} ({resp.exam_questions?.type})</span>
-                                        <span className={resp.isCorrect ? 'text-green-400' : 'text-red-400'}>
-                                          {resp.isCorrect ? 'Correct' : 'Incorrect'}
+                                        <span className={resp.isCorrect ? 'text-green-400 font-bold' : isAttempted ? 'text-red-400 font-bold' : 'text-gray-400 font-bold'}>
+                                          {resp.isCorrect ? '✓ Correct' : isAttempted ? '✗ Incorrect' : '⚪ Unattempted'}
                                         </span>
                                       </p>
+                                      <p className="mb-0.5"><span className="text-white/40">Marks:</span> <span className="font-bold">{resp.earnedMarks > 0 ? `+${resp.earnedMarks}` : resp.earnedMarks}</span> / {resp.maxMarks}</p>
                                       <p className="mb-0.5"><span className="text-white/40">Topic:</span> {resp.exam_questions?.topics?.[0] || 'General'}</p>
                                       <p className="mb-0.5"><span className="text-white/40">Time Spent:</span> {resp.time_spent || 0}s (Avg: {resp.communityAvgTime || 45}s)</p>
-                                      <p className="mb-0.5"><span className="text-white/40">Difficulty:</span> {resp.exam_questions?.difficulty}</p>
+                                      <p className="mb-0.5"><span className="text-white/40">Difficulty:</span> {resp.exam_questions?.difficulty || 'Medium'}</p>
                                       <p><span className="text-white/40">Adjustments:</span> {resp.answer_changes || 0} times</p>
                                     </div>
                                   </div>
