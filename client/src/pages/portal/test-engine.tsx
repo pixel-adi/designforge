@@ -283,26 +283,36 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     setLoading(true);
     try {
       if (!id) throw new Error("Invalid Test ID");
-      // Fetch Test Details
-      const { data: testData, error: testErr } = await supabase.from('exam_tests').select('*, exam_programs(name)').eq('id', id).single();
-      if (testErr) throw new Error(`DB Error: ${testErr.message}`);
-      if (!testData) throw new Error(`Test not found in DB for ID: ${id}`);
+      
+      // Parallel Batch 1: Fetch Test Details, Sections, and Question Links simultaneously
+      const [testRes, sectionsRes, tqRes] = await Promise.all([
+        supabase.from('exam_tests').select('*, exam_programs(name)').eq('id', id).single(),
+        supabase.from('exam_test_sections').select('*').eq('test_id', id),
+        supabase.from('exam_test_questions').select('question_id').eq('test_id', id)
+      ]);
 
-      // Fetch Sections
-      const { data: sectionsData } = await supabase.from('exam_test_sections').select('*').eq('test_id', id);
+      if (testRes.error) throw new Error(`DB Error: ${testRes.error.message}`);
+      if (!testRes.data) throw new Error(`Test not found in DB for ID: ${id}`);
 
-      // Fetch Question Links
-      const { data: tqData } = await supabase.from('exam_test_questions').select('question_id').eq('test_id', id);
-      const questionIds = tqData?.map((t: any) => t.question_id) || [];
+      const testData = testRes.data;
+      const sectionsData = sectionsRes.data || [];
+      const questionIds = tqRes.data?.map((t: any) => t.question_id) || [];
 
-      // Fetch Actual Questions
       let questionsData: any[] = [];
       let optionsMap: Record<string, any[]> = {};
       let initialResponses: Record<string, ResponseData> = {};
 
       if (questionIds.length > 0) {
-        const { data: qData } = await supabase.from('exam_questions').select('*').in('id', questionIds);
-        questionsData = qData || [];
+        // Parallel Batch 2: Fetch Questions and Options simultaneously
+        const [qRes, optRes] = await Promise.all([
+          supabase.from('exam_questions').select('*').in('id', questionIds),
+          supabase.from('exam_options')
+            .select('id, question_id, content_text, media_url, created_at')
+            .in('question_id', questionIds)
+            .order('id', { ascending: true })
+        ]);
+
+        questionsData = qRes.data || [];
 
         // Sort questions by Part, then strictly NAT -> MSQ -> MCQ -> SUBJECTIVE, then ID for determinism
         const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3, 'SUBJECTIVE': 4 };
@@ -312,18 +322,35 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           return a.id.localeCompare(b.id);
         });
 
-        // Fetch Options securely
-        const { data: optData } = await supabase.from('exam_options')
-          .select('id, question_id, content_text, media_url, created_at')
-          .in('question_id', questionIds)
-          .order('id', { ascending: true }); // Sort by random UUID to naturally shuffle options while staying deterministic
+        const optData = optRes.data || [];
+        optData.forEach(opt => {
+          if (!optionsMap[opt.question_id]) optionsMap[opt.question_id] = [];
+          optionsMap[opt.question_id].push(opt);
+        });
 
-        if (optData) {
-          optData.forEach(opt => {
-            if (!optionsMap[opt.question_id]) optionsMap[opt.question_id] = [];
-            optionsMap[opt.question_id].push(opt);
-          });
-        }
+        // Image Preloader: Cache all media URLs in memory for instant rendering without flickering
+        const imageUrlsToPreload: string[] = [];
+        questionsData.forEach(q => {
+          if (q.media_url) imageUrlsToPreload.push(q.media_url);
+          if (q.content_text) {
+            const matches = q.content_text.match(/src=["'](.*?)["']/g);
+            if (matches) {
+              matches.forEach((m: string) => {
+                const src = m.replace(/src=["']|["']/g, '');
+                if (src && src.startsWith('http')) imageUrlsToPreload.push(src);
+              });
+            }
+          }
+        });
+        optData.forEach(opt => {
+          if (opt.media_url) imageUrlsToPreload.push(opt.media_url);
+        });
+
+        // Trigger asynchronous image preloading
+        imageUrlsToPreload.forEach(url => {
+          const img = new Image();
+          img.src = url;
+        });
 
         // Initialize Responses State
         questionsData.forEach(q => {
@@ -622,32 +649,23 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             breakdown.MSQ_T++;
             if (selected.length > 0) {
               breakdown.MSQ_A++;
-              if (isUceed || isCeed) {
-                const correctIds = correctOptsArr.map(c => c.id);
-                const C = correctIds.length;
-                const S = selected.length;
-                const W = selected.filter(s => !correctIds.includes(s)).length;
+              const correctIds = correctOptsArr.map(c => String(c.id).toLowerCase());
+              const selectedIds = selected.map((s: any) => String(s).toLowerCase());
+              const C = correctIds.length;
+              const S = selectedIds.length;
+              const W = selectedIds.filter((s: string) => !correctIds.includes(s)).length;
 
-                if (W > 0) {
-                  earned = msWrong; // Wrong option selected -> negative marking
-                  isCorrect = false;
-                } else {
-                  // No wrong options selected
-                  if (S === C && C > 0) {
-                    earned = msCorrect; // All correct chosen -> full marks
-                    isCorrect = true;
-                  } else if (S > 0) {
-                    earned = S; // Partial marking -> +S
-                    isCorrect = false;
-                  }
-                }
+              if (W > 0) {
+                earned = msWrong; // Wrong option selected -> negative marking (-1)
+                isCorrect = false;
               } else {
-                // Fallback generic MSQ
-                const correctIds = correctOptsArr.map(c => c.id);
-                const allCorrect = correctIds.every(c => selected.includes(c)) && selected.every(s => correctIds.includes(s));
-                if (allCorrect) {
-                  earned = 1;
+                // No wrong options selected (W === 0)
+                if (S === C && C > 0) {
+                  earned = msCorrect; // All correct chosen -> full marks (+4)
                   isCorrect = true;
+                } else if (S > 0) {
+                  earned = S; // Partial marking -> +S marks (+1, +2, +3)
+                  isCorrect = true; // Positive marks earned
                 }
               }
             }

@@ -358,15 +358,34 @@ export default function PortalDashboard() {
         const tqQuestionIds = (testQuestions || []).map(tq => tq.question_id);
         const respQuestionIds = (responses || []).map(r => r.question_id).filter(Boolean);
         const questionIds = Array.from(new Set([...tqQuestionIds, ...respQuestionIds]));
+        const missingQuestionIds = tqQuestionIds.filter(qId => !respQuestionIds.includes(qId));
         
         let correctOpts: any[] = [];
+        let commData: any[] = [];
+        let missingQsData: any[] = [];
+
         if (questionIds.length > 0) {
-          const { data: optsData } = await supabase
-            .from('exam_options')
-            .select('id, question_id, is_correct, content_text')
-            .in('question_id', questionIds)
-            .eq('is_correct', true);
-          correctOpts = optsData || [];
+          const [optsRes, commRes, missingQsRes] = await Promise.all([
+            supabase
+              .from('exam_options')
+              .select('id, question_id, is_correct, content_text')
+              .in('question_id', questionIds)
+              .eq('is_correct', true),
+            supabase
+              .from('exam_responses')
+              .select('question_id, time_spent')
+              .in('question_id', questionIds),
+            missingQuestionIds.length > 0
+              ? supabase
+                  .from('exam_questions')
+                  .select('id, type, part, difficulty, content_text, topics, pyq_tag')
+                  .in('id', missingQuestionIds)
+              : Promise.resolve({ data: [] })
+          ]);
+
+          correctOpts = optsRes.data || [];
+          commData = commRes.data || [];
+          missingQsData = missingQsRes.data || [];
         }
 
         const correctMap: Record<string, any[]> = {};
@@ -374,15 +393,6 @@ export default function PortalDashboard() {
           if (!correctMap[opt.question_id]) correctMap[opt.question_id] = [];
           correctMap[opt.question_id].push(opt);
         });
-
-        let commData: any[] = [];
-        if (questionIds.length > 0) {
-          const { data: commRes } = await supabase
-            .from('exam_responses')
-            .select('question_id, time_spent')
-            .in('question_id', questionIds);
-          commData = commRes || [];
-        }
 
         const commAverages: Record<string, { totalTime: number, count: number }> = {};
         (commData || []).forEach(r => {
@@ -392,21 +402,13 @@ export default function PortalDashboard() {
           commAverages[r.question_id].count += 1;
         });
 
-        const missingQuestionIds = tqQuestionIds.filter(qId => !respQuestionIds.includes(qId));
         let allQuestionsMap: Record<string, any> = {};
         (responses || []).forEach(r => {
           if (r.exam_questions) allQuestionsMap[r.exam_questions.id] = r.exam_questions;
         });
-
-        if (missingQuestionIds.length > 0) {
-          const { data: missingQs } = await supabase
-            .from('exam_questions')
-            .select('id, type, part, difficulty, content_text, topics, pyq_tag')
-            .in('id', missingQuestionIds);
-          (missingQs || []).forEach(q => {
-            allQuestionsMap[q.id] = q;
-          });
-        }
+        (missingQsData || []).forEach(q => {
+          allQuestionsMap[q.id] = q;
+        });
 
         const respMap: Record<string, any> = {};
         (responses || []).forEach(r => {
@@ -447,23 +449,27 @@ export default function PortalDashboard() {
             earnedMarks = isCorrect ? 4 : 0;
             maxMarks = 4;
           } else if (q.type === 'MCQ') {
-            isCorrect = selected.length === 1 && correctOptsArr.some(c => c.id === selected[0]);
+            const selectedStr = selected.map((s: any) => String(s).toLowerCase());
+            isCorrect = selectedStr.length === 1 && correctOptsArr.some(c => String(c.id).toLowerCase() === selectedStr[0]);
             earnedMarks = isCorrect ? 3 : (isAttempted ? -0.5 : 0);
             maxMarks = 3;
           } else if (q.type === 'MSQ') {
-            const correctIds = correctOptsArr.map(c => c.id);
+            const correctIds = correctOptsArr.map(c => String(c.id).toLowerCase());
+            const selectedIds = selected.map((s: any) => String(s).toLowerCase());
             const C = correctIds.length;
-            const S = selected.length;
-            const W = selected.filter((s: any) => !correctIds.includes(s)).length;
+            const S = selectedIds.length;
+            const W = selectedIds.filter((s: string) => !correctIds.includes(s)).length;
             if (isAttempted) {
               if (W > 0) {
                 earnedMarks = -1;
+                isCorrect = false;
               } else {
                 if (S === C && C > 0) {
                   earnedMarks = 4;
                   isCorrect = true;
                 } else if (S > 0) {
                   earnedMarks = S;
+                  isCorrect = true;
                 }
               }
             }
