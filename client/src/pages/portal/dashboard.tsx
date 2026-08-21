@@ -81,6 +81,7 @@ export default function PortalDashboard() {
   const [questionDifficultyFilter, setQuestionDifficultyFilter] = useState('all');
   const [questionTopicFilter, setQuestionTopicFilter] = useState('');
   const [showAnswers, setShowAnswers] = useState<Record<string, boolean>>({});
+  const [topicFilter, setTopicFilter] = useState<'all' | 'strong' | 'weak'>('all');
 
   // Study Materials state
   const [studyMaterials, setStudyMaterials] = useState<any[]>([]);
@@ -656,7 +657,7 @@ export default function PortalDashboard() {
 
   const getConceptMasteryData = (responses: any[]) => {
     const partA = (responses || []).filter(r => r.exam_questions?.part === 'A');
-    const topicMap: Record<string, { total: number, earned: number }> = {};
+    const topicMap: Record<string, { total: number, earned: number, count: number, difficultyWeights: number[] }> = {};
 
     partA.forEach(r => {
       const q = r.exam_questions;
@@ -668,37 +669,40 @@ export default function PortalDashboard() {
 
       q.topics.forEach((t: string) => {
         const topicName = t.trim();
+        if (!topicName) return;
         if (!topicMap[topicName]) {
-          topicMap[topicName] = { total: 0, earned: 0 };
+          topicMap[topicName] = { total: 0, earned: 0, count: 0, difficultyWeights: [] };
         }
         const maxM = Number(r.maxMarks) || 1;
         const earnedM = Number(r.earnedMarks) || 0;
         topicMap[topicName].total += maxM * weight;
         topicMap[topicName].earned += Math.max(0, earnedM) * weight;
+        topicMap[topicName].count += 1;
+        topicMap[topicName].difficultyWeights.push(weight);
       });
     });
 
     const data = Object.keys(topicMap).map(topic => {
       const info = topicMap[topic];
       const rawPercent = info.total > 0 ? (info.earned / info.total) * 100 : 0;
-      const percent = isFinite(rawPercent) ? Math.min(100, Math.round(rawPercent * 100) / 100) : 0;
+      const percent = isFinite(rawPercent) ? Math.min(100, Math.round(rawPercent)) : 0;
+      const avgWeight = info.difficultyWeights.length > 0
+        ? info.difficultyWeights.reduce((a, b) => a + b, 0) / info.difficultyWeights.length
+        : 2;
+      
+      const difficultyTag = avgWeight >= 2.5 ? 'High (3x)' : avgWeight <= 1.5 ? 'Low (1x)' : 'Med (2x)';
+
       return {
-        subject: topic,
-        A: percent,
-        fullMark: 100
+        topic,
+        mastery: percent,
+        count: info.count,
+        earnedWeighted: info.earned,
+        totalWeighted: info.total,
+        difficultyTag
       };
     });
 
-    if (data.length === 0) {
-      return [
-        { subject: 'Visualisation', A: 0, fullMark: 100 },
-        { subject: 'Observation', A: 0, fullMark: 100 },
-        { subject: 'Aptitude', A: 0, fullMark: 100 },
-        { subject: 'GK', A: 0, fullMark: 100 },
-        { subject: 'Theory', A: 0, fullMark: 100 }
-      ];
-    }
-
+    data.sort((a, b) => b.mastery - a.mastery);
     return data;
   };
 
@@ -809,9 +813,14 @@ export default function PortalDashboard() {
         secondHalfAccuracy: 0,
         pacingDecay: 1.0,
         accuracyDrop: 0,
+        speedChangeLabel: "Normal Pace",
+        speedExplanation: "No question time data logged yet.",
+        accuracyChangeLabel: "No Change",
+        accuracyExplanation: "Attempt a mock test to track precision changes.",
         staminaScore: 100,
         state: 'flow',
-        critique: "No telemetry responses to parse. Attempt mock exams to measure your focus endurance."
+        headline: "Optimal Focus & Pace",
+        critique: "Complete a mock test session to unlock personalized endurance and pacing analytics."
       };
     }
 
@@ -848,18 +857,58 @@ export default function PortalDashboard() {
     staminaScore -= Math.min(40, Math.abs(pacingDecay - 1.0) * 100);
     const finalStaminaScore = isFinite(staminaScore) ? Math.max(10, Math.min(100, Math.round(staminaScore))) : 100;
 
-    let state = 'flow';
-    let critique = "Superb consistency. You maintained balanced pacing and accuracy across the entire test session. You are ready for peak exam conditions!";
+    // Plain English Speed Trend
+    let speedChangeLabel = "Steady Pacing";
+    let speedExplanation = `You averaged ${firstHalfAvgPacing}s per question in 1st half vs ${secondHalfAvgPacing}s in 2nd half.`;
 
-    if (pacingDecay > 1.15 && accuracyDrop > 5) {
-      state = 'exhaustion';
-      critique = `Your speed slowed by ${Math.round((pacingDecay - 1.0) * 100)}% and accuracy fell by ${Math.round(accuracyDrop)}% in the second half. This indicates stamina depletion. We recommend practicing in 90-minute focused sprints to build cognitive tolerance.`;
-    } else if (pacingDecay < 0.85 && accuracyDrop > 5) {
+    if (pacingDecay < 0.7) {
+      const timesFaster = (1 / pacingDecay).toFixed(1);
+      speedChangeLabel = `${timesFaster}x Faster in 2nd Half`;
+      speedExplanation = `You accelerated from ${firstHalfAvgPacing}s down to ${secondHalfAvgPacing}s per question in the second half.`;
+    } else if (pacingDecay < 0.9) {
+      const pctFaster = Math.round((1 - pacingDecay) * 100);
+      speedChangeLabel = `${pctFaster}% Faster in 2nd Half`;
+      speedExplanation = `You picked up speed slightly in 2nd half (${secondHalfAvgPacing}s vs ${firstHalfAvgPacing}s).`;
+    } else if (pacingDecay > 1.3) {
+      const pctSlower = Math.round((pacingDecay - 1) * 100);
+      speedChangeLabel = `${pctSlower}% Slower in 2nd Half`;
+      speedExplanation = `Your average time per question increased from ${firstHalfAvgPacing}s up to ${secondHalfAvgPacing}s in 2nd half.`;
+    }
+
+    // Plain English Accuracy Trend
+    let accuracyChangeLabel = "Stable Precision";
+    let accuracyExplanation = `Maintained ${secondHalfAccuracy}% accuracy across both halves of the exam.`;
+
+    if (accuracyDrop > 10) {
+      accuracyChangeLabel = `-${accuracyDrop}% Accuracy Drop`;
+      accuracyExplanation = `Accuracy dropped from ${firstHalfAccuracy}% in 1st half down to ${secondHalfAccuracy}% in 2nd half.`;
+    } else if (accuracyDrop < -10) {
+      const gain = Math.abs(accuracyDrop);
+      accuracyChangeLabel = `+${gain}% Accuracy Gain`;
+      accuracyExplanation = `Accuracy improved from ${firstHalfAccuracy}% in 1st half up to ${secondHalfAccuracy}% in 2nd half!`;
+    }
+
+    // Personalized Critique
+    let state = 'flow';
+    let headline = "Superb Focus & Rhythm 🌟";
+    let critique = `Great job! You maintained smooth pacing (${firstHalfAvgPacing}s to ${secondHalfAvgPacing}s) and solid precision (${firstHalfAccuracy}% to ${secondHalfAccuracy}%). You didn't burn out or panic under time pressure.`;
+
+    if (pacingDecay < 0.7 && accuracyDrop <= 5) {
+      state = 'flow';
+      headline = "High-Speed Accuracy Sprint ⚡";
+      critique = `Impressive stamina! You sped up substantially in the second half (${secondHalfAvgPacing}s vs ${firstHalfAvgPacing}s per question) while keeping your accuracy steady at ${secondHalfAccuracy}%. You managed your exam clock aggressively without sacrificing correct answers.`;
+    } else if (pacingDecay < 0.7 && accuracyDrop > 10) {
       state = 'panic';
-      critique = `You sped up by ${Math.round((1.0 - pacingDecay) * 100)}% but accuracy dropped by ${Math.round(accuracyDrop)}% as the test progressed. This suggests rushing under time pressure. Focus on steady pacing distribution and time management.`;
+      headline = "Rushed Finish Warning ⚠️";
+      critique = `You accelerated sharply in the second half (${secondHalfAvgPacing}s vs ${firstHalfAvgPacing}s), but your accuracy fell by ${accuracyDrop}% (${firstHalfAccuracy}% → ${secondHalfAccuracy}%). Rushing to complete questions caused avoidable mistakes. Aim for steady pacing next time!`;
+    } else if (pacingDecay > 1.25 && accuracyDrop > 10) {
+      state = 'exhaustion';
+      headline = "Cognitive Fatigue Detected 🔋";
+      critique = `Your speed slowed by ${Math.round((pacingDecay - 1) * 100)}% and accuracy dropped by ${accuracyDrop}% in the second half of the mock. Mental fatigue set in toward the end. We recommend 45-minute sprint sessions and 15-second breathing pauses to build endurance.`;
     } else if (accuracyDrop > 15) {
       state = 'exhaustion';
-      critique = `Your accuracy dropped sharply by ${Math.round(accuracyDrop)}% in the second half of the exam. Try taking short 30-second breathing pauses every 45 minutes to refresh your focus.`;
+      headline = "Late-Exam Precision Dip 📉";
+      critique = `Your accuracy dropped from ${firstHalfAccuracy}% in the first half to ${secondHalfAccuracy}% in the second half. Take 10-second posture/reset pauses every 30 minutes during long mock tests to keep your mind sharp.`;
     }
 
     return {
@@ -869,8 +918,13 @@ export default function PortalDashboard() {
       secondHalfAccuracy: isFinite(secondHalfAccuracy) ? secondHalfAccuracy : 0,
       pacingDecay,
       accuracyDrop,
+      speedChangeLabel,
+      speedExplanation,
+      accuracyChangeLabel,
+      accuracyExplanation,
       staminaScore: finalStaminaScore,
       state,
+      headline,
       critique
     };
   };
@@ -1835,24 +1889,126 @@ export default function PortalDashboard() {
                               </div>
                             </div>
 
-                            {/* Dynamics Concept Mastery Radar */}
+                            {/* Enhanced Topic Mastery Breakdown Widget */}
                             <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
-                              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-6">Topic Mastery Strength (Difficulty-Weighted)</h3>
-                              <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-                                    <PolarGrid stroke="#E5E7EB" />
-                                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#6B7280', fontSize: 10 }} />
-                                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                                    <Radar name="Mastery" dataKey="A" stroke="#FF6B6B" fill="#FF6B6B" fillOpacity={0.4} />
-                                    <RechartsTooltip 
-                                      contentStyle={{ borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', background: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 12 }}
-                                      formatter={(value: any) => [typeof value === 'number' ? `${Number(value.toFixed(2))}%` : value, 'Mastery']}
-                                    />
-                                  </RadarChart>
-                                </ResponsiveContainer>
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                                <div>
+                                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-1">
+                                    Topic Mastery & Strength Breakdown
+                                  </h3>
+                                  <p className="text-[10px] text-foreground/40 font-medium">
+                                    Difficulty-weighted performance analysis across tested concepts (Low 1x, Med 2x, High 3x).
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1.5 bg-black/5 p-1 rounded-xl text-xs font-bold shrink-0">
+                                  <button 
+                                    onClick={() => setTopicFilter('all')} 
+                                    className={`px-3 py-1 rounded-lg transition-all ${topicFilter === 'all' ? 'bg-white text-primary shadow-sm' : 'text-foreground/50 hover:text-foreground'}`}
+                                  >
+                                    All ({radarData.length})
+                                  </button>
+                                  <button 
+                                    onClick={() => setTopicFilter('strong')} 
+                                    className={`px-3 py-1 rounded-lg transition-all ${topicFilter === 'strong' ? 'bg-white text-green-700 shadow-sm' : 'text-foreground/50 hover:text-foreground'}`}
+                                  >
+                                    Strong ({radarData.filter((t: any) => t.mastery >= 60).length})
+                                  </button>
+                                  <button 
+                                    onClick={() => setTopicFilter('weak')} 
+                                    className={`px-3 py-1 rounded-lg transition-all ${topicFilter === 'weak' ? 'bg-white text-red-600 shadow-sm' : 'text-foreground/50 hover:text-foreground'}`}
+                                  >
+                                    Needs Focus ({radarData.filter((t: any) => t.mastery < 60).length})
+                                  </button>
+                                </div>
                               </div>
-                              <p className="text-[10px] font-medium text-foreground/40 mt-4 text-center">Score values are weighted based on question difficulty: Low (1x), Med (2x), High (3x) weight points.</p>
+
+                              {/* Top Mastery Highlights Cards */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                                <div className="p-4 bg-green-50/70 border border-green-200/80 rounded-xl flex items-start gap-3">
+                                  <div className="w-9 h-9 rounded-lg bg-green-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+                                    🏆
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] font-bold text-green-800 uppercase tracking-wider block">Top Mastery Strength</span>
+                                    <h4 className="font-extrabold text-green-950 text-sm mt-0.5">
+                                      {radarData[0]?.topic || 'N/A'} {radarData[0] ? `(${radarData[0].mastery}%)` : ''}
+                                    </h4>
+                                    <p className="text-xs text-green-800/80 font-medium mt-1">
+                                      {radarData[0] ? `Highest accuracy across ${radarData[0].count} questions.` : 'No topics recorded.'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="p-4 bg-red-50/70 border border-red-200/80 rounded-xl flex items-start gap-3">
+                                  <div className="w-9 h-9 rounded-lg bg-red-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+                                    🎯
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] font-bold text-red-800 uppercase tracking-wider block">Priority Focus Area</span>
+                                    <h4 className="font-extrabold text-red-950 text-sm mt-0.5">
+                                      {radarData[radarData.length - 1]?.topic || 'N/A'} {radarData[radarData.length - 1] ? `(${radarData[radarData.length - 1].mastery}%)` : ''}
+                                    </h4>
+                                    <p className="text-xs text-red-800/80 font-medium mt-1">
+                                      {radarData[radarData.length - 1] ? `Target this topic in practice sessions!` : 'No topics recorded.'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Filtered Topic Mastery List */}
+                              {(() => {
+                                const filteredTopics = radarData.filter((t: any) => {
+                                  if (topicFilter === 'strong') return t.mastery >= 60;
+                                  if (topicFilter === 'weak') return t.mastery < 60;
+                                  return true;
+                                });
+
+                                if (filteredTopics.length === 0) {
+                                  return (
+                                    <div className="text-center p-6 text-xs text-foreground/40 font-medium bg-black/5 rounded-xl">
+                                      No topics matching the selected filter.
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div className="space-y-3 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
+                                    {filteredTopics.map((item: any, idx: number) => {
+                                      const isHighMastery = item.mastery >= 70;
+                                      const isMedMastery = item.mastery >= 40 && item.mastery < 70;
+                                      const barColor = isHighMastery ? 'bg-green-500' : isMedMastery ? 'bg-amber-500' : 'bg-red-500';
+                                      const badgeBg = isHighMastery ? 'bg-green-100 text-green-800' : isMedMastery ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800';
+
+                                      return (
+                                        <div key={idx} className="p-3 bg-black/[0.02] hover:bg-black/[0.04] border border-black/5 rounded-xl transition-colors">
+                                          <div className="flex items-center justify-between gap-3 mb-1.5">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                              <span className="font-bold text-xs text-[#262626] truncate">{item.topic}</span>
+                                              <span className="text-[9px] font-bold bg-black/5 text-foreground/60 px-2 py-0.5 rounded shrink-0">
+                                                {item.difficultyTag}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-3 shrink-0">
+                                              <span className="text-xs font-medium text-foreground/50">
+                                                {item.count} {item.count === 1 ? 'question' : 'questions'}
+                                              </span>
+                                              <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${badgeBg}`}>
+                                                {item.mastery}%
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <div className="w-full h-2 bg-black/5 rounded-full overflow-hidden">
+                                            <div 
+                                              className={`h-full rounded-full transition-all duration-500 ${barColor}`} 
+                                              style={{ width: `${item.mastery}%` }} 
+                                            />
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
 
@@ -1877,80 +2033,131 @@ export default function PortalDashboard() {
 
                           {/* Cognitive Fatigue & Stamina Profile Widget */}
                           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                            {/* Header */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-black/5 pb-4">
                               <div>
-                                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-1">Cognitive Fatigue & Stamina Profile</h3>
-                                <p className="text-[10px] text-foreground/40 font-medium">Endurance analysis comparing the first 50% vs final 50% of your mock test attempts.</p>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60">
+                                    Cognitive Fatigue & Stamina Profile
+                                  </h3>
+                                  <span className="text-[10px] font-bold bg-primary/10 text-primary px-2.5 py-0.5 rounded-full">
+                                    Endurance Flow
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-foreground/40 font-medium mt-1">
+                                  Comparing your Speed (Seconds/Question) & Accuracy (%) between the First 50% vs Final 50% of the exam.
+                                </p>
                               </div>
-                              <div className="flex items-center gap-3 shrink-0">
+
+                              <div className="flex items-center gap-3 shrink-0 bg-black/5 px-4 py-2 rounded-2xl">
                                 <div className="text-right">
-                                  <span className="text-[10px] font-bold text-foreground/40 block uppercase tracking-wider">Stamina Score</span>
+                                  <span className="text-[9px] font-bold text-foreground/40 block uppercase tracking-wider">Stamina Score</span>
                                   <span className={`text-2xl font-black ${staminaData.staminaScore >= 80 ? 'text-green-600' : staminaData.staminaScore >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
                                     {staminaData.staminaScore}/100
                                   </span>
                                 </div>
-                                <div className="w-12 h-12 rounded-full border-4 border-black/5 flex items-center justify-center relative">
-                                  <div className={`absolute inset-0 rounded-full border-4 border-t-transparent ${staminaData.staminaScore >= 80 ? 'border-green-500' : staminaData.staminaScore >= 50 ? 'border-amber-500' : 'border-red-500'} animate-spin-slow`} style={{ transform: `rotate(${staminaData.staminaScore * 3.6}deg)` }} />
-                                  <span className="text-xs font-black text-[#262626]">{staminaData.staminaScore}%</span>
+                                <div className="w-11 h-11 rounded-full border-4 border-black/10 flex items-center justify-center relative bg-white shadow-sm">
+                                  <div className={`absolute inset-0 rounded-full border-4 border-t-transparent ${staminaData.staminaScore >= 80 ? 'border-green-500' : staminaData.staminaScore >= 50 ? 'border-amber-500' : 'border-red-500'}`} style={{ transform: `rotate(${staminaData.staminaScore * 3.6}deg)` }} />
+                                  <span className="text-[11px] font-black text-[#262626]">{staminaData.staminaScore}%</span>
                                 </div>
                               </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              {/* Stamina metrics comparison chart */}
-                              <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <BarChart 
-                                    data={[
-                                      { name: 'First Half', Pacing: staminaData.firstHalfPacing, Accuracy: staminaData.firstHalfAccuracy },
-                                      { name: 'Second Half', Pacing: staminaData.secondHalfPacing, Accuracy: staminaData.secondHalfAccuracy }
-                                    ]}
-                                    margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
-                                  >
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6B7280' }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6B7280' }} />
-                                    <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                                    <Legend wrapperStyle={{ fontSize: 10, fontWeight: 'bold' }} />
-                                    <Bar dataKey="Pacing" name="Avg Speed (s)" fill="#FF6B6B" radius={[3, 3, 0, 0]} maxBarSize={25} />
-                                    <Bar dataKey="Accuracy" name="Accuracy (%)" fill="#10B981" radius={[3, 3, 0, 0]} maxBarSize={25} />
-                                  </BarChart>
-                                </ResponsiveContainer>
-                              </div>
+                              {/* Visual Comparison: Speed vs Accuracy across 1st Half and 2nd Half */}
+                              <div className="space-y-4">
+                                <h4 className="text-xs font-bold text-[#262626] uppercase tracking-wider">Pacing & Precision Split</h4>
 
-                              {/* Stamina details and critique panel */}
-                              <div className="flex flex-col justify-between space-y-4">
-                                <div className="grid grid-cols-2 gap-3 text-center">
-                                  <div className="p-3 bg-black/5 rounded-xl">
-                                    <span className="text-[9px] font-bold uppercase text-foreground/40 block">Pacing Decay Index</span>
-                                    <span className={`text-md font-black block mt-0.5 ${staminaData.pacingDecay > 1.15 ? 'text-red-500' : staminaData.pacingDecay < 0.85 ? 'text-amber-600' : 'text-green-600'}`}>
-                                      {staminaData.pacingDecay.toFixed(2)}x
+                                {/* First Half Box */}
+                                <div className="p-4 rounded-xl bg-gray-50 border border-black/5 space-y-3">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-bold text-xs text-[#262626] flex items-center gap-1.5">
+                                      <span className="w-2 h-2 rounded-full bg-blue-500" /> First 50% of Test
                                     </span>
-                                    <span className="text-[9px] font-semibold text-foreground/50">
-                                      {staminaData.pacingDecay > 1.0 ? 'Deceleration' : 'Acceleration'}
-                                    </span>
+                                    <span className="text-xs font-semibold text-foreground/50">Questions 1 – {Math.ceil(responses.filter((r: any) => r.exam_questions?.part === 'A').length / 2)}</span>
                                   </div>
-                                  <div className="p-3 bg-black/5 rounded-xl">
-                                    <span className="text-[9px] font-bold uppercase text-foreground/40 block">Accuracy Drop</span>
-                                    <span className={`text-md font-black block mt-0.5 ${staminaData.accuracyDrop > 10 ? 'text-red-500' : staminaData.accuracyDrop > 0 ? 'text-amber-500' : 'text-green-600'}`}>
-                                      {staminaData.accuracyDrop > 0 ? `+${staminaData.accuracyDrop}%` : `${staminaData.accuracyDrop}%`}
-                                    </span>
-                                    <span className="text-[9px] font-semibold text-foreground/50">
-                                      {staminaData.accuracyDrop > 0 ? 'Accuracy Decay' : 'Stamina Growth'}
-                                    </span>
+                                  <div className="grid grid-cols-2 gap-3 text-center">
+                                    <div className="bg-white p-2.5 rounded-lg border border-black/5">
+                                      <span className="text-[9px] font-bold uppercase text-foreground/40 block">Avg Speed</span>
+                                      <span className="text-sm font-black text-[#262626] block mt-0.5">{staminaData.firstHalfPacing}s <span className="text-[10px] text-foreground/40 font-normal">/ q</span></span>
+                                    </div>
+                                    <div className="bg-white p-2.5 rounded-lg border border-black/5">
+                                      <span className="text-[9px] font-bold uppercase text-foreground/40 block">Accuracy</span>
+                                      <span className="text-sm font-black text-green-600 block mt-0.5">{staminaData.firstHalfAccuracy}%</span>
+                                    </div>
                                   </div>
                                 </div>
 
-                                {/* Dynamic alert-style callout critique */}
-                                <div className={`p-4 rounded-xl border flex gap-3 text-xs font-semibold leading-relaxed ${staminaData.state === 'flow' ? 'bg-green-50 border-green-200 text-green-800' : staminaData.state === 'panic' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-                                  {staminaData.state === 'flow' ? (
-                                    <Sparkles className="w-5 h-5 text-green-600 shrink-0" />
-                                  ) : (
-                                    <Lightbulb className="w-5 h-5 shrink-0 text-amber-600" />
-                                  )}
+                                {/* Second Half Box */}
+                                <div className="p-4 rounded-xl bg-gray-50 border border-black/5 space-y-3">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-bold text-xs text-[#262626] flex items-center gap-1.5">
+                                      <span className="w-2 h-2 rounded-full bg-purple-500" /> Final 50% of Test
+                                    </span>
+                                    <span className="text-xs font-semibold text-foreground/50">Final Questions</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3 text-center">
+                                    <div className="bg-white p-2.5 rounded-lg border border-black/5">
+                                      <span className="text-[9px] font-bold uppercase text-foreground/40 block">Avg Speed</span>
+                                      <span className="text-sm font-black text-[#262626] block mt-0.5">{staminaData.secondHalfPacing}s <span className="text-[10px] text-foreground/40 font-normal">/ q</span></span>
+                                    </div>
+                                    <div className="bg-white p-2.5 rounded-lg border border-black/5">
+                                      <span className="text-[9px] font-bold uppercase text-foreground/40 block">Accuracy</span>
+                                      <span className={`text-sm font-black block mt-0.5 ${staminaData.secondHalfAccuracy >= staminaData.firstHalfAccuracy ? 'text-green-600' : 'text-amber-600'}`}>
+                                        {staminaData.secondHalfAccuracy}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Student-Friendly Performance Insights & AI Mentor Feedback */}
+                              <div className="flex flex-col justify-between space-y-4">
+                                {/* 2 Clear Metric Badges */}
+                                <div className="grid grid-cols-2 gap-3 text-left">
+                                  <div className="p-3.5 bg-black/5 rounded-xl border border-black/5">
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-foreground/40 block">Speed Trend</span>
+                                    <span className="text-sm font-black text-[#262626] block mt-1">
+                                      {staminaData.speedChangeLabel}
+                                    </span>
+                                    <p className="text-[10px] font-medium text-foreground/50 mt-1 leading-snug">
+                                      {staminaData.speedExplanation}
+                                    </p>
+                                  </div>
+
+                                  <div className="p-3.5 bg-black/5 rounded-xl border border-black/5">
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-foreground/40 block">Accuracy Trend</span>
+                                    <span className={`text-sm font-black block mt-1 ${staminaData.accuracyDrop > 10 ? 'text-red-500' : staminaData.accuracyDrop < -10 ? 'text-green-600' : 'text-green-700'}`}>
+                                      {staminaData.accuracyChangeLabel}
+                                    </span>
+                                    <p className="text-[10px] font-medium text-foreground/50 mt-1 leading-snug">
+                                      {staminaData.accuracyExplanation}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Super Personal AI Mentor Advice */}
+                                <div className={`p-4 rounded-xl border flex gap-3 text-xs leading-relaxed shadow-sm ${
+                                  staminaData.state === 'flow' 
+                                    ? 'bg-green-50/80 border-green-200 text-green-900' 
+                                    : staminaData.state === 'panic' 
+                                    ? 'bg-amber-50/80 border-amber-200 text-amber-900' 
+                                    : 'bg-red-50/80 border-red-200 text-red-900'
+                                }`}>
+                                  <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center shrink-0 border border-black/5">
+                                    {staminaData.state === 'flow' ? (
+                                      <Sparkles className="w-5 h-5 text-green-600" />
+                                    ) : (
+                                      <Lightbulb className="w-5 h-5 text-amber-600" />
+                                    )}
+                                  </div>
                                   <div>
-                                    <span className="font-bold block mb-0.5">{staminaData.state === 'flow' ? 'Optimal Flow State' : staminaData.state === 'panic' ? 'Rushing Detected' : 'Endurance Exhaustion'}</span>
-                                    {staminaData.critique}
+                                    <span className="font-extrabold text-sm block mb-1">
+                                      {staminaData.headline}
+                                    </span>
+                                    <p className="font-medium opacity-90">
+                                      {staminaData.critique}
+                                    </p>
                                   </div>
                                 </div>
                               </div>
