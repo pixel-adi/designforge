@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy, BookOpen, Lightbulb, ClipboardList, Lock, CreditCard, ExternalLink, Download, Eye, EyeOff, Upload, AlertCircle, Star, Shield, Sparkles, ThumbsUp, Plus, HelpCircle, Send, Zap } from "lucide-react";
+import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy, BookOpen, Lightbulb, ClipboardList, Lock, CreditCard, ExternalLink, Download, Eye, EyeOff, Upload, AlertCircle, Star, Shield, Sparkles, ThumbsUp, Plus, HelpCircle, Send, Zap, Target, TrendingUp } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -704,6 +704,68 @@ export default function PortalDashboard() {
 
     data.sort((a, b) => b.mastery - a.mastery);
     return data;
+  };
+
+  const getDomainGroupedData = (radarData: any[]) => {
+    const domains: Record<string, { id: string, name: string, icon: string, color: string, border: string, bg: string, topics: any[] }> = {
+      spatial: {
+        id: 'spatial',
+        name: "Visual & Spatial Intelligence",
+        icon: "📐",
+        color: "text-indigo-700",
+        border: "border-indigo-200/80",
+        bg: "bg-indigo-50/40",
+        topics: []
+      },
+      logic: {
+        id: 'logic',
+        name: "Aptitude & Logical Reasoning",
+        icon: "🧠",
+        color: "text-blue-700",
+        border: "border-blue-200/80",
+        bg: "bg-blue-50/40",
+        topics: []
+      },
+      design: {
+        id: 'design',
+        name: "Design Culture & Aptitude",
+        icon: "🎨",
+        color: "text-purple-700",
+        border: "border-purple-200/80",
+        bg: "bg-purple-50/40",
+        topics: []
+      },
+      science: {
+        id: 'science',
+        name: "Applied Science & Technology",
+        icon: "⚡",
+        color: "text-emerald-700",
+        border: "border-emerald-200/80",
+        bg: "bg-emerald-50/40",
+        topics: []
+      }
+    };
+
+    (radarData || []).forEach(item => {
+      const name = (item.topic || '').toLowerCase();
+      if (name.includes('spatial') || name.includes('visual') || name.includes('3d') || name.includes('orthographic') || name.includes('perspective') || name.includes('rotation') || name.includes('paper') || name.includes('view') || name.includes('geometry') || name.includes('shape') || name.includes('grid') || name.includes('puzzle') || name.includes('top view') || name.includes('pattern')) {
+        domains.spatial.topics.push(item);
+      } else if (name.includes('aptitude') || name.includes('logic') || name.includes('reasoning') || name.includes('deduction') || name.includes('set') || name.includes('direction') || name.includes('path') || name.includes('constraint') || name.includes('math') || name.includes('quantitative')) {
+        domains.logic.topics.push(item);
+      } else if (name.includes('science') || name.includes('physics') || name.includes('moulding') || name.includes('materials') || name.includes('crafts') || name.includes('optics') || name.includes('ergonomics') || name.includes('animation') || name.includes('color') || name.includes('process')) {
+        domains.science.topics.push(item);
+      } else {
+        domains.design.topics.push(item);
+      }
+    });
+
+    return Object.values(domains).map(d => {
+      const totalMastery = d.topics.length > 0
+        ? Math.round(d.topics.reduce((acc, t) => acc + t.mastery, 0) / d.topics.length)
+        : 0;
+      const totalCount = d.topics.reduce((acc, t) => acc + t.count, 0);
+      return { ...d, totalMastery, totalCount };
+    });
   };
 
   const getTimeWastage = (responses: any[]) => {
@@ -1889,119 +1951,154 @@ export default function PortalDashboard() {
                               </div>
                             </div>
 
-                            {/* Enhanced Topic Mastery Breakdown Widget */}
-                            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                            {/* Enhanced Visual Topic Mastery & Domain Matrix Widget */}
+                            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6 space-y-6">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/5 pb-4">
                                 <div>
-                                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-1">
-                                    Topic Mastery & Strength Breakdown
-                                  </h3>
-                                  <p className="text-[10px] text-foreground/40 font-medium">
-                                    Difficulty-weighted performance analysis across tested concepts (Low 1x, Med 2x, High 3x).
+                                  <div className="flex items-center gap-2">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60">
+                                      Topic Mastery & Domain Matrix
+                                    </h3>
+                                    <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2.5 py-0.5 rounded-full">
+                                      Entrance Exam Domains
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-foreground/40 font-medium mt-1">
+                                    Difficulty-weighted performance grouped into core entrance exam domains (Low 1x, Med 2x, High 3x).
                                   </p>
                                 </div>
+
                                 <div className="flex items-center gap-1.5 bg-black/5 p-1 rounded-xl text-xs font-bold shrink-0">
                                   <button 
                                     onClick={() => setTopicFilter('all')} 
                                     className={`px-3 py-1 rounded-lg transition-all ${topicFilter === 'all' ? 'bg-white text-primary shadow-sm' : 'text-foreground/50 hover:text-foreground'}`}
                                   >
-                                    All ({radarData.length})
+                                    All Domains
                                   </button>
                                   <button 
                                     onClick={() => setTopicFilter('strong')} 
                                     className={`px-3 py-1 rounded-lg transition-all ${topicFilter === 'strong' ? 'bg-white text-green-700 shadow-sm' : 'text-foreground/50 hover:text-foreground'}`}
                                   >
-                                    Strong ({radarData.filter((t: any) => t.mastery >= 60).length})
+                                    Strong (≥60%)
                                   </button>
                                   <button 
                                     onClick={() => setTopicFilter('weak')} 
                                     className={`px-3 py-1 rounded-lg transition-all ${topicFilter === 'weak' ? 'bg-white text-red-600 shadow-sm' : 'text-foreground/50 hover:text-foreground'}`}
                                   >
-                                    Needs Focus ({radarData.filter((t: any) => t.mastery < 60).length})
+                                    Focus (&lt;60%)
                                   </button>
                                 </div>
                               </div>
 
                               {/* Top Mastery Highlights Cards */}
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                                <div className="p-4 bg-green-50/70 border border-green-200/80 rounded-xl flex items-start gap-3">
-                                  <div className="w-9 h-9 rounded-lg bg-green-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="p-4 bg-gradient-to-r from-green-50/80 to-emerald-50/40 border border-green-200/80 rounded-2xl flex items-center gap-3.5 shadow-xs">
+                                  <div className="w-11 h-11 rounded-xl bg-green-500 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-sm">
                                     🏆
                                   </div>
                                   <div>
-                                    <span className="text-[10px] font-bold text-green-800 uppercase tracking-wider block">Top Mastery Strength</span>
+                                    <span className="text-[9px] font-extrabold text-green-800 uppercase tracking-wider block">Top Concept Mastery</span>
                                     <h4 className="font-extrabold text-green-950 text-sm mt-0.5">
-                                      {radarData[0]?.topic || 'N/A'} {radarData[0] ? `(${radarData[0].mastery}%)` : ''}
+                                      {radarData[0]?.topic || 'N/A'} {radarData[0] ? `(${radarData[0].mastery}% Mastery)` : ''}
                                     </h4>
-                                    <p className="text-xs text-green-800/80 font-medium mt-1">
+                                    <p className="text-[11px] text-green-800/80 font-medium mt-0.5">
                                       {radarData[0] ? `Highest accuracy across ${radarData[0].count} questions.` : 'No topics recorded.'}
                                     </p>
                                   </div>
                                 </div>
 
-                                <div className="p-4 bg-red-50/70 border border-red-200/80 rounded-xl flex items-start gap-3">
-                                  <div className="w-9 h-9 rounded-lg bg-red-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+                                <div className="p-4 bg-gradient-to-r from-red-50/80 to-rose-50/40 border border-red-200/80 rounded-2xl flex items-center gap-3.5 shadow-xs">
+                                  <div className="w-11 h-11 rounded-xl bg-red-500 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-sm">
                                     🎯
                                   </div>
                                   <div>
-                                    <span className="text-[10px] font-bold text-red-800 uppercase tracking-wider block">Priority Focus Area</span>
+                                    <span className="text-[9px] font-extrabold text-red-800 uppercase tracking-wider block">Priority Focus Concept</span>
                                     <h4 className="font-extrabold text-red-950 text-sm mt-0.5">
-                                      {radarData[radarData.length - 1]?.topic || 'N/A'} {radarData[radarData.length - 1] ? `(${radarData[radarData.length - 1].mastery}%)` : ''}
+                                      {radarData[radarData.length - 1]?.topic || 'N/A'} {radarData[radarData.length - 1] ? `(${radarData[radarData.length - 1].mastery}% Mastery)` : ''}
                                     </h4>
-                                    <p className="text-xs text-red-800/80 font-medium mt-1">
+                                    <p className="text-[11px] text-red-800/80 font-medium mt-0.5">
                                       {radarData[radarData.length - 1] ? `Target this topic in practice sessions!` : 'No topics recorded.'}
                                     </p>
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Filtered Topic Mastery List */}
+                              {/* Visual Domain Group Cards Grid (4 Domain Columns / 2x2 Grid) */}
                               {(() => {
-                                const filteredTopics = radarData.filter((t: any) => {
-                                  if (topicFilter === 'strong') return t.mastery >= 60;
-                                  if (topicFilter === 'weak') return t.mastery < 60;
-                                  return true;
-                                });
-
-                                if (filteredTopics.length === 0) {
-                                  return (
-                                    <div className="text-center p-6 text-xs text-foreground/40 font-medium bg-black/5 rounded-xl">
-                                      No topics matching the selected filter.
-                                    </div>
-                                  );
-                                }
+                                const domainGroups = getDomainGroupedData(radarData);
 
                                 return (
-                                  <div className="space-y-3 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
-                                    {filteredTopics.map((item: any, idx: number) => {
-                                      const isHighMastery = item.mastery >= 70;
-                                      const isMedMastery = item.mastery >= 40 && item.mastery < 70;
-                                      const barColor = isHighMastery ? 'bg-green-500' : isMedMastery ? 'bg-amber-500' : 'bg-red-500';
-                                      const badgeBg = isHighMastery ? 'bg-green-100 text-green-800' : isMedMastery ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800';
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {domainGroups.map((domain) => {
+                                      const filteredTopics = domain.topics.filter((t: any) => {
+                                        if (topicFilter === 'strong') return t.mastery >= 60;
+                                        if (topicFilter === 'weak') return t.mastery < 60;
+                                        return true;
+                                      });
+
+                                      const isHighDomain = domain.totalMastery >= 70;
+                                      const isMedDomain = domain.totalMastery >= 40 && domain.totalMastery < 70;
+                                      const domainBadgeBg = isHighDomain ? 'bg-green-100 text-green-800 border-green-200' : isMedDomain ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-red-100 text-red-800 border-red-200';
+                                      const progressBarColor = isHighDomain ? 'bg-green-500' : isMedDomain ? 'bg-amber-500' : 'bg-red-500';
 
                                       return (
-                                        <div key={idx} className="p-3 bg-black/[0.02] hover:bg-black/[0.04] border border-black/5 rounded-xl transition-colors">
-                                          <div className="flex items-center justify-between gap-3 mb-1.5">
-                                            <div className="flex items-center gap-2 min-w-0">
-                                              <span className="font-bold text-xs text-[#262626] truncate">{item.topic}</span>
-                                              <span className="text-[9px] font-bold bg-black/5 text-foreground/60 px-2 py-0.5 rounded shrink-0">
-                                                {item.difficultyTag}
-                                              </span>
+                                        <div key={domain.id} className={`p-4 rounded-2xl border ${domain.border} ${domain.bg} space-y-3.5 transition-all hover:shadow-sm`}>
+                                          {/* Domain Card Header */}
+                                          <div className="flex items-center justify-between gap-3 border-b border-black/5 pb-2.5">
+                                            <div className="flex items-center gap-2.5">
+                                              <span className="text-xl">{domain.icon}</span>
+                                              <div>
+                                                <h4 className="font-extrabold text-xs text-[#262626]">{domain.name}</h4>
+                                                <span className="text-[10px] font-medium text-foreground/50">
+                                                  {domain.topics.length} {domain.topics.length === 1 ? 'concept' : 'concepts'} • {domain.totalCount} Qs
+                                                </span>
+                                              </div>
                                             </div>
-                                            <div className="flex items-center gap-3 shrink-0">
-                                              <span className="text-xs font-medium text-foreground/50">
-                                                {item.count} {item.count === 1 ? 'question' : 'questions'}
-                                              </span>
-                                              <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${badgeBg}`}>
-                                                {item.mastery}%
-                                              </span>
+                                            <div className={`px-2.5 py-1 rounded-full text-xs font-black border ${domainBadgeBg}`}>
+                                              {domain.totalMastery}%
                                             </div>
                                           </div>
-                                          <div className="w-full h-2 bg-black/5 rounded-full overflow-hidden">
-                                            <div 
-                                              className={`h-full rounded-full transition-all duration-500 ${barColor}`} 
-                                              style={{ width: `${item.mastery}%` }} 
-                                            />
+
+                                          {/* Domain Overall Progress Bar */}
+                                          <div className="space-y-1">
+                                            <div className="w-full h-2.5 bg-black/10 rounded-full overflow-hidden p-0.5">
+                                              <div 
+                                                className={`h-full rounded-full transition-all duration-500 ${progressBarColor}`}
+                                                style={{ width: `${domain.totalMastery}%` }}
+                                              />
+                                            </div>
+                                          </div>
+
+                                          {/* Visual Topic Badges Cloud */}
+                                          <div className="pt-1">
+                                            <span className="text-[9px] font-bold uppercase tracking-wider text-foreground/40 block mb-2">
+                                              Concept Breakdown
+                                            </span>
+                                            {filteredTopics.length === 0 ? (
+                                              <span className="text-[10px] italic text-foreground/40 block">No topics matching filter in this domain.</span>
+                                            ) : (
+                                              <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1 custom-scrollbar">
+                                                {filteredTopics.map((topic: any, tidx: number) => {
+                                                  const isStrong = topic.mastery >= 60;
+                                                  const pillBg = isStrong 
+                                                    ? 'bg-green-100/90 text-green-950 border-green-300/80 hover:bg-green-200/90' 
+                                                    : 'bg-red-100/90 text-red-950 border-red-300/80 hover:bg-red-200/90';
+
+                                                  return (
+                                                    <div 
+                                                      key={tidx}
+                                                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${pillBg} transition-colors flex items-center gap-1.5 shadow-xs`}
+                                                      title={`${topic.count} question(s) | Weight: ${topic.difficultyTag}`}
+                                                    >
+                                                      <span>{topic.topic}</span>
+                                                      <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-full ${isStrong ? 'bg-green-200 text-green-950' : 'bg-red-200 text-red-950'}`}>
+                                                        {topic.mastery}%
+                                                      </span>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
                                       );
@@ -2031,27 +2128,28 @@ export default function PortalDashboard() {
                             </div>
                           </div>
 
-                          {/* Cognitive Fatigue & Stamina Profile Widget */}
-                          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
+                          {/* Highly Visual Cognitive Fatigue & Stamina Profile Widget */}
+                          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6 space-y-6">
                             {/* Header */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-black/5 pb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/5 pb-4">
                               <div>
                                 <div className="flex items-center gap-2">
                                   <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/60">
                                     Cognitive Fatigue & Stamina Profile
                                   </h3>
-                                  <span className="text-[10px] font-bold bg-primary/10 text-primary px-2.5 py-0.5 rounded-full">
-                                    Endurance Flow
+                                  <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2.5 py-0.5 rounded-full">
+                                    Endurance Telemetry
                                   </span>
                                 </div>
                                 <p className="text-[10px] text-foreground/40 font-medium mt-1">
-                                  Comparing your Speed (Seconds/Question) & Accuracy (%) between the First 50% vs Final 50% of the exam.
+                                  Comparing Speed (Sec/Q) & Precision (%) between First 50% vs Final 50% of the exam.
                                 </p>
                               </div>
 
+                              {/* Visual Stamina Ring Meter */}
                               <div className="flex items-center gap-3 shrink-0 bg-black/5 px-4 py-2 rounded-2xl">
                                 <div className="text-right">
-                                  <span className="text-[9px] font-bold text-foreground/40 block uppercase tracking-wider">Stamina Score</span>
+                                  <span className="text-[9px] font-bold text-foreground/40 block uppercase tracking-wider">Stamina Index</span>
                                   <span className={`text-2xl font-black ${staminaData.staminaScore >= 80 ? 'text-green-600' : staminaData.staminaScore >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
                                     {staminaData.staminaScore}/100
                                   </span>
@@ -2063,103 +2161,125 @@ export default function PortalDashboard() {
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              {/* Visual Comparison: Speed vs Accuracy across 1st Half and 2nd Half */}
-                              <div className="space-y-4">
-                                <h4 className="text-xs font-bold text-[#262626] uppercase tracking-wider">Pacing & Precision Split</h4>
-
-                                {/* First Half Box */}
-                                <div className="p-4 rounded-xl bg-gray-50 border border-black/5 space-y-3">
-                                  <div className="flex justify-between items-center">
-                                    <span className="font-bold text-xs text-[#262626] flex items-center gap-1.5">
-                                      <span className="w-2 h-2 rounded-full bg-blue-500" /> First 50% of Test
-                                    </span>
-                                    <span className="text-xs font-semibold text-foreground/50">Questions 1 – {Math.ceil(responses.filter((r: any) => r.exam_questions?.part === 'A').length / 2)}</span>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-3 text-center">
-                                    <div className="bg-white p-2.5 rounded-lg border border-black/5">
-                                      <span className="text-[9px] font-bold uppercase text-foreground/40 block">Avg Speed</span>
-                                      <span className="text-sm font-black text-[#262626] block mt-0.5">{staminaData.firstHalfPacing}s <span className="text-[10px] text-foreground/40 font-normal">/ q</span></span>
+                            {/* Visual Split Cards: Speed Meter & Accuracy Meter */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              {/* Speed Performance Meter Card */}
+                              <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-50/60 to-indigo-50/30 border border-blue-200/60 space-y-4 shadow-xs">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-xl bg-blue-500 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                                      ⚡
                                     </div>
-                                    <div className="bg-white p-2.5 rounded-lg border border-black/5">
-                                      <span className="text-[9px] font-bold uppercase text-foreground/40 block">Accuracy</span>
-                                      <span className="text-sm font-black text-green-600 block mt-0.5">{staminaData.firstHalfAccuracy}%</span>
+                                    <div>
+                                      <h4 className="font-extrabold text-xs text-[#262626]">Speed Pace & Acceleration</h4>
+                                      <span className="text-[10px] font-medium text-foreground/50">Average seconds per question</span>
                                     </div>
                                   </div>
+                                  <span className="px-2.5 py-1 bg-blue-100 text-blue-900 border border-blue-200 rounded-lg text-xs font-black">
+                                    {staminaData.speedChangeLabel}
+                                  </span>
                                 </div>
 
-                                {/* Second Half Box */}
-                                <div className="p-4 rounded-xl bg-gray-50 border border-black/5 space-y-3">
-                                  <div className="flex justify-between items-center">
-                                    <span className="font-bold text-xs text-[#262626] flex items-center gap-1.5">
-                                      <span className="w-2 h-2 rounded-full bg-purple-500" /> Final 50% of Test
-                                    </span>
-                                    <span className="text-xs font-semibold text-foreground/50">Final Questions</span>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-3 text-center">
-                                    <div className="bg-white p-2.5 rounded-lg border border-black/5">
-                                      <span className="text-[9px] font-bold uppercase text-foreground/40 block">Avg Speed</span>
-                                      <span className="text-sm font-black text-[#262626] block mt-0.5">{staminaData.secondHalfPacing}s <span className="text-[10px] text-foreground/40 font-normal">/ q</span></span>
-                                    </div>
-                                    <div className="bg-white p-2.5 rounded-lg border border-black/5">
-                                      <span className="text-[9px] font-bold uppercase text-foreground/40 block">Accuracy</span>
-                                      <span className={`text-sm font-black block mt-0.5 ${staminaData.secondHalfAccuracy >= staminaData.firstHalfAccuracy ? 'text-green-600' : 'text-amber-600'}`}>
-                                        {staminaData.secondHalfAccuracy}%
+                                {/* Visual Speed Comparison Bars */}
+                                <div className="space-y-3 bg-white p-3.5 rounded-xl border border-black/5 shadow-xs">
+                                  <div>
+                                    <div className="flex justify-between text-xs font-bold mb-1">
+                                      <span className="text-foreground/70 flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-blue-500" /> First 50% Pace
                                       </span>
+                                      <span className="text-blue-700 font-black">{staminaData.firstHalfPacing}s / q</span>
+                                    </div>
+                                    <div className="w-full h-2.5 bg-black/5 rounded-full overflow-hidden">
+                                      <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (staminaData.firstHalfPacing / 60) * 100)}%` }} />
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <div className="flex justify-between text-xs font-bold mb-1">
+                                      <span className="text-foreground/70 flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-indigo-600" /> Final 50% Pace
+                                      </span>
+                                      <span className="text-indigo-800 font-black">{staminaData.secondHalfPacing}s / q</span>
+                                    </div>
+                                    <div className="w-full h-2.5 bg-black/5 rounded-full overflow-hidden">
+                                      <div className="h-full bg-indigo-600 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (staminaData.secondHalfPacing / 60) * 100)}%` }} />
                                     </div>
                                   </div>
                                 </div>
+                                
+                                <p className="text-[11px] font-medium text-blue-950/80 leading-snug">
+                                  💡 {staminaData.speedExplanation}
+                                </p>
                               </div>
 
-                              {/* Student-Friendly Performance Insights & AI Mentor Feedback */}
-                              <div className="flex flex-col justify-between space-y-4">
-                                {/* 2 Clear Metric Badges */}
-                                <div className="grid grid-cols-2 gap-3 text-left">
-                                  <div className="p-3.5 bg-black/5 rounded-xl border border-black/5">
-                                    <span className="text-[9px] font-bold uppercase tracking-wider text-foreground/40 block">Speed Trend</span>
-                                    <span className="text-sm font-black text-[#262626] block mt-1">
-                                      {staminaData.speedChangeLabel}
-                                    </span>
-                                    <p className="text-[10px] font-medium text-foreground/50 mt-1 leading-snug">
-                                      {staminaData.speedExplanation}
-                                    </p>
+                              {/* Precision & Accuracy Shift Meter Card */}
+                              <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50/60 to-teal-50/30 border border-emerald-200/60 space-y-4 shadow-xs">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                                      🎯
+                                    </div>
+                                    <div>
+                                      <h4 className="font-extrabold text-xs text-[#262626]">Precision & Accuracy Shift</h4>
+                                      <span className="text-[10px] font-medium text-foreground/50">Percentage of correct answers</span>
+                                    </div>
                                   </div>
-
-                                  <div className="p-3.5 bg-black/5 rounded-xl border border-black/5">
-                                    <span className="text-[9px] font-bold uppercase tracking-wider text-foreground/40 block">Accuracy Trend</span>
-                                    <span className={`text-sm font-black block mt-1 ${staminaData.accuracyDrop > 10 ? 'text-red-500' : staminaData.accuracyDrop < -10 ? 'text-green-600' : 'text-green-700'}`}>
-                                      {staminaData.accuracyChangeLabel}
-                                    </span>
-                                    <p className="text-[10px] font-medium text-foreground/50 mt-1 leading-snug">
-                                      {staminaData.accuracyExplanation}
-                                    </p>
-                                  </div>
+                                  <span className={`px-2.5 py-1 rounded-lg text-xs font-black border ${staminaData.accuracyDrop > 10 ? 'bg-red-100 text-red-900 border-red-200' : 'bg-emerald-100 text-emerald-900 border-emerald-200'}`}>
+                                    {staminaData.accuracyChangeLabel}
+                                  </span>
                                 </div>
 
-                                {/* Super Personal AI Mentor Advice */}
-                                <div className={`p-4 rounded-xl border flex gap-3 text-xs leading-relaxed shadow-sm ${
-                                  staminaData.state === 'flow' 
-                                    ? 'bg-green-50/80 border-green-200 text-green-900' 
-                                    : staminaData.state === 'panic' 
-                                    ? 'bg-amber-50/80 border-amber-200 text-amber-900' 
-                                    : 'bg-red-50/80 border-red-200 text-red-900'
-                                }`}>
-                                  <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center shrink-0 border border-black/5">
-                                    {staminaData.state === 'flow' ? (
-                                      <Sparkles className="w-5 h-5 text-green-600" />
-                                    ) : (
-                                      <Lightbulb className="w-5 h-5 text-amber-600" />
-                                    )}
-                                  </div>
+                                {/* Visual Accuracy Comparison Bars */}
+                                <div className="space-y-3 bg-white p-3.5 rounded-xl border border-black/5 shadow-xs">
                                   <div>
-                                    <span className="font-extrabold text-sm block mb-1">
-                                      {staminaData.headline}
-                                    </span>
-                                    <p className="font-medium opacity-90">
-                                      {staminaData.critique}
-                                    </p>
+                                    <div className="flex justify-between text-xs font-bold mb-1">
+                                      <span className="text-foreground/70 flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500" /> First 50% Accuracy
+                                      </span>
+                                      <span className="text-emerald-700 font-black">{staminaData.firstHalfAccuracy}%</span>
+                                    </div>
+                                    <div className="w-full h-2.5 bg-black/5 rounded-full overflow-hidden">
+                                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${staminaData.firstHalfAccuracy}%` }} />
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <div className="flex justify-between text-xs font-bold mb-1">
+                                      <span className="text-foreground/70 flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-teal-600" /> Final 50% Accuracy
+                                      </span>
+                                      <span className="text-teal-800 font-black">{staminaData.secondHalfAccuracy}%</span>
+                                    </div>
+                                    <div className="w-full h-2.5 bg-black/5 rounded-full overflow-hidden">
+                                      <div className="h-full bg-teal-600 rounded-full transition-all duration-500" style={{ width: `${staminaData.secondHalfAccuracy}%` }} />
+                                    </div>
                                   </div>
                                 </div>
+
+                                <p className="text-[11px] font-medium text-emerald-950/80 leading-snug">
+                                  💡 {staminaData.accuracyExplanation}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Visual Mentor Advice Banner */}
+                            <div className={`p-4 rounded-2xl border flex items-center gap-3 text-xs leading-relaxed shadow-xs ${
+                              staminaData.state === 'flow' 
+                                ? 'bg-green-50/80 border-green-200 text-green-900' 
+                                : staminaData.state === 'panic' 
+                                ? 'bg-amber-50/80 border-amber-200 text-amber-900' 
+                                : 'bg-red-50/80 border-red-200 text-red-900'
+                            }`}>
+                              <div className="w-10 h-10 rounded-xl bg-white shadow-xs flex items-center justify-center shrink-0 border border-black/5 text-lg">
+                                {staminaData.state === 'flow' ? '🌟' : '💡'}
+                              </div>
+                              <div>
+                                <span className="font-extrabold text-sm block">
+                                  {staminaData.headline}
+                                </span>
+                                <p className="font-medium opacity-90 mt-0.5">
+                                  {staminaData.critique}
+                                </p>
                               </div>
                             </div>
                           </div>
@@ -2169,13 +2289,40 @@ export default function PortalDashboard() {
                       {/* PART B DRILLDOWN */}
                       {analyticsSubTab === 'part-b' && (
                         <div className="space-y-6">
-                          {attemptObj?.part_b_evaluation_status !== 'completed' ? (
-                            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-16 text-center">
-                              <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4 animate-pulse" />
-                              <h4 className="font-bold text-lg text-[#262626] mb-1">Part B Evaluation Awaiting 🎨</h4>
-                              <p className="text-sm text-foreground/50 max-w-sm mx-auto animate-fadeIn">Your subjective sketches and drawings are currently under review by our design mentors. Rubrics, scoring matrices, and loom recordings will post immediately when published!</p>
-                            </div>
-                          ) : (
+                          {(() => {
+                            const partBResponses = responses.filter((r: any) => r.exam_questions?.part === 'B');
+                            const hasAttemptedPartB = partBResponses.some((r: any) => (r.file_url && r.file_url.trim().length > 0) || r.status === 'answered' || r.status === 'marked' || (r.marks_awarded !== null && r.marks_awarded !== undefined && r.marks_awarded > 0));
+
+                            if (partBResponses.length === 0 || !hasAttemptedPartB) {
+                              return (
+                                <div className="bg-white rounded-2xl border border-amber-200/80 shadow-sm p-12 text-center bg-gradient-to-b from-amber-50/40 via-white to-white">
+                                  <div className="w-16 h-16 rounded-2xl bg-amber-100 border border-amber-200 text-amber-700 flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm">
+                                    🎨
+                                  </div>
+                                  <h4 className="font-extrabold text-lg text-amber-950 mb-1">Part B Subjective Questions Not Attempted / Uploaded</h4>
+                                  <p className="text-xs text-amber-900/70 max-w-md mx-auto font-medium leading-relaxed mb-4">
+                                    You did not upload drawing sketches or subjective answers for Part B during this mock test attempt.
+                                  </p>
+                                  <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl max-w-md mx-auto text-xs font-bold text-amber-900 flex items-center justify-center gap-2">
+                                    <span>💡</span>
+                                    <span>Attempt & upload your sketches in future tests to unlock mentor evaluations, rubric breakdown, and video feedback!</span>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            if (attemptObj?.part_b_evaluation_status !== 'completed') {
+                              return (
+                                <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-16 text-center">
+                                  <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4 animate-pulse" />
+                                  <h4 className="font-bold text-lg text-[#262626] mb-1">Part B Evaluation Awaiting 🎨</h4>
+                                  <p className="text-sm text-foreground/50 max-w-sm mx-auto animate-fadeIn">Your subjective sketches and drawings are currently under review by our design mentors. Rubrics, scoring matrices, and loom recordings will post immediately when published!</p>
+                                </div>
+                              );
+                            }
+
+                            return null;
+                          })() || (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                               {/* Rubric metrics chart */}
                               <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6 flex flex-col justify-between">
