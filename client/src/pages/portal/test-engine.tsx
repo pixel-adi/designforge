@@ -25,6 +25,8 @@ interface EngineState {
   sections: any[];
   questions: any[];
   options: Record<string, any[]>;
+  totalMins: number;
+  partAMins: number;
   partA_TimeThreshold: number;
   hasPartB: boolean;
 }
@@ -187,10 +189,18 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     }
   };
 
+  const checkIsPartBActive = (currentTimeLeft: number) => {
+    if (!engineData?.hasPartB) return false;
+    if (testStep === 'part-b-instructions') return true;
+    const totalSecs = (engineData.totalMins || 180) * 60;
+    if (engineData.partA_TimeThreshold >= totalSecs) return false;
+    return currentTimeLeft <= engineData.partA_TimeThreshold && currentTimeLeft < totalSecs;
+  };
+
   // Tab switching detection (Only monitored during Part A)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      const isPartBActive = engineData?.hasPartB && (timeLeft <= engineData.partA_TimeThreshold || testStep === 'part-b-instructions');
+      const isPartBActive = checkIsPartBActive(timeLeft);
       // If Part B is active or test step is part-b-instructions/submitted, do not flag tab switching for uploading sketches
       if (document.hidden && testStep === 'test' && !isPartBActive) {
         setWarningsCount(prev => {
@@ -255,7 +265,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           }
 
           // Part A to Part B Transition: Auto-lock & score Part A
-          if (engineData?.hasPartB && prev === engineData.partA_TimeThreshold + 1) {
+          const totalSecs = (engineData?.totalMins || 180) * 60;
+          if (engineData?.hasPartB && engineData.partA_TimeThreshold < totalSecs && prev === engineData.partA_TimeThreshold + 1 && prev < totalSecs) {
             finalizeAttempt(responses, attemptId, false);
             setTestStep('part-b-instructions');
             toast({ title: "Part A Time Up 🔒", description: "Part A has been auto-submitted and locked. Please proceed to Part B.", duration: 8000 });
@@ -329,15 +340,22 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       }
 
       const totalMins = sectionsData?.reduce((acc: number, sec: any) => acc + sec.duration_minutes, 0) || 180;
-      const partAMins = sectionsData?.find((s: any) => s.part === 'A')?.duration_minutes || 0;
-      const partA_TimeThreshold = (totalMins * 60) - (partAMins * 60);
+      let partAMins = sectionsData?.find((s: any) => s.part === 'A')?.duration_minutes || 0;
       const hasPartB = questionsData.some(q => q.part === 'B');
+
+      if (hasPartB && partAMins === 0) {
+        partAMins = Math.round(totalMins / 2);
+      }
+
+      const partA_TimeThreshold = (totalMins * 60) - (partAMins * 60);
 
       setEngineData({
         test: testData,
         sections: sectionsData || [],
         questions: questionsData,
         options: optionsMap,
+        totalMins,
+        partAMins,
         partA_TimeThreshold,
         hasPartB
       });
@@ -471,15 +489,28 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     setAttemptId(newAttemptId);
     setTestStep('test');
     setTimerRunning(true);
+    setActiveQuestionIndex(0);
 
-    // Mark first question as visited
+    // Initialize fresh responses for the new attempt
+    const freshResponses: Record<string, ResponseData> = {};
+    (engineData?.questions || []).forEach(q => {
+      freshResponses[q.id] = {
+        status: 'unseen',
+        selectedOptions: [],
+        answerText: '',
+        fileUrl: '',
+        timeSpent: 0,
+        answerChanges: 0,
+        stateTransitions: []
+      };
+    });
+
     if (engineData?.questions.length) {
       const firstQId = engineData.questions[0].id;
-      setResponses(prev => ({
-        ...prev,
-        [firstQId]: { ...prev[firstQId], status: prev[firstQId].status === 'unseen' ? 'visited' : prev[firstQId].status }
-      }));
+      freshResponses[firstQId].status = 'visited';
     }
+
+    setResponses(freshResponses);
   };
 
   const startPartB = () => {
@@ -716,7 +747,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
   const handleNavigateQuestion = (idx: number, skipChecks: boolean = false) => {
     const q = engineData!.questions[idx];
-    const isPartBActive = engineData!.hasPartB && timeLeft <= engineData!.partA_TimeThreshold;
+    const isPartBActive = checkIsPartBActive(timeLeft);
 
     if (!skipChecks && testStep !== 'review' && testStep !== 'submitted') {
       // Part Locking Logic: Cannot access Part B if Part A time is still running
@@ -792,7 +823,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     const q = engineData!.questions.find(x => x.id === qId);
     if (!q) return;
 
-    const isPartBActive = engineData!.hasPartB && timeLeft <= engineData!.partA_TimeThreshold;
+    const isPartBActive = checkIsPartBActive(timeLeft);
 
     // Safety check, should be blocked by navigation anyway
     if (q.part === 'A' && isPartBActive && testStep !== 'review') {
@@ -954,7 +985,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         <div className="grid grid-cols-5 gap-1.5">
           {groups[groupName].map(({ q, idx }) => {
             const status = responses[q.id]?.status || 'unseen';
-            const isPartALocked = q.part === 'A' && engineData?.hasPartB && timeLeft <= engineData.partA_TimeThreshold && testStep !== 'review';
+            const isPartALocked = q.part === 'A' && checkIsPartBActive(timeLeft) && testStep !== 'review';
             let bgClass = "bg-white border-black/20 text-foreground/70 hover:bg-black/5"; // unseen default
 
             if (isPartALocked) {
@@ -1265,7 +1296,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         {testStep !== 'review' ? (
           <div className="flex items-center gap-4 md:gap-6">
             {engineData?.hasPartB && (
-              timeLeft <= engineData.partA_TimeThreshold ? (
+              checkIsPartBActive(timeLeft) ? (
                 <div className="hidden sm:flex items-center gap-1.5 text-green-700 bg-green-50 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
                   <UploadCloud className="w-3.5 h-3.5" /> Part B: Tab switching enabled for upload
                 </div>
