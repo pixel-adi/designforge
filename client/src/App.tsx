@@ -17,6 +17,7 @@ const FocusBatchPage = lazy(() => import("@/pages/focus-batch-page"));
 const AboutPage = lazy(() => import("@/pages/about-page"));
 const JoinUsPage = lazy(() => import("@/pages/join-us-page"));
 const ApprenticeshipPage = lazy(() => import("@/pages/apprenticeship-page"));
+const AINativeUX = lazy(() => import("@/pages/ai-native-ux"));
 const PrivacyPolicy = lazy(() => import("@/pages/privacy-policy"));
 const TermsOfService = lazy(() => import("@/pages/terms-of-service"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -74,6 +75,7 @@ function Router() {
         <Route path="/about">{() => <PageWrapper><AboutPage /></PageWrapper>}</Route>
         <Route path="/join-us">{() => <PageWrapper><JoinUsPage /></PageWrapper>}</Route>
         <Route path="/apprenticeship">{() => <PageWrapper><ApprenticeshipPage /></PageWrapper>}</Route>
+        <Route path="/courses/ai-native-ux">{() => <PageWrapper><AINativeUX /></PageWrapper>}</Route>
         <Route path="/privacy-policy">{() => <PageWrapper><PrivacyPolicy /></PageWrapper>}</Route>
         <Route path="/terms-of-service">{() => <PageWrapper><TermsOfService /></PageWrapper>}</Route>
 

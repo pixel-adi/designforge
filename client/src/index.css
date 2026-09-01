@@ -38,6 +38,9 @@
   --font-sans: 'Inter', sans-serif;
   --font-heading: 'Questrial', sans-serif;
   --font-body: 'Inter', sans-serif;
+  --font-ubuntu: 'Ubuntu', sans-serif;
+  --font-nunito: 'Nunito Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
 :root {

@@ -1,12 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -14,15 +8,29 @@ import {
   SheetTrigger,
   SheetClose
 } from "@/components/ui/sheet";
-import { ChevronDown, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RegistrationSheet } from "@/components/registration-sheet";
+import { CohortLeadModal } from "@/components/cohort-lead-modal";
 
 export function Navbar() {
   const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isRegOpen, setIsRegOpen] = useState(false);
+  const [isCohortModalOpen, setIsCohortModalOpen] = useState(false);
+
+  // Auto-open cohort modal on first landing (once per session)
+  useEffect(() => {
+    const hasSeenModal = sessionStorage.getItem("df_cohort_modal_seen");
+    if (!hasSeenModal) {
+      const timer = setTimeout(() => {
+        setIsCohortModalOpen(true);
+        sessionStorage.setItem("df_cohort_modal_seen", "1");
+      }, 2500); // Wait 2.5s after page load
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   return (
     <div className="sticky top-0 z-40 w-full flex flex-col">
@@ -36,6 +44,7 @@ export function Navbar() {
         </div>
       </div>
       <RegistrationSheet open={isRegOpen} onOpenChange={setIsRegOpen} defaultProgram="Focus Batch" />
+      <CohortLeadModal open={isCohortModalOpen} onOpenChange={setIsCohortModalOpen} />
       <header className="w-full bg-background/95 backdrop-blur-xl border-b border-black/[0.03] transition-all duration-300">
         <div className="container mx-auto px-4 sm:px-6 lg:px-10 h-20 md:h-24 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -49,20 +58,13 @@ export function Navbar() {
             <Link href="/mentorship" className={`text-xs xl:text-sm font-medium transition-colors tracking-wide whitespace-nowrap ${location === '/mentorship' ? 'text-primary' : 'text-foreground/70 hover:text-primary'}`}>Mentorship</Link>
             <Link href="/apprenticeship" className={`text-xs xl:text-sm font-medium transition-colors tracking-wide whitespace-nowrap ${location === '/apprenticeship' ? 'text-primary' : 'text-foreground/70 hover:text-primary'}`}>Apprenticeship</Link>
             <Link href="/focus-batch" className={`text-xs xl:text-sm font-medium transition-colors tracking-wide whitespace-nowrap ${location === '/focus-batch' ? 'text-primary' : 'text-foreground/70 hover:text-primary'}`}>Focus Batch</Link>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger className={`text-xs xl:text-sm font-medium transition-colors tracking-wide flex items-center gap-1 outline-none ${location.startsWith('/community') || location === '/join-us' ? 'text-primary' : 'text-foreground/70 hover:text-primary'}`}>
-                Community <ChevronDown className="w-3 h-3 lg:w-4 lg:h-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-white/95 backdrop-blur-md border-white/40 shadow-sm rounded-xl">
-                <DropdownMenuItem asChild className="focus:bg-primary/5 focus:text-primary cursor-pointer py-2">
-                  <Link href="/community" className={`w-full ${location === '/community' ? 'text-primary' : ''}`}>Community Hub</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild className="focus:bg-primary/5 focus:text-primary cursor-pointer py-2">
-                  <Link href="/join-us" className={`w-full ${location === '/join-us' ? 'text-primary' : ''}`}>Join Us</Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Link href="/courses/ai-native-ux" className={`text-xs xl:text-sm font-medium transition-colors tracking-wide whitespace-nowrap relative inline-flex items-center gap-1.5 ${location === '/courses/ai-native-ux' ? 'text-primary' : 'text-foreground/70 hover:text-primary'}`}>
+              AI-Native UX
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+              </span>
+            </Link>
           </nav>
 
           <div className="flex items-center gap-2 md:gap-4">
@@ -94,12 +96,13 @@ export function Navbar() {
                     <Link href="/mentorship" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${location === '/mentorship' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Mentorship</Link>
                     <Link href="/apprenticeship" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${location === '/apprenticeship' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Apprenticeship</Link>
                     <Link href="/focus-batch" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${location === '/focus-batch' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Focus Batch</Link>
-
-                    <div className="flex flex-col gap-3 py-2 border-y border-black/5">
-                      <p className="text-sm font-semibold text-foreground/50 uppercase tracking-wider">Community</p>
-                      <Link href="/community" onClick={() => setIsOpen(false)} className={`text-lg font-medium pl-2 transition-colors ${location === '/community' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Hub</Link>
-                      <Link href="/join-us" onClick={() => setIsOpen(false)} className={`text-lg font-medium pl-2 transition-colors ${location === '/join-us' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>Join Us</Link>
-                    </div>
+                    <Link href="/courses/ai-native-ux" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors relative inline-flex items-center gap-2 ${location === '/courses/ai-native-ux' ? 'text-primary' : 'text-foreground hover:text-primary'}`}>
+                      AI-Native UX
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                      </span>
+                    </Link>
                   </div>
 
                   <div className="mt-auto pb-8 pt-6 flex flex-col gap-3">
