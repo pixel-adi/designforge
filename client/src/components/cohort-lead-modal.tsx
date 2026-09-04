@@ -86,8 +86,12 @@ export function CohortLeadModal({ open, onOpenChange, context = "" }: CohortLead
       // Save locally to localStorage as backup
       try {
         const stored = JSON.parse(localStorage.getItem("df_leads") || "[]");
-        stored.push(leadPayload);
-        localStorage.setItem("df_leads", JSON.stringify(stored));
+        const exists = stored.some((s: any) => s.email === leadPayload.email && s.interest === leadPayload.interest);
+        if (!exists) {
+          stored.unshift({ ...leadPayload, id: `local-${Date.now()}` });
+          localStorage.setItem("df_leads", JSON.stringify(stored));
+          window.dispatchEvent(new Event("df_lead_added"));
+        }
       } catch (e) {
         // ignore
       }
@@ -95,6 +99,7 @@ export function CohortLeadModal({ open, onOpenChange, context = "" }: CohortLead
       // Try inserting into cohort_leads or leads
       const { error: dbError } = await supabase.from("cohort_leads").insert(leadPayload);
       if (dbError) {
+        console.warn("cohort_leads table insert warning:", dbError.message);
         try {
           await supabase.from("leads").insert(leadPayload);
         } catch {
