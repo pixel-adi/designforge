@@ -1,0 +1,1235 @@
+{
+  "schemaVersion": "2.0.0",
+  "sourcesOfTruth": [
+    {
+      "id": "handbook-ug",
+      "title": "NID Admissions 2027-28 Handbook: 5.5-year Integrated M.Des (NID Ahmedabad) and B.Des / Integrated M.Des (NID AP, MP, Haryana, Assam)",
+      "published": "2026-09-10",
+      "binding": true
+    },
+    {
+      "id": "handbook-pg",
+      "title": "NID M.Des Admissions Handbook 2027-28",
+      "binding": true
+    },
+    {
+      "id": "outline",
+      "title": "Designforge Self-Study Outline, Edition 02 (2026)",
+      "binding": false,
+      "note": "Designforge's method. Where it conflicts with a handbook, the handbook wins."
+    }
+  ],
+  "exam": {
+    "common": {
+      "prelimsDate": "2026-12-20",
+      "prelimsDay": "Sunday",
+      "format": "Paper-and-pencil or pen test, same time on the same day at every centre. Questions may involve text and visuals. English only.",
+      "duration": "Stated on the admit card. Designforge practice papers run three hours.",
+      "prelimsWeightage": "Used only to shortlist for the Mains. Not carried forward.",
+      "modeChangeCaveat": "NID may change schedules or the nature and structure of exams, including moving them online, in unforeseen circumstances.",
+      "testCentres": [
+        "Ahmedabad",
+        "Bengaluru",
+        "Bhopal",
+        "Bhubaneswar",
+        "Chandigarh",
+        "Chennai",
+        "Dehradun",
+        "Hyderabad",
+        "Jaipur",
+        "Jorhat",
+        "Kochi",
+        "Kolkata",
+        "Lucknow",
+        "Mumbai",
+        "Nagpur",
+        "New Delhi",
+        "Patna"
+      ],
+      "testCentreRule": "A city can have more than one centre. NID may allot a centre that isn't your choice. The city can be changed only during the edit window.",
+      "noAccommodation": "NID does not provide travel or accommodation for the Prelims or Mains.",
+      "cannotApplyBoth": "Undergraduate programmes and the 2.5-year M.Des are examined simultaneously, so a candidate can apply for only one.",
+      "lockedFields": [
+        "Programme applied for",
+        "Name",
+        "Date of birth",
+        "Registered mobile number",
+        "Registered email ID"
+      ],
+      "designforgeGuidance": "The Designforge outline treats the Prelims as creative, observational and drawing-led, with no general-ability section, so this plan contains no GK, reasoning, English or quantitative drills.",
+      "source": [
+        "handbook-ug §2, §3, §8.2, §8.3",
+        "handbook-pg §2, §3, §8.2, §8.3",
+        "outline §01"
+      ]
+    },
+    "ug": {
+      "programmes": [
+        "5.5-year Professional Education Master of Design (Integrated Pathway) at NID Ahmedabad, Bengaluru and Gandhinagar",
+        "4-year B.Des or 5.5-year Integrated M.Des at NID Andhra Pradesh, Madhya Pradesh, Haryana and Assam"
+      ],
+      "mains": [
+        "Studio Sensitivity Test",
+        "In-Person Sensitivity Test"
+      ],
+      "mainsShortlistMultiple": 2.5,
+      "mainsShortlistRule": "For each category, the number shortlisted equals 2.5 times the seats available.",
+      "finalMerit": "Calculated from DAT Mains marks using weightages NID will announce later.",
+      "designforgeGuidance": "Prepare for studio stamina, making under time and talking about your work. Do not display a fixed studio-to-in-person split: NID has not published one for 2027-28.",
+      "source": [
+        "handbook-ug §2.1, §8.4, §8.5, §9.3",
+        "outline §11"
+      ]
+    },
+    "pg": {
+      "mains": [
+        "Studio Test (group-wise; discipline-wise for Group X)",
+        "Interview (separate for each discipline)"
+      ],
+      "mainsConductedBy": "NID Ahmedabad for disciplines at Ahmedabad, Bengaluru and Gandhinagar. NID MP and NID Haryana run their own Mains.",
+      "mainsShortlistMultiple": 4.5,
+      "mainsShortlistRule": "For each discipline, 4.5 times the seats available in each category applied for.",
+      "finalMerit": "Calculated from DAT Mains marks using weightages NID will announce later. Only candidates who attend both the Studio Test and Interview enter the final merit list.",
+      "designforgeGuidance": "Your portfolio and how you explain it carry the interview. Check the Mains notification for any portfolio requirements when NID publishes it.",
+      "source": [
+        "handbook-pg §8.4, §8.5, §9.3",
+        "outline §12, §16, §17"
+      ]
+    }
+  },
+  "timeline": {
+    "ug": [
+      {
+        "date": "2026-09-10",
+        "time": null,
+        "label": "Applications open"
+      },
+      {
+        "date": "2026-11-30",
+        "time": "23:59",
+        "label": "Last date to submit application and fee"
+      },
+      {
+        "date": "2026-12-01",
+        "endDate": "2026-12-03",
+        "time": "16:00",
+        "endTime": "23:59",
+        "label": "Window to edit the application form"
+      },
+      {
+        "date": "2026-12-10",
+        "time": "16:00",
+        "label": "Prelims admit cards available"
+      },
+      {
+        "date": "2026-12-20",
+        "label": "DAT Prelims"
+      },
+      {
+        "date": "2027-02-16",
+        "endDate": "2027-02-28",
+        "time": "16:00",
+        "endTime": "23:59",
+        "label": "One-time window to edit the category certificate"
+      },
+      {
+        "date": "2027-03-16",
+        "time": "16:00",
+        "label": "DAT Prelims result"
+      },
+      {
+        "date": "2027-03-16",
+        "endDate": "2027-03-17",
+        "time": "16:00",
+        "endTime": "23:59",
+        "label": "Re-totalling of Prelims answer booklet"
+      },
+      {
+        "date": null,
+        "label": "Mains admit card, Studio Sensitivity Test, In-Person Sensitivity Test, results and counselling: to be announced"
+      }
+    ],
+    "pg": [
+      {
+        "date": "2026-09-10",
+        "time": null,
+        "label": "Applications open"
+      },
+      {
+        "date": "2026-11-30",
+        "time": "23:59",
+        "label": "Last date to submit application and fee"
+      },
+      {
+        "date": "2026-12-01",
+        "endDate": "2026-12-03",
+        "time": "16:00",
+        "endTime": "23:59",
+        "label": "Window to edit the application form"
+      },
+      {
+        "date": "2026-12-10",
+        "time": "16:00",
+        "label": "Prelims admit cards available"
+      },
+      {
+        "date": "2026-12-20",
+        "label": "DAT Prelims"
+      },
+      {
+        "date": "2027-01-15",
+        "endDate": "2027-01-31",
+        "time": "16:00",
+        "endTime": "23:59",
+        "label": "One-time window to edit the category certificate"
+      },
+      {
+        "date": "2027-02-16",
+        "time": "16:00",
+        "label": "DAT Prelims result"
+      },
+      {
+        "date": "2027-02-16",
+        "endDate": "2027-02-18",
+        "time": "18:00",
+        "endTime": "23:59",
+        "label": "Re-totalling of Prelims answer booklet"
+      },
+      {
+        "date": null,
+        "label": "Mains admit card, Studio Test, Interview, results and counselling: to be announced"
+      }
+    ],
+    "scorecardNote": "Scorecards stay on the admissions website for only 20 days after each result. Download them immediately.",
+    "source": [
+      "handbook-ug §3",
+      "handbook-pg §3",
+      "handbook §9"
+    ]
+  },
+  "application": {
+    "site": "https://admissions.nid.edu",
+    "uploads": {
+      "photo": "Colour photograph taken at a professional studio, JPG/JPEG, 50 to 200 KB. Self-composed portraits are not accepted.",
+      "signature": "Scanned or photographed signature, JPG/JPEG, 50 to 200 KB.",
+      "certificates": "PDF, up to 1 MB. EWS and OBC-NCL certificates must be in the Central format, in the candidate's name, issued on or after 1 April 2026."
+    },
+    "completeWhen": "The application counts as complete only when you can view, download or print the auto-generated form after payment.",
+    "fees": {
+      "note": "Indian nationals, in rupees. For M.Des at NID Ahmedabad the fee is per discipline. Not refundable or transferable; bank charges extra.",
+      "rows": [
+        [
+          "General, Gen-EWS, OBC-NCL",
+          3000
+        ],
+        [
+          "Female candidates (except SC, ST, PwD)",
+          2000
+        ],
+        [
+          "SC and ST",
+          1500
+        ],
+        [
+          "PwD",
+          500
+        ],
+        [
+          "Third gender",
+          500
+        ]
+      ],
+      "overseas": "US$ 125 (per discipline for M.Des)"
+    },
+    "source": [
+      "handbook §7"
+    ]
+  },
+  "eligibility": {
+    "note": "Show these as a reference and link to the handbook. Do not auto-decide eligibility.",
+    "ug": {
+      "bornOnOrAfter": {
+        "General, Gen-EWS, Overseas": "2006-07-01",
+        "OBC-NCL, SC, ST": "2003-07-01",
+        "PwD": "2001-07-01"
+      },
+      "qualification": "Passed or appearing for Class 12 (or equivalent) in any stream in 2026-27, passed in the first attempt; mark sheet by 15 July 2027."
+    },
+    "pg": {
+      "bornOnOrAfter": {
+        "General, Gen-EWS, Overseas": "1995-07-01",
+        "OBC-NCL, SC, ST": "1992-07-01",
+        "PwD": "1990-07-01"
+      },
+      "designEducationBornOnOrAfter": {
+        "General, Gen-EWS, Overseas": "1992-07-01",
+        "OBC-NCL, SC, ST": "1989-07-01",
+        "PwD": "1987-07-01"
+      },
+      "qualification": "A bachelor's degree or equivalent in any discipline, or final-year candidates in 2026-27, with results by 31 July 2027. Design Education has its own qualification rules in the handbook."
+    },
+    "source": [
+      "handbook-ug §5.1",
+      "handbook-pg §5.1, §5.2"
+    ]
+  },
+  "disciplines": {
+    "ug": {
+      "nidAhmedabad": {
+        "programme": "5.5-year Integrated M.Des",
+        "streams": [
+          {
+            "name": "Industrial Design",
+            "disciplines": [
+              [
+                "Ceramic & Glass Design",
+                "Ahmedabad",
+                9
+              ],
+              [
+                "Transportation & Automobile Design",
+                "Gandhinagar",
+                9
+              ],
+              [
+                "Product Design",
+                "Ahmedabad",
+                9
+              ]
+            ]
+          },
+          {
+            "name": "Communication Design",
+            "disciplines": [
+              [
+                "Animation Film Design",
+                "Ahmedabad",
+                9
+              ],
+              [
+                "Film & Video Communication",
+                "Ahmedabad",
+                9
+              ],
+              [
+                "Graphic Design",
+                "Ahmedabad",
+                9
+              ]
+            ]
+          },
+          {
+            "name": "Spatial Experience Design",
+            "disciplines": [
+              [
+                "Exhibition Design",
+                "Ahmedabad",
+                9
+              ],
+              [
+                "Furniture & Interior Design",
+                "Ahmedabad",
+                9
+              ],
+              [
+                "Design for Retail Experience",
+                "Bengaluru",
+                9
+              ]
+            ]
+          },
+          {
+            "name": "Textile and Apparel Design",
+            "disciplines": [
+              [
+                "Textile Design",
+                "Ahmedabad",
+                9
+              ],
+              [
+                "Apparel Design",
+                "Gandhinagar",
+                9
+              ],
+              [
+                "Lifestyle Accessory Design",
+                "Gandhinagar",
+                9
+              ]
+            ]
+          },
+          {
+            "name": "Digital Design Futures",
+            "disciplines": [
+              [
+                "Digital Game Design",
+                "Bengaluru",
+                9
+              ],
+              [
+                "Interaction Design",
+                "Bengaluru",
+                9
+              ],
+              [
+                "Information Design",
+                "Bengaluru",
+                9
+              ]
+            ]
+          }
+        ]
+      },
+      "otherNIDs": [
+        {
+          "name": "NID Andhra Pradesh",
+          "url": "https://www.nid.ac.in/"
+        },
+        {
+          "name": "NID Assam",
+          "url": "https://nidj.ac.in",
+          "note": "B.Des with Industrial, Communication, and Textile & Apparel Design streams"
+        },
+        {
+          "name": "NID Haryana",
+          "url": "https://www.nidh.ac.in/"
+        },
+        {
+          "name": "NID Madhya Pradesh",
+          "url": "https://nidmp.ac.in/"
+        }
+      ]
+    },
+    "pg": {
+      "groups": {
+        "G1": {
+          "name": "Group 1",
+          "disciplines": [
+            [
+              "Animation Film Design",
+              "Ahmedabad",
+              19
+            ],
+            [
+              "Film & Video Communication",
+              "Ahmedabad",
+              19
+            ],
+            [
+              "Graphic Design",
+              "Ahmedabad",
+              19
+            ],
+            [
+              "Photography Design",
+              "Ahmedabad",
+              19
+            ]
+          ]
+        },
+        "G2": {
+          "name": "Group 2",
+          "disciplines": [
+            [
+              "Apparel Design",
+              "Gandhinagar",
+              19
+            ],
+            [
+              "Lifestyle Accessory Design",
+              "Gandhinagar",
+              19
+            ],
+            [
+              "Textile Design",
+              "Gandhinagar",
+              19
+            ]
+          ]
+        },
+        "G3": {
+          "name": "Group 3",
+          "disciplines": [
+            [
+              "Design for Retail Experience",
+              "Bengaluru",
+              19
+            ],
+            [
+              "Exhibition Design",
+              "Ahmedabad",
+              19
+            ],
+            [
+              "Furniture & Interior Design",
+              "Ahmedabad",
+              19
+            ]
+          ]
+        },
+        "G4": {
+          "name": "Group 4",
+          "disciplines": [
+            [
+              "Ceramic & Glass Design",
+              "Ahmedabad",
+              12
+            ],
+            [
+              "Product Design",
+              "Ahmedabad",
+              19
+            ],
+            [
+              "Toy & Game Design",
+              "Gandhinagar",
+              12
+            ],
+            [
+              "Transportation & Automobile Design",
+              "Gandhinagar",
+              19
+            ]
+          ]
+        },
+        "G5": {
+          "name": "Group 5",
+          "disciplines": [
+            [
+              "Digital Game Design",
+              "Bengaluru",
+              19
+            ],
+            [
+              "Information Design",
+              "Bengaluru",
+              19
+            ],
+            [
+              "Interaction Design",
+              "Bengaluru",
+              19
+            ],
+            [
+              "New Media Design",
+              "Bengaluru",
+              19
+            ]
+          ]
+        },
+        "GX": {
+          "name": "Group X",
+          "disciplines": [
+            [
+              "Design Trends and Futures",
+              "Gandhinagar",
+              19
+            ],
+            [
+              "Design Education",
+              "Gandhinagar",
+              19
+            ],
+            [
+              "Strategic Design Management",
+              "Gandhinagar",
+              19
+            ],
+            [
+              "Universal Design",
+              "Bengaluru",
+              19
+            ]
+          ],
+          "note": "Design Education has separate eligibility. Studio Test is discipline-wise for this group."
+        }
+      },
+      "combinationRules": [
+        {
+          "count": 1,
+          "rule": "Any one discipline from any group."
+        },
+        {
+          "count": 2,
+          "rule": "Two disciplines from the same group (not Group X), or one from Groups 1 to 5 plus one from Group X."
+        },
+        {
+          "count": 3,
+          "rule": "Two disciplines from the same group (not Group X), plus one from Group X."
+        }
+      ],
+      "choicesLocked": "Discipline choices cannot be changed later and applications are not transferable between disciplines.",
+      "otherNIDs": [
+        {
+          "name": "NID Haryana",
+          "url": "https://www.nidh.ac.in/"
+        },
+        {
+          "name": "NID Madhya Pradesh",
+          "url": "https://nidmp.ac.in/"
+        }
+      ],
+      "otherNIDsRule": "A separate application is needed for each NID."
+    },
+    "source": [
+      "handbook-ug §4",
+      "handbook-pg §4"
+    ]
+  },
+  "tiers": {
+    "light": {
+      "hoursPerWeek": "12 to 15",
+      "for": "School or college students, or people with a job"
+    },
+    "intensive": {
+      "hoursPerWeek": "18 to 22",
+      "for": "Full-time aspirants with a free year"
+    },
+    "floor": "Below eight hours a week the plan does not compress; it simply fails. If eight hours is genuinely the ceiling, the outline recommends a 24-week plan instead.",
+    "source": [
+      "outline §03"
+    ]
+  },
+  "diagnostic": {
+    "scale": "1 = never done this, 5 = do this reliably under time pressure",
+    "axes": [
+      {
+        "id": "observation",
+        "name": "Observation",
+        "score5": "You notice how things are made and where they fail, without being prompted, and you have written proof of it.",
+        "weight": "All exams",
+        "fixDrill": "Diary 'where it fails' quadrant and an extra field mission"
+      },
+      {
+        "id": "drawing",
+        "name": "Drawing fluency",
+        "score5": "You can put a recognisable object in correct perspective, in context, in under five minutes.",
+        "weight": "All exams",
+        "fixDrill": "Your current drawing level's daily drill, timed"
+      },
+      {
+        "id": "ideation",
+        "name": "Ideation speed",
+        "score5": "Ten distinct, non-trivial concepts in ten minutes, without stalling after the third.",
+        "weight": "All exams",
+        "fixDrill": "Ten-in-ten with the three-premise rule, then constraint flip"
+      },
+      {
+        "id": "form_material",
+        "name": "Form and material",
+        "score5": "Given paper, wire and tape, you can build a standing, working object in twenty minutes.",
+        "weight": "NID heavy",
+        "fixDrill": "Two building drills, photographed"
+      },
+      {
+        "id": "articulation",
+        "name": "Articulation",
+        "score5": "You can explain any concept of yours in sixty seconds and answer ‘why not the opposite?’ well.",
+        "weight": "NID heavy",
+        "fixDrill": "Two recorded sixty-second pitches and explanation cards"
+      },
+      {
+        "id": "awareness",
+        "name": "Awareness",
+        "score5": "You hold opinions about twenty designed things, Indian and global, and can defend them.",
+        "weight": "All exams",
+        "fixDrill": "Two index cards, then argue the opposite position for two minutes each"
+      }
+    ],
+    "bands": [
+      {
+        "id": "foundation",
+        "min": 6,
+        "max": 13,
+        "name": "Foundation first",
+        "outlineAdvice": "The outline recommends 24 weeks for this band.",
+        "portalMessage": "You have about 13 weeks. Run the plan as written, protect the four non-negotiables, and use the optional weak-axis block. Treat this attempt as calibration: the outline recommends starting the full plan again the day after the paper if this cycle is too soon."
+      },
+      {
+        "id": "standard",
+        "min": 14,
+        "max": 22,
+        "name": "Standard build",
+        "outlineAdvice": "The 16-week spine, with one extra block a week for each of your two lowest axes.",
+        "portalMessage": "This is a compressed plan for you. Protect the non-negotiables and add the weak-axis block for your lowest axis each week."
+      },
+      {
+        "id": "sharpening",
+        "min": 23,
+        "max": 30,
+        "name": "Sharpening",
+        "outlineAdvice": "The 12-week compression. Skip foundational drawing drills; spend the time on simulation volume, portfolio depth and articulation.",
+        "portalMessage": "This plan is your compression. Full simulations start in week 4, and Drawing L0 is skipped."
+      }
+    ],
+    "rescoreWeeks": [
+      8
+    ],
+    "rescoreRule": "Re-score without looking at the first answers. A score that has not moved on an axis in six weeks means the drill isn't working: change the drill, not the effort.",
+    "skipL0Rule": "Skip Drawing L0 if the drawing axis scored 3 or more.",
+    "source": [
+      "outline §03",
+      "outline §18"
+    ]
+  },
+  "nonNegotiables": [
+    "The 45-minute daily drill, six days a week",
+    "One critique conversation every week",
+    "One Sunday review, written, thirty minutes",
+    "One full simulation a week from week 7 (outline: week 9 in the 16-week spine)"
+  ],
+  "safeToSacrifice": [
+    "Breadth of ideation methods",
+    "Volume of awareness reading",
+    "Perfection of any single drawing",
+    "Number of finished portfolio pieces"
+  ],
+  "weeklyOperatingSystem": [
+    {
+      "block": "Daily drill",
+      "duration": 45,
+      "frequency": "6 a week",
+      "what": "15 min observation sketch from life, 20 min the skill of the current week, 10 min logging what broke. Same time every day."
+    },
+    {
+      "block": "Build block",
+      "duration": 90,
+      "frequency": "3 a week",
+      "what": "Deep work on the week's theme. Phone in another room."
+    },
+    {
+      "block": "Simulation",
+      "duration": "120 to 180",
+      "frequency": "1 a week",
+      "what": "Timed, uninterrupted, exam conditions."
+    },
+    {
+      "block": "Critique",
+      "duration": 60,
+      "frequency": "1 a week",
+      "what": "Someone other than you says what is wrong with the week's output."
+    },
+    {
+      "block": "Sunday review",
+      "duration": 30,
+      "frequency": "1 a week",
+      "what": "Written: what improved, what did not, what changes next week."
+    }
+  ],
+  "practiceRules": [
+    "Constrain, don't liberate.",
+    "Time-box everything, including the small things.",
+    "Cut feedback latency: review within 48 hours.",
+    "Separate generating from judging.",
+    "Keep an error ledger.",
+    "Redo, don't just do.",
+    "Make it public."
+  ],
+  "critique": {
+    "frame": [
+      "What do you think this is doing?",
+      "Where does it break?",
+      "What would you try instead?"
+    ],
+    "withoutMentor": [
+      "Cold-read yesterday's work first thing in the morning.",
+      "Trade work weekly with two other aspirants on a fixed day.",
+      "Ask a non-designer about clarity.",
+      "Explain it aloud, recorded, and note every hesitation."
+    ]
+  },
+  "diary": {
+    "quadrants": [
+      "What I saw",
+      "How it works",
+      "Where it fails",
+      "What I'd change"
+    ],
+    "minutesPerDay": 10,
+    "weeklyThemes": [
+      "Things people queue for",
+      "Things held in one hand while doing something else",
+      "Public signage that fails",
+      "Repairs: how Indians fix what breaks",
+      "Objects designed for water",
+      "Anything a child under six operates",
+      "Street vending: display, storage, transport",
+      "Interfaces used by people who did not choose them"
+    ],
+    "fieldMissionPlaces": [
+      "Railway platform",
+      "Government office",
+      "Hospital OPD",
+      "Wet market",
+      "Hardware shop",
+      "Bus depot",
+      "Temple or dargah",
+      "School gate at 3 pm",
+      "Kirana at closing time",
+      "Local workshop"
+    ],
+    "fieldMissionBrief": "90 minutes, notebook, no phone. Come back with twelve sketches and three failures observed.",
+    "checkpoints": [
+      {
+        "week": 4,
+        "target": "24 diary pages; name three failures in objects you use daily"
+      },
+      {
+        "week": 10,
+        "target": "60+ diary pages; patterns appearing across entries"
+      }
+    ]
+  },
+  "drawingLevels": [
+    {
+      "level": "L0",
+      "focus": "Line control",
+      "drill": "Straight lines, ellipses, parallel hatching: 10 min, no ruler, wrist locked",
+      "pass": "Ellipses close cleanly and lines are confident single strokes"
+    },
+    {
+      "level": "L1",
+      "focus": "Primitives in space",
+      "drill": "Cubes, cylinders, cones in one- and two-point perspective from imagination",
+      "pass": "You can rotate a cube to an arbitrary angle without measuring"
+    },
+    {
+      "level": "L2",
+      "focus": "Compound objects",
+      "drill": "Real objects built from primitives: mixer, torch, stapler, chair",
+      "pass": "A stranger identifies the object immediately, from any of three angles"
+    },
+    {
+      "level": "L3",
+      "focus": "Surface and material",
+      "drill": "Shading, cast shadow, and rendering glass, steel, cloth, cane, terracotta",
+      "pass": "Material reads correctly in greyscale without labels"
+    },
+    {
+      "level": "L4",
+      "focus": "People and scenes",
+      "drill": "Figures in proportion, in action, in a place, from memory",
+      "pass": "Figures carry weight and scenes have a believable ground plane"
+    },
+    {
+      "level": "L5",
+      "focus": "Speed",
+      "drill": "Object, user and context in five minutes, then four, then three",
+      "pass": "A legible, annotated concept sketch in under four minutes"
+    }
+  ],
+  "examinersLookFor": [
+    "Confidence of line",
+    "Correct proportion over correct detail",
+    "Context: the hand, the surface, the moment of use",
+    "Annotation: two words with a leader line"
+  ],
+  "kit": "A cheap A4 sketchbook, 2B pencil, 0.5 black fineliner, one grey marker, one red pen for annotation.",
+  "ideation": {
+    "compressedMethods": [
+      "Crazy Eights",
+      "SCAMPER",
+      "Constraint flip"
+    ],
+    "methods": [
+      [
+        "Crazy Eights",
+        "Eight concepts, eight minutes, one per fold. No editing."
+      ],
+      [
+        "SCAMPER",
+        "Substitute, Combine, Adapt, Modify, Put to other use, Eliminate, Reverse, in sequence on one object."
+      ],
+      [
+        "Constraint flip",
+        "List the brief's assumptions, negate one, design for the negation."
+      ],
+      [
+        "Forced connection",
+        "Pair the brief with a random unrelated object or system and find the bridge."
+      ],
+      [
+        "Worst possible idea",
+        "Design the worst solution, then invert each property."
+      ],
+      [
+        "Analogy transfer",
+        "Find another domain that solved the same structural problem and import its mechanism."
+      ],
+      [
+        "6-3-5",
+        "Six people, three ideas, five minutes, then pass and build on your neighbour's."
+      ]
+    ],
+    "convergenceCriteria": [
+      "Does it answer the brief as written?",
+      "Is it feasible with plausible material?",
+      "Is it different from the other nine?",
+      "Can I draw it clearly in four minutes?",
+      "Can I explain why it exists in one line?"
+    ],
+    "tenInTen": {
+      "rule": "One brief, ten distinct concepts, ten minutes, a thumbnail each. Count how many arrive after minute six.",
+      "target": "Six or more post-minute-six concepts by week 12"
+    },
+    "threePremiseRule": "At least three concepts in a set must attack the problem from a different user, mechanism or definition of the problem."
+  },
+  "buildingDrills": [
+    {
+      "n": 1,
+      "name": "Stand it up",
+      "brief": "A 30 cm structure from one A4 sheet that supports a book."
+    },
+    {
+      "n": 2,
+      "name": "Join without glue",
+      "brief": "Connect two card pieces five ways: slot, tab, fold, weave, tension."
+    },
+    {
+      "n": 3,
+      "name": "Make it move",
+      "brief": "One hinge, one slider, one rotating joint, from card alone."
+    },
+    {
+      "n": 4,
+      "name": "Hold water",
+      "brief": "A vessel from flat material that doesn't leak for sixty seconds."
+    },
+    {
+      "n": 5,
+      "name": "Grip it",
+      "brief": "A handle for a specific hand doing a specific task: wet, gloved, arthritic, a child's."
+    },
+    {
+      "n": 6,
+      "name": "Compress it",
+      "brief": "An object that folds to a quarter of its volume and returns."
+    },
+    {
+      "n": 7,
+      "name": "One material, three forms",
+      "brief": "The same sheet of card, three completely different objects."
+    },
+    {
+      "n": 8,
+      "name": "Blind build",
+      "brief": "Build to a written brief without drawing first. Then draw what you built."
+    }
+  ],
+  "buildRules": {
+    "materials": "Paper, card, wire, thread, tape, scissors, a blade. Nothing else.",
+    "minutes": 20,
+    "photograph": "Every model, three angles, plain background, decent light, the moment it's finished.",
+    "archiveTarget": 40,
+    "materialVocabulary": [
+      "Paper & card",
+      "Wire",
+      "Bamboo & cane",
+      "Terracotta",
+      "Brass & sheet metal",
+      "Cotton & jute",
+      "Wood",
+      "Glass",
+      "Injection-moulded plastic",
+      "Leather",
+      "Lac & resin",
+      "Stone"
+    ],
+    "materialQuestions": [
+      "How does it fail?",
+      "How does it join?",
+      "How is it finished?",
+      "Which Indian craft uses it well?"
+    ]
+  },
+  "explanationCard": [
+    "Who: the specific person, not ‘users’",
+    "What breaks: the exact failure moment today",
+    "The move: your intervention, in one sentence",
+    "Why this and not the obvious one",
+    "What it costs: the trade-off you accepted"
+  ],
+  "articulation": {
+    "pitchStructure": [
+      "Context",
+      "The problem as you framed it",
+      "What you made",
+      "What you learned"
+    ],
+    "writingDrills": [
+      "250 words a week on a designed thing you encountered: describe, judge, justify.",
+      "Rewrite five briefs as single sentences beginning ‘How might we…’.",
+      "Restate one brief three ways and note how each opens different solutions."
+    ],
+    "questionBank": [
+      "Why design? Why not the thing your marks qualify you for?",
+      "Which of these is your weakest piece, and why?",
+      "What would you change if you started again?",
+      "Whose work do you admire, and what specifically about it?",
+      "Show me something badly designed that you use every day.",
+      "What did you make most recently, outside of exam preparation?",
+      "What have you read or watched in the last month?",
+      "What would you do if you did not get in this year?"
+    ],
+    "bankOfTwenty": "Twenty things you can speak about for two minutes each, from your diary and builds.",
+    "tenPositions": "Ten opinions about design you can hold under disagreement."
+  },
+  "awareness": {
+    "indexCardFields": [
+      "What it is",
+      "Why it mattered",
+      "One example you have seen yourself",
+      "One sentence of your own opinion"
+    ],
+    "targets": {
+      "working": 20,
+      "strong": 40
+    },
+    "test": "Someone picks a card and argues the opposite. If you can't hold your ground for two minutes, you have facts but no view.",
+    "twentyThingsRule": "Mix the celebrated with the everyday. At least half Indian, and at least five things you dislike.",
+    "layers": {
+      "indianLineage": [
+        "The India Report and the founding of NID",
+        "The Eameses' visit and what it argued for",
+        "Khadi and design as a political instrument",
+        "Folk and tribal traditions and their contemporary misuse",
+        "Craft clusters and the artisan economy",
+        "The National Design Policy"
+      ],
+      "contemporaryIndia": [
+        "Railway signage, metro wayfinding, currency, the rupee symbol",
+        "Digital public goods and their interface problems",
+        "Design for constrained contexts",
+        "Indian studios and independent practice",
+        "Vernacular commercial design"
+      ],
+      "global": [
+        "Bauhaus and Ulm",
+        "Human-centred design and its critiques",
+        "Universal design and accessibility",
+        "Sustainability: circularity, repair, material honesty",
+        "The UN Sustainable Development Goals as design briefs",
+        "Systems, service and interaction design (M.Des)"
+      ]
+    }
+  },
+  "errorBuckets": [
+    {
+      "id": "concept",
+      "name": "Concept",
+      "example": "All ten concepts were the same idea",
+      "fix": "Forced connection; three-premise rule"
+    },
+    {
+      "id": "time",
+      "name": "Time",
+      "example": "Ran out of time in the last question",
+      "fix": "Time-boxed thumbnails; hard stop at 60% of allotted time"
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "example": "The examiner could not tell what the object was",
+      "fix": "Every sketch gets a user, a surface, two labels"
+    },
+    {
+      "id": "care",
+      "name": "Care",
+      "example": "Misread the brief's constraint",
+      "fix": "Two-minute read-and-underline before any mark"
+    }
+  ],
+  "errorLedgerFields": [
+    "date",
+    "whatWentWrong",
+    "bucket",
+    "rootCause",
+    "fixingDrill"
+  ],
+  "errorLedgerRule": "An error logged three times is a gap in method: it needs a drill, not more effort.",
+  "reviewProtocol": [
+    "Score it before you feel anything.",
+    "Put every error in exactly one bucket.",
+    "Count the buckets; the dominant one is this week's repair target.",
+    "Rewrite one answer properly, untimed.",
+    "Log it in the ledger and close the paper."
+  ],
+  "simulationLogFields": [
+    "date",
+    "paperOrBrief",
+    "timeTakenMinutes",
+    "finished",
+    "dominantBucket",
+    "answerRewritten",
+    "selfScore (optional)",
+    "mentorScore (optional)"
+  ],
+  "sundayReview": {
+    "fields": [
+      "whatImprovedWithEvidence",
+      "whatDidNotMoveAndWhy",
+      "oneChangeForNextWeek"
+    ],
+    "weekCompletionCheck": [
+      "Daily drill, 6 days",
+      "3 build blocks",
+      "1 simulation",
+      "1 critique conversation",
+      "Diary complete",
+      "Ledger updated",
+      "One redo from two weeks ago",
+      "Work posted publicly"
+    ]
+  },
+  "portfolio": {
+    "spine": [
+      [
+        "Context",
+        "Where this sits, and for whom. One paragraph."
+      ],
+      [
+        "Question",
+        "The problem as you framed it, not as it was handed to you."
+      ],
+      [
+        "Evidence",
+        "What you observed or tested: photographs, notes, quotes."
+      ],
+      [
+        "Exploration",
+        "The concepts you rejected, and honestly why."
+      ],
+      [
+        "Iteration",
+        "What changed between versions, and what forced the change."
+      ],
+      [
+        "Outcome",
+        "The resolved thing, shown properly."
+      ],
+      [
+        "Reflection",
+        "What failed, and what you would do differently now."
+      ]
+    ],
+    "shape": [
+      "Four to six projects",
+      "Lead with your strongest, close with your second strongest",
+      "Range: making-led, research-led, visual, self-initiated",
+      "Consistent grid and two typefaces"
+    ],
+    "failures": [
+      "Process invented afterwards to justify a finished image",
+      "Group work with no statement of what you did",
+      "Software showreels with no problem attached",
+      "Every project a success, no evidence of judgement",
+      "Text too dense to read, or too thin to assess"
+    ]
+  },
+  "sop": {
+    "length": "500 to 800 words unless specified",
+    "structure": [
+      "Open with a specific thing you did or noticed",
+      "Trace the line from it to this application",
+      "Name what you want to work on, and why here",
+      "Admit a gap and how you'll close it"
+    ],
+    "edit": "Cut it by a third: remove every sentence that could appear in someone else's statement."
+  },
+  "mainsPrep": {
+    "ug": {
+      "studio": "Long studio briefs, materials restricted, no phone, no reference. Rotate making-led, drawing-led, narrative and group formats. Budget the last 20% of time for presentation.",
+      "inPerson": "Weekly rehearsal from week 8 with someone who pushes back. Carry twenty things you can talk about and ten opinions you can defend. Think aloud. Bring the sketchbook."
+    },
+    "pg": {
+      "studio": "Timed domain studio sets in your group's format.",
+      "interview": "Mock interviews weekly from week 8; every project rehearsed to sixty seconds; portfolio and statement of purpose finished."
+    },
+    "materialsTest": "Two weeks before, do one full brief using only what you intend to carry, and note what fails. Check official instructions for what is permitted and provided."
+  },
+  "resources": {
+    "readFoundations": [
+      "The Design of Everyday Things (Donald Norman)",
+      "Thoughtless Acts? (Jane Fulton Suri)",
+      "How to See (George Nelson)",
+      "Design as Art (Bruno Munari)",
+      "The India Report (Charles and Ray Eames)"
+    ],
+    "readDrawingMaking": [
+      "Sketching: Drawing Techniques for Product Designers (Koos Eissen and Roselien Steur)",
+      "Drawing on the Right Side of the Brain (Betty Edwards)",
+      "Universal Principles of Design (Lidwell, Holden and Butler)"
+    ],
+    "watch": [
+      "Objectified (Gary Hustwit)",
+      "Helvetica (Gary Hustwit)",
+      "Abstract: The Art of Design",
+      "Rams (Gary Hustwit)",
+      "Eames Office short films"
+    ],
+    "follow": [
+      "Dezeen",
+      "Core77",
+      "It's Nice That",
+      "World Design Organization",
+      "Interaction Design Foundation",
+      "IxDA",
+      "Design institute degree shows",
+      "Student portfolios from your target programme"
+    ],
+    "go": [
+      "Your nearest craft cluster or artisan workshop",
+      "A state handicrafts emporium",
+      "A working railway station on a weekday",
+      "A city museum's objects collection",
+      "A hardware or wholesale market",
+      "A degree show at a design institute"
+    ],
+    "pastPapers": "Use official past papers first. Solve every question before reading any solution, then write your own justification.",
+    "rule": "Pick two books, two films and two ongoing sources for the whole plan."
+  },
+  "conflictsResolved": [
+    {
+      "topic": "Mains shortlisting",
+      "outline": "Roughly 1.5× seats per category (outline §01, §11)",
+      "handbook": "UG: 2.5× seats per category (handbook-ug §2.1, §8.4, §9.3). PG: 4.5× seats per discipline per category (handbook-pg §9.3)",
+      "decision": "Use the handbook figures."
+    },
+    {
+      "topic": "B.Des Mains weighting",
+      "outline": "Studio 60 : In-person 40 (outline §01, §11, §17)",
+      "handbook": "Weightages to be announced later (handbook-ug §8.5)",
+      "decision": "Do not show a split. Describe both parts as substantial."
+    },
+    {
+      "topic": "Prelims duration",
+      "outline": "Around three hours (outline §11)",
+      "handbook": "Announced in the admit card (handbook §8.2)",
+      "decision": "Practice papers run three hours; label it as Designforge practice, not an exam fact."
+    },
+    {
+      "topic": "Programme naming",
+      "outline": "‘NID DAT B.Des’",
+      "handbook": "NID Ahmedabad now offers a 5.5-year Integrated M.Des; B.Des is at NID AP, MP, Haryana, Assam (handbook-ug §4)",
+      "decision": "Call the track ‘B.Des and Integrated M.Des (after Class 12)’."
+    },
+    {
+      "topic": "M.Des discipline choice",
+      "outline": "‘A limited number of disciplines within one faculty stream’ (outline §12)",
+      "handbook": "One to three disciplines, with group rules and Group X (handbook-pg §4.1)",
+      "decision": "Use the handbook rules and validate them in onboarding."
+    },
+    {
+      "topic": "M.Des portfolio",
+      "outline": "Portfolio examined at the interview (outline §01, §12)",
+      "handbook": "Studio Test and Interview; portfolio not mentioned (handbook-pg §8.4)",
+      "decision": "Keep portfolio prep as Designforge guidance and tell students to check the Mains notification."
+    },
+    {
+      "topic": "Diagnostic re-score",
+      "outline": "Weeks 8 and 14 of 16",
+      "handbook": "n/a",
+      "decision": "Week 8 only; week 14 falls after the exam in a 13-week plan."
+    }
+  ]
+}

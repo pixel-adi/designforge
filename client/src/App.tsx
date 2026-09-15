@@ -45,6 +45,7 @@ const AdminMentorPlaceholder = lazy(() => import("@/pages/admin/admin-mentor-pla
 const PortalLogin = lazy(() => import("@/pages/portal/login"));
 const PortalDashboard = lazy(() => import("@/pages/portal/dashboard"));
 const PortalTestEngine = lazy(() => import("@/pages/portal/test-engine"));
+const PortalPrepTracker = lazy(() => import("@/pages/portal/prep-tracker"));
 
 // Per-route wrapper — each page gets its own ErrorBoundary so one crash
 // doesn't bring down the entire app, just that single page.
@@ -82,6 +83,7 @@ function Router() {
         {/* Candidate Portal */}
         <Route path="/portal/login">{() => <PageWrapper><PortalLogin /></PageWrapper>}</Route>
         <Route path="/portal/dashboard">{() => <PageWrapper><PortalDashboard /></PageWrapper>}</Route>
+        <Route path="/portal/prep-tracker">{() => <PageWrapper><PortalPrepTracker /></PageWrapper>}</Route>
         <Route path="/portal/test/:id">{() => <PageWrapper><PortalTestEngine /></PageWrapper>}</Route>
 
         {/* Admin Routes */}
