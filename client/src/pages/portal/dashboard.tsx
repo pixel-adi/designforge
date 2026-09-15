@@ -1,16 +1,18 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy, BookOpen, Lightbulb, ClipboardList, Lock, CreditCard, ExternalLink, Download, Eye, EyeOff, Upload, AlertCircle, Star, Shield, Sparkles, ThumbsUp, Plus, HelpCircle, Send, Zap, Target, TrendingUp, Calendar } from "lucide-react";
+import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy, BookOpen, Lightbulb, ClipboardList, Lock, CreditCard, ExternalLink, Download, Eye, EyeOff, Upload, AlertCircle, Star, Shield, Sparkles, ThumbsUp, Plus, HelpCircle, Send, Zap, Target, TrendingUp, Calendar, ChevronLeft } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ScatterChart, Scatter, Cell, Legend } from "recharts";
+import { PortalPrepTrackerSection } from "@/prep-tracker/components/PortalPrepTrackerSection";
+import { ExamCountdownTimer } from "@/prep-tracker/components/ExamCountdownTimer";
 const CustomScatterTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length && payload[0] && payload[0].payload) {
     const data = payload[0].payload;
@@ -45,7 +47,15 @@ export default function PortalDashboard() {
   const [activeTests, setActiveTests] = useState<any[]>([]);
   const [testCategoryFilter, setTestCategoryFilter] = useState<'all' | 'full_length' | 'short'>('all');
   const [candidateAttemptsMap, setCandidateAttemptsMap] = useState<Record<string, any[]>>({});
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get('tab') === 'tracker' || window.location.pathname.includes('prep-tracker')) {
+        return 'tracker';
+      }
+    }
+    return 'overview';
+  });
   const [pastAttempts, setPastAttempts] = useState<any[]>([]);
   const [loadingAttempts, setLoadingAttempts] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -81,6 +91,9 @@ export default function PortalDashboard() {
   const [questionDifficultyFilter, setQuestionDifficultyFilter] = useState('all');
   const [questionTopicFilter, setQuestionTopicFilter] = useState('');
   const [showAnswers, setShowAnswers] = useState<Record<string, boolean>>({});
+  const [showAllAnswers, setShowAllAnswers] = useState(false);
+  const [questionPage, setQuestionPage] = useState(1);
+  const QUESTIONS_PER_PAGE = 15;
   const [userSelectedOptions, setUserSelectedOptions] = useState<Record<string, string>>({});
   const [questionDomainFilter, setQuestionDomainFilter] = useState<string>('all');
   const [topicFilter, setTopicFilter] = useState<'all' | 'strong' | 'weak'>('all');
@@ -1447,14 +1460,21 @@ export default function PortalDashboard() {
               <Sparkles className="w-4 h-4" /> Feature Board
             </button>
 
-            <a
-              href="/portal/prep-tracker"
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-extrabold text-white bg-gradient-to-r from-[#E23A25] to-[#B82210] hover:brightness-110 transition-all shadow-xs"
+            <button
+              type="button"
+              onClick={() => setActiveTab('tracker')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                activeTab === 'tracker'
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'text-foreground/80 hover:bg-black/5 hover:text-foreground'
+              }`}
             >
-              <Calendar className="w-4 h-4 text-white" />
+              <Calendar className={`w-4 h-4 ${activeTab === 'tracker' ? 'text-white' : 'text-primary'}`} />
               <span>92-Day Prep Tracker</span>
-              <span className="px-1.5 py-0.2 rounded text-[10px] bg-white/20 text-white font-black ml-auto">NID '27</span>
-            </a>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ml-auto ${activeTab === 'tracker' ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>
+                NID '27
+              </span>
+            </button>
           </div>
 
           <p className="px-4 text-xs font-semibold uppercase tracking-wider text-foreground/40 mb-2 mt-6">Resources</p>
@@ -1523,10 +1543,9 @@ export default function PortalDashboard() {
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto p-6 md:p-10 lg:p-12">
-
           <div className="mb-10">
             <h1 className="text-2xl sm:text-3xl font-bold text-[#262626] tracking-tight">
-              {activeTab === 'overview' ? 'Dashboard Overview' : activeTab === 'progress' ? 'Performance Analytics' : activeTab === 'leaderboard' ? 'Global Leaderboard' : activeTab === 'questions' ? 'Question Bank' : activeTab === 'materials' ? 'Study Materials' : activeTab === 'assignments' ? 'Class Assignments' : activeTab === 'notes' ? 'Class Notes' : 'Profile Settings'}
+              {activeTab === 'overview' ? 'Dashboard Overview' : activeTab === 'tracker' ? 'NID DAT 2027 · 92-Day Prep Tracker' : activeTab === 'progress' ? 'Performance Analytics' : activeTab === 'leaderboard' ? 'Global Leaderboard' : activeTab === 'questions' ? 'Question Bank' : activeTab === 'materials' ? 'Study Materials' : activeTab === 'assignments' ? 'Class Assignments' : activeTab === 'notes' ? 'Class Notes' : 'Profile Settings'}
             </h1>
             <p className="text-foreground/60 mt-1">
               {Array.isArray(candidate?.program_ids) && candidate.program_ids.length > 0 ? `Preparing for ${programs.filter(p => candidate.program_ids.includes(p.id)).map(p => p.name).join(' & ')}` : 'Welcome to the candidate portal'}
@@ -1549,32 +1568,39 @@ export default function PortalDashboard() {
 
               {candidate && (
                 <section>
-                  {/* 92-Day NID Prep Tracker Launch Banner */}
-                  <div className="mb-6 rounded-2xl border border-primary/20 bg-gradient-to-br from-[#1C1C1E] via-[#2A1B19] to-[#1F1413] p-5 text-white shadow-md relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="relative z-10 space-y-1">
+                  {/* 92-Day NID Prep Tracker Launch Banner with Live Countdown */}
+                  <div className="mb-6 rounded-2xl border border-primary/20 bg-gradient-to-br from-[#1C1C1E] via-[#2A1B19] to-[#1F1413] p-5 sm:p-6 text-white shadow-md relative overflow-hidden flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+                    <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-primary/25 blur-3xl" />
+
+                    <div className="relative z-10 space-y-1.5">
                       <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-primary text-white uppercase tracking-wider">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-primary text-white uppercase tracking-wider">
                           NID DAT 2027
                         </span>
                         <span className="text-xs text-white/70 font-semibold">
-                          Exam: 20 Dec 2026
+                          Exam Date: Sunday 20 Dec 2026
                         </span>
                       </div>
-                      <h3 className="text-lg font-black tracking-tight text-white">
+                      <h3 className="text-lg sm:text-xl font-black tracking-tight text-white">
                         92-Day NID Preparation Tracker
                       </h3>
-                      <p className="text-xs text-white/60 max-w-xl">
-                        Daily 45-min drills, 3 build blocks, Thursday critique, Saturday simulation, and locked milestone tracking.
+                      <p className="text-xs text-white/60 max-w-xl leading-relaxed">
+                        Daily 45-min drills, 3 build blocks, Thursday critique, Saturday simulation, and progressive milestone unlocks.
                       </p>
                     </div>
 
-                    <a
-                      href="/portal/prep-tracker"
-                      className="relative z-10 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-extrabold shadow-md transition-all shrink-0"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span>Open Prep Tracker</span>
-                    </a>
+                    {/* LIVE COUNTDOWN + ACTION */}
+                    <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto justify-between sm:justify-end">
+                      <ExamCountdownTimer variant="compact" />
+                      <Button
+                        type="button"
+                        onClick={() => setActiveTab('tracker')}
+                        className="bg-primary hover:bg-primary/90 text-white text-xs font-extrabold shadow-md h-10 px-5 rounded-xl gap-2 shrink-0"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        <span>Open Tracker</span>
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
@@ -1733,9 +1759,10 @@ export default function PortalDashboard() {
                         )}
                       </div>
                     );
-                  })})()}
-                  </div>
-                </section>
+                  });
+                })()}
+              </div>
+            </section>
               )}
             </div>
           )}
@@ -2701,204 +2728,346 @@ export default function PortalDashboard() {
                 </div>
               </div>
 
-              {/* Filters */}
-              <div className="flex flex-wrap items-center gap-3">
-                <select
-                  value={questionTypeFilter}
-                  onChange={e => {
-                    setQuestionTypeFilter(e.target.value);
-                    setTimeout(fetchQuestions, 0);
-                  }}
-                  className="h-9 px-3 rounded-lg border border-black/10 bg-white text-xs font-semibold"
-                >
-                  <option value="all">All Question Types</option>
-                  {questionPartFilter === 'A' ? (
-                    <>
-                      <option value="MCQ">MCQ (Single Choice)</option>
-                      <option value="MSQ">MSQ (Multiple Choice)</option>
-                      <option value="NAT">NAT (Numerical)</option>
-                    </>
-                  ) : (
-                    <option value="SUBJECTIVE">Subjective Drawing</option>
-                  )}
-                </select>
+              {/* Filters & Answer Toggle Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-black/10 shadow-xs">
+                <div className="flex flex-wrap items-center gap-3">
+                  <select
+                    value={questionTypeFilter}
+                    onChange={e => {
+                      setQuestionTypeFilter(e.target.value);
+                      setQuestionPage(1);
+                      setTimeout(fetchQuestions, 0);
+                    }}
+                    className="h-9 px-3 rounded-lg border border-black/10 bg-white text-xs font-semibold"
+                  >
+                    <option value="all">All Question Types</option>
+                    {questionPartFilter === 'A' ? (
+                      <>
+                        <option value="MCQ">MCQ (Single Choice)</option>
+                        <option value="MSQ">MSQ (Multiple Choice)</option>
+                        <option value="NAT">NAT (Numerical)</option>
+                      </>
+                    ) : (
+                      <option value="SUBJECTIVE">Subjective Drawing</option>
+                    )}
+                  </select>
 
-                <select
-                  value={questionDifficultyFilter}
-                  onChange={e => {
-                    setQuestionDifficultyFilter(e.target.value);
-                    setTimeout(fetchQuestions, 0);
-                  }}
-                  className="h-9 px-3 rounded-lg border border-black/10 bg-white text-xs font-semibold"
-                >
-                  <option value="all">All Difficulties</option>
-                  <option value="Low">Low Difficulty</option>
-                  <option value="Medium">Medium Difficulty</option>
-                  <option value="High">High Difficulty</option>
-                </select>
+                  <select
+                    value={questionDifficultyFilter}
+                    onChange={e => {
+                      setQuestionDifficultyFilter(e.target.value);
+                      setQuestionPage(1);
+                      setTimeout(fetchQuestions, 0);
+                    }}
+                    className="h-9 px-3 rounded-lg border border-black/10 bg-white text-xs font-semibold"
+                  >
+                    <option value="all">All Difficulties</option>
+                    <option value="Low">Low Difficulty</option>
+                    <option value="Medium">Medium Difficulty</option>
+                    <option value="High">High Difficulty</option>
+                  </select>
 
-                <input
-                  placeholder="Filter by keyword or topic..."
-                  value={questionTopicFilter}
-                  onChange={e => setQuestionTopicFilter(e.target.value)}
-                  className="h-9 px-3 rounded-lg border border-black/10 bg-white text-xs w-60"
-                />
+                  <input
+                    placeholder="Filter by keyword or topic..."
+                    value={questionTopicFilter}
+                    onChange={e => {
+                      setQuestionTopicFilter(e.target.value);
+                      setQuestionPage(1);
+                    }}
+                    className="h-9 px-3 rounded-lg border border-black/10 bg-white text-xs w-52 sm:w-60"
+                  />
+                </div>
+
+                {/* Global Show/Hide Answers Toggle */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAllAnswers(prev => !prev)}
+                  className={`h-9 px-3.5 text-xs font-bold gap-1.5 transition-all ${
+                    showAllAnswers
+                      ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
+                      : 'bg-white text-[#262626] border-black/15 hover:bg-black/5'
+                  }`}
+                >
+                  {showAllAnswers ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  <span>{showAllAnswers ? 'Hide All Answers' : 'Show All Answers'}</span>
+                </Button>
               </div>
 
-              {/* Questions List */}
+              {/* Questions List with Pagination (15 per page) */}
               {loadingQuestions ? (
                 <div className="flex justify-center py-16">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 </div>
-              ) : questions.filter(
+              ) : (() => {
+                const filteredQuestions = questions.filter(
                   q =>
                     !questionTopicFilter ||
                     (q.topics || []).some((t: string) =>
                       t.toLowerCase().includes(questionTopicFilter.toLowerCase())
                     )
-                ).length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-2xl border border-black/5">
-                  <BookOpen className="w-12 h-12 text-foreground/20 mx-auto mb-4" />
-                  <h3 className="font-bold text-[#262626] mb-2">No questions found</h3>
-                  <p className="text-sm text-foreground/50">Try adjusting your section or filters.</p>
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  {questions
-                    .filter(
-                      q =>
-                        !questionTopicFilter ||
-                        (q.topics || []).some((t: string) =>
-                          t.toLowerCase().includes(questionTopicFilter.toLowerCase())
-                        )
-                    )
-                    .map((q, qIndex) => {
-                      const options = questionOptions[q.id] || [];
-                      const selectedOptId = userSelectedOptions[q.id];
-                      const isAnswerRevealed = showAnswers[q.id];
-                      const isPartB = q.part === 'B';
+                );
 
-                      return (
-                        <div
-                          key={q.id}
-                          className="bg-white rounded-2xl border border-black/10 p-6 shadow-xs space-y-4"
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-mono text-xs font-black text-foreground/40">
-                                Q{qIndex + 1}
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-primary/10 text-primary">
-                                {q.type}
-                              </span>
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  q.difficulty === 'High'
-                                    ? 'bg-red-100 text-red-700'
-                                    : q.difficulty === 'Medium'
-                                    ? 'bg-orange-100 text-orange-700'
-                                    : 'bg-green-100 text-green-700'
-                                }`}
-                              >
-                                {q.difficulty}
-                              </span>
-                              {q.pyq_tag && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
-                                  {q.pyq_tag}
-                                </span>
-                              )}
-                            </div>
+                const totalPages = Math.max(1, Math.ceil(filteredQuestions.length / QUESTIONS_PER_PAGE));
+                const startIdx = (questionPage - 1) * QUESTIONS_PER_PAGE;
+                const paginatedQuestions = filteredQuestions.slice(startIdx, startIdx + QUESTIONS_PER_PAGE);
 
-                            <div className="flex flex-wrap gap-1.5 justify-end">
-                              {(q.topics || []).map((t: string) => (
-                                <span
-                                  key={t}
-                                  className="px-2 py-0.5 rounded text-[10px] font-medium bg-black/5 text-foreground/60"
-                                >
-                                  {t}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
+                if (filteredQuestions.length === 0) {
+                  return (
+                    <div className="text-center py-16 bg-white rounded-2xl border border-black/5">
+                      <BookOpen className="w-12 h-12 text-foreground/20 mx-auto mb-4" />
+                      <h3 className="font-bold text-[#262626] mb-2">No questions found</h3>
+                      <p className="text-sm text-foreground/50">Try adjusting your section or filters.</p>
+                    </div>
+                  );
+                }
 
+                return (
+                  <div className="space-y-6">
+                    <div className="space-y-5">
+                      {paginatedQuestions.map((q, pageIdx) => {
+                        const qIndex = startIdx + pageIdx;
+                        const options = questionOptions[q.id] || [];
+                        const selectedOptId = userSelectedOptions[q.id];
+                        const isAnswerRevealed = showAllAnswers || Boolean(showAnswers[q.id]);
+                        const isPartB = q.part === 'B';
+
+                        return (
                           <div
-                            className="prose prose-sm max-w-none text-[#262626] font-medium"
-                            dangerouslySetInnerHTML={{ __html: q.content_text || '' }}
-                          />
-
-                          {q.media_url && (
-                            <div className="my-3">
-                              <img
-                                src={q.media_url}
-                                alt="Question media"
-                                className="max-w-md rounded-xl border border-black/10 shadow-xs"
-                              />
-                            </div>
-                          )}
-
-                          {/* PART A: INTERACTIVE OPTIONS & IMMEDIATE VERIFICATION */}
-                          {!isPartB && options.length > 0 && (
-                            <div className="space-y-2 pt-2 border-t border-black/5">
-                              <p className="text-[11px] font-bold text-foreground/50 uppercase tracking-wider">
-                                Select Option to Practice:
-                              </p>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {options.map((opt: any, optIdx: number) => {
-                                  const isSelected = selectedOptId === opt.id;
-                                  const isCorrect = Boolean(opt.is_correct);
-
-                                  let optStyles =
-                                    'bg-white border-black/10 hover:border-black/30 text-foreground/80';
-
-                                  if (isAnswerRevealed) {
-                                    if (isCorrect) {
-                                      optStyles =
-                                        'bg-green-50 border-green-400 text-green-950 font-bold ring-1 ring-green-400';
-                                    } else if (isSelected && !isCorrect) {
-                                      optStyles =
-                                        'bg-red-50 border-red-300 text-red-900 line-through';
-                                    } else {
-                                      optStyles = 'bg-black/[0.02] border-black/10 opacity-60';
-                                    }
-                                  } else if (isSelected) {
-                                    optStyles =
-                                      'bg-primary/10 border-primary text-primary font-bold shadow-xs';
-                                  }
-
-                                  return (
-                                    <button
-                                      key={opt.id}
-                                      type="button"
-                                      onClick={() => {
-                                        setUserSelectedOptions(prev => ({
-                                          ...prev,
-                                          [q.id]: opt.id,
-                                        }));
-                                      }}
-                                      className={`p-3 rounded-xl border text-left text-xs transition-all flex items-start gap-3 ${optStyles}`}
-                                    >
-                                      <span
-                                        className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[11px] shrink-0 ${
-                                          isAnswerRevealed && isCorrect
-                                            ? 'bg-green-600 text-white'
-                                            : isSelected
-                                            ? 'bg-primary text-white'
-                                            : 'bg-black/10 text-foreground/70'
-                                        }`}
-                                      >
-                                        {String.fromCharCode(65 + optIdx)}
-                                      </span>
-                                      <span className="flex-1 mt-0.5">{opt.content_text}</span>
-                                      {isAnswerRevealed && isCorrect && (
-                                        <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
-                                      )}
-                                    </button>
-                                  );
-                                })}
+                            key={q.id}
+                            className="bg-white rounded-2xl border border-black/10 p-6 shadow-xs space-y-4"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono text-xs font-black text-foreground/40">
+                                  Q{qIndex + 1}
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-primary/10 text-primary">
+                                  {q.type}
+                                </span>
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    q.difficulty === 'High'
+                                      ? 'bg-red-100 text-red-700'
+                                      : q.difficulty === 'Medium'
+                                      ? 'bg-orange-100 text-orange-700'
+                                      : 'bg-green-100 text-green-700'
+                                  }`}
+                                >
+                                  {q.difficulty}
+                                </span>
+                                {q.pyq_tag && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
+                                    {q.pyq_tag}
+                                  </span>
+                                )}
                               </div>
 
-                              <div className="flex items-center justify-between pt-2">
+                              <div className="flex flex-wrap gap-1.5 justify-end">
+                                {(q.topics || []).map((t: string) => (
+                                  <span
+                                    key={t}
+                                    className="px-2 py-0.5 rounded text-[10px] font-medium bg-black/5 text-foreground/60"
+                                  >
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div
+                              className="prose prose-sm max-w-none text-[#262626] font-medium"
+                              dangerouslySetInnerHTML={{ __html: q.content_text || '' }}
+                            />
+
+                            {q.media_url && (
+                              <div className="my-3">
+                                <img
+                                  src={q.media_url}
+                                  alt="Question media"
+                                  className="max-w-md rounded-xl border border-black/10 shadow-xs"
+                                />
+                              </div>
+                            )}
+
+                            {/* PART A: OPTIONS PRACTICE + VISIBLE ANSWER KEY */}
+                            {!isPartB && options.length > 0 && (
+                              <div className="space-y-3 pt-3 border-t border-black/5">
+                                <p className="text-[11px] font-bold text-foreground/50 uppercase tracking-wider">
+                                  Select Option to Practice:
+                                </p>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {options.map((opt: any, optIdx: number) => {
+                                    const isSelected = selectedOptId === opt.id;
+                                    const isCorrect = Boolean(opt.is_correct);
+
+                                    let optStyles =
+                                      'bg-white border-black/10 hover:border-black/30 text-foreground/80';
+
+                                    if (isAnswerRevealed) {
+                                      if (isCorrect) {
+                                        optStyles =
+                                          'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold ring-1 ring-emerald-500';
+                                      } else if (isSelected && !isCorrect) {
+                                        optStyles =
+                                          'bg-red-50 border-red-300 text-red-900 line-through';
+                                      } else {
+                                        optStyles = 'bg-black/[0.02] border-black/10 opacity-60';
+                                      }
+                                    } else if (isSelected) {
+                                      optStyles =
+                                        'bg-primary/10 border-primary text-primary font-bold shadow-xs';
+                                    }
+
+                                    return (
+                                      <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setUserSelectedOptions(prev => ({
+                                            ...prev,
+                                            [q.id]: opt.id,
+                                          }));
+                                        }}
+                                        className={`p-3 rounded-xl border text-left text-xs transition-all flex items-start gap-3 ${optStyles}`}
+                                      >
+                                        <span
+                                          className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[11px] shrink-0 ${
+                                            isAnswerRevealed && isCorrect
+                                              ? 'bg-emerald-600 text-white'
+                                              : isSelected
+                                              ? 'bg-primary text-white'
+                                              : 'bg-black/10 text-foreground/70'
+                                          }`}
+                                        >
+                                          {String.fromCharCode(65 + optIdx)}
+                                        </span>
+                                        <span className="flex-1 mt-0.5">{opt.content_text}</span>
+                                        {isAnswerRevealed && isCorrect && (
+                                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() =>
+                                      setShowAnswers(prev => ({ ...prev, [q.id]: !prev[q.id] }))
+                                    }
+                                    className={`text-xs font-bold h-8 gap-1.5 ${
+                                      isAnswerRevealed
+                                        ? 'bg-black/5 hover:bg-black/10 text-foreground/80'
+                                        : 'bg-primary hover:bg-primary/90 text-white'
+                                    }`}
+                                  >
+                                    {isAnswerRevealed ? (
+                                      <>
+                                        <EyeOff className="w-3.5 h-3.5" /> Hide Answer
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Eye className="w-3.5 h-3.5" /> Show Answer & Solution
+                                      </>
+                                    )}
+                                  </Button>
+
+                                  {selectedOptId && (
+                                    <span className="text-xs font-extrabold">
+                                      {options.find((o: any) => o.id === selectedOptId)?.is_correct ? (
+                                        <span className="text-emerald-600 flex items-center gap-1">
+                                          <CheckCircle2 className="w-3.5 h-3.5" /> Correct Answer!
+                                        </span>
+                                      ) : (
+                                        <span className="text-red-600">
+                                          ✗ Incorrect. See correct option highlighted above.
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Answer Key & Solution Details */}
+                                {isAnswerRevealed && (
+                                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 space-y-1.5 text-xs text-emerald-950 mt-2">
+                                    <div className="flex items-center gap-2 font-black text-emerald-900">
+                                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                      <span>
+                                        Correct Answer: Option{' '}
+                                        {options.findIndex((o: any) => o.is_correct) >= 0
+                                          ? String.fromCharCode(65 + options.findIndex((o: any) => o.is_correct))
+                                          : 'Key'}
+                                        {options.find((o: any) => o.is_correct)?.content_text
+                                          ? ` — ${options.find((o: any) => o.is_correct).content_text}`
+                                          : ''}
+                                      </span>
+                                    </div>
+                                    {(q.explanation || q.solution_text) && (
+                                      <p className="text-emerald-900/85 pl-6 leading-relaxed">
+                                        <strong className="font-bold">Explanation:</strong>{' '}
+                                        {q.explanation || q.solution_text}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* PART A (NO OPTIONS OR NAT TYPE) */}
+                            {!isPartB && options.length === 0 && (
+                              <div className="pt-3 border-t border-black/5 space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() =>
+                                      setShowAnswers(prev => ({ ...prev, [q.id]: !prev[q.id] }))
+                                    }
+                                    className={`text-xs font-bold h-8 gap-1.5 ${
+                                      isAnswerRevealed
+                                        ? 'bg-black/5 hover:bg-black/10 text-foreground/80'
+                                        : 'bg-primary hover:bg-primary/90 text-white'
+                                    }`}
+                                  >
+                                    {isAnswerRevealed ? (
+                                      <>
+                                        <EyeOff className="w-3.5 h-3.5" /> Hide Answer
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Eye className="w-3.5 h-3.5" /> Show Answer & Solution
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+
+                                {isAnswerRevealed && (
+                                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 space-y-1.5 text-xs text-emerald-950">
+                                    <div className="flex items-center gap-2 font-black text-emerald-900">
+                                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                      <span>
+                                        Correct Answer: {q.correct_answer || q.answer || 'Refer to solution rubric'}
+                                      </span>
+                                    </div>
+                                    {(q.explanation || q.solution_text) && (
+                                      <p className="text-emerald-900/85 pl-6 leading-relaxed">
+                                        <strong className="font-bold">Explanation:</strong>{' '}
+                                        {q.explanation || q.solution_text}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* PART B: SUBJECTIVE MODEL SOLUTION & EVALUATION CRITERIA */}
+                            {isPartB && (
+                              <div className="space-y-3 pt-3 border-t border-black/5">
                                 <Button
                                   type="button"
                                   size="sm"
@@ -2913,96 +3082,127 @@ export default function PortalDashboard() {
                                 >
                                   {isAnswerRevealed ? (
                                     <>
-                                      <EyeOff className="w-3.5 h-3.5" /> Hide Answer
+                                      <EyeOff className="w-3.5 h-3.5" /> Hide Model Solution
                                     </>
                                   ) : (
                                     <>
-                                      <CheckCircle2 className="w-3.5 h-3.5" /> Verify Answer
+                                      <BookOpen className="w-3.5 h-3.5" /> View Model Answer & Rubric
                                     </>
                                   )}
                                 </Button>
 
-                                {isAnswerRevealed && selectedOptId && (
-                                  <span className="text-xs font-extrabold">
-                                    {options.find(o => o.id === selectedOptId)?.is_correct ? (
-                                      <span className="text-green-600 flex items-center gap-1">
-                                        <CheckCircle2 className="w-3.5 h-3.5" /> Correct Answer!
-                                      </span>
-                                    ) : (
-                                      <span className="text-red-600">
-                                        ✗ Incorrect. See correct option highlighted above.
-                                      </span>
+                                {isAnswerRevealed && (
+                                  <div className="rounded-xl border border-primary/20 bg-primary/[0.02] p-4 space-y-3 text-xs text-[#262626]">
+                                    <h4 className="font-extrabold text-primary flex items-center gap-1.5">
+                                      <Sparkles className="w-4 h-4" />
+                                      NID / CEED Evaluation Rubric & Model Approach:
+                                    </h4>
+
+                                    {q.sample_answer && (
+                                      <div className="p-3 bg-white rounded-lg border border-black/10 space-y-1">
+                                        <strong className="text-foreground/90 block">Model Approach:</strong>
+                                        <p className="text-foreground/75 leading-relaxed">{q.sample_answer}</p>
+                                      </div>
                                     )}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          )}
 
-                          {/* PART B: SUBJECTIVE MODEL SOLUTION & EVALUATION CRITERIA */}
-                          {isPartB && (
-                            <div className="space-y-3 pt-3 border-t border-black/5">
-                              <Button
-                                type="button"
-                                size="sm"
-                                onClick={() =>
-                                  setShowAnswers(prev => ({ ...prev, [q.id]: !prev[q.id] }))
-                                }
-                                className="text-xs font-bold h-8 gap-1.5 bg-primary hover:bg-primary/90 text-white"
-                              >
-                                {isAnswerRevealed ? (
-                                  <>
-                                    <EyeOff className="w-3.5 h-3.5" /> Hide Model Solution
-                                  </>
-                                ) : (
-                                  <>
-                                    <BookOpen className="w-3.5 h-3.5" /> View Model Answer & Rubric
-                                  </>
-                                )}
-                              </Button>
-
-                              {isAnswerRevealed && (
-                                <div className="rounded-xl border border-primary/20 bg-primary/[0.02] p-4 space-y-3 text-xs text-[#262626]">
-                                  <h4 className="font-extrabold text-primary flex items-center gap-1.5">
-                                    <Sparkles className="w-4 h-4" />
-                                    NID / CEED Evaluation Rubric & Model Approach:
-                                  </h4>
-
-                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px]">
-                                    <div className="p-3 bg-white rounded-lg border border-black/5 space-y-1">
-                                      <strong className="text-foreground/90 block">
-                                        1. Concept & Novelty (40%)
-                                      </strong>
-                                      <p className="text-foreground/60">
-                                        Must offer an original physical or interaction mechanism. Avoid cliché generic designs.
-                                      </p>
-                                    </div>
-                                    <div className="p-3 bg-white rounded-lg border border-black/5 space-y-1">
-                                      <strong className="text-foreground/90 block">
-                                        2. Proportion & Perspective (30%)
-                                      </strong>
-                                      <p className="text-foreground/60">
-                                        Accurate 2-point or 3-point perspective with user human scale hand interaction indicated.
-                                      </p>
-                                    </div>
-                                    <div className="p-3 bg-white rounded-lg border border-black/5 space-y-1">
-                                      <strong className="text-foreground/90 block">
-                                        3. Callouts & Detailing (30%)
-                                      </strong>
-                                      <p className="text-foreground/60">
-                                        Numbered feature arrows, materials named (e.g. brushed aluminum, matte silicone), and assembly points.
-                                      </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px]">
+                                      <div className="p-3 bg-white rounded-lg border border-black/5 space-y-1">
+                                        <strong className="text-foreground/90 block">
+                                          1. Concept & Novelty (40%)
+                                        </strong>
+                                        <p className="text-foreground/60">
+                                          Must offer an original physical or interaction mechanism. Avoid cliché generic designs.
+                                        </p>
+                                      </div>
+                                      <div className="p-3 bg-white rounded-lg border border-black/5 space-y-1">
+                                        <strong className="text-foreground/90 block">
+                                          2. Proportion & Perspective (30%)
+                                        </strong>
+                                        <p className="text-foreground/60">
+                                          Accurate 2-point or 3-point perspective with user human scale hand interaction indicated.
+                                        </p>
+                                      </div>
+                                      <div className="p-3 bg-white rounded-lg border border-black/5 space-y-1">
+                                        <strong className="text-foreground/90 block">
+                                          3. Callouts & Detailing (30%)
+                                        </strong>
+                                        <p className="text-foreground/60">
+                                          Numbered feature arrows, materials named (e.g. brushed aluminum, matte silicone), and assembly points.
+                                        </p>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* PAGINATION CONTROLS (15 QUESTIONS PER PAGE) */}
+                    {totalPages > 1 && (
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6 border-t border-black/10">
+                        <p className="text-xs text-foreground/60 font-medium">
+                          Showing <strong className="text-[#262626]">{startIdx + 1}</strong> to{' '}
+                          <strong className="text-[#262626]">
+                            {Math.min(startIdx + QUESTIONS_PER_PAGE, filteredQuestions.length)}
+                          </strong>{' '}
+                          of <strong className="text-[#262626]">{filteredQuestions.length}</strong> questions (15 per page)
+                        </p>
+
+                        <div className="flex items-center gap-1.5 self-center sm:self-auto">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setQuestionPage(p => Math.max(1, p - 1))}
+                            disabled={questionPage <= 1}
+                            className="h-8 px-3 text-xs font-bold"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5 mr-1" /> Previous
+                          </Button>
+
+                          {Array.from({ length: totalPages }, (_, i) => i + 1)
+                            .filter(page => {
+                              return page === 1 || page === totalPages || Math.abs(page - questionPage) <= 1;
+                            })
+                            .map((page, idx, arr) => {
+                              const prevPage = arr[idx - 1];
+                              const hasGap = prevPage && page - prevPage > 1;
+
+                              return (
+                                <span key={page} className="flex items-center">
+                                  {hasGap && <span className="px-1 text-xs text-foreground/40 font-bold">...</span>}
+                                  <button
+                                    type="button"
+                                    onClick={() => setQuestionPage(page)}
+                                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                                      questionPage === page
+                                        ? 'bg-primary text-white shadow-xs'
+                                        : 'bg-black/5 hover:bg-black/10 text-foreground/70'
+                                    }`}
+                                  >
+                                    {page}
+                                  </button>
+                                </span>
+                              );
+                            })}
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setQuestionPage(p => Math.min(totalPages, p + 1))}
+                            disabled={questionPage >= totalPages}
+                            className="h-8 px-3 text-xs font-bold"
+                          >
+                            Next <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                          </Button>
                         </div>
-                      );
-                    })}
-                </div>
-              )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -3248,6 +3448,17 @@ export default function PortalDashboard() {
                 </Button>
               </form>
             </div>
+          )}
+
+          {/* Prep Tracker Tab */}
+          {activeTab === 'tracker' && (
+            <PortalPrepTrackerSection
+              candidate={candidate}
+              onSolvePortalMock={() => {
+                setActiveTab('overview');
+                window.scrollTo({ top: 400, behavior: 'smooth' });
+              }}
+            />
           )}
 
         </div>

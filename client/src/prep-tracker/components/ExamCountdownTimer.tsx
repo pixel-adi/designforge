@@ -5,12 +5,14 @@ interface ExamCountdownTimerProps {
   currentDayNum?: number;
   phaseName?: string;
   className?: string;
+  variant?: 'full' | 'compact';
 }
 
 export function ExamCountdownTimer({
   currentDayNum = 1,
   phaseName = 'Orientation & Foundation',
   className = '',
+  variant = 'full',
 }: ExamCountdownTimerProps) {
   // Target date: Sunday 20 December 2026, 10:00:00 AM IST
   const targetDate = new Date('2026-12-20T10:00:00+05:30').getTime();
@@ -51,6 +53,56 @@ export function ExamCountdownTimer({
     const interval = setInterval(calculateTime, 1000);
     return () => clearInterval(interval);
   }, [targetDate]);
+
+  const digitsView = (
+    <div className="flex items-center gap-1.5 sm:gap-2">
+      <div className="flex flex-col items-center justify-center rounded-xl border border-white/15 bg-white/10 px-2.5 py-1.5 min-w-[50px] sm:min-w-[58px] backdrop-blur-md">
+        <span className="font-mono text-lg sm:text-2xl font-black text-white">
+          {String(timeLeft.days).padStart(2, '0')}
+        </span>
+        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-white/60">
+          Days
+        </span>
+      </div>
+
+      <span className="font-mono text-sm sm:text-base font-bold text-white/40">:</span>
+
+      <div className="flex flex-col items-center justify-center rounded-xl border border-white/15 bg-white/10 px-2.5 py-1.5 min-w-[50px] sm:min-w-[58px] backdrop-blur-md">
+        <span className="font-mono text-lg sm:text-2xl font-black text-white">
+          {String(timeLeft.hours).padStart(2, '0')}
+        </span>
+        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-white/60">
+          Hours
+        </span>
+      </div>
+
+      <span className="font-mono text-sm sm:text-base font-bold text-white/40">:</span>
+
+      <div className="flex flex-col items-center justify-center rounded-xl border border-white/15 bg-white/10 px-2.5 py-1.5 min-w-[50px] sm:min-w-[58px] backdrop-blur-md">
+        <span className="font-mono text-lg sm:text-2xl font-black text-white">
+          {String(timeLeft.minutes).padStart(2, '0')}
+        </span>
+        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-white/60">
+          Mins
+        </span>
+      </div>
+
+      <span className="font-mono text-sm sm:text-base font-bold text-white/40">:</span>
+
+      <div className="flex flex-col items-center justify-center rounded-xl border border-primary/40 bg-primary/20 px-2.5 py-1.5 min-w-[50px] sm:min-w-[58px] backdrop-blur-md">
+        <span className="font-mono text-lg sm:text-2xl font-black text-primary sm:text-primary">
+          {String(timeLeft.seconds).padStart(2, '0')}
+        </span>
+        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-primary/80">
+          Secs
+        </span>
+      </div>
+    </div>
+  );
+
+  if (variant === 'compact') {
+    return <div className={className}>{digitsView}</div>;
+  }
 
   return (
     <div

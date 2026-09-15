@@ -83,7 +83,7 @@ function Router() {
         {/* Candidate Portal */}
         <Route path="/portal/login">{() => <PageWrapper><PortalLogin /></PageWrapper>}</Route>
         <Route path="/portal/dashboard">{() => <PageWrapper><PortalDashboard /></PageWrapper>}</Route>
-        <Route path="/portal/prep-tracker">{() => <PageWrapper><PortalPrepTracker /></PageWrapper>}</Route>
+        <Route path="/portal/prep-tracker">{() => <PageWrapper><PortalDashboard /></PageWrapper>}</Route>
         <Route path="/portal/test/:id">{() => <PageWrapper><PortalTestEngine /></PageWrapper>}</Route>
 
         {/* Admin Routes */}
