@@ -42,6 +42,8 @@ interface OnboardingModalProps {
     tier: Tier;
     disciplines?: string[];
     diagnosticScores: DiagnosticScores;
+    activeExamIds?: string[];
+    primaryExamId?: string;
   }) => Promise<void>;
 }
 
@@ -84,6 +86,7 @@ export function OnboardingModal({ open, onOpenChange, onComplete }: OnboardingMo
   const [track, setTrack] = useState<Track>('ug');
   const [tier, setTier] = useState<Tier>('intensive');
   const [selectedDisciplines, setSelectedDisciplines] = useState<string[]>([]);
+  const [selectedExams, setSelectedExams] = useState<string[]>(['nid-ug-2027', 'uceed-2027']);
   const [saving, setSaving] = useState(false);
 
   const [diagnosticScores, setDiagnosticScores] = useState<DiagnosticScores>({
@@ -116,6 +119,22 @@ export function OnboardingModal({ open, onOpenChange, onComplete }: OnboardingMo
     }
   };
 
+  const handleToggleExam = (examId: string) => {
+    if (selectedExams.includes(examId)) {
+      if (selectedExams.length === 1) {
+        toast({
+          title: 'At least one exam required',
+          description: 'Please select at least one design entrance exam to prepare for.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setSelectedExams(selectedExams.filter(id => id !== examId));
+    } else {
+      setSelectedExams([...selectedExams, examId]);
+    }
+  };
+
   const handleFinish = async () => {
     if (track === 'pg' && !pgValidation.valid) {
       toast({
@@ -128,15 +147,18 @@ export function OnboardingModal({ open, onOpenChange, onComplete }: OnboardingMo
 
     setSaving(true);
     try {
+      const activeExamIds = selectedExams.length > 0 ? selectedExams : [track === 'pg' ? 'nid-pg-2027' : 'nid-ug-2027'];
       await onComplete({
         track,
         tier,
         disciplines: track === 'pg' ? selectedDisciplines : [],
         diagnosticScores,
+        activeExamIds,
+        primaryExamId: activeExamIds[0],
       });
       toast({
         title: 'Plan Activated!',
-        description: 'Your personalised 92-day schedule is ready.',
+        description: 'Your personalised multi-exam schedule is ready.',
       });
       onOpenChange(false);
     } catch (err: any) {
@@ -180,67 +202,200 @@ export function OnboardingModal({ open, onOpenChange, onComplete }: OnboardingMo
           </DialogDescription>
         </DialogHeader>
 
-        {/* STEP 1: PROGRAMME SELECTION */}
+        {/* STEP 1: PROGRAMME & EXAMS SELECTION */}
         {step === 1 && (
-          <div className="py-4 space-y-4">
-            <div
-              onClick={() => setTrack('ug')}
-              className={`p-5 rounded-2xl border cursor-pointer transition-all ${
-                track === 'ug'
-                  ? 'border-primary bg-primary/[0.03] shadow-md ring-1 ring-primary'
-                  : 'border-black/10 hover:border-black/20 bg-white'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-bold text-base text-[#262626]">
-                    B.Des & Integrated M.Des (UG)
-                  </h3>
-                  <p className="text-xs text-foreground/60 mt-1">
-                    For candidates after Class 12. 5.5-year Integrated M.Des at NID Ahmedabad; 4-year B.Des at NID AP, MP, Haryana, Assam.
-                  </p>
-                </div>
+          <div className="py-4 space-y-5">
+            <div>
+              <Label className="text-xs font-bold text-[#1e293b] uppercase tracking-wider mb-2 block">
+                1. Select Academic Track
+              </Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div
-                  className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                    track === 'ug' ? 'border-primary bg-primary text-white' : 'border-black/20'
+                  onClick={() => {
+                    setTrack('ug');
+                    setSelectedExams(prev => [
+                      ...prev.filter(id => !id.includes('pg') && !id.includes('ceed')),
+                      'nid-ug-2027',
+                      'uceed-2027',
+                    ]);
+                  }}
+                  className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                    track === 'ug'
+                      ? 'border-primary bg-primary/[0.03] shadow-xs ring-1 ring-primary'
+                      : 'border-black/10 hover:border-black/20 bg-white'
                   }`}
                 >
-                  {track === 'ug' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-bold text-sm text-[#262626]">
+                        Undergraduate (B.Des)
+                      </h3>
+                      <p className="text-[11px] text-foreground/60 mt-0.5">
+                        After Class 12. NID B.Des, UCEED, NIFT B.Des.
+                      </p>
+                    </div>
+                    <div
+                      className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                        track === 'ug' ? 'border-primary bg-primary text-white' : 'border-black/20'
+                      }`}
+                    >
+                      {track === 'ug' && <CheckCircle2 className="w-3 h-3" />}
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => {
+                    setTrack('pg');
+                    setSelectedExams(prev => [
+                      ...prev.filter(id => !id.includes('ug') && !id.includes('uceed')),
+                      'nid-pg-2027',
+                      'ceed-2027',
+                    ]);
+                  }}
+                  className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                    track === 'pg'
+                      ? 'border-primary bg-primary/[0.03] shadow-xs ring-1 ring-primary'
+                      : 'border-black/10 hover:border-black/20 bg-white'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-bold text-sm text-[#262626]">
+                        Postgraduate (M.Des)
+                      </h3>
+                      <p className="text-[11px] text-foreground/60 mt-0.5">
+                        For Graduates. NID M.Des, CEED (IITs), NIFT M.Des.
+                      </p>
+                    </div>
+                    <div
+                      className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                        track === 'pg' ? 'border-primary bg-primary text-white' : 'border-black/20'
+                      }`}
+                    >
+                      {track === 'pg' && <CheckCircle2 className="w-3 h-3" />}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div
-              onClick={() => setTrack('pg')}
-              className={`p-5 rounded-2xl border cursor-pointer transition-all ${
-                track === 'pg'
-                  ? 'border-primary bg-primary/[0.03] shadow-md ring-1 ring-primary'
-                  : 'border-black/10 hover:border-black/20 bg-white'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-bold text-base text-[#262626]">
-                    M.Des (Postgraduate)
-                  </h3>
-                  <p className="text-xs text-foreground/60 mt-1">
-                    For graduates. 2.5-year Master of Design across 19 disciplines in Ahmedabad, Bengaluru and Gandhinagar.
-                  </p>
-                </div>
+            <div>
+              <Label className="text-xs font-bold text-[#1e293b] uppercase tracking-wider mb-2 block">
+                2. Select Target Exams (Choose all that apply)
+              </Label>
+              <div className="space-y-2.5">
+                {/* NID DAT */}
                 <div
-                  className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                    track === 'pg' ? 'border-primary bg-primary text-white' : 'border-black/20'
+                  onClick={() => handleToggleExam(track === 'pg' ? 'nid-pg-2027' : 'nid-ug-2027')}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                    selectedExams.includes(track === 'pg' ? 'nid-pg-2027' : 'nid-ug-2027')
+                      ? 'border-primary bg-primary/[0.02] ring-1 ring-primary'
+                      : 'border-black/10 bg-white hover:border-black/20'
                   }`}
                 >
-                  {track === 'pg' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                  <div>
+                    <span className="font-bold text-sm text-[#1e293b]">NID DAT 2027</span>
+                    <p className="text-[11px] text-foreground/60">Prelims: Sunday 20 Dec 2026</p>
+                  </div>
+                  <div
+                    className={`w-4 h-4 rounded border flex items-center justify-center ${
+                      selectedExams.includes(track === 'pg' ? 'nid-pg-2027' : 'nid-ug-2027')
+                        ? 'bg-primary border-primary text-white'
+                        : 'border-black/20'
+                    }`}
+                  >
+                    {selectedExams.includes(track === 'pg' ? 'nid-pg-2027' : 'nid-ug-2027') && (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    )}
+                  </div>
+                </div>
+
+                {/* UCEED or CEED */}
+                {track === 'ug' ? (
+                  <div
+                    onClick={() => handleToggleExam('uceed-2027')}
+                    className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                      selectedExams.includes('uceed-2027')
+                        ? 'border-primary bg-primary/[0.02] ring-1 ring-primary'
+                        : 'border-black/10 bg-white hover:border-black/20'
+                    }`}
+                  >
+                    <div>
+                      <span className="font-bold text-sm text-[#1e293b]">UCEED 2027 (IIT Bombay)</span>
+                      <p className="text-[11px] text-foreground/60">B.Des: Part A (Computer NAT/MSQ/MCQ) + Part B Drawing</p>
+                    </div>
+                    <div
+                      className={`w-4 h-4 rounded border flex items-center justify-center ${
+                        selectedExams.includes('uceed-2027')
+                          ? 'bg-primary border-primary text-white'
+                          : 'border-black/20'
+                      }`}
+                    >
+                      {selectedExams.includes('uceed-2027') && (
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => handleToggleExam('ceed-2027')}
+                    className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                      selectedExams.includes('ceed-2027')
+                        ? 'border-primary bg-primary/[0.02] ring-1 ring-primary'
+                        : 'border-black/10 bg-white hover:border-black/20'
+                    }`}
+                  >
+                    <div>
+                      <span className="font-bold text-sm text-[#1e293b]">CEED 2027 (IITs M.Des)</span>
+                      <p className="text-[11px] text-foreground/60">Part A Aptitude Qualifying + Part B Creative Problem Solving</p>
+                    </div>
+                    <div
+                      className={`w-4 h-4 rounded border flex items-center justify-center ${
+                        selectedExams.includes('ceed-2027')
+                          ? 'bg-primary border-primary text-white'
+                          : 'border-black/20'
+                      }`}
+                    >
+                      {selectedExams.includes('ceed-2027') && (
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* NIFT */}
+                <div
+                  onClick={() => handleToggleExam('nift-2027')}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                    selectedExams.includes('nift-2027')
+                      ? 'border-primary bg-primary/[0.02] ring-1 ring-primary'
+                      : 'border-black/10 bg-white hover:border-black/20'
+                  }`}
+                >
+                  <div>
+                    <span className="font-bold text-sm text-[#1e293b]">NIFT 2027</span>
+                    <p className="text-[11px] text-foreground/60">National Institute of Fashion Technology (CAT + GAT)</p>
+                  </div>
+                  <div
+                    className={`w-4 h-4 rounded border flex items-center justify-center ${
+                      selectedExams.includes('nift-2027')
+                        ? 'bg-primary border-primary text-white'
+                        : 'border-black/20'
+                    }`}
+                  >
+                    {selectedExams.includes('nift-2027') && (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 flex items-start gap-2.5 text-xs text-amber-900">
+            <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 flex items-start gap-2 text-xs text-amber-900">
               <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <span>
-                <strong>NID Handbook Rule:</strong> Programme, Name, Date of Birth, Mobile, and Email ID cannot be changed after submission even during the edit window.
+                <strong>Multi-Exam Mode:</strong> You can switch between active exam curricula using the tabs at the top of your tracker anytime.
               </span>
             </div>
           </div>

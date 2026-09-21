@@ -11,6 +11,24 @@ export type DiagnosticScores = {
   awareness: number;
 };
 
+export type ExamCode = 'NID' | 'UCEED' | 'CEED' | 'NIFT' | string;
+
+export interface ExamPlanMetadata {
+  id: string;
+  exam_code: ExamCode;
+  title: string;
+  track: Track;
+  academic_year: string;
+  start_date: string;
+  end_date: string;
+  exam_date: string;
+  tiers?: Record<string, { label: string; summary: string }>;
+  phases?: Array<{ id: string; name: string; startDate: string; endDate: string; summary: string }>;
+  days?: DayRecord[];
+  reference_data?: any;
+  is_active?: boolean;
+}
+
 export interface StudentProfileInput {
   track: Track;
   tier: Tier;
@@ -18,6 +36,8 @@ export interface StudentProfileInput {
   disciplines?: string[]; // PG only
   applicationSubmittedAt?: string | null;
   hasNotesAccess?: boolean;
+  activeExamIds?: string[];
+  primaryExamId?: string;
 }
 
 export interface ResolvedProfile {

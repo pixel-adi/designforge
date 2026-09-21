@@ -17,6 +17,8 @@ import {
   PitchLogModal,
 } from './DiaryAndArtifactsModals';
 import { Button } from '@/components/ui/button';
+import { CalendarDayStrip } from './CalendarDayStrip';
+import { TrackerAnalyticsHistory } from './TrackerAnalyticsHistory';
 import {
   Calendar,
   Layers,
@@ -31,6 +33,7 @@ import {
   Settings,
   Clock,
   Compass,
+  BarChart3,
 } from 'lucide-react';
 
 interface PortalPrepTrackerSectionProps {
@@ -42,7 +45,7 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
   const [, setLocation] = useLocation();
   const effectiveCandidateId = candidate?.id || 'preview-candidate-id';
 
-  const [activeTab, setActiveTab] = useState<'today' | 'board' | 'ledger'>('today');
+  const [activeTab, setActiveTab] = useState<'today' | 'board' | 'ledger' | 'analytics'>('today');
 
   // Modals state
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -73,6 +76,7 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
     loading: trackerLoading,
     enrolment,
     profile,
+    rawPlan,
     resolvedDays,
     currentDay,
     selectedDayNum,
@@ -82,7 +86,26 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
     toggleTask,
     completeOnboarding,
     refreshData,
+    activeExamId,
+    setActiveExamId,
+    allExamPlans,
+    availableExamIds,
   } = usePrepTracker(effectiveCandidateId);
+
+  // Pre-configured exam catalogue for switchable tabs
+  const examOptions = [
+    { id: 'nid-ug-2027', label: 'NID DAT (UG)', code: 'NID' },
+    { id: 'nid-pg-2027', label: 'NID DAT (PG)', code: 'NID' },
+    { id: 'uceed-2027', label: 'UCEED 2027', code: 'UCEED' },
+    { id: 'ceed-2027', label: 'CEED 2027', code: 'CEED' },
+    { id: 'nift-2027', label: 'NIFT 2027', code: 'NIFT' },
+  ];
+
+  // Current active exam label
+  const currentExam = examOptions.find(e => e.id === activeExamId) || {
+    id: activeExamId,
+    label: (rawPlan as any)?.title || 'Design Prep Tracker',
+  };
 
   // Trigger onboarding if no enrolment exists once loading finishes
   useEffect(() => {
@@ -138,23 +161,55 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      {/* 0. Multi-Exam Switcher Pill Strip */}
+      <div className="flex flex-wrap items-center justify-between gap-2 p-1.5 rounded-2xl bg-[#f8fafc] border border-black/10 shadow-2xs">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {examOptions.map(exam => {
+            const isSelected = activeExamId === exam.id;
+            return (
+              <button
+                key={exam.id}
+                type="button"
+                onClick={() => setActiveExamId(exam.id)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all ${
+                  isSelected
+                    ? 'bg-primary text-white shadow-xs'
+                    : 'text-[#475569] hover:text-[#0f172a] hover:bg-black/5'
+                }`}
+              >
+                {exam.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowOnboarding(true)}
+          className="text-xs font-bold text-foreground/60 hover:text-primary px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
+        >
+          <Settings className="w-3.5 h-3.5" />
+          <span>Select Exams</span>
+        </button>
+      </div>
+
       {/* 1. Calm Header Bar */}
       <div className="rounded-2xl border border-black/10 bg-white p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-primary text-white uppercase tracking-wider">
-              NID DAT 2027
+              {currentExam.code || 'DESIGN PREP'}
             </span>
             <span className="text-xs font-bold text-foreground/60">
-              Day {currentDay?.day || 1} of 92 · Week {currentDay?.week || 1}
+              Day {currentDay?.day || 1} of {resolvedDays.length || 92} · Week {currentDay?.week || 1}
             </span>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black/5 text-foreground/70">
-              Exam: Sun 20 Dec 2026
+              Exam Target: 2027
             </span>
           </div>
 
           <h2 className="text-xl sm:text-2xl font-black text-[#262626] tracking-tight">
-            92-Day Preparation Tracker
+            {currentExam.label}
           </h2>
 
           <p className="text-xs text-foreground/60 max-w-xl">
@@ -298,6 +353,19 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
             <AlertTriangle className="w-3.5 h-3.5" />
             <span>Error Ledger</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('analytics')}
+            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${
+              activeTab === 'analytics'
+                ? 'bg-[#262626] text-white shadow-xs'
+                : 'bg-black/5 hover:bg-black/10 text-foreground/70'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>History & Analytics</span>
+          </button>
         </div>
 
         <Button
@@ -313,17 +381,25 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
 
       {/* 4. Tab Content */}
       {activeTab === 'today' && currentDay && (
-        <TodayDayView
-          day={currentDay}
-          totalDays={resolvedDays.length || 92}
-          onSelectDay={dayNum => setSelectedDayNum(dayNum)}
-          onToggleTask={(taskId, minutes) => toggleTask(taskId, minutes)}
-          togglingTaskId={togglingTaskId}
-          onOpenNotes={handleOpenNotes}
-          onOpenCapture={handleOpenCapture}
-          onSolvePortalMock={onSolvePortalMock || (() => setLocation('/portal/dashboard'))}
-          hasNotesAccess={Boolean(enrolment?.has_notes_access)}
-        />
+        <div className="space-y-6">
+          <CalendarDayStrip
+            days={resolvedDays}
+            selectedDayNum={selectedDayNum}
+            onSelectDay={dayNum => setSelectedDayNum(dayNum)}
+            examTitle={currentExam.label}
+          />
+          <TodayDayView
+            day={currentDay}
+            totalDays={resolvedDays.length || 92}
+            onSelectDay={dayNum => setSelectedDayNum(dayNum)}
+            onToggleTask={(taskId, minutes) => toggleTask(taskId, minutes)}
+            togglingTaskId={togglingTaskId}
+            onOpenNotes={handleOpenNotes}
+            onOpenCapture={handleOpenCapture}
+            onSolvePortalMock={onSolvePortalMock || (() => setLocation('/portal/dashboard'))}
+            hasNotesAccess={Boolean(enrolment?.has_notes_access)}
+          />
+        </div>
       )}
 
       {activeTab === 'board' && (
@@ -373,6 +449,16 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
             ))}
           </div>
         </div>
+      )}
+
+      {activeTab === 'analytics' && (
+        <TrackerAnalyticsHistory
+          candidateId={effectiveCandidateId}
+          resolvedDays={resolvedDays}
+          tier={enrolment?.tier || 'intensive'}
+          band={profile?.band}
+          diagnostic={profile?.diagnostic}
+        />
       )}
 
       {/* Modals Container */}

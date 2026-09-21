@@ -13,6 +13,7 @@ import {
   resolveProfile,
   resolveDay,
   getTodayDateAsiaKolkata,
+  PG_DISCIPLINE_GROUPS,
 } from './resolver';
 
 // Import raw curriculum plans
@@ -27,6 +28,8 @@ export function usePrepTracker(candidateId: string | null) {
   const [diagnostics, setDiagnostics] = useState<any[]>([]);
   const [selectedDayNum, setSelectedDayNum] = useState<number>(1);
   const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
+  const [allExamPlans, setAllExamPlans] = useState<any[]>([]);
+  const [activeExamId, setActiveExamId] = useState<string>('nid-ug-2027');
 
   const todayDate = useMemo(() => getTodayDateAsiaKolkata(), []);
 
@@ -38,14 +41,24 @@ export function usePrepTracker(candidateId: string | null) {
     }
     setLoading(true);
     try {
-      const [enr, comp, diag] = await Promise.all([
+      const [enr, comp, diag, plans] = await Promise.all([
         prepApi.getEnrolment(candidateId),
         prepApi.getCompletions(candidateId),
         prepApi.getDiagnostics(candidateId),
+        prepApi.getExamPlans(),
       ]);
       setEnrolment(enr);
       setCompletions(comp);
       setDiagnostics(diag);
+      setAllExamPlans(plans || []);
+
+      if (enr?.primary_exam_id) {
+        setActiveExamId(enr.primary_exam_id);
+      } else if (enr?.track === 'pg') {
+        setActiveExamId('nid-pg-2027');
+      } else {
+        setActiveExamId('nid-ug-2027');
+      }
     } catch (err) {
       console.error('Failed to load prep tracker data:', err);
     } finally {
@@ -86,9 +99,15 @@ export function usePrepTracker(candidateId: string | null) {
 
   // Raw plan
   const rawPlan = useMemo(() => {
-    if (!resolvedProfile) return ugPlanData;
-    return resolvedProfile.track === 'pg' ? pgPlanData : ugPlanData;
-  }, [resolvedProfile]);
+    const matchedPlan = allExamPlans.find((p: any) => p.id === activeExamId);
+    if (matchedPlan && Array.isArray(matchedPlan.days) && matchedPlan.days.length > 0) {
+      return matchedPlan;
+    }
+    if (activeExamId === 'nid-pg-2027' || (resolvedProfile && resolvedProfile.track === 'pg')) {
+      return pgPlanData;
+    }
+    return ugPlanData;
+  }, [allExamPlans, activeExamId, resolvedProfile]);
 
   // Set today's day number when plan loads
   useEffect(() => {
@@ -183,26 +202,33 @@ export function usePrepTracker(candidateId: string | null) {
     tier: Tier;
     disciplines?: string[];
     diagnosticScores: DiagnosticScores;
+    activeExamIds?: string[];
+    primaryExamId?: string;
   }) => {
     if (!candidateId) return;
     setLoading(true);
     try {
-      const groups = (data.disciplines || []).map(d => {
-        for (const [g, list] of Object.entries((referenceData as any).disciplines?.pg?.groups || {})) {
-          if ((list as any).disciplines?.some((item: any) => item[0] === d)) return g;
+      let primaryGroup: string | undefined = undefined;
+      const groups = (data.disciplines || []).map(discId => {
+        for (const [groupKey, groupData] of Object.entries(PG_DISCIPLINE_GROUPS)) {
+          if (groupData.disciplines.some(d => d.id === discId)) {
+            return groupKey;
+          }
         }
         return null;
       }).filter(Boolean) as string[];
 
       const firstNonGx = groups.find(g => g !== 'GX');
-      const primaryGroup = firstNonGx || (groups.length > 0 ? 'GX' : undefined);
+      const resolvedPrimaryGroup = firstNonGx || (groups.length > 0 ? 'GX' : undefined);
 
       const savedEnrolment = await prepApi.saveEnrolment({
         candidate_id: candidateId,
         track: data.track,
         tier: data.tier,
         disciplines: data.disciplines || [],
-        primary_group: primaryGroup,
+        primary_group: resolvedPrimaryGroup,
+        active_exam_ids: data.activeExamIds && data.activeExamIds.length > 0 ? data.activeExamIds : ['nid-ug-2027'],
+        primary_exam_id: data.primaryExamId || 'nid-ug-2027',
       });
 
       const total = Object.values(data.diagnosticScores).reduce((a, b) => a + b, 0);
@@ -217,6 +243,9 @@ export function usePrepTracker(candidateId: string | null) {
       });
 
       setEnrolment(savedEnrolment);
+      if (data.primaryExamId) {
+        setActiveExamId(data.primaryExamId);
+      }
       await refreshData();
     } finally {
       setLoading(false);
@@ -239,5 +268,9 @@ export function usePrepTracker(candidateId: string | null) {
     toggleTask,
     completeOnboarding,
     refreshData,
+    activeExamId,
+    setActiveExamId,
+    allExamPlans,
+    availableExamIds: enrolment?.active_exam_ids || ['nid-ug-2027'],
   };
 }

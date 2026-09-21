@@ -10,6 +10,8 @@ export interface EnrolmentData {
   primary_group?: string;
   application_submitted_at?: string | null;
   has_notes_access?: boolean;
+  active_exam_ids?: string[];
+  primary_exam_id?: string;
 }
 
 export const prepApi = {
@@ -658,4 +660,78 @@ export const prepApi = {
       return enrolment;
     }
   },
+
+  // Dynamic Exam Plans (NID, UCEED, CEED, NIFT)
+  async getExamPlans() {
+    try {
+      const { data, error } = await supabase
+        .from('prep_exam_plans')
+        .select('*')
+        .eq('is_active', true)
+        .order('exam_code', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.warn('Failed to load dynamic exam plans from Supabase, using local defaults:', e);
+      return [];
+    }
+  },
+
+  async getExamPlan(id: string) {
+    try {
+      const { data, error } = await supabase
+        .from('prep_exam_plans')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    } catch (e) {
+      console.warn('Failed to load plan from Supabase:', e);
+      return null;
+    }
+  },
+
+  async saveExamPlan(plan: any) {
+    const { data, error } = await supabase
+      .from('prep_exam_plans')
+      .upsert({
+        ...plan,
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  // Admin Roster & Enrolments
+  async getAllEnrolments() {
+    try {
+      const { data, error } = await supabase
+        .from('prep_enrolments')
+        .select('*')
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.error('Failed to fetch enrolments:', e);
+      return [];
+    }
+  },
+
+  async adminUpdateEnrolment(candidateId: string, updates: Partial<EnrolmentData>) {
+    const { data, error } = await supabase
+      .from('prep_enrolments')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('candidate_id', candidateId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
 };
+

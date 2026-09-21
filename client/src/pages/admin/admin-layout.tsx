@@ -6,6 +6,7 @@ import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 
 const allNavItems = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+  { label: "Prep Tracker", href: "/admin/prep-tracker", icon: Calendar },
   { label: "Ranks", href: "/admin/ranks", icon: Trophy },
   { label: "Workshops", href: "/admin/workshops", icon: Calendar },
   { label: "Programs", href: "/admin/programs", icon: BookOpen },
@@ -25,6 +26,7 @@ const allNavItems = [
 const roleNavPermissions: Record<string, string[]> = {
   admin: [
     "/admin/dashboard",
+    "/admin/prep-tracker",
     "/admin/ranks",
     "/admin/workshops",
     "/admin/programs",
@@ -40,6 +42,7 @@ const roleNavPermissions: Record<string, string[]> = {
     "/admin/subscribers",
   ],
   sme: [
+    "/admin/prep-tracker",
     "/admin/exam-questions",
     "/admin/exam-tests",
     "/admin/study-materials",

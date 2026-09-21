@@ -40,6 +40,7 @@ const AdminAssignments = lazy(() => import("@/pages/admin/admin-assignments"));
 const AdminClassNotes = lazy(() => import("@/pages/admin/admin-class-notes"));
 const AdminStaff = lazy(() => import("@/pages/admin/admin-staff"));
 const AdminMentorPlaceholder = lazy(() => import("@/pages/admin/admin-mentor-placeholder"));
+const AdminPrepTracker = lazy(() => import("@/pages/admin/admin-prep-tracker"));
 
 // Candidate Portal
 const PortalLogin = lazy(() => import("@/pages/portal/login"));
@@ -90,6 +91,9 @@ function Router() {
         <Route path="/admin">{() => <PageWrapper><AdminLogin /></PageWrapper>}</Route>
         <Route path="/admin/dashboard">
           {() => <PageWrapper><AdminLayout><AdminDashboard /></AdminLayout></PageWrapper>}
+        </Route>
+        <Route path="/admin/prep-tracker">
+          {() => <PageWrapper><AdminPrepTracker /></PageWrapper>}
         </Route>
         <Route path="/admin/ranks">
           {() => <PageWrapper><AdminLayout><AdminRanks /></AdminLayout></PageWrapper>}
