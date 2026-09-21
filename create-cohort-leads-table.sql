@@ -50,13 +50,19 @@ FOR SELECT
 TO authenticated 
 USING (true);
 
--- 6. Policy: Allow authenticated staff / admin users to delete leads
+-- 6. Policy: Allow admin staff to delete leads (not all authenticated users)
 DROP POLICY IF EXISTS "Allow authenticated delete cohort_leads" ON public.cohort_leads;
 CREATE POLICY "Allow authenticated delete cohort_leads" 
 ON public.cohort_leads
 FOR DELETE 
 TO authenticated 
-USING (true);
+USING (
+  auth.jwt()->>'email' LIKE '%@designforge.co.in'
+  OR EXISTS (
+    SELECT 1 FROM public.staff_users
+    WHERE auth_user_id = auth.uid() AND role = 'admin'
+  )
+);
 
 -- 7. Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_cohort_leads_created_at ON public.cohort_leads (created_at DESC);

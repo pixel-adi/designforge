@@ -132,14 +132,19 @@ export function AINativeUXContent() {
                   >
                     Register for the September cohort
                   </Button>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    onClick={() => handleOpenLead("Brochure Download")}
-                    className="h-14 px-8 rounded-full text-base bg-white w-full sm:w-auto border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                  <a
+                    href="https://drive.google.com/file/d/1ewW1sekTWMeZbG8wUohMY3ws_00GuTHx/view?usp=sharing"
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
-                    Download the brochure
-                  </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="h-14 px-8 rounded-full text-base bg-white w-full sm:w-auto border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                    >
+                      Download the brochure
+                    </Button>
+                  </a>
                 </div>
 
                 <div className="hero-meta flex flex-wrap items-center gap-y-2 gap-x-3 text-sm text-foreground/60 font-medium">
@@ -439,44 +444,46 @@ export function AINativeUXContent() {
 
             {/* Tier Cards */}
             <div className="stagger-group grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-              {/* Founding */}
-              <div className="stagger-item bg-primary/[0.04] rounded-3xl p-8 border-2 border-primary/20 flex flex-col justify-between relative shadow-sm hover:shadow-xl transition-all duration-500">
+              {/* Founding — CLOSED */}
+              <div className="stagger-item bg-black/[0.02] rounded-3xl p-8 border-2 border-black/10 flex flex-col justify-between relative shadow-sm opacity-75">
                 <div>
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-xs text-primary font-bold uppercase tracking-wider font-mono">Tier 01</span>
-                    <span className="px-3 py-1 rounded-full bg-primary text-white text-[10px] font-bold uppercase tracking-wider">Best Value</span>
+                    <span className="text-xs text-foreground/40 font-bold uppercase tracking-wider font-mono">Tier 01</span>
+                    <span className="px-3 py-1 rounded-full bg-foreground/80 text-white text-[10px] font-bold uppercase tracking-wider">Closed</span>
                   </div>
-                  <h3 className="text-2xl font-heading text-[#262626] mb-2">Founding Cohort</h3>
-                  <div className="text-3xl font-heading font-bold text-[#262626] mb-1">₹28,000</div>
-                  <p className="text-foreground/60 text-sm mb-3">or 2-part: ₹15,000 × 2 (₹30,000 total)</p>
-                  <p className="text-foreground/70 text-sm leading-relaxed mb-6">First 8 seats only. Closes 7 September 2026.</p>
+                  <h3 className="text-2xl font-heading text-foreground/50 mb-2 line-through decoration-1">Founding Cohort</h3>
+                  <div className="text-3xl font-heading font-bold text-foreground/40 mb-1 line-through decoration-1">₹28,000</div>
+                  <p className="text-foreground/40 text-sm mb-3">or 2-part: ₹15,000 × 2 (₹30,000 total)</p>
+                  <p className="text-foreground/50 text-sm leading-relaxed mb-6">All 8 founding seats have been claimed.</p>
                 </div>
                 <div>
-                  <div className="border-t border-primary/15 pt-4 mb-5">
-                    <p className="text-sm italic text-primary font-medium">Includes private founding-cohort thread with the programme mentor.</p>
+                  <div className="border-t border-black/10 pt-4 mb-5">
+                    <p className="text-sm italic text-foreground/40 font-medium">Founding cohort registrations are now closed.</p>
                   </div>
                   <Button
-                    onClick={() => handleOpenLead("Founding Cohort")}
-                    className="w-full h-12 rounded-2xl text-base btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] transition-all cursor-pointer"
+                    disabled
+                    className="w-full h-12 rounded-2xl text-base bg-foreground/20 text-white cursor-not-allowed"
                   >
-                    Claim founding seat <ArrowRight className="w-4 h-4 ml-2" />
+                    Registration closed
                   </Button>
                 </div>
               </div>
 
               {/* Early Bird */}
-              <div className="stagger-item bg-white rounded-3xl p-8 border border-black/5 flex flex-col justify-between shadow-sm hover:shadow-xl transition-all duration-500">
+              <div className="stagger-item bg-primary/[0.04] rounded-3xl p-8 border-2 border-primary/20 flex flex-col justify-between relative shadow-sm hover:shadow-xl transition-all duration-500">
                 <div>
-                  <div className="text-xs text-foreground/50 font-bold uppercase tracking-wider font-mono mb-4">Tier 02</div>
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-xs text-primary font-bold uppercase tracking-wider font-mono">Tier 02</span>
+                    <span className="px-3 py-1 rounded-full bg-orange-500 text-white text-[10px] font-bold uppercase tracking-wider animate-pulse">Filling fast</span>
+                  </div>
                   <h3 className="text-2xl font-heading text-[#262626] mb-2">Early Bird</h3>
                   <div className="text-3xl font-heading font-bold text-[#262626] mb-1">₹32,000</div>
                   <p className="text-foreground/60 text-sm mb-3">or 2-part: ₹17,000 × 2 (₹34,000 total)</p>
-                  <p className="text-foreground/70 text-sm leading-relaxed mb-6">Next 12 seats. Closes 14 September 2026.</p>
+                  <p className="text-foreground/70 text-sm leading-relaxed mb-6">Limited seats. Closes 2 October 2026.</p>
                 </div>
                 <Button
-                  variant="outline"
                   onClick={() => handleOpenLead("Early Bird")}
-                  className="w-full h-12 rounded-2xl text-base bg-white border-black/10 hover:bg-background hover:text-foreground shadow-sm hover:shadow-md transition-all cursor-pointer"
+                  className="w-full h-12 rounded-2xl text-base btn-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_4px_14px_0_rgb(255,107,107,0.39)] transition-all cursor-pointer"
                 >
                   Register early bird <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
@@ -489,7 +496,7 @@ export function AINativeUXContent() {
                   <h3 className="text-2xl font-heading text-[#262626] mb-2">Regular</h3>
                   <div className="text-3xl font-heading font-bold text-[#262626] mb-1">₹40,000</div>
                   <p className="text-foreground/60 text-sm mb-3">or 2-part: ₹21,000 × 2 (₹42,000 total)</p>
-                  <p className="text-foreground/70 text-sm leading-relaxed mb-6">Remaining seats. After 14 September 2026.</p>
+                  <p className="text-foreground/70 text-sm leading-relaxed mb-6">Remaining seats. Closes 9 October 2026.</p>
                 </div>
                 <Button
                   variant="outline"
@@ -605,22 +612,29 @@ export function AINativeUXContent() {
               >
                 Register for the September cohort
               </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => handleOpenLead("Brochure Download")}
-                className="w-full sm:w-auto h-14 px-8 rounded-full text-base bg-white border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+              <a
+                href="https://drive.google.com/file/d/1ewW1sekTWMeZbG8wUohMY3ws_00GuTHx/view?usp=sharing"
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                Download the brochure
-              </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full sm:w-auto h-14 px-8 rounded-full text-base bg-white border-black/10 hover:bg-white hover:text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+                >
+                  Download the brochure
+                </Button>
+              </a>
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-y-2 gap-x-4 text-xs md:text-sm text-foreground/40 font-mono tracking-widest uppercase">
               <span>Cohort begins · 7 Sept 2026</span>
               <span className="w-1 h-1 rounded-full bg-black/20"></span>
-              <span>Founding closes · 7 Sept 2026</span>
+              <span>Founding · Closed</span>
               <span className="w-1 h-1 rounded-full bg-black/20"></span>
-              <span>Early bird closes · 14 Sept 2026</span>
+              <span>Early bird closes · 2 Oct 2026</span>
+              <span className="w-1 h-1 rounded-full bg-black/20"></span>
+              <span>Regular closes · 9 Oct 2026</span>
             </div>
           </div>
         </section>
