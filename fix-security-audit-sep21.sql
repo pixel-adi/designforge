@@ -50,10 +50,19 @@ CREATE POLICY "Admins can delete registrations" ON public.registrations
   USING (private.is_admin());
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 4. cohort_leads: prevent spam with unique constraint
+-- 4. cohort_leads: remove existing duplicates & add unique constraint to prevent spam
 -- ─────────────────────────────────────────────────────────────────────────────
--- Add unique constraint on (email, interest) to prevent duplicate lead entries
--- ON CONFLICT will cause a harmless error on the client (already handled gracefully)
+-- Keep earliest entry for duplicate (email, interest) pairs
+DELETE FROM public.cohort_leads
+WHERE id IN (
+  SELECT id
+  FROM (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY email, interest ORDER BY created_at ASC, id ASC) as rnum
+    FROM public.cohort_leads
+  ) t
+  WHERE t.rnum > 1
+);
+
 DO $$
 BEGIN
   IF NOT EXISTS (
