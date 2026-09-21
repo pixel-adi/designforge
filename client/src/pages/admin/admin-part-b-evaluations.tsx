@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, ChevronLeft, MessageSquare, Video, FileText, Maximize, X, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 const PAGE_SIZE = 100;
 
@@ -469,7 +470,7 @@ export default function AdminPartBEvaluations() {
           
           {currentQ && (
             <div className="bg-white p-5 rounded-xl border border-black/5 shadow-sm mb-6">
-               <div className="text-sm text-[#262626] leading-relaxed max-w-full overflow-hidden prose prose-sm prose-p:my-1 prose-img:max-h-40 prose-img:w-auto" dangerouslySetInnerHTML={{ __html: (currentQ.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ') }}></div>
+               <div className="text-sm text-[#262626] leading-relaxed max-w-full overflow-hidden prose prose-sm prose-p:my-1 prose-img:max-h-40 prose-img:w-auto" dangerouslySetInnerHTML={{ __html: sanitizeHtml((currentQ.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ')) }}></div>
             </div>
           )}
           

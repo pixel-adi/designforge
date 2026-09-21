@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ScatterChart, Scatter, Cell, Legend } from "recharts";
 import { PortalPrepTrackerSection } from "@/prep-tracker/components/PortalPrepTrackerSection";
 import { ExamCountdownTimer } from "@/prep-tracker/components/ExamCountdownTimer";
+import { sanitizeHtml } from "@/lib/sanitize";
 const CustomScatterTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length && payload[0] && payload[0].payload) {
     const data = payload[0].payload;
@@ -2878,7 +2879,7 @@ export default function PortalDashboard() {
 
                             <div
                               className="prose prose-sm max-w-none text-[#262626] font-medium"
-                              dangerouslySetInnerHTML={{ __html: q.content_text || '' }}
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(q.content_text) }}
                             />
 
                             {q.media_url && (
@@ -3289,7 +3290,7 @@ export default function PortalDashboard() {
                           </div>
                         </div>
                         {a.description && <p className="text-sm text-foreground/60 mb-4">{a.description}</p>}
-                        {a.content_text && <div className="prose prose-sm max-w-none text-foreground/70 mb-4 border-l-2 border-primary/20 pl-4" dangerouslySetInnerHTML={{ __html: a.content_text }} />}
+                        {a.content_text && <div className="prose prose-sm max-w-none text-foreground/70 mb-4 border-l-2 border-primary/20 pl-4" dangerouslySetInnerHTML={{ __html: sanitizeHtml(a.content_text) }} />}
                         {a.file_url && <a href={a.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors mb-4"><Download className="w-3.5 h-3.5" /> Download Brief</a>}
                         
                         {/* Mentor Feedback (Focus Batch only gets detailed) */}

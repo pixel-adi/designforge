@@ -5,6 +5,7 @@ import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, 
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 export const parseFileUrls = (fileUrlString: string | undefined | null): string[] => {
   if (!fileUrlString) return [];
@@ -1384,7 +1385,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar pb-2">
               <div className="text-lg text-[#262626] font-medium leading-relaxed mb-4 flex items-start w-full overflow-hidden">
                 <span className="font-bold mr-2 shrink-0">Q{activeQuestionIndex + 1}.</span>
-                <div className="break-words whitespace-normal w-full min-w-0 [&_p]:mb-4 last:[&_p]:mb-0 [&_p:empty]:h-6 [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-4 [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-4" dangerouslySetInnerHTML={{ __html: (currentQ.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ').replace(/\n/g, '<br/>') }}></div>
+                <div className="break-words whitespace-normal w-full min-w-0 [&_p]:mb-4 last:[&_p]:mb-0 [&_p:empty]:h-6 [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-4 [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-4" dangerouslySetInnerHTML={{ __html: sanitizeHtml((currentQ.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ').replace(/\n/g, '<br/>')) }}></div>
               </div>
 
               {currentQ.media_url && (
