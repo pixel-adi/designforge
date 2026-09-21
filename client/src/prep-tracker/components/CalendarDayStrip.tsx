@@ -220,7 +220,7 @@ export function CalendarDayStrip({
               const isSelected = rDay && selectedDayNum === rDay.day;
               const isDone = rDay && rDay.totalCount > 0 && rDay.completedCount >= rDay.totalCount;
               const isPartiallyDone = rDay && rDay.completedCount > 0 && !isDone;
-              const hasSimulation = rDay && rDay.tasks.some(t => t.kind === 'simulation');
+              const hasSimulation = Boolean(rDay && Array.isArray(rDay.tasks) && rDay.tasks.some(t => t.kind === 'simulation'));
 
               return (
                 <button

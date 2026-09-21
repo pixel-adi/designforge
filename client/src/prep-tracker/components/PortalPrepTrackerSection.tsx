@@ -157,7 +157,7 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
 
   const drillDoneThisWeek = resolvedDays
     .filter(d => d.week === (currentDay?.week || 0))
-    .filter(d => d.tasks.some(t => t.block === 'drill' && t.completed)).length;
+    .filter(d => Array.isArray(d.tasks) && d.tasks.some(t => t.block === 'drill' && t.completed)).length;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

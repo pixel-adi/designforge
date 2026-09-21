@@ -77,10 +77,14 @@ export function Board92Day({ days, selectedDayNum, onSelectDay }: Board92DayProp
                   const isSelected = selectedDayNum === d.day;
                   const isDone = d.totalCount > 0 && d.completedCount >= d.totalCount;
                   const isPartiallyDone = d.completedCount > 0 && !isDone;
-                  const hasSimulation = d.tasks.some(
-                    t => t.block === 'simulation' || t.kind === 'simulation'
+                  const hasSimulation = Boolean(
+                    Array.isArray(d.tasks) &&
+                    d.tasks.some(t => t.block === 'simulation' || t.kind === 'simulation')
                   );
-                  const hasMilestone = d.tasks.some(t => t.kind === 'milestone');
+                  const hasMilestone = Boolean(
+                    Array.isArray(d.tasks) &&
+                    d.tasks.some(t => t.kind === 'milestone')
+                  );
 
                   return (
                     <button

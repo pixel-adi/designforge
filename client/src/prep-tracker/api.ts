@@ -25,11 +25,13 @@ export const prepApi = {
         id: 'preview-enrolment',
         candidate_id: candidateId,
         track: 'ug' as Track,
-        tier: 'standard' as Tier,
+        tier: 'intensive' as Tier,
         disciplines: [],
         primary_group: null,
         application_submitted_at: null,
         has_notes_access: false,
+        active_exam_ids: ['nid-ug-2027'],
+        primary_exam_id: 'nid-ug-2027',
       };
       localStorage.setItem(`df_prep_enrolment_${candidateId}`, JSON.stringify(defaultEnrolment));
       return defaultEnrolment;
@@ -41,8 +43,17 @@ export const prepApi = {
         .select('*')
         .eq('candidate_id', candidateId)
         .maybeSingle();
-      if (error) console.error('Error fetching enrolment:', error);
-      return data;
+      if (error) {
+        console.error('Error fetching enrolment from db:', error);
+        const local = localStorage.getItem(`df_prep_enrolment_${candidateId}`);
+        return local ? JSON.parse(local) : null;
+      }
+      if (data) {
+        localStorage.setItem(`df_prep_enrolment_${candidateId}`, JSON.stringify(data));
+        return data;
+      }
+      const local = localStorage.getItem(`df_prep_enrolment_${candidateId}`);
+      return local ? JSON.parse(local) : null;
     } catch (e) {
       console.warn('Falling back to local enrolment:', e);
       const local = localStorage.getItem(`df_prep_enrolment_${candidateId}`);
@@ -51,10 +62,17 @@ export const prepApi = {
   },
 
   async saveEnrolment(enrolment: EnrolmentData) {
+    const activeExams = enrolment.active_exam_ids && enrolment.active_exam_ids.length > 0
+      ? enrolment.active_exam_ids
+      : [enrolment.track === 'pg' ? 'nid-pg-2027' : 'nid-ug-2027'];
+    const primaryExam = enrolment.primary_exam_id || activeExams[0];
+
     if (enrolment.candidate_id.startsWith('preview-')) {
       const saved = {
         ...enrolment,
         id: enrolment.id || 'preview-enrolment',
+        active_exam_ids: activeExams,
+        primary_exam_id: primaryExam,
         updated_at: new Date().toISOString(),
       };
       localStorage.setItem(`df_prep_enrolment_${enrolment.candidate_id}`, JSON.stringify(saved));
@@ -73,6 +91,8 @@ export const prepApi = {
             primary_group: enrolment.primary_group || null,
             application_submitted_at: enrolment.application_submitted_at || null,
             has_notes_access: enrolment.has_notes_access ?? false,
+            active_exam_ids: activeExams,
+            primary_exam_id: primaryExam,
             updated_at: new Date().toISOString(),
           },
           { onConflict: 'candidate_id' }
@@ -80,10 +100,18 @@ export const prepApi = {
         .select()
         .single();
       if (error) throw error;
+      localStorage.setItem(`df_prep_enrolment_${enrolment.candidate_id}`, JSON.stringify(data || enrolment));
       return data;
     } catch (err) {
-      localStorage.setItem(`df_prep_enrolment_${enrolment.candidate_id}`, JSON.stringify(enrolment));
-      return enrolment;
+      console.warn('Saving enrolment to local storage:', err);
+      const fallback = {
+        ...enrolment,
+        active_exam_ids: activeExams,
+        primary_exam_id: primaryExam,
+        updated_at: new Date().toISOString(),
+      };
+      localStorage.setItem(`df_prep_enrolment_${enrolment.candidate_id}`, JSON.stringify(fallback));
+      return fallback;
     }
   },
 

@@ -84,18 +84,19 @@ export function usePrepTracker(candidateId: string | null) {
     };
   }, [diagnostics]);
 
-  // Resolve active profile
-  const resolvedProfile = useMemo<ResolvedProfile | null>(() => {
-    if (!enrolment) return null;
+  // Resolve active profile with fallback so tracker always displays
+  const resolvedProfile = useMemo<ResolvedProfile>(() => {
+    const track = enrolment?.track || (activeExamId === 'nid-pg-2027' || activeExamId === 'ceed-2027' ? 'pg' : 'ug');
+    const tier = enrolment?.tier || 'intensive';
     return resolveProfile({
-      track: enrolment.track,
-      tier: enrolment.tier,
+      track,
+      tier,
       diagnostic: latestDiagnostic,
-      disciplines: enrolment.disciplines || [],
-      applicationSubmittedAt: enrolment.application_submitted_at,
-      hasNotesAccess: Boolean(enrolment.has_notes_access),
+      disciplines: enrolment?.disciplines || [],
+      applicationSubmittedAt: enrolment?.application_submitted_at,
+      hasNotesAccess: Boolean(enrolment?.has_notes_access),
     });
-  }, [enrolment, latestDiagnostic]);
+  }, [enrolment, latestDiagnostic, activeExamId]);
 
   // Raw plan
   const rawPlan = useMemo(() => {
@@ -103,7 +104,7 @@ export function usePrepTracker(candidateId: string | null) {
     if (matchedPlan && Array.isArray(matchedPlan.days) && matchedPlan.days.length > 0) {
       return matchedPlan;
     }
-    if (activeExamId === 'nid-pg-2027' || (resolvedProfile && resolvedProfile.track === 'pg')) {
+    if (activeExamId === 'nid-pg-2027' || activeExamId === 'ceed-2027' || resolvedProfile.track === 'pg') {
       return pgPlanData;
     }
     return ugPlanData;
@@ -210,8 +211,8 @@ export function usePrepTracker(candidateId: string | null) {
     try {
       let primaryGroup: string | undefined = undefined;
       const groups = (data.disciplines || []).map(discId => {
-        for (const [groupKey, groupData] of Object.entries(PG_DISCIPLINE_GROUPS)) {
-          if (groupData.disciplines.some(d => d.id === discId)) {
+        for (const [groupKey, list] of Object.entries(PG_DISCIPLINE_GROUPS)) {
+          if (Array.isArray(list) && (list.includes(discId) || list.some(d => d.toLowerCase() === String(discId).toLowerCase()))) {
             return groupKey;
           }
         }

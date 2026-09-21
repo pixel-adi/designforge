@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import AdminLayout from './admin-layout';
 import { prepApi } from '@/prep-tracker/api';
 import { DayRecord, TaskRecord } from '@/prep-tracker/types';
+import ugPlanData from '../../../../prep-tracker-kit/content/plan.ug.json';
+import pgPlanData from '../../../../prep-tracker-kit/content/plan.pg.json';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -104,11 +106,61 @@ export default function AdminPrepTracker() {
       ]);
 
       const defaultPlans = [
-        { id: 'nid-ug-2027', exam_code: 'NID', title: 'NID DAT 2027: B.Des & Integrated M.Des', track: 'ug', academic_year: '2027', start_date: '2026-09-19', end_date: '2026-12-19', exam_date: '2026-12-20', days: [] },
-        { id: 'nid-pg-2027', exam_code: 'NID', title: 'NID DAT 2027: M.Des Disciplines', track: 'pg', academic_year: '2027', start_date: '2026-09-19', end_date: '2026-12-19', exam_date: '2026-12-20', days: [] },
-        { id: 'uceed-2027', exam_code: 'UCEED', title: 'UCEED 2027: B.Des (IIT Bombay)', track: 'ug', academic_year: '2027', start_date: '2026-09-28', end_date: '2027-01-16', exam_date: '2027-01-17', days: [] },
-        { id: 'ceed-2027', exam_code: 'CEED', title: 'CEED 2027: M.Des (IITs)', track: 'pg', academic_year: '2027', start_date: '2026-09-28', end_date: '2027-01-16', exam_date: '2027-01-17', days: [] },
-        { id: 'nift-2027', exam_code: 'NIFT', title: 'NIFT 2027: Fashion & Design (CAT+GAT)', track: 'ug', academic_year: '2027', start_date: '2026-10-05', end_date: '2027-02-06', exam_date: '2027-02-07', days: [] },
+        {
+          id: 'nid-ug-2027',
+          exam_code: 'NID',
+          title: 'NID DAT 2027: B.Des & Integrated M.Des',
+          track: 'ug',
+          academic_year: '2027',
+          start_date: '2026-09-19',
+          end_date: '2026-12-19',
+          exam_date: '2026-12-20',
+          days: (ugPlanData.days as any[]) || [],
+        },
+        {
+          id: 'nid-pg-2027',
+          exam_code: 'NID',
+          title: 'NID DAT 2027: M.Des Disciplines',
+          track: 'pg',
+          academic_year: '2027',
+          start_date: '2026-09-19',
+          end_date: '2026-12-19',
+          exam_date: '2026-12-20',
+          days: (pgPlanData.days as any[]) || [],
+        },
+        {
+          id: 'uceed-2027',
+          exam_code: 'UCEED',
+          title: 'UCEED 2027: B.Des (IIT Bombay)',
+          track: 'ug',
+          academic_year: '2027',
+          start_date: '2026-09-28',
+          end_date: '2027-01-16',
+          exam_date: '2027-01-17',
+          days: [],
+        },
+        {
+          id: 'ceed-2027',
+          exam_code: 'CEED',
+          title: 'CEED 2027: M.Des (IITs)',
+          track: 'pg',
+          academic_year: '2027',
+          start_date: '2026-09-28',
+          end_date: '2027-01-16',
+          exam_date: '2027-01-17',
+          days: [],
+        },
+        {
+          id: 'nift-2027',
+          exam_code: 'NIFT',
+          title: 'NIFT 2027: Fashion & Design (CAT+GAT)',
+          track: 'ug',
+          academic_year: '2027',
+          start_date: '2026-10-05',
+          end_date: '2027-02-06',
+          exam_date: '2027-02-07',
+          days: [],
+        },
       ];
 
       // Merge fetched plans with default catalogue
@@ -116,7 +168,9 @@ export default function AdminPrepTracker() {
       for (const p of fetchedPlans || []) {
         const idx = mergedPlans.findIndex(m => m.id === p.id);
         if (idx >= 0) {
-          mergedPlans[idx] = { ...mergedPlans[idx], ...p };
+          // If the fetched plan has days, use them. If it has empty days ([]), preserve the rich default days!
+          const daysToUse = Array.isArray(p.days) && p.days.length > 0 ? p.days : mergedPlans[idx].days;
+          mergedPlans[idx] = { ...mergedPlans[idx], ...p, days: daysToUse };
         } else {
           mergedPlans.push(p);
         }
@@ -177,7 +231,7 @@ export default function AdminPrepTracker() {
       dayRecord?: DayRecord;
     }> = [];
 
-    for (let i = 0; i < 35; i++) {
+    for (let i = 0; i < 42; i++) {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
       const year = d.getFullYear();
@@ -691,9 +745,11 @@ export default function AdminPrepTracker() {
               {/* 35 Days Grid */}
               <div className="grid grid-cols-7 divide-x divide-y divide-black/5">
                 {monthGridDays.map(cell => {
-                  const hasTasks = cell.dayRecord && cell.dayRecord.tasks.length > 0;
-                  const taskCount = cell.dayRecord?.tasks.length || 0;
-                  const totalMinutes = cell.dayRecord?.tasks.reduce((sum, t) => sum + (t.minutes.light || 0), 0) || 0;
+                  const hasTasks = Boolean(cell.dayRecord && Array.isArray(cell.dayRecord.tasks) && cell.dayRecord.tasks.length > 0);
+                  const taskCount = cell.dayRecord && Array.isArray(cell.dayRecord.tasks) ? cell.dayRecord.tasks.length : 0;
+                  const totalMinutes = cell.dayRecord && Array.isArray(cell.dayRecord.tasks)
+                    ? cell.dayRecord.tasks.reduce((sum, t) => sum + (typeof t.minutes === 'number' ? t.minutes : (t.minutes?.light || 0)), 0)
+                    : 0;
 
                   return (
                     <div
