@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import AdminLayout from './admin-layout';
 import { prepApi } from '@/prep-tracker/api';
 import { DayRecord, TaskRecord } from '@/prep-tracker/types';
@@ -9,6 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  SelectGroup,
+  SelectLabel,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -36,7 +45,12 @@ import {
   Save,
   Loader2,
   AlertCircle,
-  Copy,
+  Trophy,
+  Flame,
+  X,
+  Eye,
+  Undo2,
+  Filter,
 } from 'lucide-react';
 
 const BLOCK_OPTIONS = [
@@ -64,16 +78,17 @@ export default function AdminPrepTracker() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'calendar' | 'csv' | 'settings' | 'students'>('calendar');
+  const [activeTab, setActiveTab] = useState<'calendar' | 'csv' | 'students'>('calendar');
 
   // Exam Plans
   const [plans, setPlans] = useState<any[]>([]);
   const [activePlanId, setActivePlanId] = useState<string>('nid-ug-2027');
   const [currentPlan, setCurrentPlan] = useState<any | null>(null);
 
-  // Calendar State
+  // Calendar State & Cadence Filter
   const [viewYear, setViewYear] = useState(2026);
   const [viewMonth, setViewMonth] = useState(8); // Sep (0-indexed: 8)
+  const [cadenceFilter, setCadenceFilter] = useState<'all' | 'drill' | 'build' | 'critique' | 'simulation' | 'review'>('all');
 
   // Day Editor Drawer / Modal
   const [editingDate, setEditingDate] = useState<string | null>(null);
@@ -88,13 +103,16 @@ export default function AdminPrepTracker() {
     capture: [],
   });
 
+  // CSV Import & Draft Preview State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [csvText, setCsvText] = useState('');
+  const [csvPreview, setCsvPreview] = useState<any[]>([]);
+  const [stagedDays, setStagedDays] = useState<DayRecord[] | null>(null);
+  const [isPreviewMode, setIsPreviewMode] = useState<boolean>(false);
+
   // Students Roster State
   const [enrolments, setEnrolments] = useState<any[]>([]);
   const [editingStudent, setEditingStudent] = useState<any | null>(null);
-
-  // CSV Import State
-  const [csvText, setCsvText] = useState('');
-  const [csvPreview, setCsvPreview] = useState<any[]>([]);
 
   // Load plans & initial data
   const loadData = async () => {
@@ -106,6 +124,7 @@ export default function AdminPrepTracker() {
       ]);
 
       const defaultPlans = [
+        // Undergraduate (UG)
         {
           id: 'nid-ug-2027',
           exam_code: 'NID',
@@ -116,17 +135,6 @@ export default function AdminPrepTracker() {
           end_date: '2026-12-19',
           exam_date: '2026-12-20',
           days: (ugPlanData.days as any[]) || [],
-        },
-        {
-          id: 'nid-pg-2027',
-          exam_code: 'NID',
-          title: 'NID DAT 2027: M.Des Disciplines',
-          track: 'pg',
-          academic_year: '2027',
-          start_date: '2026-09-19',
-          end_date: '2026-12-19',
-          exam_date: '2026-12-20',
-          days: (pgPlanData.days as any[]) || [],
         },
         {
           id: 'uceed-2027',
@@ -140,9 +148,32 @@ export default function AdminPrepTracker() {
           days: [],
         },
         {
+          id: 'nift-ug-2027',
+          exam_code: 'NIFT',
+          title: 'NIFT 2027: Bachelor of Design (B.Des)',
+          track: 'ug',
+          academic_year: '2027',
+          start_date: '2026-10-05',
+          end_date: '2027-02-06',
+          exam_date: '2027-02-07',
+          days: [],
+        },
+        // Postgraduate (PG)
+        {
+          id: 'nid-pg-2027',
+          exam_code: 'NID',
+          title: 'NID DAT 2027: M.Des Disciplines',
+          track: 'pg',
+          academic_year: '2027',
+          start_date: '2026-09-19',
+          end_date: '2026-12-19',
+          exam_date: '2026-12-20',
+          days: (pgPlanData.days as any[]) || [],
+        },
+        {
           id: 'ceed-2027',
           exam_code: 'CEED',
-          title: 'CEED 2027: M.Des (IITs)',
+          title: 'CEED 2027: Master of Design (IITs)',
           track: 'pg',
           academic_year: '2027',
           start_date: '2026-09-28',
@@ -151,10 +182,10 @@ export default function AdminPrepTracker() {
           days: [],
         },
         {
-          id: 'nift-2027',
+          id: 'nift-pg-2027',
           exam_code: 'NIFT',
-          title: 'NIFT 2027: Fashion & Design (CAT+GAT)',
-          track: 'ug',
+          title: 'NIFT 2027: Master of Design (M.Des)',
+          track: 'pg',
           academic_year: '2027',
           start_date: '2026-10-05',
           end_date: '2027-02-06',
@@ -166,11 +197,12 @@ export default function AdminPrepTracker() {
       // Merge fetched plans with default catalogue
       const mergedPlans = [...defaultPlans];
       for (const p of fetchedPlans || []) {
-        const idx = mergedPlans.findIndex(m => m.id === p.id);
+        // Map legacy nift-2027 to nift-ug-2027 if present
+        const targetId = p.id === 'nift-2027' ? 'nift-ug-2027' : p.id;
+        const idx = mergedPlans.findIndex(m => m.id === targetId);
         if (idx >= 0) {
-          // If the fetched plan has days, use them. If it has empty days ([]), preserve the rich default days!
           const daysToUse = Array.isArray(p.days) && p.days.length > 0 ? p.days : mergedPlans[idx].days;
-          mergedPlans[idx] = { ...mergedPlans[idx], ...p, days: daysToUse };
+          mergedPlans[idx] = { ...mergedPlans[idx], ...p, id: targetId, days: daysToUse };
         } else {
           mergedPlans.push(p);
         }
@@ -192,11 +224,17 @@ export default function AdminPrepTracker() {
     loadData();
   }, []);
 
-  // When activePlanId changes, update currentPlan
+  // When activePlanId changes, update currentPlan and reset draft preview
   useEffect(() => {
     const p = plans.find(item => item.id === activePlanId);
     if (p) {
       setCurrentPlan(p);
+      setIsPreviewMode(false);
+      setStagedDays(null);
+      setCsvPreview([]);
+      setCsvText('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+
       if (p.start_date) {
         const d = new Date(p.start_date);
         setViewYear(d.getFullYear());
@@ -205,18 +243,57 @@ export default function AdminPrepTracker() {
     }
   }, [activePlanId, plans]);
 
+  // Separate UG and PG plans
+  const ugPlans = useMemo(() => plans.filter(p => p.track === 'ug'), [plans]);
+  const pgPlans = useMemo(() => plans.filter(p => p.track === 'pg'), [plans]);
+
+  // Active days: staged draft days if in preview mode, otherwise currentPlan.days
+  const activeDaysList: DayRecord[] = useMemo(() => {
+    if (isPreviewMode && stagedDays) return stagedDays;
+    return (currentPlan?.days as DayRecord[]) || [];
+  }, [isPreviewMode, stagedDays, currentPlan]);
+
   // Map of days by date for quick lookup
   const planDaysByDate = useMemo(() => {
     const map = new Map<string, DayRecord>();
-    if (currentPlan && Array.isArray(currentPlan.days)) {
-      for (const d of currentPlan.days) {
+    for (const d of activeDaysList) {
+      if (d.date) {
         map.set(d.date, d);
       }
     }
     return map;
+  }, [activeDaysList]);
+
+  // Days until official exam date
+  const daysUntilExam = useMemo(() => {
+    if (!currentPlan?.exam_date) return null;
+    const examTime = new Date(currentPlan.exam_date).getTime();
+    const today = new Date().getTime();
+    const diff = Math.ceil((examTime - today) / (1000 * 60 * 60 * 24));
+    return diff;
   }, [currentPlan]);
 
-  // Calendar month grid generator (35 cells)
+  // Total curriculum statistics for current plan
+  const planSummary = useMemo(() => {
+    let totalTasks = 0;
+    let totalMinutes = 0;
+    for (const d of activeDaysList) {
+      if (Array.isArray(d.tasks)) {
+        totalTasks += d.tasks.length;
+        for (const t of d.tasks) {
+          const mins = typeof t.minutes === 'number' ? t.minutes : (t.minutes?.intensive || t.minutes?.light || 45);
+          totalMinutes += mins;
+        }
+      }
+    }
+    return {
+      daysCount: activeDaysList.length,
+      tasksCount: totalTasks,
+      hoursCount: Math.round(totalMinutes / 60),
+    };
+  }, [activeDaysList]);
+
+  // Calendar month grid generator (42 cells: 6 full weeks)
   const monthGridDays = useMemo(() => {
     const firstDay = new Date(viewYear, viewMonth, 1);
     const startOffset = firstDay.getDay(); // 0 is Sun
@@ -229,6 +306,7 @@ export default function AdminPrepTracker() {
       dayOfMonth: number;
       isCurrentMonth: boolean;
       dayRecord?: DayRecord;
+      isExamDate: boolean;
     }> = [];
 
     for (let i = 0; i < 42; i++) {
@@ -238,17 +316,19 @@ export default function AdminPrepTracker() {
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
+      const isExam = dateStr === currentPlan?.exam_date;
 
       cells.push({
         dateStr,
         dayOfMonth: d.getDate(),
         isCurrentMonth: d.getMonth() === viewMonth,
         dayRecord: planDaysByDate.get(dateStr),
+        isExamDate: isExam,
       });
     }
 
     return cells;
-  }, [viewYear, viewMonth, planDaysByDate]);
+  }, [viewYear, viewMonth, planDaysByDate, currentPlan]);
 
   // Month navigation
   const prevMonth = () => {
@@ -398,7 +478,7 @@ export default function AdminPrepTracker() {
     }
   };
 
-  // Quick Apply Rhythm Template (Drill + Build on weekdays, Mock on Sat, Review on Sun)
+  // Quick Apply Rhythm Template
   const handleApplyRhythm = () => {
     if (!editingDayRecord) return;
     const weekday = editingDayRecord.weekday.toLowerCase();
@@ -423,29 +503,70 @@ export default function AdminPrepTracker() {
         ],
       });
     } else if (weekday.includes('sat')) {
-      // Saturday Simulation Template
+      // Saturday Full Simulation Template
       setEditingDayRecord({
         ...editingDayRecord,
-        title: `Full Exam Simulation & Critique`,
+        title: `Saturday Full Simulation & 45m Audit (Week ${editingDayRecord.week})`,
         tasks: [
           {
             id: `task-${Date.now()}-1`,
             block: 'simulation',
             module: 'Simulation',
             kind: 'simulation',
-            title: 'Full Length 3-Hour Timed Mock Paper',
-            detail: 'Simulate strict exam conditions. Log paper score and errors into the 4 buckets.',
+            title: 'Full Pen-and-Paper Practice Simulation (3 Hours)',
+            detail: 'Timed studio exam under strict non-distraction protocol.',
             minutes: { light: 180, intensive: 180 },
             capture: ['simulationLog'],
+            source: ['OS Template'],
+          },
+          {
+            id: `task-${Date.now()}-2`,
+            block: 'review',
+            module: 'Simulation',
+            kind: 'task',
+            title: 'Same-Day 45-Min Mistake Classification & Audit',
+            detail: 'Log every mistake into Concept, Time, Clarity, or Care bucket and write rewritten answers.',
+            minutes: { light: 45, intensive: 45 },
+            capture: ['errorLedger'],
+            source: ['OS Template'],
+          },
+        ],
+      });
+    } else if (weekday.includes('thu')) {
+      // Thursday Critique Session
+      setEditingDayRecord({
+        ...editingDayRecord,
+        title: `Thursday Weekly Critique & Peer Audit (Week ${editingDayRecord.week})`,
+        tasks: [
+          {
+            id: `task-${Date.now()}-1`,
+            block: 'drill',
+            module: 'Drill',
+            kind: 'task',
+            title: '45-Min Daily Speed Drill',
+            detail: 'Observation and visual thinking exercise.',
+            minutes: { light: 45, intensive: 45 },
+            capture: ['diaryEntry'],
+            source: ['OS Template'],
+          },
+          {
+            id: `task-${Date.now()}-2`,
+            block: 'critique',
+            module: 'Critique',
+            kind: 'task',
+            title: '60-Min Mentor/Peer Critique & Rubric Audit',
+            detail: 'Upload work and record critical feedback against admissions criteria.',
+            minutes: { light: 60, intensive: 60 },
+            capture: ['reviewSubmission'],
             source: ['OS Template'],
           },
         ],
       });
     } else {
-      // Mon - Fri Standard Rhythm
+      // Standard Mon / Wed / Fri: Daily Drill + Build Block
       setEditingDayRecord({
         ...editingDayRecord,
-        title: `Daily Drill & Studio Challenge`,
+        title: `Daily Operating Rhythm (Day ${editingDayRecord.day})`,
         tasks: [
           {
             id: `task-${Date.now()}-1`,
@@ -479,7 +600,7 @@ export default function AdminPrepTracker() {
     });
   };
 
-  // CSV Template Exporter
+  // CSV Template Exporter (Blank structure)
   const handleDownloadCsvTemplate = () => {
     const headers = 'day,week,phase,date,block,kind,title,detail,minutes_light,minutes_intensive,capture\n';
     const sampleRows = [
@@ -495,6 +616,50 @@ export default function AdminPrepTracker() {
     a.download = `${currentPlan?.id || 'exam-plan'}-template.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // Export LIVE populated plan as CSV
+  const handleDownloadLiveCsv = () => {
+    if (!currentPlan || !Array.isArray(currentPlan.days) || currentPlan.days.length === 0) {
+      toast({
+        title: 'No days to export',
+        description: 'This plan does not have configured days yet.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const headers = 'day,week,phase,date,block,kind,title,detail,minutes_light,minutes_intensive,capture\n';
+    const rows: string[] = [];
+
+    for (const d of currentPlan.days) {
+      if (!d.tasks || d.tasks.length === 0) {
+        const cleanTitle = (d.title || '').replace(/"/g, '""');
+        rows.push(`${d.day},${d.week},${d.phaseId || 'p1'},${d.date},drill,task,"${cleanTitle}","",45,45,none`);
+      } else {
+        for (const t of d.tasks) {
+          const cleanTitle = (t.title || '').replace(/"/g, '""');
+          const cleanDetail = (t.detail || '').replace(/"/g, '""');
+          const minLight = typeof t.minutes === 'number' ? t.minutes : (t.minutes?.light || 45);
+          const minIntensive = typeof t.minutes === 'number' ? t.minutes : (t.minutes?.intensive || 45);
+          const cap = t.capture && t.capture.length > 0 ? t.capture[0] : 'none';
+          rows.push(`${d.day},${d.week},${d.phaseId || 'p1'},${d.date},${t.block || 'drill'},${t.kind || 'task'},"${cleanTitle}","${cleanDetail}",${minLight},${minIntensive},${cap}`);
+        }
+      }
+    }
+
+    const blob = new Blob([headers + rows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentPlan.id}-live-curriculum.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: 'Curriculum Exported',
+      description: `Exported ${currentPlan.days.length} days (${rows.length} tasks) to CSV.`,
+    });
   };
 
   // Parse Uploaded CSV
@@ -554,22 +719,63 @@ export default function AdminPrepTracker() {
 
       const parsedDays = Object.values(dayMap).sort((a, b) => a.day - b.day);
       setCsvPreview(parsedDays);
+      setStagedDays(parsedDays);
+
       toast({
         title: 'CSV Parsed Successfully',
-        description: `Found ${parsedDays.length} days with ${rows.length} total tasks.`,
+        description: `Found ${parsedDays.length} days with ${rows.length} tasks. You can now Preview on Calendar or Publish.`,
       });
     };
     reader.readAsText(file);
   };
 
-  // Commit CSV to Database
-  const handleCommitCsvToPlan = async () => {
-    if (csvPreview.length === 0 || !currentPlan) return;
+  // Cancel CSV Upload & Clear Staged
+  const handleCancelCsvUpload = () => {
+    setCsvText('');
+    setCsvPreview([]);
+    setStagedDays(null);
+    setIsPreviewMode(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    toast({
+      title: 'Upload Cancelled',
+      description: 'Staged CSV has been cleared.',
+    });
+  };
+
+  // Preview Staged CSV on Calendar View
+  const handlePreviewOnCalendar = () => {
+    if (csvPreview.length === 0) return;
+    setStagedDays(csvPreview);
+    setIsPreviewMode(true);
+    setActiveTab('calendar');
+    toast({
+      title: 'Previewing on Calendar',
+      description: 'Staged changes are now displayed on the calendar. Inspect days, then click Publish or Discard.',
+    });
+  };
+
+  // Discard Draft Preview
+  const handleDiscardStaged = () => {
+    setIsPreviewMode(false);
+    setStagedDays(null);
+    setCsvPreview([]);
+    setCsvText('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    toast({
+      title: 'Draft Discarded',
+      description: 'Reverted to live published curriculum.',
+    });
+  };
+
+  // Commit Staged / CSV to Database
+  const handleCommitStagedToPlan = async () => {
+    const daysToSave = stagedDays || csvPreview;
+    if (daysToSave.length === 0 || !currentPlan) return;
     setSaving(true);
     try {
       const updatedPlan = {
         ...currentPlan,
-        days: csvPreview,
+        days: daysToSave,
       };
 
       await prepApi.saveExamPlan(updatedPlan);
@@ -577,16 +783,19 @@ export default function AdminPrepTracker() {
       setPlans(prev => prev.map(p => (p.id === updatedPlan.id ? updatedPlan : p)));
 
       toast({
-        title: 'Curriculum Imported!',
-        description: `Successfully loaded ${csvPreview.length} days into ${currentPlan.title}.`,
+        title: 'Curriculum Published!',
+        description: `Successfully published ${daysToSave.length} days into ${currentPlan.title}.`,
       });
 
+      setIsPreviewMode(false);
+      setStagedDays(null);
       setCsvPreview([]);
       setCsvText('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       setActiveTab('calendar');
     } catch (e: any) {
       toast({
-        title: 'Import failed',
+        title: 'Publish failed',
         description: e.message,
         variant: 'destructive',
       });
@@ -612,11 +821,11 @@ export default function AdminPrepTracker() {
     <AdminLayout>
       <div className="space-y-6 pb-12">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-primary/10 text-primary uppercase tracking-wider">
-                Admin Control
+                Admin Control Center
               </span>
               <span className="text-xs text-foreground/50 font-semibold">Universal Curriculum OS</span>
             </div>
@@ -624,88 +833,236 @@ export default function AdminPrepTracker() {
               Prep Tracker Control Center
             </h1>
             <p className="text-xs text-foreground/60 mt-0.5">
-              Manage curricula for NID, UCEED, CEED, and NIFT. Tap any date on the calendar to edit tasks or import via CSV.
+              Manage 92-day curricula for NID, UCEED, CEED, and NIFT. Tap any date to edit tasks or import via CSV.
             </p>
           </div>
 
+          {/* Top Quick Actions */}
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadLiveCsv}
+              className="h-9 gap-1.5 text-xs font-bold bg-white border-black/10 text-[#1e293b]"
+            >
+              <Download className="w-3.5 h-3.5 text-primary" />
+              <span>Export Live CSV</span>
+            </Button>
+
             <Button
               variant="outline"
               size="sm"
               onClick={handleDownloadCsvTemplate}
               className="h-9 gap-1.5 text-xs font-bold bg-white border-black/10 text-[#1e293b]"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>CSV Template</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-foreground/60" />
+              <span>Blank Template</span>
             </Button>
           </div>
         </div>
 
-        {/* 1. Exam Selector Switcher Tabs */}
-        <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-[#f8fafc] border border-black/10">
-          {plans.map(p => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setActivePlanId(p.id)}
-              className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
-                activePlanId === p.id
-                  ? 'bg-primary text-white shadow-xs'
-                  : 'text-[#475569] hover:text-[#0f172a] hover:bg-black/5'
-              }`}
-            >
-              {p.exam_code}: {p.title.split(':')[0]}
-            </button>
-          ))}
+        {/* 1. Clear Exam Level Segregation & Dropdown Selector */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-black/10 shadow-xs space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="space-y-1.5 w-full md:w-auto">
+              <Label className="text-xs font-extrabold uppercase tracking-wider text-foreground/60 block">
+                Select Exam Curriculum Track
+              </Label>
+              <Select value={activePlanId} onValueChange={setActivePlanId}>
+                <SelectTrigger className="w-full sm:w-[380px] bg-[#f8fafc] border-black/15 shadow-2xs font-bold text-xs h-10">
+                  <SelectValue placeholder="Select Exam Track..." />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-black/10 shadow-lg">
+                  <SelectGroup>
+                    <SelectLabel className="text-[11px] font-black uppercase text-blue-700 bg-blue-50/70 py-1.5 px-3 tracking-wider flex items-center justify-between">
+                      <span>Undergraduate (UG) Entrance Exams</span>
+                      <span className="text-[10px] font-bold text-blue-600">Bachelors</span>
+                    </SelectLabel>
+                    {ugPlans.map(p => (
+                      <SelectItem key={p.id} value={p.id} className="py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-100 text-blue-800">
+                            UG
+                          </span>
+                          <span className="font-extrabold text-xs text-[#1e293b]">{p.exam_code}</span>
+                          <span className="text-xs text-foreground/70 truncate">
+                            · {p.title.split(':')[1] || p.title}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+
+                  <SelectGroup>
+                    <SelectLabel className="text-[11px] font-black uppercase text-purple-700 bg-purple-50/70 py-1.5 px-3 tracking-wider flex items-center justify-between mt-1">
+                      <span>Postgraduate (PG) Entrance Exams</span>
+                      <span className="text-[10px] font-bold text-purple-600">Masters</span>
+                    </SelectLabel>
+                    {pgPlans.map(p => (
+                      <SelectItem key={p.id} value={p.id} className="py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-purple-100 text-purple-800">
+                            PG
+                          </span>
+                          <span className="font-extrabold text-xs text-[#1e293b]">{p.exam_code}</span>
+                          <span className="text-xs text-foreground/70 truncate">
+                            · {p.title.split(':')[1] || p.title}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Current Exam Highlight Banner */}
+            {currentPlan && (
+              <div className="flex flex-wrap items-center gap-3 bg-[#f8fafc] border border-black/5 p-3 rounded-xl self-stretch md:self-auto">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-black tracking-wide uppercase ${
+                      currentPlan.track === 'ug'
+                        ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                        : 'bg-purple-100 text-purple-800 border border-purple-200'
+                    }`}
+                  >
+                    {currentPlan.track === 'ug' ? 'UG: Bachelors' : 'PG: Masters'}
+                  </span>
+                  <div className="text-xs font-extrabold text-[#1e293b]">
+                    {currentPlan.title}
+                  </div>
+                </div>
+
+                {/* Official Exam Date Badge */}
+                {currentPlan.exam_date && (
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-extrabold">
+                    <Trophy className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Exam Day: {currentPlan.exam_date}</span>
+                    {daysUntilExam !== null && (
+                      <span className="px-1.5 py-0.2 rounded bg-amber-200/80 text-[10px] font-black text-amber-900 ml-1">
+                        {daysUntilExam > 0 ? `${daysUntilExam}d to go` : 'Passed'}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Curriculum Metrics */}
+                <div className="text-[11px] text-foreground/60 font-semibold pl-1">
+                  {planSummary.daysCount} Days Configured · {planSummary.tasksCount} Tasks · ~{planSummary.hoursCount}h Total
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 2. Admin Section View Switcher */}
-        <div className="flex items-center gap-2 border-b border-black/10 pb-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab('calendar')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-              activeTab === 'calendar'
-                ? 'bg-[#1e293b] text-white shadow-xs'
-                : 'bg-black/5 hover:bg-black/10 text-foreground/70'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Interactive Calendar Day Editor</span>
-          </button>
+        <div className="flex items-center justify-between border-b border-black/10 pb-2">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('calendar')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                activeTab === 'calendar'
+                  ? 'bg-[#1e293b] text-white shadow-xs'
+                  : 'bg-black/5 hover:bg-black/10 text-foreground/70'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Interactive Calendar Day Editor</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('csv')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-              activeTab === 'csv'
-                ? 'bg-[#1e293b] text-white shadow-xs'
-                : 'bg-black/5 hover:bg-black/10 text-foreground/70'
-            }`}
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>CSV / File Bulk Import</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('csv')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                activeTab === 'csv'
+                  ? 'bg-[#1e293b] text-white shadow-xs'
+                  : 'bg-black/5 hover:bg-black/10 text-foreground/70'
+              }`}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>CSV Bulk Importer</span>
+              {csvPreview.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-500 text-white">
+                  {csvPreview.length}
+                </span>
+              )}
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('students')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-              activeTab === 'students'
-                ? 'bg-[#1e293b] text-white shadow-xs'
-                : 'bg-black/5 hover:bg-black/10 text-foreground/70'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Student Roster ({enrolments.length})</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('students')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                activeTab === 'students'
+                  ? 'bg-[#1e293b] text-white shadow-xs'
+                  : 'bg-black/5 hover:bg-black/10 text-foreground/70'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Student Roster ({enrolments.length})</span>
+            </button>
+          </div>
+
+          {/* Draft Preview Indicator if active */}
+          {isPreviewMode && (
+            <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1.5 animate-pulse">
+              <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+              Draft Preview Active
+            </span>
+          )}
         </div>
 
         {/* 3. TAB CONTENT: Interactive Calendar Editor */}
         {activeTab === 'calendar' && (
           <div className="space-y-4 animate-in fade-in">
-            {/* Calendar Controls */}
-            <div className="p-4 rounded-2xl border border-black/10 bg-white shadow-xs flex items-center justify-between">
+            {/* Draft Preview Banner (Visible when admin is previewing CSV before publishing) */}
+            {isPreviewMode && (
+              <div className="p-4 rounded-2xl border-2 border-amber-400 bg-amber-50/90 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black shrink-0">
+                    <Eye className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-amber-900 uppercase tracking-wide">
+                        Draft Preview Mode
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900">
+                        {stagedDays?.length} Days Staged from CSV
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-800/90 mt-0.5">
+                      You are previewing this curriculum on the calendar. Changes are <strong>not yet published</strong> to students.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDiscardStaged}
+                    className="border-amber-300 text-amber-900 hover:bg-amber-100 text-xs font-bold gap-1 bg-white"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                    <span>Discard Draft</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleCommitStagedToPlan}
+                    disabled={saving}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold gap-1.5 shadow-xs"
+                  >
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    <span>Publish to Live Students</span>
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Calendar Controls & Cadence Filter */}
+            <div className="p-4 rounded-2xl border border-black/10 bg-white shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -714,7 +1071,7 @@ export default function AdminPrepTracker() {
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <span className="text-base font-extrabold text-[#1e293b]">{monthLabel}</span>
+                <span className="text-base font-black text-[#1e293b]">{monthLabel}</span>
                 <button
                   type="button"
                   onClick={nextMonth}
@@ -724,12 +1081,36 @@ export default function AdminPrepTracker() {
                 </button>
               </div>
 
-              <div className="text-xs text-foreground/60 font-medium">
-                Tap any day to view or add drills, builds & critique tasks.
+              {/* Cadence Filter Pills */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-bold text-foreground/50 mr-1 flex items-center gap-1">
+                  <Filter className="w-3 h-3" /> Filter:
+                </span>
+                {[
+                  { id: 'all', label: 'All Tasks' },
+                  { id: 'drill', label: 'Drills' },
+                  { id: 'build', label: 'Builds' },
+                  { id: 'critique', label: 'Critiques' },
+                  { id: 'simulation', label: 'Simulations' },
+                  { id: 'review', label: 'Sunday Reviews' },
+                ].map(f => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setCadenceFilter(f.id as any)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                      cadenceFilter === f.id
+                        ? 'bg-[#1e293b] text-white shadow-2xs'
+                        : 'bg-black/5 hover:bg-black/10 text-foreground/70'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Calendar Grid */}
+            {/* Calendar Grid (42 Cells) */}
             <div className="rounded-2xl border border-black/10 bg-white overflow-hidden shadow-xs">
               {/* Day names */}
               <div className="grid grid-cols-7 border-b border-black/10 bg-[#f8fafc] text-center py-2 text-[11px] font-bold uppercase text-foreground/50">
@@ -742,53 +1123,93 @@ export default function AdminPrepTracker() {
                 <span>Sat</span>
               </div>
 
-              {/* 35 Days Grid */}
+              {/* 42 Days Grid */}
               <div className="grid grid-cols-7 divide-x divide-y divide-black/5">
                 {monthGridDays.map(cell => {
-                  const hasTasks = Boolean(cell.dayRecord && Array.isArray(cell.dayRecord.tasks) && cell.dayRecord.tasks.length > 0);
-                  const taskCount = cell.dayRecord && Array.isArray(cell.dayRecord.tasks) ? cell.dayRecord.tasks.length : 0;
-                  const totalMinutes = cell.dayRecord && Array.isArray(cell.dayRecord.tasks)
-                    ? cell.dayRecord.tasks.reduce((sum, t) => sum + (typeof t.minutes === 'number' ? t.minutes : (t.minutes?.light || 0)), 0)
-                    : 0;
+                  const dayTasks = cell.dayRecord && Array.isArray(cell.dayRecord.tasks) ? cell.dayRecord.tasks : [];
+                  const filteredTasks = cadenceFilter === 'all'
+                    ? dayTasks
+                    : dayTasks.filter(t => t.block === cadenceFilter || t.kind === cadenceFilter);
+
+                  const hasTasks = filteredTasks.length > 0;
+                  const taskCount = filteredTasks.length;
+                  const totalMinutes = filteredTasks.reduce(
+                    (sum, t) => sum + (typeof t.minutes === 'number' ? t.minutes : (t.minutes?.light || 0)),
+                    0
+                  );
 
                   return (
                     <div
                       key={cell.dateStr}
                       onClick={() => handleSelectDate(cell.dateStr)}
-                      className={`min-h-[100px] p-2.5 transition-all cursor-pointer flex flex-col justify-between group hover:bg-sky-50/50 ${
-                        cell.isCurrentMonth ? 'bg-white' : 'bg-slate-50/40 text-foreground/30'
+                      className={`min-h-[110px] p-2.5 transition-all cursor-pointer flex flex-col justify-between group hover:bg-sky-50/50 relative ${
+                        cell.isExamDate
+                          ? 'bg-amber-50/40 ring-2 ring-amber-400 ring-inset'
+                          : cell.isCurrentMonth
+                          ? 'bg-white'
+                          : 'bg-slate-50/40 text-foreground/30'
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <span
                           className={`text-xs font-bold ${
-                            cell.isCurrentMonth ? 'text-[#1e293b]' : 'text-foreground/40'
+                            cell.isExamDate
+                              ? 'text-amber-900 font-black'
+                              : cell.isCurrentMonth
+                              ? 'text-[#1e293b]'
+                              : 'text-foreground/40'
                           }`}
                         >
                           {cell.dayOfMonth}
                         </span>
 
-                        {cell.dayRecord && (
-                          <span className="text-[10px] font-bold text-primary px-1.5 py-0.2 rounded bg-primary/5">
-                            Day {cell.dayRecord.day}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {isPreviewMode && cell.dayRecord && (
+                            <span className="text-[9px] font-black bg-amber-200 text-amber-800 px-1 rounded">
+                              Draft
+                            </span>
+                          )}
+
+                          {cell.dayRecord && (
+                            <span className="text-[10px] font-bold text-primary px-1.5 py-0.2 rounded bg-primary/5">
+                              Day {cell.dayRecord.day}
+                            </span>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Official Exam Day Visual Indicator */}
+                      {cell.isExamDate && (
+                        <div className="my-1 p-1 rounded-md bg-linear-to-r from-amber-500 to-amber-600 text-white text-[9px] font-black flex items-center justify-center gap-1 shadow-2xs">
+                          <Trophy className="w-3 h-3 shrink-0" />
+                          <span className="truncate">OFFICIAL EXAM DAY</span>
+                        </div>
+                      )}
 
                       <div className="space-y-1 my-1">
                         {hasTasks ? (
-                          <div className="p-1 rounded-md bg-emerald-50 border border-emerald-200/60 text-[10px] text-emerald-800 font-semibold leading-tight">
+                          <div
+                            className={`p-1 rounded-md text-[10px] font-semibold leading-tight ${
+                              filteredTasks.some(t => t.block === 'simulation' || t.kind === 'simulation')
+                                ? 'bg-red-50 border border-red-200 text-red-800'
+                                : filteredTasks.some(t => t.block === 'critique')
+                                ? 'bg-purple-50 border border-purple-200 text-purple-800'
+                                : filteredTasks.some(t => t.block === 'review')
+                                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                                : 'bg-blue-50 border border-blue-200 text-blue-800'
+                            }`}
+                          >
                             {taskCount} task{taskCount > 1 ? 's' : ''} · {totalMinutes}m
                           </div>
-                        ) : (
+                        ) : !cell.isExamDate ? (
                           <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-foreground/40 text-center py-1 border border-dashed border-black/10 rounded">
                             + Add Tasks
                           </div>
-                        )}
+                        ) : null}
                       </div>
 
-                      <div className="text-[9px] text-foreground/40 truncate">
-                        {cell.dayRecord?.title || ''}
+                      <div className="text-[9px] text-foreground/40 truncate font-medium">
+                        {cell.dayRecord?.title || (cell.isExamDate ? 'National Entrance Examination' : '')}
                       </div>
                     </div>
                   );
@@ -802,20 +1223,38 @@ export default function AdminPrepTracker() {
         {activeTab === 'csv' && (
           <div className="space-y-6 animate-in fade-in">
             <div className="p-6 rounded-2xl border border-black/10 bg-white shadow-xs space-y-4">
-              <div>
-                <h3 className="text-base font-extrabold text-[#1e293b]">Bulk Import Curriculum via CSV</h3>
-                <p className="text-xs text-foreground/60 mt-0.5">
-                  Upload a 60–92 day curriculum file for {currentPlan?.title}. The system validates day numbers, task kinds, and minutes.
-                </p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-extrabold text-[#1e293b]">Bulk Import Curriculum via CSV</h3>
+                  <p className="text-xs text-foreground/60 mt-0.5">
+                    Upload a 60–92 day curriculum file for <strong>{currentPlan?.title}</strong>. Preview it on the calendar grid before saving.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDownloadCsvTemplate}
+                    className="h-8 text-xs font-bold gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download Blank Template</span>
+                  </Button>
+                </div>
               </div>
 
+              {/* Drag & Drop File Zone */}
               <div className="border-2 border-dashed border-black/15 rounded-2xl p-8 text-center space-y-3 bg-[#f8fafc]">
                 <FileSpreadsheet className="w-10 h-10 text-primary/60 mx-auto" />
                 <div className="space-y-1">
                   <p className="text-xs font-bold text-[#1e293b]">Choose a CSV file or drag and drop here</p>
-                  <p className="text-[11px] text-foreground/50">Required columns: day, week, phase, date, block, kind, title, detail, minutes_light, minutes_intensive, capture</p>
+                  <p className="text-[11px] text-foreground/50">
+                    Required columns: <code>day, week, phase, date, block, kind, title, detail, minutes_light, minutes_intensive, capture</code>
+                  </p>
                 </div>
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept=".csv"
                   onChange={handleParseCsv}
@@ -823,31 +1262,67 @@ export default function AdminPrepTracker() {
                 />
               </div>
 
+              {/* Parsed Preview Card with Action Buttons: Cancel, Preview on Calendar, Publish */}
               {csvPreview.length > 0 && (
-                <div className="space-y-3 pt-4 border-t border-black/10">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      Preview Ready ({csvPreview.length} days parsed)
-                    </span>
-                    <Button
-                      size="sm"
-                      onClick={handleCommitCsvToPlan}
-                      disabled={saving}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold gap-1.5"
-                    >
-                      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                      <span>Save into {currentPlan?.exam_code} Plan</span>
-                    </Button>
+                <div className="space-y-4 pt-4 border-t border-black/10">
+                  <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        CSV Parsed: {csvPreview.length} Days Ready
+                      </span>
+                      <p className="text-[11px] text-emerald-800/80 mt-0.5">
+                        You can cancel this upload, inspect it on the interactive calendar, or publish directly to students.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Cancel Upload Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelCsvUpload}
+                        className="bg-white border-black/10 text-foreground/70 hover:text-red-700 hover:bg-red-50 text-xs font-bold gap-1"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Cancel Upload</span>
+                      </Button>
+
+                      {/* Preview on Calendar View Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handlePreviewOnCalendar}
+                        className="bg-white border-primary/30 text-primary hover:bg-primary/5 text-xs font-bold gap-1.5 shadow-2xs"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Preview on Calendar Grid</span>
+                      </Button>
+
+                      {/* Direct Publish Button */}
+                      <Button
+                        size="sm"
+                        onClick={handleCommitStagedToPlan}
+                        disabled={saving}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold gap-1.5 shadow-xs"
+                      >
+                        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        <span>Publish to {currentPlan?.exam_code} Plan</span>
+                      </Button>
+                    </div>
                   </div>
 
-                  <div className="max-h-60 overflow-y-auto border border-black/10 rounded-xl divide-y text-xs">
-                    {csvPreview.slice(0, 10).map((d: any) => (
-                      <div key={d.day} className="p-3 flex items-center justify-between">
+                  {/* Sample rows preview */}
+                  <div className="max-h-60 overflow-y-auto border border-black/10 rounded-xl divide-y text-xs bg-white">
+                    {csvPreview.slice(0, 15).map((d: any) => (
+                      <div key={d.day} className="p-3 flex items-center justify-between hover:bg-slate-50">
                         <div>
-                          <span className="font-bold">Day {d.day} (Week {d.week}):</span> {d.title}
+                          <span className="font-bold text-[#1e293b]">Day {d.day} (Week {d.week}):</span> {d.title}
+                          <span className="text-[11px] text-foreground/40 block">{d.date}</span>
                         </div>
-                        <span className="text-foreground/50 font-medium">{d.tasks?.length || 0} tasks</span>
+                        <span className="text-foreground/50 font-semibold px-2 py-0.5 rounded bg-black/5">
+                          {d.tasks?.length || 0} tasks
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -882,19 +1357,24 @@ export default function AdminPrepTracker() {
                   </thead>
                   <tbody className="divide-y divide-black/5">
                     {enrolments.map(enr => (
-                      <tr key={enr.id || enr.candidate_id} className="hover:bg-slate-50/50">
-                        <td className="p-3 font-semibold text-[#1e293b]">{enr.candidate_id}</td>
+                      <tr key={enr.id || enr.candidate_id} className="hover:bg-black/[0.01]">
+                        <td className="p-3 font-mono text-[11px] font-bold text-[#1e293b]">
+                          {enr.candidate_id}
+                        </td>
                         <td className="p-3">
                           <div className="flex flex-wrap gap-1">
-                            {(enr.active_exam_ids || [enr.track === 'pg' ? 'nid-pg-2027' : 'nid-ug-2027']).map((id: string) => (
-                              <span key={id} className="px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary">
-                                {id}
+                            {(enr.active_exam_ids || [enr.track === 'pg' ? 'nid-pg-2027' : 'nid-ug-2027']).map((eid: string) => (
+                              <span
+                                key={eid}
+                                className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary"
+                              >
+                                {eid}
                               </span>
                             ))}
                           </div>
                         </td>
-                        <td className="p-3 uppercase font-bold">{enr.track || 'UG'}</td>
-                        <td className="p-3 capitalize">{enr.tier || 'intensive'}</td>
+                        <td className="p-3 uppercase font-bold text-foreground/70">{enr.track}</td>
+                        <td className="p-3 capitalize text-foreground/70">{enr.tier}</td>
                         <td className="p-3">
                           {enr.has_notes_access ? (
                             <span className="text-emerald-600 font-bold">Unlocked</span>
@@ -942,6 +1422,19 @@ export default function AdminPrepTracker() {
 
           {editingDayRecord && (
             <div className="space-y-5 py-2">
+              {/* If this is the Official Exam Day */}
+              {editingDate === currentPlan?.exam_date && (
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 space-y-1">
+                  <div className="flex items-center gap-2 font-black text-xs">
+                    <Trophy className="w-4 h-4 text-amber-600" />
+                    <span>Official Examination Day for {currentPlan?.title}</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800/80">
+                    This is the designated date for the test. Ensure reporting time, stationary kit, and admit card reminder tasks are included.
+                  </p>
+                </div>
+              )}
+
               {/* Day Meta fields */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -1081,7 +1574,7 @@ export default function AdminPrepTracker() {
 
                 {/* List of Tasks */}
                 <div className="space-y-2">
-                  {editingDayRecord.tasks.map((t, idx) => (
+                  {editingDayRecord.tasks.map((t) => (
                     <div
                       key={t.id}
                       className="p-3 rounded-xl border border-black/5 bg-white shadow-2xs flex items-center justify-between"
@@ -1095,7 +1588,7 @@ export default function AdminPrepTracker() {
                         </div>
                         <p className="text-[11px] text-foreground/50 line-clamp-1">{t.detail}</p>
                         <div className="text-[10px] text-foreground/40 font-medium">
-                          Light: {t.minutes.light || 0}m · Intensive: {t.minutes.intensive || 0}m
+                          Light: {typeof t.minutes === 'number' ? t.minutes : (t.minutes?.light || 0)}m · Intensive: {typeof t.minutes === 'number' ? t.minutes : (t.minutes?.intensive || 0)}m
                         </div>
                       </div>
 
