@@ -1670,7 +1670,7 @@ export default function PortalDashboard() {
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto p-6 md:p-10 lg:p-12">
-          <div className="mb-10">
+          <div className={activeTab === 'tracker' ? 'mb-5' : 'mb-10'}>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#262626] tracking-tight">
               {activeTab === 'overview' ? 'Dashboard Overview' : activeTab === 'tracker' ? 'Exam Tracker 2027' : activeTab === 'progress' ? 'Performance Analytics' : activeTab === 'leaderboard' ? 'Global Leaderboard' : activeTab === 'questions' ? 'Question Bank' : activeTab === 'materials' ? 'Study Materials' : activeTab === 'assignments' ? 'Class Assignments' : activeTab === 'notes' ? 'Class Notes' : 'Profile Settings'}
             </h1>

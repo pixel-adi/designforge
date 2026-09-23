@@ -122,23 +122,37 @@ export function Board92Day({ days, selectedDayNum, onSelectDay }: Board92DayProp
                       </span>
 
                       {/* Markers */}
-                      <div className="flex items-center gap-1 mt-2">
+                      <div className="flex items-center gap-1 mt-1.5 min-h-[16px]">
                         {hasSimulation && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-red-100 text-red-700">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-red-100 text-red-700">
                             Mock
                           </span>
                         )}
                         {hasMilestone && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-700">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-700">
                             Key
                           </span>
                         )}
                       </div>
 
+                      {/* Tasks aligned per day */}
+                      <div className="flex items-center justify-between mt-2 pt-1 border-t border-black/5 text-[10px]">
+                        <span className="font-semibold text-foreground/60">
+                          {d.tasks?.length || d.totalCount || 0} tasks
+                        </span>
+                        {d.completedCount > 0 ? (
+                          <span className={`font-bold text-[9px] ${isDone ? 'text-green-600' : 'text-primary'}`}>
+                            {d.completedCount}/{d.totalCount} done
+                          </span>
+                        ) : (
+                          <span className="text-foreground/40 text-[9px]">planned</span>
+                        )}
+                      </div>
+
                       {/* Completion bar */}
-                      <div className="w-full bg-black/5 rounded-full h-1 mt-2 overflow-hidden">
+                      <div className="w-full bg-black/5 rounded-full h-1 mt-1.5 overflow-hidden">
                         <div
-                          className={`h-full transition-all ${
+                          className={`h-full transition-all duration-300 ${
                             isDone ? 'bg-green-500' : 'bg-primary'
                           }`}
                           style={{

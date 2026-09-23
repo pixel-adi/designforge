@@ -167,6 +167,23 @@ export function CalendarDayStrip({
     }
   };
 
+  // Return / Reset to Current Day
+  const handleResetToToday = () => {
+    const todayDay = days.find(d => d.isToday);
+    if (todayDay) {
+      onSelectDay(todayDay.day);
+      if (todayDay.date) {
+        const parsed = new Date(todayDay.date + 'T00:00:00');
+        if (!isNaN(parsed.getTime())) {
+          setViewYear(parsed.getFullYear());
+          setViewMonth(parsed.getMonth());
+        }
+      }
+    } else if (days.length > 0) {
+      onSelectDay(1);
+    }
+  };
+
   return (
     <div className="w-full bg-white rounded-2xl border border-black/10 shadow-xs overflow-hidden transition-all duration-300 select-none">
       {/* Header Month & Navigation & Roadmap Button */}
@@ -192,6 +209,15 @@ export function CalendarDayStrip({
             title="Next"
           >
             <ChevronRight className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={handleResetToToday}
+            className="ml-1 px-2.5 py-1 text-[11px] font-black rounded-lg border border-black/10 bg-white hover:bg-black/5 text-[#1e293b] transition-all shadow-2xs hover:border-black/20"
+            title="Reset calendar to Today"
+          >
+            Today
           </button>
         </div>
 

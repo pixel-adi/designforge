@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { CalendarDayStrip } from './CalendarDayStrip';
 import { TrackerAnalyticsHistory } from './TrackerAnalyticsHistory';
+import { PortalWeeklyUpdatesModal, WeeklyUpdatesTriggerButton } from './PortalWeeklyUpdatesModal';
 import {
   Select,
   SelectContent,
@@ -74,6 +75,7 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
   // View state for right-hand side performance unit
   const [sideUnitTab, setSideUnitTab] = useState<'ledger' | 'analytics'>('ledger');
   const [showRoadmapModal, setShowRoadmapModal] = useState<boolean>(false);
+  const [showWeeklyUpdatesModal, setShowWeeklyUpdatesModal] = useState<boolean>(false);
 
   // Modals state
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -219,96 +221,100 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
     .filter(d => Array.isArray(d.tasks) && d.tasks.some(t => t.block === 'drill' && t.completed)).length;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* 1. Consolidated Unified Banner Card */}
-      <div className="rounded-2xl border border-black/10 bg-white p-5 sm:p-6 shadow-xs space-y-5">
-        {/* Top Row: Exam Selector Dropdown, Day/Phase Info & Unified Top-Right Actions */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Exam Selector Dropdown */}
-            <Select value={activeExamId} onValueChange={setActiveExamId}>
-              <SelectTrigger className="w-auto min-w-[220px] sm:min-w-[260px] h-10 rounded-xl bg-[#f8fafc] border-black/15 shadow-2xs font-extrabold text-xs text-[#1e293b] gap-2">
-                <SelectValue placeholder="Select Exam Tracker..." />
-              </SelectTrigger>
-              <SelectContent className="bg-white border-black/10 shadow-lg">
-                <div className="px-2 py-1 text-[10px] font-black uppercase text-foreground/40 tracking-wider">
-                  Select Target Exam
-                </div>
-                {allExamOptions.map(exam => (
-                  <SelectItem key={exam.id} value={exam.id} className="py-2 cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${exam.track === 'pg' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
-                        {exam.code}
-                      </span>
-                      <span className="font-extrabold text-xs text-[#1e293b]">{exam.label}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Day / Week / Phase Progress Badge */}
-            <div className="flex items-center gap-2 text-xs">
-              <span className="px-2.5 py-1 rounded-lg bg-black/5 font-extrabold text-[#1e293b]">
-                Day {currentDay?.day || 1} of {resolvedDays.length || 92}
-              </span>
-              <span className="font-semibold text-foreground/40 hidden sm:inline">·</span>
-              <span className="font-bold text-foreground/60 hidden sm:inline">
-                Week {currentDay?.week || 0}
-              </span>
-              {currentDay?.phaseName && (
-                <>
-                  <span className="font-semibold text-foreground/40 hidden md:inline">·</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary hidden md:inline">
-                    {currentDay.phaseName}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Dynamic Countdown Pill & Unified Adjust Action */}
-          <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
-            {/* Dynamic Countdown Counter */}
-            {daysUntilExam !== null && (
-              <div className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-black flex items-center gap-1.5 shadow-2xs">
-                <Clock className="w-3.5 h-3.5 text-amber-600" />
-                <span>{daysUntilExam} Days to {currentExam.code || 'Exam'}</span>
+    <div className="space-y-6 animate-in fade-in duration-300 w-full min-w-0">
+      {/* 1. Integrated Header Controls Bar (Aligned seamlessly with the header line) */}
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3.5 pb-2">
+        {/* Left: Exam Selector Dropdown & Day/Phase Counter */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Exam Selector Dropdown */}
+          <Select value={activeExamId} onValueChange={setActiveExamId}>
+            <SelectTrigger className="w-auto min-w-[210px] sm:min-w-[250px] h-9 rounded-xl bg-white border border-black/15 shadow-2xs font-extrabold text-xs text-[#1e293b] gap-2 px-3">
+              <SelectValue placeholder="Select Exam Tracker..." />
+            </SelectTrigger>
+            <SelectContent className="bg-white border-black/10 shadow-lg">
+              <div className="px-2 py-1 text-[10px] font-black uppercase text-foreground/40 tracking-wider">
+                Select Target Exam
               </div>
+              {allExamOptions.map(exam => (
+                <SelectItem key={exam.id} value={exam.id} className="py-2 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${exam.track === 'pg' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                      {exam.code}
+                    </span>
+                    <span className="font-extrabold text-xs text-[#1e293b]">{exam.label}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Day / Week / Phase Progress Badge */}
+          <div className="flex items-center gap-2 text-xs bg-slate-100/80 border border-slate-200/60 px-3 py-1.5 rounded-xl">
+            <span className="font-extrabold text-[#1e293b]">
+              Day {currentDay?.day || 1} of {resolvedDays.length || 92}
+            </span>
+            <span className="text-foreground/40 hidden sm:inline">·</span>
+            <span className="font-bold text-foreground/70 hidden sm:inline">
+              Week {currentDay?.week || 0}
+            </span>
+            {currentDay?.phaseName && (
+              <>
+                <span className="text-foreground/40 hidden md:inline">·</span>
+                <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-primary/10 text-primary hidden md:inline">
+                  {currentDay.phaseName}
+                </span>
+              </>
             )}
-
-            {/* Unified Adjust Exam Plan Action */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowOnboarding(true)}
-              className="h-9 gap-1.5 text-xs font-bold border-black/15 bg-white hover:bg-black/5 text-[#262626] shadow-2xs"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-foreground/60" />
-              <span>Adjust Exam Plan</span>
-            </Button>
-
-            {/* Class Notes Button */}
-            <Button
-              size="sm"
-              onClick={() => handleOpenNotes('Class Notes')}
-              className={`h-9 gap-1.5 text-xs font-bold shadow-2xs ${
-                enrolment?.has_notes_access
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                  : 'bg-[#262626] hover:bg-black text-white'
-              }`}
-            >
-              {enrolment?.has_notes_access ? (
-                <BookOpen className="w-3.5 h-3.5" />
-              ) : (
-                <Lock className="w-3.5 h-3.5" />
-              )}
-              <span>{enrolment?.has_notes_access ? 'Notes Unlocked' : 'Class Notes (₹500)'}</span>
-            </Button>
           </div>
         </div>
 
-        {/* Middle: Progress Bar */}
+        {/* Right: Dynamic Countdown Pill & Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2 self-start xl:self-auto">
+          {/* Dynamic Countdown Counter */}
+          {daysUntilExam !== null && (
+            <div className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs font-black flex items-center gap-1.5 shadow-2xs">
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              <span>{daysUntilExam} Days to {currentExam.code || 'Exam'}</span>
+            </div>
+          )}
+
+          {/* Weekly Updates Trigger Button */}
+          <WeeklyUpdatesTriggerButton onClick={() => setShowWeeklyUpdatesModal(true)} />
+
+          {/* Unified Adjust Exam Plan Action */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowOnboarding(true)}
+            className="h-9 gap-1.5 text-xs font-bold border-black/15 bg-white hover:bg-black/5 text-[#262626] shadow-2xs"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-foreground/60" />
+            <span>Adjust Plan</span>
+          </Button>
+
+          {/* Class Notes Button */}
+          <Button
+            size="sm"
+            onClick={() => handleOpenNotes('Class Notes')}
+            className={`h-9 gap-1.5 text-xs font-bold shadow-2xs ${
+              enrolment?.has_notes_access
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                : 'bg-[#262626] hover:bg-black text-white'
+            }`}
+          >
+            {enrolment?.has_notes_access ? (
+              <BookOpen className="w-3.5 h-3.5" />
+            ) : (
+              <Lock className="w-3.5 h-3.5" />
+            )}
+            <span>{enrolment?.has_notes_access ? 'Notes Unlocked' : 'Class Notes (₹500)'}</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* 2. Streamlined Curriculum Progress & Non-Negotiables Surface */}
+      <div className="rounded-2xl border border-black/[0.08] bg-white p-4 sm:p-5 shadow-xs space-y-4">
+        {/* Progress Bar Row */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs">
             <span className="font-bold text-[#1e293b]">
@@ -326,10 +332,10 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
           </div>
         </div>
 
-        {/* Bottom Row: The 4 Non-Negotiables & Diagnostic Band Pill Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1 border-t border-black/5">
+        {/* The 4 Non-Negotiables & Diagnostic Band Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t border-black/5">
           {/* 1. Daily Drill */}
-          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc]/70 flex items-center justify-between">
+          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc] flex items-center justify-between hover:bg-[#f1f5f9] transition-colors">
             <div>
               <span className="text-[10px] font-black uppercase text-foreground/40 block">1. Daily Drill</span>
               <p className="text-xs font-black text-[#1e293b]">{drillDoneThisWeek}/6 Completed</p>
@@ -339,7 +345,7 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
           </div>
 
           {/* 2. Weekly Critique */}
-          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc]/70 flex items-center justify-between">
+          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc] flex items-center justify-between hover:bg-[#f1f5f9] transition-colors">
             <div>
               <span className="text-[10px] font-black uppercase text-foreground/40 block">2. Critique</span>
               <p className="text-xs font-black text-[#1e293b]">Every Thursday</p>
@@ -349,7 +355,7 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
           </div>
 
           {/* 3. Saturday Mock */}
-          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc]/70 flex items-center justify-between">
+          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc] flex items-center justify-between hover:bg-[#f1f5f9] transition-colors">
             <div>
               <span className="text-[10px] font-black uppercase text-foreground/40 block">3. Saturday Mock</span>
               <p className="text-xs font-black text-[#1e293b]">Full Simulation</p>
@@ -359,7 +365,7 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
           </div>
 
           {/* 4. Sunday Review */}
-          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc]/70 flex items-center justify-between">
+          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc] flex items-center justify-between hover:bg-[#f1f5f9] transition-colors">
             <div>
               <span className="text-[10px] font-black uppercase text-foreground/40 block">4. Sunday Review</span>
               <p className="text-xs font-black text-[#1e293b]">Rest & Reflection</p>
@@ -369,7 +375,7 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
           </div>
 
           {/* Diagnostic Band */}
-          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc]/70 flex items-center justify-between col-span-2 sm:col-span-1">
+          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc] flex items-center justify-between col-span-2 sm:col-span-1 hover:bg-[#f1f5f9] transition-colors">
             <div>
               <span className="text-[10px] font-black uppercase text-foreground/40 block">Diagnostic Band</span>
               <p className="text-xs font-black capitalize text-[#1e293b]">{profile?.band || 'Calibrating'}</p>
@@ -380,10 +386,10 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
         </div>
       </div>
 
-      {/* 2. Lower Dashboard: Workout Unit (Left) + Performance & Error Ledger (Right) */}
+      {/* 3. Lower Dashboard: Workout Unit (Left) + Performance & Error Ledger (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column (Col-Span 7): Calendar Day Strip & Today's Tasks in ONE Unit */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 space-y-4 min-w-0 max-w-full">
           <CalendarDayStrip
             days={resolvedDays}
             selectedDayNum={selectedDayNum}
@@ -409,7 +415,7 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
         </div>
 
         {/* Right Column (Col-Span 5): Error Ledger & History / Analytics in ONE Unit */}
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-black/10 p-5 sm:p-6 shadow-xs space-y-5">
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-black/10 p-5 sm:p-6 shadow-xs space-y-5 min-w-0 max-w-full overflow-hidden">
           {/* Tab Switcher Header */}
           <div className="flex items-center justify-between border-b border-black/5 pb-3">
             <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#f8fafc] border border-black/5">
@@ -641,6 +647,12 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
         onSaved={() => {
           refreshData();
         }}
+      />
+
+      {/* Weekly Feature Additions & Changelog Modal */}
+      <PortalWeeklyUpdatesModal
+        open={showWeeklyUpdatesModal}
+        onOpenChange={setShowWeeklyUpdatesModal}
       />
     </div>
   );
