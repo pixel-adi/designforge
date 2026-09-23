@@ -173,7 +173,7 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
     }
   }, [trackerLoading, enrolment, candidate]);
 
-  if (trackerLoading || !candidate?.id) {
+  if (trackerLoading && !rawPlan) {
     return (
       <div className="py-20 flex items-center justify-center">
         <div className="text-center space-y-3">

@@ -22,45 +22,103 @@ import pgPlanData from '../../../prep-tracker-kit/content/plan.pg.json';
 import referenceData from '../../../prep-tracker-kit/content/reference.json';
 
 export function usePrepTracker(candidateId: string | null) {
-  const [loading, setLoading] = useState(true);
-  const [enrolment, setEnrolment] = useState<any | null>(null);
-  const [completions, setCompletions] = useState<Record<string, { completedAt: string; minutesLogged: number; note?: string }>>({});
-  const [diagnostics, setDiagnostics] = useState<any[]>([]);
+  const cid = candidateId || 'candidate-default';
+
+  // Instant synchronous cache load for 0ms initial render
+  const [enrolment, setEnrolment] = useState<any | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const local = localStorage.getItem(`df_prep_enrolment_${cid}`) || localStorage.getItem('df_prep_enrolment_preview-candidate-id');
+    if (local) {
+      try { return JSON.parse(local); } catch (e) {}
+    }
+    return {
+      candidate_id: cid,
+      track: 'ug',
+      tier: 'intensive',
+      disciplines: [],
+      active_exam_ids: ['nid-ug-2027'],
+      primary_exam_id: 'nid-ug-2027',
+    };
+  });
+
+  const [completions, setCompletions] = useState<Record<string, { completedAt: string; minutesLogged: number; note?: string }>>(() => {
+    if (typeof window === 'undefined') return {};
+    const local = localStorage.getItem(`df_prep_comp_${cid}`) || localStorage.getItem('df_prep_comp_preview-candidate-id');
+    if (local) {
+      try { return JSON.parse(local); } catch (e) {}
+    }
+    return {};
+  });
+
+  const [diagnostics, setDiagnostics] = useState<any[]>(() => {
+    if (typeof window === 'undefined') return [];
+    const local = localStorage.getItem(`df_prep_diag_${cid}`) || localStorage.getItem('df_prep_diag_preview-candidate-id');
+    if (local) {
+      try { return JSON.parse(local); } catch (e) {}
+    }
+    return [];
+  });
+
+  const [allExamPlans, setAllExamPlans] = useState<any[]>(() => {
+    if (typeof window === 'undefined') return [];
+    const local = localStorage.getItem('df_prep_exam_plans');
+    if (local) {
+      try { return JSON.parse(local); } catch (e) {}
+    }
+    return [];
+  });
+
+  // Never block UI on mount because we already have bundled plans & cached/default enrolment
+  const [loading, setLoading] = useState(false);
   const [selectedDayNum, setSelectedDayNum] = useState<number>(1);
   const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
-  const [allExamPlans, setAllExamPlans] = useState<any[]>([]);
-  const [activeExamId, setActiveExamId] = useState<string>('nid-ug-2027');
+  const [activeExamId, setActiveExamId] = useState<string>(() => {
+    return enrolment?.primary_exam_id || 'nid-ug-2027';
+  });
 
   const todayDate = useMemo(() => getTodayDateAsiaKolkata(), []);
 
-  // Fetch initial data
+  // Fetch remote data quietly in background (stale-while-revalidate)
   const refreshData = useCallback(async () => {
-    if (!candidateId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+    if (!candidateId) return;
+
+    // Timeout helper to avoid any hanging network request
+    const withTimeout = (promise: Promise<any>, timeoutMs = 3500, fallback: any = null) =>
+      Promise.race([
+        promise,
+        new Promise(resolve => setTimeout(() => resolve(fallback), timeoutMs)),
+      ]);
+
     try {
       const [enr, comp, diag, plans] = await Promise.all([
-        prepApi.getEnrolment(candidateId),
-        prepApi.getCompletions(candidateId),
-        prepApi.getDiagnostics(candidateId),
-        prepApi.getExamPlans(),
+        withTimeout(prepApi.getEnrolment(candidateId), 3500, null),
+        withTimeout(prepApi.getCompletions(candidateId), 3500, {}),
+        withTimeout(prepApi.getDiagnostics(candidateId), 3500, []),
+        withTimeout(prepApi.getExamPlans(), 3500, []),
       ]);
-      setEnrolment(enr);
-      setCompletions(comp);
-      setDiagnostics(diag);
-      setAllExamPlans(plans || []);
 
-      if (enr?.primary_exam_id) {
-        setActiveExamId(enr.primary_exam_id);
-      } else if (enr?.track === 'pg') {
-        setActiveExamId('nid-pg-2027');
-      } else {
-        setActiveExamId('nid-ug-2027');
+      if (enr) {
+        setEnrolment(enr);
+        if (enr.primary_exam_id) {
+          setActiveExamId(enr.primary_exam_id);
+        } else if (enr.track === 'pg') {
+          setActiveExamId('nid-pg-2027');
+        }
+      }
+      if (comp && Object.keys(comp).length > 0) {
+        setCompletions(comp);
+      }
+      if (diag && diag.length > 0) {
+        setDiagnostics(diag);
+      }
+      if (plans && plans.length > 0) {
+        setAllExamPlans(plans);
+        try {
+          localStorage.setItem('df_prep_exam_plans', JSON.stringify(plans));
+        } catch (e) {}
       }
     } catch (err) {
-      console.error('Failed to load prep tracker data:', err);
+      console.warn('Background prep tracker refresh handled:', err);
     } finally {
       setLoading(false);
     }

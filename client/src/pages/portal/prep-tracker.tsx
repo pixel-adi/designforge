@@ -131,13 +131,13 @@ export default function PortalPrepTracker() {
     }
   }, [trackerLoading, enrolment, candidate]);
 
-  if (loadingUser || trackerLoading) {
+  if (loadingUser && !candidate) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F9F9F9]">
         <div className="text-center space-y-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
           <p className="text-xs font-bold text-foreground/60">
-            Calibrating your 92-day NID preparation plan...
+            Calibrating your 92-day preparation plan...
           </p>
         </div>
       </div>
