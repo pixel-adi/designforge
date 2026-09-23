@@ -373,7 +373,8 @@ export default function PortalDashboard() {
 
   const fetchDashboardData = async (programIds: string[], educationLevel: string, candidateId: string) => {
     try {
-      const [testsRes, attemptsRes, programsRes] = await Promise.all([
+      // Run queries individually so one failure doesn't block all data
+      const [testsRes, attemptsRes, programsRes] = await Promise.allSettled([
         supabase
           .from('exam_tests')
           .select(`*, exam_test_sections(part, duration_minutes)`)
@@ -383,11 +384,13 @@ export default function PortalDashboard() {
         supabase.from('exam_programs').select('id, name')
       ]);
 
-      if (testsRes.error) throw testsRes.error;
+      const tests = testsRes.status === 'fulfilled' && !testsRes.value.error ? testsRes.value.data : [];
+      const attempts = attemptsRes.status === 'fulfilled' && !attemptsRes.value.error ? attemptsRes.value.data : [];
+      const allPrograms = programsRes.status === 'fulfilled' && !programsRes.value.error ? programsRes.value.data : [];
 
-      const tests = testsRes.data;
-      const attempts = attemptsRes.data;
-      const allPrograms = programsRes.data;
+      if (attemptsRes.status === 'fulfilled' && attemptsRes.value.error) {
+        console.warn('exam_attempts query failed (RLS?):', attemptsRes.value.error.message);
+      }
 
       // Group attempts by test_id as arrays
       const attemptMap: Record<string, any[]> = {};
