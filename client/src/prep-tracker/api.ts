@@ -52,8 +52,28 @@ export const prepApi = {
         localStorage.setItem(`df_prep_enrolment_${candidateId}`, JSON.stringify(data));
         return data;
       }
-      const local = localStorage.getItem(`df_prep_enrolment_${candidateId}`);
-      return local ? JSON.parse(local) : null;
+
+      // Check candidate's local storage or preview migration
+      let local = localStorage.getItem(`df_prep_enrolment_${candidateId}`);
+      if (!local) {
+        local = localStorage.getItem('df_prep_enrolment_preview-candidate-id');
+      }
+      if (local) {
+        try {
+          const parsed = JSON.parse(local);
+          if (parsed && typeof parsed === 'object') {
+            // Save and sync it to Supabase for the authenticated candidate
+            const synced = await this.saveEnrolment({
+              ...parsed,
+              candidate_id: candidateId,
+            });
+            return synced;
+          }
+        } catch (e) {
+          console.warn('Failed to auto-migrate local enrolment:', e);
+        }
+      }
+      return null;
     } catch (e) {
       console.warn('Falling back to local enrolment:', e);
       const local = localStorage.getItem(`df_prep_enrolment_${candidateId}`);

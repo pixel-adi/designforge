@@ -222,14 +222,18 @@ export function usePrepTracker(candidateId: string | null) {
       const firstNonGx = groups.find(g => g !== 'GX');
       const resolvedPrimaryGroup = firstNonGx || (groups.length > 0 ? 'GX' : undefined);
 
+      const defaultExamId = data.track === 'pg' ? 'nid-pg-2027' : 'nid-ug-2027';
+      const activeExamIds = data.activeExamIds && data.activeExamIds.length > 0 ? data.activeExamIds : [defaultExamId];
+      const primaryExamId = data.primaryExamId || activeExamIds[0] || defaultExamId;
+
       const savedEnrolment = await prepApi.saveEnrolment({
         candidate_id: candidateId,
         track: data.track,
         tier: data.tier,
         disciplines: data.disciplines || [],
         primary_group: resolvedPrimaryGroup,
-        active_exam_ids: data.activeExamIds && data.activeExamIds.length > 0 ? data.activeExamIds : ['nid-ug-2027'],
-        primary_exam_id: data.primaryExamId || 'nid-ug-2027',
+        active_exam_ids: activeExamIds,
+        primary_exam_id: primaryExamId,
       });
 
       const total = Object.values(data.diagnosticScores).reduce((a, b) => a + b, 0);

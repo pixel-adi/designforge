@@ -74,6 +74,77 @@ const CAPTURE_OPTIONS = [
   { value: 'pitch', label: '60s Recorded Pitch' },
 ];
 
+const DEFAULT_EXAM_PLANS = [
+  // Undergraduate (UG)
+  {
+    id: 'nid-ug-2027',
+    exam_code: 'NID',
+    title: 'NID DAT 2027: B.Des & Integrated M.Des',
+    track: 'ug',
+    academic_year: '2027',
+    start_date: '2026-09-19',
+    end_date: '2026-12-19',
+    exam_date: '2026-12-20',
+    days: (ugPlanData.days as any[]) || [],
+  },
+  {
+    id: 'uceed-2027',
+    exam_code: 'UCEED',
+    title: 'UCEED 2027: B.Des (IIT Bombay)',
+    track: 'ug',
+    academic_year: '2027',
+    start_date: '2026-09-28',
+    end_date: '2027-01-16',
+    exam_date: '2027-01-17',
+    days: [],
+  },
+  {
+    id: 'nift-ug-2027',
+    exam_code: 'NIFT',
+    title: 'NIFT 2027: Bachelor of Design (B.Des)',
+    track: 'ug',
+    academic_year: '2027',
+    start_date: '2026-10-05',
+    end_date: '2027-02-06',
+    exam_date: '2027-02-07',
+    days: [],
+  },
+  // Postgraduate (PG)
+  {
+    id: 'nid-pg-2027',
+    exam_code: 'NID',
+    title: 'NID DAT 2027: M.Des Disciplines',
+    track: 'pg',
+    academic_year: '2027',
+    start_date: '2026-09-19',
+    end_date: '2026-12-19',
+    exam_date: '2026-12-20',
+    days: (pgPlanData.days as any[]) || [],
+  },
+  {
+    id: 'ceed-2027',
+    exam_code: 'CEED',
+    title: 'CEED 2027: Master of Design (IITs)',
+    track: 'pg',
+    academic_year: '2027',
+    start_date: '2026-09-28',
+    end_date: '2027-01-16',
+    exam_date: '2027-01-17',
+    days: [],
+  },
+  {
+    id: 'nift-pg-2027',
+    exam_code: 'NIFT',
+    title: 'NIFT 2027: Master of Design (M.Des)',
+    track: 'pg',
+    academic_year: '2027',
+    start_date: '2026-10-05',
+    end_date: '2027-02-06',
+    exam_date: '2027-02-07',
+    days: [],
+  },
+];
+
 export default function AdminPrepTracker() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -81,9 +152,9 @@ export default function AdminPrepTracker() {
   const [activeTab, setActiveTab] = useState<'calendar' | 'csv' | 'students'>('calendar');
 
   // Exam Plans
-  const [plans, setPlans] = useState<any[]>([]);
+  const [plans, setPlans] = useState<any[]>(DEFAULT_EXAM_PLANS);
   const [activePlanId, setActivePlanId] = useState<string>('nid-ug-2027');
-  const [currentPlan, setCurrentPlan] = useState<any | null>(null);
+  const [currentPlan, setCurrentPlan] = useState<any | null>(DEFAULT_EXAM_PLANS[0]);
 
   // Calendar State & Cadence Filter
   const [viewYear, setViewYear] = useState(2026);
@@ -123,82 +194,16 @@ export default function AdminPrepTracker() {
         prepApi.getAllEnrolments(),
       ]);
 
-      const defaultPlans = [
-        // Undergraduate (UG)
-        {
-          id: 'nid-ug-2027',
-          exam_code: 'NID',
-          title: 'NID DAT 2027: B.Des & Integrated M.Des',
-          track: 'ug',
-          academic_year: '2027',
-          start_date: '2026-09-19',
-          end_date: '2026-12-19',
-          exam_date: '2026-12-20',
-          days: (ugPlanData.days as any[]) || [],
-        },
-        {
-          id: 'uceed-2027',
-          exam_code: 'UCEED',
-          title: 'UCEED 2027: B.Des (IIT Bombay)',
-          track: 'ug',
-          academic_year: '2027',
-          start_date: '2026-09-28',
-          end_date: '2027-01-16',
-          exam_date: '2027-01-17',
-          days: [],
-        },
-        {
-          id: 'nift-ug-2027',
-          exam_code: 'NIFT',
-          title: 'NIFT 2027: Bachelor of Design (B.Des)',
-          track: 'ug',
-          academic_year: '2027',
-          start_date: '2026-10-05',
-          end_date: '2027-02-06',
-          exam_date: '2027-02-07',
-          days: [],
-        },
-        // Postgraduate (PG)
-        {
-          id: 'nid-pg-2027',
-          exam_code: 'NID',
-          title: 'NID DAT 2027: M.Des Disciplines',
-          track: 'pg',
-          academic_year: '2027',
-          start_date: '2026-09-19',
-          end_date: '2026-12-19',
-          exam_date: '2026-12-20',
-          days: (pgPlanData.days as any[]) || [],
-        },
-        {
-          id: 'ceed-2027',
-          exam_code: 'CEED',
-          title: 'CEED 2027: Master of Design (IITs)',
-          track: 'pg',
-          academic_year: '2027',
-          start_date: '2026-09-28',
-          end_date: '2027-01-16',
-          exam_date: '2027-01-17',
-          days: [],
-        },
-        {
-          id: 'nift-pg-2027',
-          exam_code: 'NIFT',
-          title: 'NIFT 2027: Master of Design (M.Des)',
-          track: 'pg',
-          academic_year: '2027',
-          start_date: '2026-10-05',
-          end_date: '2027-02-06',
-          exam_date: '2027-02-07',
-          days: [],
-        },
-      ];
-
       // Merge fetched plans with default catalogue
-      const mergedPlans = [...defaultPlans];
+      const mergedPlans = [...DEFAULT_EXAM_PLANS];
       for (const p of fetchedPlans || []) {
-        // Map legacy nift-2027 to nift-ug-2027 if present
-        const targetId = p.id === 'nift-2027' ? 'nift-ug-2027' : p.id;
+        let targetId = p.id;
+        if (targetId === 'nift-2027' || targetId === 'nift') targetId = 'nift-ug-2027';
+        if (targetId === 'nid-2027' || targetId === 'nid' || targetId === 'nid-ug') targetId = 'nid-ug-2027';
+        if (targetId === 'nid-pg') targetId = 'nid-pg-2027';
+        if (targetId === 'uceed') targetId = 'uceed-2027';
+        if (targetId === 'ceed') targetId = 'ceed-2027';
+
         const idx = mergedPlans.findIndex(m => m.id === targetId);
         if (idx >= 0) {
           const daysToUse = Array.isArray(p.days) && p.days.length > 0 ? p.days : mergedPlans[idx].days;
@@ -429,6 +434,37 @@ export default function AdminPrepTracker() {
       ...editingDayRecord,
       tasks: editingDayRecord.tasks.filter(t => t.id !== taskId),
     });
+  };
+
+  // Toggle or Mark Current Date as Official Exam Day
+  const handleToggleExamDate = async () => {
+    if (!editingDate || !currentPlan) return;
+    setSaving(true);
+    try {
+      const isCurrentlyExam = currentPlan.exam_date === editingDate;
+      const newExamDate = isCurrentlyExam ? null : editingDate;
+      const updatedPlan = {
+        ...currentPlan,
+        exam_date: newExamDate,
+      };
+      await prepApi.saveExamPlan(updatedPlan);
+      setCurrentPlan(updatedPlan);
+      setPlans(prev => prev.map(p => (p.id === updatedPlan.id ? updatedPlan : p)));
+      toast({
+        title: newExamDate ? 'Exam Day Designated!' : 'Exam Day Removed',
+        description: newExamDate
+          ? `${editingDate} is now marked as the Official Exam Day for ${currentPlan.title}.`
+          : `Official exam date unassigned for ${currentPlan.title}.`,
+      });
+    } catch (e: any) {
+      toast({
+        title: 'Failed to update exam date',
+        description: e.message || 'Database error',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Save Day Record into Current Plan & Supabase
@@ -1422,18 +1458,43 @@ export default function AdminPrepTracker() {
 
           {editingDayRecord && (
             <div className="space-y-5 py-2">
-              {/* If this is the Official Exam Day */}
-              {editingDate === currentPlan?.exam_date && (
-                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 space-y-1">
-                  <div className="flex items-center gap-2 font-black text-xs">
-                    <Trophy className="w-4 h-4 text-amber-600" />
-                    <span>Official Examination Day for {currentPlan?.title}</span>
+              {/* Official Exam Day Controls & Status Banner */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-amber-50/80 border border-amber-300">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${editingDate === currentPlan?.exam_date ? 'bg-amber-500 text-white shadow-2xs' : 'bg-black/5 text-foreground/40'}`}>
+                    <Trophy className="w-4 h-4" />
                   </div>
-                  <p className="text-[11px] text-amber-800/80">
-                    This is the designated date for the test. Ensure reporting time, stationary kit, and admit card reminder tasks are included.
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-black text-[#1e293b]">
+                        {editingDate === currentPlan?.exam_date ? 'Official Examination Day' : 'Mark as Official Exam Day'}
+                      </p>
+                      {editingDate === currentPlan?.exam_date && (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-200 text-amber-900 uppercase">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-foreground/60">
+                      {editingDate === currentPlan?.exam_date
+                        ? `Designated test date for ${currentPlan?.exam_code || 'this exam'}. Highlighted with gold trophy banner across calendars.`
+                        : `Set this day (${editingDate}) as the official test date for ${currentPlan?.title}.`}
+                    </p>
+                  </div>
                 </div>
-              )}
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={editingDate === currentPlan?.exam_date ? 'destructive' : 'outline'}
+                  disabled={saving}
+                  onClick={handleToggleExamDate}
+                  className="text-xs font-bold gap-1.5 shrink-0 self-end sm:self-auto bg-white hover:bg-amber-100 border-amber-300 text-amber-900"
+                >
+                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trophy className="w-3.5 h-3.5" />}
+                  <span>{editingDate === currentPlan?.exam_date ? 'Unset Exam Day' : 'Mark as Exam Day'}</span>
+                </Button>
+              </div>
 
               {/* Day Meta fields */}
               <div className="grid grid-cols-2 gap-3">

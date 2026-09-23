@@ -49,6 +49,7 @@ export default defineConfig({
           'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-tooltip', '@radix-ui/react-toast'],
           'vendor-supabase': ['@supabase/supabase-js'],
           'vendor-form': ['react-hook-form', '@hookform/resolvers', 'zod'],
+          'vendor-lucide': ['lucide-react'],
         },
       },
     },

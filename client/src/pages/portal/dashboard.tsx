@@ -135,25 +135,32 @@ export default function PortalDashboard() {
   // ===== SINGLE-DEVICE SESSION ENFORCEMENT =====
   const registerSession = useCallback(async (candidateId: string) => {
     try {
-      const newSessionId = crypto.randomUUID();
+      let localSessionId = typeof window !== 'undefined' ? sessionStorage.getItem('df_active_session_id') : null;
+      if (!localSessionId) {
+        localSessionId = crypto.randomUUID();
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('df_active_session_id', localSessionId);
+        }
+      }
+      sessionIdRef.current = localSessionId;
+
       const { error } = await supabase
         .from('exam_candidates')
-        .update({ active_session_id: newSessionId })
+        .update({ active_session_id: localSessionId })
         .eq('id', candidateId);
 
-      if (!error) {
-        sessionIdRef.current = newSessionId;
-      } else {
+      if (error) {
         console.warn("Could not set active_session_id in DB:", error.message);
       }
-      return newSessionId;
+      return localSessionId;
     } catch (err) {
       console.warn("Session registration failed:", err);
     }
   }, []);
 
   const checkSession = useCallback(async (candidateId: string) => {
-    if (!sessionIdRef.current) return;
+    const currentSessionId = sessionIdRef.current || (typeof window !== 'undefined' ? sessionStorage.getItem('df_active_session_id') : null);
+    if (!currentSessionId) return;
     try {
       const { data, error } = await supabase
         .from('exam_candidates')
@@ -162,15 +169,19 @@ export default function PortalDashboard() {
         .maybeSingle();
 
       // Only kick if database has a valid, non-null active_session_id AND it does not match our local session
-      if (!error && data && data.active_session_id && data.active_session_id !== sessionIdRef.current) {
+      if (!error && data && data.active_session_id && data.active_session_id !== currentSessionId) {
         console.warn("Session conflict: Logged in on another device.");
         setSessionKicked(true);
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('df_active_session_id');
+        }
         await supabase.auth.signOut();
+        setLocation('/portal/login');
       }
     } catch (err) {
       console.warn("Session check error:", err);
     }
-  }, []);
+  }, [setLocation]);
 
   // Session check interval (optimized for 1000 concurrent users: 60s interval)
   useEffect(() => {
@@ -178,8 +189,6 @@ export default function PortalDashboard() {
     const interval = setInterval(() => checkSession(candidate.id), 60000); // Check every 60s
     return () => clearInterval(interval);
   }, [candidate?.id, sessionKicked, checkSession]);
-
-
 
   // --- 7. Periodic server-side access re-validation ---
   useEffect(() => {
@@ -200,19 +209,67 @@ export default function PortalDashboard() {
     return () => clearInterval(revalidate);
   }, [candidate?.id, candidate?.access_level]);
 
+  // Robust Auth & Candidate Profile Initialization (Prevents Logout on Refresh)
   useEffect(() => {
-    checkUser();
-  }, []);
+    let active = true;
 
-  const checkUser = async () => {
-    try {
-      const { data: { user }, error: authErr } = await supabase.auth.getUser();
-      if (authErr || !user) {
-        setLocation('/portal/login');
-        return;
+    async function initializeAuthAndProfile() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          if (active) {
+            setLocation('/portal/login');
+          }
+          return;
+        }
+
+        if (active) {
+          setAuthUser(session.user);
+        }
+
+        await loadCandidateProfile(session.user, active);
+      } catch (err) {
+        console.error("Auth init error:", err);
+        if (active) {
+          setLocation('/portal/login');
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
-      setAuthUser(user);
+    }
 
+    initializeAuthAndProfile();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        if (active) {
+          setAuthUser(null);
+          setCandidate(null);
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('df_active_session_id');
+          }
+          setLocation('/portal/login');
+        }
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        if (session?.user && active) {
+          setAuthUser(session.user);
+          if (!candidate) {
+            await loadCandidateProfile(session.user, active);
+          }
+        }
+      }
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [setLocation]);
+
+  const loadCandidateProfile = async (user: any, active = true) => {
+    try {
       // Fetch candidate profile and programs concurrently
       const [candRes, progRes] = await Promise.all([
         supabase.from('exam_candidates').select(`*`).eq('auth_user_id', user.id).maybeSingle(),
@@ -220,18 +277,19 @@ export default function PortalDashboard() {
       ]);
 
       if (candRes.error) throw candRes.error;
-      if (progRes.data) setPrograms(progRes.data);
+      if (progRes.data && active) setPrograms(progRes.data);
 
       const candidateData = candRes.data;
 
       if (!candidateData) {
         // Needs onboarding
-        setShowOnboarding(true);
-        // Default name if Google provided it
-        if (user.user_metadata?.full_name) {
-          setOnboardingData(prev => ({ ...prev, name: user.user_metadata.full_name }));
+        if (active) {
+          setShowOnboarding(true);
+          if (user.user_metadata?.full_name) {
+            setOnboardingData(prev => ({ ...prev, name: user.user_metadata.full_name }));
+          }
         }
-      } else {
+      } else if (active) {
         setCandidate(candidateData);
 
         setOnboardingData({
@@ -242,17 +300,22 @@ export default function PortalDashboard() {
           education_level: candidateData.education_level || "bachelors"
         });
 
-        // Register this device session
+        // Prompt onboarding if WhatsApp phone is missing or blank
+        if (!candidateData.phone || candidateData.phone.trim() === '') {
+          setShowOnboarding(true);
+        }
+
+        // Register this device session safely
         await registerSession(candidateData.id);
 
         fetchDashboardData(candidateData.program_ids || [], candidateData.education_level || "bachelors", candidateData.id);
         fetchAttempts(candidateData.id);
       }
     } catch (err: any) {
-      console.error(err);
-      toast({ title: "Error", description: "Failed to load profile.", variant: "destructive" });
-    } finally {
-      setLoading(false);
+      console.error("Profile load error:", err);
+      if (active) {
+        toast({ title: "Error", description: "Failed to load candidate profile.", variant: "destructive" });
+      }
     }
   };
 
@@ -1098,8 +1161,18 @@ export default function PortalDashboard() {
 
   const handleOnboardingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!onboardingData.name) {
-      toast({ title: "Missing Fields", description: "Please provide your name.", variant: "destructive" });
+    if (!onboardingData.name || !onboardingData.name.trim()) {
+      toast({ title: "Name Required", description: "Please provide your full name.", variant: "destructive" });
+      return;
+    }
+    const rawPhone = (onboardingData.phone || '').trim();
+    const cleanedDigits = rawPhone.replace(/\D/g, '');
+    if (!rawPhone || cleanedDigits.length < 10 || cleanedDigits.length > 15) {
+      toast({
+        title: "Valid WhatsApp Number Required",
+        description: "Please enter a valid WhatsApp phone number (10 to 15 digits) so mentors can coordinate and send evaluation feedback.",
+        variant: "destructive"
+      });
       return;
     }
     setSavingOnboarding(true);
@@ -1108,8 +1181,8 @@ export default function PortalDashboard() {
       if (candidate) {
         // Update existing profile
         result = await supabase.from('exam_candidates').update({
-          name: onboardingData.name,
-          phone: onboardingData.phone || null,
+          name: onboardingData.name.trim(),
+          phone: rawPhone,
           program_ids: onboardingData.program_ids,
           avatar_url: onboardingData.avatar_url || null,
           education_level: onboardingData.education_level
@@ -1119,8 +1192,8 @@ export default function PortalDashboard() {
         result = await supabase.from('exam_candidates').insert({
           auth_user_id: authUser.id,
           email: authUser.email,
-          name: onboardingData.name,
-          phone: onboardingData.phone || null,
+          name: onboardingData.name.trim(),
+          phone: rawPhone,
           program_ids: onboardingData.program_ids || [],
           avatar_url: onboardingData.avatar_url || null,
           education_level: onboardingData.education_level || "bachelors"
@@ -3421,13 +3494,16 @@ export default function PortalDashboard() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="prof-phone">Phone Number</Label>
+                    <Label htmlFor="prof-phone">WhatsApp Number *</Label>
                     <Input
                       id="prof-phone"
                       value={onboardingData.phone}
                       onChange={e => setOnboardingData({ ...onboardingData, phone: e.target.value })}
+                      placeholder="e.g. 9876543210 or +91 9876543210"
+                      required
                       className="bg-background/50 border-black/10 focus:bg-white"
                     />
+                    <p className="text-[11px] text-foreground/50">Used for mentor feedback and official prep coordination.</p>
                   </div>
                 </div>
 
@@ -3466,12 +3542,26 @@ export default function PortalDashboard() {
       </div>
 
       {/* Onboarding Modal */}
-      <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
+      <Dialog 
+        open={showOnboarding} 
+        onOpenChange={(open) => {
+          // Prevent closing without saving if profile is incomplete
+          if (!open && (!candidate || !candidate.phone || candidate.phone.trim() === '')) {
+            toast({
+              title: "Profile Incomplete",
+              description: "Please enter your full name and WhatsApp number to continue.",
+              variant: "destructive"
+            });
+            return;
+          }
+          setShowOnboarding(open);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl">Complete your profile</DialogTitle>
             <DialogDescription>
-              Just a few more details so we can assign the right mock tests to you.
+              Please provide your WhatsApp number and details so mentors can guide you and coordinate mock test feedback.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleOnboardingSubmit} className="space-y-4 py-4">
@@ -3481,18 +3571,22 @@ export default function PortalDashboard() {
                 id="name"
                 value={onboardingData.name}
                 onChange={e => setOnboardingData({ ...onboardingData, name: e.target.value })}
+                placeholder="e.g. Aditya Gupta"
                 required
                 className="bg-background/50 border-black/10 focus:bg-white"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number (Optional)</Label>
+              <Label htmlFor="phone">WhatsApp Number *</Label>
               <Input
                 id="phone"
                 value={onboardingData.phone}
                 onChange={e => setOnboardingData({ ...onboardingData, phone: e.target.value })}
+                placeholder="e.g. 9876543210 or +91 9876543210"
+                required
                 className="bg-background/50 border-black/10 focus:bg-white"
               />
+              <p className="text-[11px] text-foreground/50">Required for official mentor WhatsApp support and mock evaluations.</p>
             </div>
             <div className="space-y-2">
               <Label>Target Programs for Preparation *</Label>

@@ -43,7 +43,7 @@ interface PortalPrepTrackerSectionProps {
 
 export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: PortalPrepTrackerSectionProps) {
   const [, setLocation] = useLocation();
-  const effectiveCandidateId = candidate?.id || 'preview-candidate-id';
+  const effectiveCandidateId = candidate?.id || null;
 
   const [activeTab, setActiveTab] = useState<'today' | 'board' | 'ledger' | 'analytics'>('today');
 
@@ -114,13 +114,13 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
     }
   }, [trackerLoading, enrolment, candidate]);
 
-  if (trackerLoading) {
+  if (trackerLoading || !candidate?.id) {
     return (
       <div className="py-20 flex items-center justify-center">
         <div className="text-center space-y-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
           <p className="text-xs font-bold text-foreground/60">
-            Calibrating your 92-day NID preparation plan...
+            Calibrating your 92-day preparation plan...
           </p>
         </div>
       </div>
