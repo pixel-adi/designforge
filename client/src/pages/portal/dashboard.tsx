@@ -159,9 +159,13 @@ export default function PortalDashboard() {
   }, []);
 
   const checkSession = useCallback(async (candidateId: string) => {
+    if (typeof document !== 'undefined' && document.hidden) return;
     const currentSessionId = sessionIdRef.current || (typeof window !== 'undefined' ? sessionStorage.getItem('df_active_session_id') : null);
     if (!currentSessionId) return;
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
       const { data, error } = await supabase
         .from('exam_candidates')
         .select('active_session_id')
@@ -193,20 +197,37 @@ export default function PortalDashboard() {
   // --- 7. Periodic server-side access re-validation ---
   useEffect(() => {
     if (!candidate?.id) return;
-    const revalidate = setInterval(async () => {
-      const { data } = await supabase
-        .from('exam_candidates')
-        .select('access_level, access_expires_at')
-        .eq('id', candidate.id)
-        .maybeSingle();
-      if (data) {
-        // If access was revoked/downgraded server-side, update client state
-        if (data.access_level !== candidate.access_level) {
-          setCandidate((prev: any) => prev ? { ...prev, access_level: data.access_level, access_expires_at: data.access_expires_at } : prev);
+
+    const performRevalidate = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const { data, error } = await supabase
+          .from('exam_candidates')
+          .select('access_level, access_expires_at')
+          .eq('id', candidate.id)
+          .maybeSingle();
+
+        if (!error && data) {
+          // If access was revoked/downgraded server-side, update client state
+          if (data.access_level !== candidate.access_level) {
+            setCandidate((prev: any) => prev ? { ...prev, access_level: data.access_level, access_expires_at: data.access_expires_at } : prev);
+          }
         }
+      } catch (err) {
+        // Silently catch network hiccups
       }
-    }, 30000); // Re-validate every 30s
-    return () => clearInterval(revalidate);
+    };
+
+    const revalidate = setInterval(performRevalidate, 120000); // Re-validate every 2m
+    window.addEventListener('focus', performRevalidate);
+
+    return () => {
+      clearInterval(revalidate);
+      window.removeEventListener('focus', performRevalidate);
+    };
   }, [candidate?.id, candidate?.access_level]);
 
   // Robust Auth & Candidate Profile Initialization (Prevents Logout on Refresh)
