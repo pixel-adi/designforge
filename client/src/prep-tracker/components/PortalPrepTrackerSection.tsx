@@ -74,14 +74,6 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
   const { toast } = useToast();
   const effectiveCandidateId = candidate?.id || null;
 
-  // Material upgrade & Notes access calculation:
-  // Anyone with a material upgrade (materials_only / focus_batch / has_materials_access) automatically gets notes access
-  const hasMaterialAccess =
-    candidate?.access_level === 'materials_only' ||
-    candidate?.access_level === 'focus_batch' ||
-    Boolean(candidate?.has_materials_access);
-  const hasNotesAccess = Boolean(enrolment?.has_notes_access || hasMaterialAccess);
-
   // View state for right-hand side performance unit
   const [sideUnitTab, setSideUnitTab] = useState<'ledger' | 'analytics'>('ledger');
   const [showRoadmapModal, setShowRoadmapModal] = useState<boolean>(false);
@@ -131,6 +123,14 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
     allExamPlans,
     availableExamIds,
   } = usePrepTracker(effectiveCandidateId);
+
+  // Material upgrade & Notes access calculation:
+  // Anyone with a material upgrade (materials_only / focus_batch / has_materials_access) automatically gets notes access
+  const hasMaterialAccess =
+    candidate?.access_level === 'materials_only' ||
+    candidate?.access_level === 'focus_batch' ||
+    Boolean(candidate?.has_materials_access);
+  const hasNotesAccess = Boolean(enrolment?.has_notes_access || hasMaterialAccess);
 
   // Pre-configured exam catalogue for dropdown selector
   const baseExamOptions = [
