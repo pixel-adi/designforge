@@ -65,9 +65,18 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     let active = true;
 
     async function checkSessionAndRole() {
+      // Safety timeout: never hang more than 5 seconds in loading state
+      const fallbackTimer = setTimeout(() => {
+        if (active && loading) {
+          console.warn("Admin auth check timed out — forcing load");
+          setLoading(false);
+        }
+      }, 5000);
+
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
+          clearTimeout(fallbackTimer);
           setLocation("/admin");
           return;
         }
@@ -77,6 +86,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         // 1. Root admin domain fallback
         if (lowerEmail.endsWith("@designforge.co.in")) {
+          clearTimeout(fallbackTimer);
           if (active) {
             setRole("admin");
             setLoading(false);
@@ -91,7 +101,21 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           .eq("auth_user_id", session.user.id)
           .maybeSingle();
 
-        if (error) throw error;
+        clearTimeout(fallbackTimer);
+
+        if (error) {
+          // If RLS blocks the read (e.g. permission denied for is_admin),
+          // fall back to domain-based check before kicking the user
+          console.error("staff_users lookup failed:", error.message);
+          if (lowerEmail.endsWith("@designforge.co.in")) {
+            if (active) {
+              setRole("admin");
+              setLoading(false);
+            }
+            return;
+          }
+          throw error;
+        }
 
         if (!staff) {
           // If they aren't registered, log them out and redirect
@@ -106,7 +130,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         console.error("Auth check failed:", err);
-        setLocation("/admin");
+        clearTimeout(fallbackTimer);
+        if (active) {
+          setLoading(false);
+          setLocation("/admin");
+        }
       }
     }
 

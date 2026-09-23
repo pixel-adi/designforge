@@ -49,7 +49,7 @@ export function TrackerAnalyticsHistory({
       try {
         const [diag, errors, sims] = await Promise.all([
           withTimeout(prepApi.getDiagnostics(candidateId)),
-          withTimeout(prepApi.getErrorLedger(candidateId)),
+          withTimeout(prepApi.getErrorLedgers(candidateId)),
           withTimeout(prepApi.getSimulationLogs(candidateId)),
         ]);
         if (active) {
