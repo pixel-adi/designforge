@@ -1407,7 +1407,7 @@ export default function PortalDashboard() {
   const fetchClassNotes = async () => {
     setLoadingNotes(true);
     try {
-      const { data, error } = await supabase.from('class_notes').select('*').eq('is_visible', true).order('display_order').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('study_materials').select('*').eq('is_visible', true).order('display_order').order('created_at', { ascending: false });
       if (!error) setClassNotes(data || []);
     } catch (err) { console.error(err); } finally { setLoadingNotes(false); }
   };

@@ -17,6 +17,7 @@ import {
   PitchLogModal,
 } from './DiaryAndArtifactsModals';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import { CalendarDayStrip } from './CalendarDayStrip';
 import { TrackerAnalyticsHistory } from './TrackerAnalyticsHistory';
 import { PortalWeeklyUpdatesModal, WeeklyUpdatesTriggerButton } from './PortalWeeklyUpdatesModal';
@@ -70,7 +71,16 @@ const EXAM_DATES: Record<string, string> = {
 
 export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: PortalPrepTrackerSectionProps) {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const effectiveCandidateId = candidate?.id || null;
+
+  // Material upgrade & Notes access calculation:
+  // Anyone with a material upgrade (materials_only / focus_batch / has_materials_access) automatically gets notes access
+  const hasMaterialAccess =
+    candidate?.access_level === 'materials_only' ||
+    candidate?.access_level === 'focus_batch' ||
+    Boolean(candidate?.has_materials_access);
+  const hasNotesAccess = Boolean(enrolment?.has_notes_access || hasMaterialAccess);
 
   // View state for right-hand side performance unit
   const [sideUnitTab, setSideUnitTab] = useState<'ledger' | 'analytics'>('ledger');
@@ -213,6 +223,13 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
 
   const handleOpenNotes = (milestoneTitle: string) => {
     setActiveMilestoneTitle(milestoneTitle);
+    if (!hasNotesAccess) {
+      toast({
+        title: 'Class Notes — Coming Soon',
+        description:
+          'Milestone class notes are currently being curated. Anyone with a Study Materials upgrade or Focus Batch automatically gets full access!',
+      });
+    }
     setShowClassNotes(true);
   };
 
@@ -297,17 +314,13 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
             size="sm"
             onClick={() => handleOpenNotes('Class Notes')}
             className={`h-9 gap-1.5 text-xs font-bold shadow-2xs ${
-              enrolment?.has_notes_access
+              hasNotesAccess
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                 : 'bg-[#262626] hover:bg-black text-white'
             }`}
           >
-            {enrolment?.has_notes_access ? (
-              <BookOpen className="w-3.5 h-3.5" />
-            ) : (
-              <Lock className="w-3.5 h-3.5" />
-            )}
-            <span>{enrolment?.has_notes_access ? 'Notes Unlocked' : 'Class Notes (₹500)'}</span>
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Class Notes</span>
           </Button>
         </div>
       </div>
@@ -409,7 +422,7 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
               onOpenNotes={handleOpenNotes}
               onOpenCapture={handleOpenCapture}
               onSolvePortalMock={onSolvePortalMock || (() => setLocation('/portal/dashboard'))}
-              hasNotesAccess={Boolean(enrolment?.has_notes_access)}
+              hasNotesAccess={hasNotesAccess}
             />
           )}
         </div>
@@ -558,8 +571,9 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
         candidateId={effectiveCandidateId}
         candidateName={candidate?.name || 'Aspirant'}
         candidateEmail={candidate?.email || 'aspirant@designforge.co.in'}
-        hasAccess={Boolean(enrolment?.has_notes_access)}
+        hasAccess={hasNotesAccess}
         milestoneTitle={activeMilestoneTitle}
+        examCode={currentExam.code || 'NID'}
         onAccessUnlocked={() => {
           refreshData();
         }}

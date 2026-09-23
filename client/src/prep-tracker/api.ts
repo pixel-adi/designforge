@@ -596,11 +596,11 @@ export const prepApi = {
     return data;
   },
 
-  // Class Notes Integration
+  // Class Notes Integration (Picked directly from study_materials)
   async getClassNotes(examFilter?: string) {
     try {
       let query = supabase
-        .from('class_notes')
+        .from('study_materials')
         .select('*')
         .eq('is_visible', true)
         .order('display_order', { ascending: true })
@@ -612,43 +612,12 @@ export const prepApi = {
 
       const { data, error } = await query;
       if (!error && data && data.length > 0) return data;
+      if (!error && data) return data;
     } catch (e) {
-      console.warn('Falling back to default class notes:', e);
+      console.warn('Failed to load class notes from study_materials:', e);
     }
 
-    // Default rich notes preview for localhost and offline testing
-    return [
-      {
-        id: 'cn-1',
-        title: 'NID DAT Visual Grammar & Orthographic Perspective',
-        description: 'Comprehensive guide to 1-point, 2-point, and 3-point worm/bird eye perspective construction with proportion grids.',
-        category: 'Drawing & Perspective',
-        target_exam: 'NID',
-        pages_count: 18,
-        file_url: 'https://example.com/notes/perspective-guide.pdf',
-        is_free_preview: true,
-      },
-      {
-        id: 'cn-2',
-        title: 'Material Manipulation, Textures & 3D Form Sensitivity',
-        description: 'Deep dive into rendering paper folds, terracotta, bamboo, metallic finishes, and cross-sectional transformation.',
-        category: 'Form & Material',
-        target_exam: 'NID',
-        pages_count: 24,
-        file_url: 'https://example.com/notes/material-sensitivity.pdf',
-        is_free_preview: false,
-      },
-      {
-        id: 'cn-3',
-        title: 'Sequential Storyboarding & Frame-by-Frame Ideation Rubric',
-        description: 'Step-by-step masterclass on establishing shots, emotional escalation, character consistency, and concluding twists.',
-        category: 'Visual Narrative',
-        target_exam: 'NID',
-        pages_count: 16,
-        file_url: 'https://example.com/notes/storyboarding-masterclass.pdf',
-        is_free_preview: false,
-      },
-    ];
+    return [];
   },
 
   // Mock Test Integration (Link to Latest Published Exam)

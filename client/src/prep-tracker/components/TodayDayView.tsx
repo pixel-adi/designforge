@@ -132,12 +132,8 @@ export function TodayDayView({
                 : 'bg-black/5 hover:bg-black/10 text-[#262626] border border-black/10'
             }`}
           >
-            {hasNotesAccess ? (
-              <BookOpen className="w-3.5 h-3.5" />
-            ) : (
-              <Lock className="w-3.5 h-3.5 text-primary" />
-            )}
-            <span>{hasNotesAccess ? 'Class Notes' : 'Class Notes (₹500)'}</span>
+            <BookOpen className={`w-3.5 h-3.5 ${hasNotesAccess ? 'text-white' : 'text-primary'}`} />
+            <span>Class Notes</span>
           </Button>
         </div>
       </div>
