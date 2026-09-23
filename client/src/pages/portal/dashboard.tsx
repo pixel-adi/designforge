@@ -123,6 +123,7 @@ export default function PortalDashboard() {
 
   // Session enforcement state
   const sessionIdRef = useRef<string>('');
+  const profileLoadingRef = useRef<boolean>(false);
   const [sessionKicked, setSessionKicked] = useState(false);
   const [contentBlurred, setContentBlurred] = useState(false);
 
@@ -135,24 +136,24 @@ export default function PortalDashboard() {
   // ===== SINGLE-DEVICE SESSION ENFORCEMENT =====
   const registerSession = useCallback(async (candidateId: string) => {
     try {
-      let localSessionId = typeof window !== 'undefined' ? sessionStorage.getItem('df_active_session_id') : null;
-      if (!localSessionId) {
-        localSessionId = crypto.randomUUID();
+      let localDeviceId = typeof window !== 'undefined' ? localStorage.getItem('df_device_id') : null;
+      if (!localDeviceId) {
+        localDeviceId = crypto.randomUUID();
         if (typeof window !== 'undefined') {
-          sessionStorage.setItem('df_active_session_id', localSessionId);
+          localStorage.setItem('df_device_id', localDeviceId);
         }
       }
-      sessionIdRef.current = localSessionId;
+      sessionIdRef.current = localDeviceId;
 
       const { error } = await supabase
         .from('exam_candidates')
-        .update({ active_session_id: localSessionId })
+        .update({ active_session_id: localDeviceId })
         .eq('id', candidateId);
 
       if (error) {
         console.warn("Could not set active_session_id in DB:", error.message);
       }
-      return localSessionId;
+      return localDeviceId;
     } catch (err) {
       console.warn("Session registration failed:", err);
     }
@@ -160,8 +161,8 @@ export default function PortalDashboard() {
 
   const checkSession = useCallback(async (candidateId: string) => {
     if (typeof document !== 'undefined' && document.hidden) return;
-    const currentSessionId = sessionIdRef.current || (typeof window !== 'undefined' ? sessionStorage.getItem('df_active_session_id') : null);
-    if (!currentSessionId) return;
+    const currentDeviceId = sessionIdRef.current || (typeof window !== 'undefined' ? localStorage.getItem('df_device_id') : null);
+    if (!currentDeviceId) return;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -172,14 +173,10 @@ export default function PortalDashboard() {
         .eq('id', candidateId)
         .maybeSingle();
 
-      // Only kick if database has a valid, non-null active_session_id AND it does not match our local session
-      if (!error && data && data.active_session_id && data.active_session_id !== currentSessionId) {
+      // Only kick if database has a valid, non-null active_session_id AND it does not match our local device
+      if (!error && data && data.active_session_id && data.active_session_id !== currentDeviceId) {
         console.warn("Session conflict: Logged in on another device.");
         setSessionKicked(true);
-        if (typeof window !== 'undefined') {
-          sessionStorage.removeItem('df_active_session_id');
-        }
-        await supabase.auth.signOut();
         setLocation('/portal/login');
       }
     } catch (err) {
@@ -264,19 +261,16 @@ export default function PortalDashboard() {
     initializeAuthAndProfile();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
+      if (event === 'SIGNED_OUT') {
         if (active) {
           setAuthUser(null);
           setCandidate(null);
-          if (typeof window !== 'undefined') {
-            sessionStorage.removeItem('df_active_session_id');
-          }
           setLocation('/portal/login');
         }
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+      } else if (event === 'SIGNED_IN') {
         if (session?.user && active) {
           setAuthUser(session.user);
-          if (!candidate) {
+          if (!candidate && !profileLoadingRef.current) {
             await loadCandidateProfile(session.user, active);
           }
         }
@@ -290,6 +284,8 @@ export default function PortalDashboard() {
   }, [setLocation]);
 
   const loadCandidateProfile = async (user: any, active = true) => {
+    if (profileLoadingRef.current) return;
+    profileLoadingRef.current = true;
     try {
       // Fetch candidate profile and programs concurrently
       const [candRes, progRes] = await Promise.all([
@@ -300,10 +296,29 @@ export default function PortalDashboard() {
       if (candRes.error) throw candRes.error;
       if (progRes.data && active) setPrograms(progRes.data);
 
-      const candidateData = candRes.data;
+      let candidateData = candRes.data;
+
+      // Fallback: If not found by auth_user_id, search by email and auto-link
+      if (!candidateData && user.email) {
+        const { data: emailMatch } = await supabase
+          .from('exam_candidates')
+          .select('*')
+          .eq('email', user.email)
+          .maybeSingle();
+
+        if (emailMatch) {
+          candidateData = emailMatch;
+          if (!emailMatch.auth_user_id) {
+            await supabase
+              .from('exam_candidates')
+              .update({ auth_user_id: user.id })
+              .eq('id', emailMatch.id);
+          }
+        }
+      }
 
       if (!candidateData) {
-        // Needs onboarding
+        // Needs onboarding (brand new user who does not exist in DB)
         if (active) {
           setShowOnboarding(true);
           if (user.user_metadata?.full_name) {
@@ -321,11 +336,6 @@ export default function PortalDashboard() {
           education_level: candidateData.education_level || "bachelors"
         });
 
-        // Prompt onboarding if WhatsApp phone is missing or blank
-        if (!candidateData.phone || candidateData.phone.trim() === '') {
-          setShowOnboarding(true);
-        }
-
         // Register this device session safely
         await registerSession(candidateData.id);
 
@@ -337,6 +347,8 @@ export default function PortalDashboard() {
       if (active) {
         toast({ title: "Error", description: "Failed to load candidate profile.", variant: "destructive" });
       }
+    } finally {
+      profileLoadingRef.current = false;
     }
   };
 
@@ -404,9 +416,7 @@ export default function PortalDashboard() {
       if (!error && data) {
         setPastAttempts(data || []);
         if (data.length > 0) {
-          const firstId = data[0].id;
-          setSelectedAttemptId(firstId);
-          fetchAttemptDetails(firstId);
+          setSelectedAttemptId(data[0].id);
         }
       }
     } catch (err) {
@@ -1199,9 +1209,10 @@ export default function PortalDashboard() {
     setSavingOnboarding(true);
     try {
       let result;
-      if (candidate) {
+      if (candidate?.id) {
         // Update existing profile
         result = await supabase.from('exam_candidates').update({
+          auth_user_id: authUser.id,
           name: onboardingData.name.trim(),
           phone: rawPhone,
           program_ids: onboardingData.program_ids,
@@ -1209,16 +1220,34 @@ export default function PortalDashboard() {
           education_level: onboardingData.education_level
         }).eq('id', candidate.id).select().single();
       } else {
-        // Insert new profile
-        result = await supabase.from('exam_candidates').insert({
-          auth_user_id: authUser.id,
-          email: authUser.email,
-          name: onboardingData.name.trim(),
-          phone: rawPhone,
-          program_ids: onboardingData.program_ids || [],
-          avatar_url: onboardingData.avatar_url || null,
-          education_level: onboardingData.education_level || "bachelors"
-        }).select().single();
+        // Check if an existing row matches auth_user_id or email
+        const { data: existingCand } = await supabase
+          .from('exam_candidates')
+          .select('id')
+          .or(`auth_user_id.eq.${authUser.id},email.eq.${authUser.email}`)
+          .maybeSingle();
+
+        if (existingCand) {
+          result = await supabase.from('exam_candidates').update({
+            auth_user_id: authUser.id,
+            name: onboardingData.name.trim(),
+            phone: rawPhone,
+            program_ids: onboardingData.program_ids,
+            avatar_url: onboardingData.avatar_url || null,
+            education_level: onboardingData.education_level
+          }).eq('id', existingCand.id).select().single();
+        } else {
+          // Insert new profile
+          result = await supabase.from('exam_candidates').insert({
+            auth_user_id: authUser.id,
+            email: authUser.email,
+            name: onboardingData.name.trim(),
+            phone: rawPhone,
+            program_ids: onboardingData.program_ids || [],
+            avatar_url: onboardingData.avatar_url || null,
+            education_level: onboardingData.education_level || "bachelors"
+          }).select().single();
+        }
       }
 
       if (result.error) throw result.error;
@@ -1235,6 +1264,9 @@ export default function PortalDashboard() {
   };
 
   const handleLogout = async () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('df_device_id');
+    }
     await supabase.auth.signOut();
     setLocation('/portal/login');
   };
@@ -3566,8 +3598,8 @@ export default function PortalDashboard() {
       <Dialog 
         open={showOnboarding} 
         onOpenChange={(open) => {
-          // Prevent closing without saving if profile is incomplete
-          if (!open && (!candidate || !candidate.phone || candidate.phone.trim() === '')) {
+          // Prevent closing without saving only for brand new users without a profile
+          if (!open && !candidate) {
             toast({
               title: "Profile Incomplete",
               description: "Please enter your full name and WhatsApp number to continue.",
