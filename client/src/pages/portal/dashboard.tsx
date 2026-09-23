@@ -12,6 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Skeleton } from "@/components/ui/skeleton";
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ScatterChart, Scatter, Cell, Legend } from "recharts";
 import { PortalPrepTrackerSection } from "@/prep-tracker/components/PortalPrepTrackerSection";
+import { PortalWeeklyUpdatesModal } from "@/prep-tracker/components/PortalWeeklyUpdatesModal";
 import { ExamCountdownTimer } from "@/prep-tracker/components/ExamCountdownTimer";
 import { sanitizeHtml } from "@/lib/sanitize";
 const CustomScatterTooltip = ({ active, payload }: any) => {
@@ -94,10 +95,21 @@ export default function PortalDashboard() {
   const [showAnswers, setShowAnswers] = useState<Record<string, boolean>>({});
   const [showAllAnswers, setShowAllAnswers] = useState(false);
   const [questionPage, setQuestionPage] = useState(1);
-  const QUESTIONS_PER_PAGE = 15;
-  const [userSelectedOptions, setUserSelectedOptions] = useState<Record<string, string>>({});
+  const QUESTIONS_PER_PAGE = 10;
+  const [userSelectedOptions, setUserSelectedOptions] = useState<Record<string, string[]>>({});
   const [questionDomainFilter, setQuestionDomainFilter] = useState<string>('all');
   const [topicFilter, setTopicFilter] = useState<'all' | 'strong' | 'weak'>('all');
+  const [showUniversalUpdatesModal, setShowUniversalUpdatesModal] = useState(false);
+
+  // Auto-prompt weekly updates modal once per new release session
+  useEffect(() => {
+    try {
+      const lastRead = localStorage.getItem('df_portal_updates_last_read');
+      if (!lastRead) {
+        setShowUniversalUpdatesModal(true);
+      }
+    } catch (e) {}
+  }, []);
 
   // Study Materials state
   const [studyMaterials, setStudyMaterials] = useState<any[]>([]);
@@ -1338,16 +1350,33 @@ export default function PortalDashboard() {
       const { data, error } = await query;
       if (error) throw error;
       setQuestions(data || []);
-      // Fetch options for Part A questions
+      // Fetch options for Part A questions in safe chunks of 40 IDs so PostgREST URI never overflows
       if (questionPartFilter === 'A' && data && data.length > 0) {
-        const { data: opts } = await supabase.from('exam_options').select('*').in('question_id', data.map(q => q.id));
+        const questionIds = data.map(q => q.id);
+        const chunkSize = 40;
+        const chunks: string[][] = [];
+        for (let i = 0; i < questionIds.length; i += chunkSize) {
+          chunks.push(questionIds.slice(i, i + chunkSize));
+        }
+
+        const optResults = await Promise.all(
+          chunks.map(chunk => supabase.from('exam_options').select('*').in('question_id', chunk))
+        );
+
         const optMap: Record<string, any[]> = {};
-        (opts || []).forEach(o => { if (!optMap[o.question_id]) optMap[o.question_id] = []; optMap[o.question_id].push(o); });
+        for (const res of optResults) {
+          if (res.data) {
+            for (const opt of res.data) {
+              if (!optMap[opt.question_id]) optMap[opt.question_id] = [];
+              optMap[opt.question_id].push(opt);
+            }
+          }
+        }
         setQuestionOptions(optMap);
       } else {
         setQuestionOptions({});
       }
-    } catch (err) { console.error(err); } finally { setLoadingQuestions(false); }
+    } catch (err) { console.error('Failed to fetch questions/options:', err); } finally { setLoadingQuestions(false); }
   };
 
   const fetchStudyMaterials = async () => {
@@ -1596,10 +1625,17 @@ export default function PortalDashboard() {
                   : 'text-foreground/80 hover:bg-black/5 hover:text-foreground'
               }`}
             >
-              <Calendar className={`w-4 h-4 ${activeTab === 'tracker' ? 'text-white' : 'text-primary'}`} />
-              <span>Exam Tracker 2027</span>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ml-auto ${activeTab === 'tracker' ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>
-                Multi-Exam
+              <Calendar className={`w-4 h-4 shrink-0 ${activeTab === 'tracker' ? 'text-white' : 'text-primary'}`} />
+              <div className="flex flex-col text-left flex-1 min-w-0">
+                <span className="leading-tight">Exam Tracker 2027</span>
+                <span className={`text-[10px] font-extrabold ${activeTab === 'tracker' ? 'text-white/85' : 'text-primary'}`}>
+                  Multi-Exam Roadmap
+                </span>
+              </div>
+              {/* Beacon beside the tab to show new things */}
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
               </span>
             </button>
           </div>
@@ -2855,30 +2891,47 @@ export default function PortalDashboard() {
                 </div>
               </div>
 
-              {/* Filters & Answer Toggle Toolbar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-black/10 shadow-xs">
-                <div className="flex flex-wrap items-center gap-3">
-                  <select
-                    value={questionTypeFilter}
-                    onChange={e => {
-                      setQuestionTypeFilter(e.target.value);
-                      setQuestionPage(1);
-                      setTimeout(fetchQuestions, 0);
-                    }}
-                    className="h-9 px-3 rounded-lg border border-black/10 bg-white text-xs font-semibold"
-                  >
-                    <option value="all">All Question Types</option>
-                    {questionPartFilter === 'A' ? (
-                      <>
-                        <option value="MCQ">MCQ (Single Choice)</option>
-                        <option value="MSQ">MSQ (Multiple Choice)</option>
-                        <option value="NAT">NAT (Numerical)</option>
-                      </>
-                    ) : (
-                      <option value="SUBJECTIVE">Subjective Drawing</option>
-                    )}
-                  </select>
+              {/* Question Types as Tags in Toolbar & Merged Filters */}
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5 bg-white p-4 rounded-2xl border border-black/10 shadow-xs">
+                {/* Left: Question Type Tags */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-black uppercase text-foreground/40 mr-1 hidden sm:inline">Type:</span>
+                  {(questionPartFilter === 'A'
+                    ? [
+                        { id: 'all', label: 'All Types' },
+                        { id: 'MCQ', label: 'MCQ (Single)' },
+                        { id: 'MSQ', label: 'MSQ (Multi-Select)' },
+                        { id: 'NAT', label: 'NAT (Numerical)' },
+                      ]
+                    : [
+                        { id: 'all', label: 'All Types' },
+                        { id: 'SUBJECTIVE', label: 'Subjective Drawing' },
+                      ]
+                  ).map(tag => {
+                    const isSelected = questionTypeFilter === tag.id;
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => {
+                          setQuestionTypeFilter(tag.id);
+                          setQuestionPage(1);
+                          setTimeout(fetchQuestions, 0);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          isSelected
+                            ? 'bg-primary text-white shadow-2xs'
+                            : 'bg-black/5 hover:bg-black/10 text-foreground/70 hover:text-foreground'
+                        }`}
+                      >
+                        {tag.label}
+                      </button>
+                    );
+                  })}
+                </div>
 
+                {/* Right: Merged Filters (Difficulty & Topic Search) */}
+                <div className="flex flex-wrap items-center gap-2.5">
                   <select
                     value={questionDifficultyFilter}
                     onChange={e => {
@@ -2894,35 +2947,33 @@ export default function PortalDashboard() {
                     <option value="High">High Difficulty</option>
                   </select>
 
-                  <input
-                    placeholder="Filter by keyword or topic..."
-                    value={questionTopicFilter}
-                    onChange={e => {
-                      setQuestionTopicFilter(e.target.value);
-                      setQuestionPage(1);
-                    }}
-                    className="h-9 px-3 rounded-lg border border-black/10 bg-white text-xs w-52 sm:w-60"
-                  />
+                  <div className="relative">
+                    <input
+                      placeholder="Filter by topic or keyword..."
+                      value={questionTopicFilter}
+                      onChange={e => {
+                        setQuestionTopicFilter(e.target.value);
+                        setQuestionPage(1);
+                      }}
+                      className="h-9 px-3 rounded-lg border border-black/10 bg-white text-xs w-48 sm:w-60 placeholder:text-foreground/40 font-medium"
+                    />
+                    {questionTopicFilter && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuestionTopicFilter('');
+                          setQuestionPage(1);
+                        }}
+                        className="absolute right-2.5 top-2.5 text-xs text-foreground/40 hover:text-foreground font-bold"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 </div>
-
-                {/* Global Show/Hide Answers Toggle */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAllAnswers(prev => !prev)}
-                  className={`h-9 px-3.5 text-xs font-bold gap-1.5 transition-all ${
-                    showAllAnswers
-                      ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
-                      : 'bg-white text-[#262626] border-black/15 hover:bg-black/5'
-                  }`}
-                >
-                  {showAllAnswers ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  <span>{showAllAnswers ? 'Hide All Answers' : 'Show All Answers'}</span>
-                </Button>
               </div>
 
-              {/* Questions List with Pagination (15 per page) */}
+              {/* Questions List with Pagination (10 per page) */}
               {loadingQuestions ? (
                 <div className="flex justify-center py-16">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -2956,9 +3007,29 @@ export default function PortalDashboard() {
                       {paginatedQuestions.map((q, pageIdx) => {
                         const qIndex = startIdx + pageIdx;
                         const options = questionOptions[q.id] || [];
-                        const selectedOptId = userSelectedOptions[q.id];
-                        const isAnswerRevealed = showAllAnswers || Boolean(showAnswers[q.id]);
+                        const selectedOptIds = userSelectedOptions[q.id] || [];
+                        const isAnswerRevealed = Boolean(showAnswers[q.id]);
                         const isPartB = q.part === 'B';
+                        const isMSQ = q.type === 'MSQ';
+
+                        const handleSelectOption = (optId: string) => {
+                          if (isMSQ) {
+                            setUserSelectedOptions(prev => {
+                              const curr = prev[q.id] || [];
+                              return {
+                                ...prev,
+                                [q.id]: curr.includes(optId)
+                                  ? curr.filter(id => id !== optId)
+                                  : [...curr, optId],
+                              };
+                            });
+                          } else {
+                            setUserSelectedOptions(prev => ({
+                              ...prev,
+                              [q.id]: [optId],
+                            }));
+                          }
+                        };
 
                         return (
                           <div
@@ -3019,66 +3090,74 @@ export default function PortalDashboard() {
                             )}
 
                             {/* PART A: OPTIONS PRACTICE + VISIBLE ANSWER KEY */}
-                            {!isPartB && options.length > 0 && (
+                            {!isPartB && (
                               <div className="space-y-3 pt-3 border-t border-black/5">
-                                <p className="text-[11px] font-bold text-foreground/50 uppercase tracking-wider">
-                                  Select Option to Practice:
-                                </p>
+                                {options.length > 0 && (
+                                  <>
+                                    <p className="text-[11px] font-bold text-foreground/50 uppercase tracking-wider">
+                                      {isMSQ ? 'Select Option(s) (MSQ - Multiple Correct):' : 'Select Option to Practice:'}
+                                    </p>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                  {options.map((opt: any, optIdx: number) => {
-                                    const isSelected = selectedOptId === opt.id;
-                                    const isCorrect = Boolean(opt.is_correct);
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      {options.map((opt: any, optIdx: number) => {
+                                        const isSelected = selectedOptIds.includes(opt.id);
+                                        const isCorrect = Boolean(opt.is_correct);
 
-                                    let optStyles =
-                                      'bg-white border-black/10 hover:border-black/30 text-foreground/80';
+                                        let optStyles =
+                                          'bg-white border-black/10 hover:border-black/30 text-foreground/80';
 
-                                    if (isAnswerRevealed) {
-                                      if (isCorrect) {
-                                        optStyles =
-                                          'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold ring-1 ring-emerald-500';
-                                      } else if (isSelected && !isCorrect) {
-                                        optStyles =
-                                          'bg-red-50 border-red-300 text-red-900 line-through';
-                                      } else {
-                                        optStyles = 'bg-black/[0.02] border-black/10 opacity-60';
-                                      }
-                                    } else if (isSelected) {
-                                      optStyles =
-                                        'bg-primary/10 border-primary text-primary font-bold shadow-xs';
-                                    }
+                                        if (isAnswerRevealed) {
+                                          if (isCorrect) {
+                                            optStyles =
+                                              'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold ring-1 ring-emerald-500';
+                                          } else if (isSelected && !isCorrect) {
+                                            optStyles =
+                                              'bg-red-50 border-red-300 text-red-900 line-through';
+                                          } else {
+                                            optStyles = 'bg-black/[0.02] border-black/10 opacity-60';
+                                          }
+                                        } else if (isSelected) {
+                                          optStyles =
+                                            'bg-primary/10 border-primary text-primary font-bold shadow-xs';
+                                        }
 
-                                    return (
-                                      <button
-                                        key={opt.id}
-                                        type="button"
-                                        onClick={() => {
-                                          setUserSelectedOptions(prev => ({
-                                            ...prev,
-                                            [q.id]: opt.id,
-                                          }));
-                                        }}
-                                        className={`p-3 rounded-xl border text-left text-xs transition-all flex items-start gap-3 ${optStyles}`}
-                                      >
-                                        <span
-                                          className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[11px] shrink-0 ${
-                                            isAnswerRevealed && isCorrect
-                                              ? 'bg-emerald-600 text-white'
-                                              : isSelected
-                                              ? 'bg-primary text-white'
-                                              : 'bg-black/10 text-foreground/70'
-                                          }`}
-                                        >
-                                          {String.fromCharCode(65 + optIdx)}
-                                        </span>
-                                        <span className="flex-1 mt-0.5">{opt.content_text}</span>
-                                        {isAnswerRevealed && isCorrect && (
-                                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                                        )}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
+                                        return (
+                                          <button
+                                            key={opt.id}
+                                            type="button"
+                                            onClick={() => handleSelectOption(opt.id)}
+                                            className={`p-3 rounded-xl border text-left text-xs transition-all flex flex-col gap-2 ${optStyles}`}
+                                          >
+                                            <div className="flex items-start gap-3 w-full">
+                                              <span
+                                                className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[11px] shrink-0 ${
+                                                  isAnswerRevealed && isCorrect
+                                                    ? 'bg-emerald-600 text-white'
+                                                    : isSelected
+                                                    ? 'bg-primary text-white'
+                                                    : 'bg-black/10 text-foreground/70'
+                                                }`}
+                                              >
+                                                {String.fromCharCode(65 + optIdx)}
+                                              </span>
+                                              <span className="flex-1 mt-0.5">{opt.content_text}</span>
+                                              {isAnswerRevealed && isCorrect && (
+                                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                              )}
+                                            </div>
+                                            {opt.media_url && (
+                                              <img
+                                                src={opt.media_url}
+                                                alt={`Option ${String.fromCharCode(65 + optIdx)}`}
+                                                className="rounded-lg border border-black/10 max-h-32 object-contain ml-8"
+                                              />
+                                            )}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </>
+                                )}
 
                                 <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                                   <Button
@@ -3104,17 +3183,26 @@ export default function PortalDashboard() {
                                     )}
                                   </Button>
 
-                                  {selectedOptId && (
+                                  {options.length > 0 && selectedOptIds.length > 0 && (
                                     <span className="text-xs font-extrabold">
-                                      {options.find((o: any) => o.id === selectedOptId)?.is_correct ? (
-                                        <span className="text-emerald-600 flex items-center gap-1">
-                                          <CheckCircle2 className="w-3.5 h-3.5" /> Correct Answer!
-                                        </span>
-                                      ) : (
-                                        <span className="text-red-600">
-                                          ✗ Incorrect. See correct option highlighted above.
-                                        </span>
-                                      )}
+                                      {(() => {
+                                        const correctIds = options.filter((o: any) => o.is_correct).map((o: any) => o.id);
+                                        const isAllCorrect =
+                                          correctIds.length === selectedOptIds.length &&
+                                          selectedOptIds.every(id => correctIds.includes(id));
+                                        if (isAllCorrect) {
+                                          return (
+                                            <span className="text-emerald-600 flex items-center gap-1">
+                                              <CheckCircle2 className="w-3.5 h-3.5" /> Correct Answer!
+                                            </span>
+                                          );
+                                        }
+                                        return (
+                                          <span className="text-red-600">
+                                            ✗ Incorrect. Click Show Answer to verify correct option(s).
+                                          </span>
+                                        );
+                                      })()}
                                     </span>
                                   )}
                                 </div>
@@ -3125,60 +3213,21 @@ export default function PortalDashboard() {
                                     <div className="flex items-center gap-2 font-black text-emerald-900">
                                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                                       <span>
-                                        Correct Answer: Option{' '}
-                                        {options.findIndex((o: any) => o.is_correct) >= 0
-                                          ? String.fromCharCode(65 + options.findIndex((o: any) => o.is_correct))
-                                          : 'Key'}
-                                        {options.find((o: any) => o.is_correct)?.content_text
-                                          ? ` — ${options.find((o: any) => o.is_correct).content_text}`
-                                          : ''}
-                                      </span>
-                                    </div>
-                                    {(q.explanation || q.solution_text) && (
-                                      <p className="text-emerald-900/85 pl-6 leading-relaxed">
-                                        <strong className="font-bold">Explanation:</strong>{' '}
-                                        {q.explanation || q.solution_text}
-                                      </p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* PART A (NO OPTIONS OR NAT TYPE) */}
-                            {!isPartB && options.length === 0 && (
-                              <div className="pt-3 border-t border-black/5 space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() =>
-                                      setShowAnswers(prev => ({ ...prev, [q.id]: !prev[q.id] }))
-                                    }
-                                    className={`text-xs font-bold h-8 gap-1.5 ${
-                                      isAnswerRevealed
-                                        ? 'bg-black/5 hover:bg-black/10 text-foreground/80'
-                                        : 'bg-primary hover:bg-primary/90 text-white'
-                                    }`}
-                                  >
-                                    {isAnswerRevealed ? (
-                                      <>
-                                        <EyeOff className="w-3.5 h-3.5" /> Hide Answer
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Eye className="w-3.5 h-3.5" /> Show Answer & Solution
-                                      </>
-                                    )}
-                                  </Button>
-                                </div>
-
-                                {isAnswerRevealed && (
-                                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 space-y-1.5 text-xs text-emerald-950">
-                                    <div className="flex items-center gap-2 font-black text-emerald-900">
-                                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                                      <span>
-                                        Correct Answer: {q.correct_answer || q.answer || 'Refer to solution rubric'}
+                                        {(() => {
+                                          const correctOpts = options.filter((o: any) => o.is_correct);
+                                          if (correctOpts.length > 0) {
+                                            const letters = correctOpts.map((o: any) => {
+                                              const idx = options.findIndex((opt: any) => opt.id === o.id);
+                                              return idx >= 0 ? String.fromCharCode(65 + idx) : '';
+                                            }).filter(Boolean);
+                                            const textSnippet =
+                                              correctOpts.length === 1 && correctOpts[0].content_text
+                                                ? ` — ${correctOpts[0].content_text}`
+                                                : '';
+                                            return `Correct Answer: Option${letters.length > 1 ? 's' : ''} ${letters.join(', ')}${textSnippet}`;
+                                          }
+                                          return `Correct Answer: ${q.correct_answer || q.answer_key || q.answer || 'Refer to step-by-step solution below'}`;
+                                        })()}
                                       </span>
                                     </div>
                                     {(q.explanation || q.solution_text) && (
@@ -3267,7 +3316,7 @@ export default function PortalDashboard() {
                       })}
                     </div>
 
-                    {/* PAGINATION CONTROLS (15 QUESTIONS PER PAGE) */}
+                    {/* PAGINATION CONTROLS (10 QUESTIONS PER PAGE) */}
                     {totalPages > 1 && (
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6 border-t border-black/10">
                         <p className="text-xs text-foreground/60 font-medium">
@@ -3275,7 +3324,7 @@ export default function PortalDashboard() {
                           <strong className="text-[#262626]">
                             {Math.min(startIdx + QUESTIONS_PER_PAGE, filteredQuestions.length)}
                           </strong>{' '}
-                          of <strong className="text-[#262626]">{filteredQuestions.length}</strong> questions (15 per page)
+                          of <strong className="text-[#262626]">{filteredQuestions.length}</strong> questions (10 per page)
                         </p>
 
                         <div className="flex items-center gap-1.5 self-center sm:self-auto">
@@ -3723,6 +3772,28 @@ export default function PortalDashboard() {
         </DialogContent>
       </Dialog>
 
+      {/* Universal Portal Updates Floating Action Button (FAB) */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <button
+          type="button"
+          onClick={() => setShowUniversalUpdatesModal(true)}
+          className="group flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#18181b] text-white hover:bg-black shadow-xl hover:shadow-2xl transition-all duration-300 border border-white/15 cursor-pointer active:scale-95"
+          title="View weekly updates and new features"
+        >
+          <Sparkles className="w-4 h-4 text-amber-400 group-hover:rotate-12 transition-transform" />
+          <span className="text-xs font-black tracking-wide">Updates</span>
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          </span>
+        </button>
+      </div>
+
+      {/* Universal Weekly Updates Modal */}
+      <PortalWeeklyUpdatesModal
+        open={showUniversalUpdatesModal}
+        onOpenChange={setShowUniversalUpdatesModal}
+      />
     </div>
   );
 }

@@ -228,20 +228,20 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Exam Selector Dropdown */}
           <Select value={activeExamId} onValueChange={setActiveExamId}>
-            <SelectTrigger className="w-auto min-w-[210px] sm:min-w-[250px] h-9 rounded-xl bg-white border border-black/15 shadow-2xs font-extrabold text-xs text-[#1e293b] gap-2 px-3">
+            <SelectTrigger className="w-auto min-w-[240px] sm:min-w-[280px] h-9 rounded-xl bg-white border border-black/15 shadow-2xs font-extrabold text-xs text-[#1e293b] gap-2 px-3">
               <SelectValue placeholder="Select Exam Tracker..." />
             </SelectTrigger>
-            <SelectContent className="bg-white border-black/10 shadow-lg">
-              <div className="px-2 py-1 text-[10px] font-black uppercase text-foreground/40 tracking-wider">
+            <SelectContent className="bg-white border-black/10 shadow-lg min-w-[360px] sm:min-w-[420px] max-w-[90vw]">
+              <div className="px-2 py-1.5 text-[10px] font-black uppercase text-foreground/40 tracking-wider border-b border-black/5 mb-1">
                 Select Target Exam
               </div>
               {allExamOptions.map(exam => (
-                <SelectItem key={exam.id} value={exam.id} className="py-2 cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${exam.track === 'pg' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                <SelectItem key={exam.id} value={exam.id} className="py-2 px-2 cursor-pointer focus:bg-slate-100">
+                  <div className="flex items-center gap-2.5 w-full">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black shrink-0 whitespace-nowrap min-w-[62px] text-center ${exam.track === 'pg' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
                       {exam.code}
                     </span>
-                    <span className="font-extrabold text-xs text-[#1e293b]">{exam.label}</span>
+                    <span className="font-bold text-xs text-[#1e293b] whitespace-nowrap">{exam.label}</span>
                   </div>
                 </SelectItem>
               ))}
