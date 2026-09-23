@@ -8,6 +8,7 @@ interface CalendarDayStripProps {
   onSelectDay: (dayNum: number) => void;
   examTitle?: string;
   examDate?: string;
+  onOpenRoadmap?: () => void;
 }
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -18,6 +19,7 @@ export function CalendarDayStrip({
   onSelectDay,
   examTitle,
   examDate,
+  onOpenRoadmap,
 }: CalendarDayStripProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -166,37 +168,52 @@ export function CalendarDayStrip({
   };
 
   return (
-    <div className="w-full max-w-xl mx-auto bg-white rounded-2xl border border-black/10 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300 select-none">
-      {/* Header Month & Navigation */}
-      <div className="pt-4 pb-2 px-6 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={handlePrev}
-          className="p-1.5 rounded-lg text-foreground/40 hover:text-foreground hover:bg-black/5 transition-colors"
-          title="Previous"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
+    <div className="w-full bg-white rounded-2xl border border-black/10 shadow-xs overflow-hidden transition-all duration-300 select-none">
+      {/* Header Month & Navigation & Roadmap Button */}
+      <div className="pt-3 pb-2.5 px-4 sm:px-6 flex items-center justify-between border-b border-black/5 bg-[#f8fafc]/60">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handlePrev}
+            className="p-1.5 rounded-lg text-foreground/50 hover:text-foreground hover:bg-black/5 transition-colors"
+            title="Previous"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
 
-        <div className="flex flex-col items-center">
-          <span className="text-sm font-semibold text-[#1e293b] tracking-tight">
+          <span className="text-sm font-bold text-[#1e293b] tracking-tight">
             {monthYearLabel}
           </span>
+
+          <button
+            type="button"
+            onClick={handleNext}
+            className="p-1.5 rounded-lg text-foreground/50 hover:text-foreground hover:bg-black/5 transition-colors"
+            title="Next"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
           {examTitle && (
-            <span className="text-[10px] text-foreground/40 font-medium tracking-wide truncate max-w-[240px]">
+            <span className="hidden md:inline text-[11px] text-foreground/50 font-semibold truncate max-w-[180px]">
               {examTitle}
             </span>
           )}
-        </div>
 
-        <button
-          type="button"
-          onClick={handleNext}
-          className="p-1.5 rounded-lg text-foreground/40 hover:text-foreground hover:bg-black/5 transition-colors"
-          title="Next"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
+          {onOpenRoadmap && (
+            <button
+              type="button"
+              onClick={onOpenRoadmap}
+              className="px-2.5 py-1 rounded-lg text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-all flex items-center gap-1.5 shadow-2xs border border-primary/20"
+              title="Open 92-Day Full Roadmap"
+            >
+              <CalendarIcon className="w-3.5 h-3.5" />
+              <span>92-Day Roadmap</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Weekday labels row: S M T W T F S */}

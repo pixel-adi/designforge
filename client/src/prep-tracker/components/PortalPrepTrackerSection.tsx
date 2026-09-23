@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { usePrepTracker } from '../usePrepTracker';
 import { ResolvedTask } from '../types';
@@ -20,6 +20,20 @@ import { Button } from '@/components/ui/button';
 import { CalendarDayStrip } from './CalendarDayStrip';
 import { TrackerAnalyticsHistory } from './TrackerAnalyticsHistory';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import {
   Calendar,
   Layers,
   FileCheck,
@@ -30,10 +44,12 @@ import {
   Lock,
   Flame,
   CheckCircle2,
-  Settings,
   Clock,
   Compass,
   BarChart3,
+  SlidersHorizontal,
+  Award,
+  Trophy,
 } from 'lucide-react';
 
 interface PortalPrepTrackerSectionProps {
@@ -41,16 +57,28 @@ interface PortalPrepTrackerSectionProps {
   onSolvePortalMock?: () => void;
 }
 
+const EXAM_DATES: Record<string, string> = {
+  'nid-ug-2027': '2026-12-20',
+  'nid-pg-2027': '2026-12-20',
+  'uceed-2027': '2027-01-17',
+  'ceed-2027': '2027-01-17',
+  'nift-ug-2027': '2027-02-07',
+  'nift-pg-2027': '2027-02-07',
+  'nift-2027': '2027-02-07',
+};
+
 export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: PortalPrepTrackerSectionProps) {
   const [, setLocation] = useLocation();
   const effectiveCandidateId = candidate?.id || null;
 
-  const [activeTab, setActiveTab] = useState<'today' | 'board' | 'ledger' | 'analytics'>('today');
+  // View state for right-hand side performance unit
+  const [sideUnitTab, setSideUnitTab] = useState<'ledger' | 'analytics'>('ledger');
+  const [showRoadmapModal, setShowRoadmapModal] = useState<boolean>(false);
 
   // Modals state
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showClassNotes, setShowClassNotes] = useState(false);
-  const [activeMilestoneTitle, setActiveMilestoneTitle] = useState('NID Milestone');
+  const [activeMilestoneTitle, setActiveMilestoneTitle] = useState('Design Milestone');
   const [showSimModal, setShowSimModal] = useState(false);
   const [activeSimTask, setActiveSimTask] = useState<{ id: string; title: string }>({
     id: '',
@@ -92,20 +120,51 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
     availableExamIds,
   } = usePrepTracker(effectiveCandidateId);
 
-  // Pre-configured exam catalogue for switchable tabs
-  const examOptions = [
-    { id: 'nid-ug-2027', label: 'NID DAT (UG)', code: 'NID' },
-    { id: 'nid-pg-2027', label: 'NID DAT (PG)', code: 'NID' },
-    { id: 'uceed-2027', label: 'UCEED 2027', code: 'UCEED' },
-    { id: 'ceed-2027', label: 'CEED 2027', code: 'CEED' },
-    { id: 'nift-2027', label: 'NIFT 2027', code: 'NIFT' },
+  // Pre-configured exam catalogue for dropdown selector
+  const baseExamOptions = [
+    { id: 'nid-ug-2027', label: 'NID DAT (UG: B.Des & Int. M.Des)', code: 'NID UG', track: 'ug' },
+    { id: 'nid-pg-2027', label: 'NID DAT (PG: M.Des Disciplines)', code: 'NID PG', track: 'pg' },
+    { id: 'uceed-2027', label: 'UCEED 2027 (IIT Bombay B.Des)', code: 'UCEED', track: 'ug' },
+    { id: 'ceed-2027', label: 'CEED 2027 (IITs M.Des)', code: 'CEED', track: 'pg' },
+    { id: 'nift-ug-2027', label: 'NIFT 2027 (Bachelor of Design)', code: 'NIFT UG', track: 'ug' },
+    { id: 'nift-pg-2027', label: 'NIFT 2027 (Master of Design)', code: 'NIFT PG', track: 'pg' },
   ];
 
-  // Current active exam label
-  const currentExam = examOptions.find(e => e.id === activeExamId) || {
-    id: activeExamId,
-    label: (rawPlan as any)?.title || 'Design Prep Tracker',
-  };
+  const allExamOptions = useMemo(() => {
+    const list = [...baseExamOptions];
+    for (const p of allExamPlans || []) {
+      const targetId = p.id === 'nift-2027' ? 'nift-ug-2027' : p.id;
+      if (!list.some(e => e.id === targetId)) {
+        list.push({
+          id: targetId,
+          label: p.title?.split(':')[1]?.trim() || p.title || targetId,
+          code: p.exam_code || 'EXAM',
+          track: p.track || 'ug',
+        });
+      }
+    }
+    return list;
+  }, [allExamPlans]);
+
+  // Current active exam info
+  const currentExam = useMemo(() => {
+    return allExamOptions.find(e => e.id === activeExamId) || {
+      id: activeExamId,
+      label: (rawPlan as any)?.title || 'Exam Tracker 2027',
+      code: 'EXAM',
+      track: 'ug',
+    };
+  }, [allExamOptions, activeExamId, rawPlan]);
+
+  // Dynamic days until exam countdown calculation
+  const targetExamDateStr = rawPlan?.examDate || rawPlan?.exam_date || EXAM_DATES[activeExamId] || '2026-12-20';
+  const daysUntilExam = useMemo(() => {
+    if (!targetExamDateStr) return null;
+    const examTime = new Date(targetExamDateStr + 'T00:00:00').getTime();
+    const today = new Date().getTime();
+    const diff = Math.ceil((examTime - today) / (1000 * 60 * 60 * 24));
+    return diff > 0 ? diff : 0;
+  }, [targetExamDateStr]);
 
   // Trigger onboarding if no enrolment exists once loading finishes
   useEffect(() => {
@@ -161,305 +220,324 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* 0. Multi-Exam Switcher Pill Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-2 p-1.5 rounded-2xl bg-[#f8fafc] border border-black/10 shadow-2xs">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {examOptions.map(exam => {
-            const isSelected = activeExamId === exam.id;
-            return (
-              <button
-                key={exam.id}
-                type="button"
-                onClick={() => setActiveExamId(exam.id)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all ${
-                  isSelected
-                    ? 'bg-primary text-white shadow-xs'
-                    : 'text-[#475569] hover:text-[#0f172a] hover:bg-black/5'
-                }`}
-              >
-                {exam.label}
-              </button>
-            );
-          })}
-        </div>
+      {/* 1. Consolidated Unified Banner Card */}
+      <div className="rounded-2xl border border-black/10 bg-white p-5 sm:p-6 shadow-xs space-y-5">
+        {/* Top Row: Exam Selector Dropdown, Day/Phase Info & Unified Top-Right Actions */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Exam Selector Dropdown */}
+            <Select value={activeExamId} onValueChange={setActiveExamId}>
+              <SelectTrigger className="w-auto min-w-[220px] sm:min-w-[260px] h-10 rounded-xl bg-[#f8fafc] border-black/15 shadow-2xs font-extrabold text-xs text-[#1e293b] gap-2">
+                <SelectValue placeholder="Select Exam Tracker..." />
+              </SelectTrigger>
+              <SelectContent className="bg-white border-black/10 shadow-lg">
+                <div className="px-2 py-1 text-[10px] font-black uppercase text-foreground/40 tracking-wider">
+                  Select Target Exam
+                </div>
+                {allExamOptions.map(exam => (
+                  <SelectItem key={exam.id} value={exam.id} className="py-2 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${exam.track === 'pg' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                        {exam.code}
+                      </span>
+                      <span className="font-extrabold text-xs text-[#1e293b]">{exam.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <button
-          type="button"
-          onClick={() => setShowOnboarding(true)}
-          className="text-xs font-bold text-foreground/60 hover:text-primary px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
-        >
-          <Settings className="w-3.5 h-3.5" />
-          <span>Select Exams</span>
-        </button>
-      </div>
-
-      {/* 1. Calm Header Bar */}
-      <div className="rounded-2xl border border-black/10 bg-white p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-primary text-white uppercase tracking-wider">
-              {currentExam.code || 'DESIGN PREP'}
-            </span>
-            <span className="text-xs font-bold text-foreground/60">
-              Day {currentDay?.day || 1} of {resolvedDays.length || 92} · Week {currentDay?.week || 1}
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black/5 text-foreground/70">
-              Exam Target: 2027
-            </span>
-          </div>
-
-          <h2 className="text-xl sm:text-2xl font-black text-[#262626] tracking-tight">
-            {currentExam.label}
-          </h2>
-
-          <p className="text-xs text-foreground/60 max-w-xl">
-            {currentDay?.title || 'Daily Discipline Routine'} · {stats.completedCountedTasks} of {stats.totalCountedTasks} counted tasks completed ({stats.percentage}% progress, {Math.round(stats.totalMinutesLogged / 60)} hrs logged).
-          </p>
-        </div>
-
-        {/* Action controls */}
-        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
-          {profile && (
-            <div className="px-3 py-1.5 rounded-xl border border-black/10 bg-black/[0.02] text-xs">
-              <span className="text-foreground/50 block text-[10px] font-semibold">Diagnostic Band</span>
-              <span className="capitalize text-[#262626] font-black">
-                {profile.band} ({profile.total}/30)
+            {/* Day / Week / Phase Progress Badge */}
+            <div className="flex items-center gap-2 text-xs">
+              <span className="px-2.5 py-1 rounded-lg bg-black/5 font-extrabold text-[#1e293b]">
+                Day {currentDay?.day || 1} of {resolvedDays.length || 92}
               </span>
+              <span className="font-semibold text-foreground/40 hidden sm:inline">·</span>
+              <span className="font-bold text-foreground/60 hidden sm:inline">
+                Week {currentDay?.week || 0}
+              </span>
+              {currentDay?.phaseName && (
+                <>
+                  <span className="font-semibold text-foreground/40 hidden md:inline">·</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary hidden md:inline">
+                    {currentDay.phaseName}
+                  </span>
+                </>
+              )}
             </div>
-          )}
+          </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowOnboarding(true)}
-            className="h-9 gap-1.5 text-xs font-bold border-black/15 bg-white hover:bg-black/5 text-[#262626]"
-          >
-            <Settings className="w-3.5 h-3.5 text-foreground/60" />
-            <span>Adjust Plan</span>
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={() => handleOpenNotes('NID DAT Class Notes')}
-            className={`h-9 gap-1.5 text-xs font-bold shadow-xs ${
-              enrolment?.has_notes_access
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                : 'bg-primary hover:bg-primary/90 text-white'
-            }`}
-          >
-            {enrolment?.has_notes_access ? (
-              <BookOpen className="w-3.5 h-3.5" />
-            ) : (
-              <Lock className="w-3.5 h-3.5" />
+          {/* Right: Dynamic Countdown Pill & Unified Adjust Action */}
+          <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
+            {/* Dynamic Countdown Counter */}
+            {daysUntilExam !== null && (
+              <div className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-black flex items-center gap-1.5 shadow-2xs">
+                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                <span>{daysUntilExam} Days to {currentExam.code || 'Exam'}</span>
+              </div>
             )}
-            <span>{enrolment?.has_notes_access ? 'Class Notes Unlocked' : 'Class Notes (₹500)'}</span>
-          </Button>
+
+            {/* Unified Adjust Exam Plan Action */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowOnboarding(true)}
+              className="h-9 gap-1.5 text-xs font-bold border-black/15 bg-white hover:bg-black/5 text-[#262626] shadow-2xs"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-foreground/60" />
+              <span>Adjust Exam Plan</span>
+            </Button>
+
+            {/* Class Notes Button */}
+            <Button
+              size="sm"
+              onClick={() => handleOpenNotes('Class Notes')}
+              className={`h-9 gap-1.5 text-xs font-bold shadow-2xs ${
+                enrolment?.has_notes_access
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  : 'bg-[#262626] hover:bg-black text-white'
+              }`}
+            >
+              {enrolment?.has_notes_access ? (
+                <BookOpen className="w-3.5 h-3.5" />
+              ) : (
+                <Lock className="w-3.5 h-3.5" />
+              )}
+              <span>{enrolment?.has_notes_access ? 'Notes Unlocked' : 'Class Notes (₹500)'}</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Middle: Progress Bar */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-[#1e293b]">
+              Curriculum Progress: <span className="text-primary font-black">{stats.percentage}%</span>
+            </span>
+            <span className="text-foreground/50 text-[11px] font-medium">
+              {stats.completedCountedTasks} of {stats.totalCountedTasks} counted tasks completed · {Math.round(stats.totalMinutesLogged / 60)} hrs logged
+            </span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-black/5 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-primary to-orange-500 transition-all duration-500"
+              style={{ width: `${Math.min(100, Math.max(0, stats.percentage))}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Bottom Row: The 4 Non-Negotiables & Diagnostic Band Pill Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1 border-t border-black/5">
+          {/* 1. Daily Drill */}
+          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc]/70 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase text-foreground/40 block">1. Daily Drill</span>
+              <p className="text-xs font-black text-[#1e293b]">{drillDoneThisWeek}/6 Completed</p>
+              <span className="text-[9px] text-foreground/50">45m Mon–Sat</span>
+            </div>
+            <Flame className={`w-4 h-4 shrink-0 ${drillDoneThisWeek >= 4 ? 'text-primary' : 'text-foreground/30'}`} />
+          </div>
+
+          {/* 2. Weekly Critique */}
+          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc]/70 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase text-foreground/40 block">2. Critique</span>
+              <p className="text-xs font-black text-[#1e293b]">Every Thursday</p>
+              <span className="text-[9px] text-foreground/50">Peer & Mentor review</span>
+            </div>
+            <Compass className="w-4 h-4 shrink-0 text-amber-500" />
+          </div>
+
+          {/* 3. Saturday Mock */}
+          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc]/70 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase text-foreground/40 block">3. Saturday Mock</span>
+              <p className="text-xs font-black text-[#1e293b]">Full Simulation</p>
+              <span className="text-[9px] text-foreground/50">3h paper + 45m review</span>
+            </div>
+            <Clock className="w-4 h-4 shrink-0 text-red-500" />
+          </div>
+
+          {/* 4. Sunday Review */}
+          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc]/70 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase text-foreground/40 block">4. Sunday Review</span>
+              <p className="text-xs font-black text-[#1e293b]">Rest & Reflection</p>
+              <span className="text-[9px] text-foreground/50">Weekly audit</span>
+            </div>
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+          </div>
+
+          {/* Diagnostic Band */}
+          <div className="p-2.5 rounded-xl border border-black/5 bg-[#f8fafc]/70 flex items-center justify-between col-span-2 sm:col-span-1">
+            <div>
+              <span className="text-[10px] font-black uppercase text-foreground/40 block">Diagnostic Band</span>
+              <p className="text-xs font-black capitalize text-[#1e293b]">{profile?.band || 'Calibrating'}</p>
+              <span className="text-[9px] text-foreground/50">{profile ? `${profile.total}/30 Score` : 'Week 0 baseline'}</span>
+            </div>
+            <Award className="w-4 h-4 shrink-0 text-purple-600" />
+          </div>
         </div>
       </div>
 
-      {/* 2. Weekly Habits Bar (The 4 Non-Negotiables) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-black/10 bg-white p-3.5 shadow-xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-foreground/50">
-              1. Daily Drill
-            </span>
-            <Flame className={`w-3.5 h-3.5 ${drillDoneThisWeek >= 4 ? 'text-primary' : 'text-foreground/30'}`} />
-          </div>
-          <p className="text-xs font-bold text-[#262626]">
-            {drillDoneThisWeek}/6 Completed
-          </p>
-          <p className="text-[10px] text-foreground/50">45 min Mon–Sat</p>
-        </div>
-
-        <div className="rounded-xl border border-black/10 bg-white p-3.5 shadow-xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-foreground/50">
-              2. Critique
-            </span>
-            <Compass className="w-3.5 h-3.5 text-amber-500" />
-          </div>
-          <p className="text-xs font-bold text-[#262626]">
-            Every Thursday
-          </p>
-          <p className="text-[10px] text-foreground/50">3 framing questions</p>
-        </div>
-
-        <div className="rounded-xl border border-black/10 bg-white p-3.5 shadow-xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-foreground/50">
-              3. Saturday Mock
-            </span>
-            <Clock className="w-3.5 h-3.5 text-red-500" />
-          </div>
-          <p className="text-xs font-bold text-[#262626]">
-            Full Simulation
-          </p>
-          <p className="text-[10px] text-foreground/50">45m review protocol</p>
-        </div>
-
-        <div className="rounded-xl border border-black/10 bg-white p-3.5 shadow-xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-foreground/50">
-              4. Sunday Review
-            </span>
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-          </div>
-          <p className="text-xs font-bold text-[#262626]">
-            Rest + Reflection
-          </p>
-          <p className="text-[10px] text-foreground/50">3 reflections + checklist</p>
-        </div>
-      </div>
-
-      {/* 3. Intuitive View Switcher */}
-      <div className="flex items-center justify-between border-b border-black/10 pb-2">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab('today')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${
-              activeTab === 'today'
-                ? 'bg-[#262626] text-white shadow-xs'
-                : 'bg-black/5 hover:bg-black/10 text-foreground/70'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Today's Tasks</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('board')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${
-              activeTab === 'board'
-                ? 'bg-[#262626] text-white shadow-xs'
-                : 'bg-black/5 hover:bg-black/10 text-foreground/70'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>92-Day Roadmap</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('ledger')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${
-              activeTab === 'ledger'
-                ? 'bg-[#262626] text-white shadow-xs'
-                : 'bg-black/5 hover:bg-black/10 text-foreground/70'
-            }`}
-          >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Error Ledger</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('analytics')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${
-              activeTab === 'analytics'
-                ? 'bg-[#262626] text-white shadow-xs'
-                : 'bg-black/5 hover:bg-black/10 text-foreground/70'
-            }`}
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>History & Analytics</span>
-          </button>
-        </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowLedgerModal(true)}
-          className="h-8 gap-1.5 text-xs font-bold border-black/10 hover:bg-black/5 text-[#262626] hidden sm:flex"
-        >
-          <AlertTriangle className="w-3 h-3 text-amber-600" />
-          <span>Log Mistake</span>
-        </Button>
-      </div>
-
-      {/* 4. Tab Content */}
-      {activeTab === 'today' && currentDay && (
-        <div className="space-y-6">
+      {/* 2. Lower Dashboard: Workout Unit (Left) + Performance & Error Ledger (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column (Col-Span 7): Calendar Day Strip & Today's Tasks in ONE Unit */}
+        <div className="lg:col-span-7 space-y-4">
           <CalendarDayStrip
             days={resolvedDays}
             selectedDayNum={selectedDayNum}
             onSelectDay={dayNum => setSelectedDayNum(dayNum)}
             examTitle={currentExam.label}
+            examDate={targetExamDateStr}
+            onOpenRoadmap={() => setShowRoadmapModal(true)}
           />
-          <TodayDayView
-            day={currentDay}
-            totalDays={resolvedDays.length || 92}
-            onSelectDay={dayNum => setSelectedDayNum(dayNum)}
-            onToggleTask={(taskId, minutes) => toggleTask(taskId, minutes)}
-            togglingTaskId={togglingTaskId}
-            onOpenNotes={handleOpenNotes}
-            onOpenCapture={handleOpenCapture}
-            onSolvePortalMock={onSolvePortalMock || (() => setLocation('/portal/dashboard'))}
-            hasNotesAccess={Boolean(enrolment?.has_notes_access)}
-          />
-        </div>
-      )}
 
-      {activeTab === 'board' && (
-        <div className="bg-white rounded-2xl border border-black/10 p-5 sm:p-6 shadow-xs">
-          <Board92Day
-            days={resolvedDays}
-            selectedDayNum={selectedDayNum}
-            onSelectDay={dayNum => {
-              setSelectedDayNum(dayNum);
-              setActiveTab('today');
-            }}
-          />
+          {currentDay && (
+            <TodayDayView
+              day={currentDay}
+              totalDays={resolvedDays.length || 92}
+              onSelectDay={dayNum => setSelectedDayNum(dayNum)}
+              onToggleTask={(taskId, minutes) => toggleTask(taskId, minutes)}
+              togglingTaskId={togglingTaskId}
+              onOpenNotes={handleOpenNotes}
+              onOpenCapture={handleOpenCapture}
+              onSolvePortalMock={onSolvePortalMock || (() => setLocation('/portal/dashboard'))}
+              hasNotesAccess={Boolean(enrolment?.has_notes_access)}
+            />
+          )}
         </div>
-      )}
 
-      {activeTab === 'ledger' && (
-        <div className="bg-white rounded-2xl border border-black/10 p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-extrabold text-[#262626]">
-                4-Bucket Error Ledger
-              </h3>
-              <p className="text-xs text-foreground/60">
-                Log simulation mistakes into Concept, Time, Clarity, and Care to target root causes.
-              </p>
+        {/* Right Column (Col-Span 5): Error Ledger & History / Analytics in ONE Unit */}
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-black/10 p-5 sm:p-6 shadow-xs space-y-5">
+          {/* Tab Switcher Header */}
+          <div className="flex items-center justify-between border-b border-black/5 pb-3">
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#f8fafc] border border-black/5">
+              <button
+                type="button"
+                onClick={() => setSideUnitTab('ledger')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                  sideUnitTab === 'ledger'
+                    ? 'bg-[#1e293b] text-white shadow-2xs'
+                    : 'text-foreground/60 hover:text-foreground hover:bg-black/5'
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                <span>Error Ledger</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSideUnitTab('analytics')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                  sideUnitTab === 'analytics'
+                    ? 'bg-[#1e293b] text-white shadow-2xs'
+                    : 'text-foreground/60 hover:text-foreground hover:bg-black/5'
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5 text-blue-500" />
+                <span>Analytics</span>
+              </button>
             </div>
-            <Button
-              size="sm"
-              onClick={() => setShowLedgerModal(true)}
-              className="bg-primary hover:bg-primary/90 text-white text-xs font-bold"
-            >
-              Add Entry
-            </Button>
+
+            {sideUnitTab === 'ledger' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowLedgerModal(true)}
+                className="h-8 gap-1 text-xs font-bold border-amber-200 bg-amber-50/50 hover:bg-amber-100/70 text-amber-900"
+              >
+                <AlertTriangle className="w-3 h-3 text-amber-600" />
+                <span>Log Mistake</span>
+              </Button>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
-            {[
-              { name: 'Concept', color: 'border-blue-200 bg-blue-50/50 text-blue-900', desc: 'Brief misunderstanding or missed requirement' },
-              { name: 'Time', color: 'border-amber-200 bg-amber-50/50 text-amber-900', desc: 'Over-rendering early or pacing collapse' },
-              { name: 'Clarity', color: 'border-purple-200 bg-purple-50/50 text-purple-900', desc: 'Weak visual hierarchy or illegible callouts' },
-              { name: 'Care', color: 'border-rose-200 bg-rose-50/50 text-rose-900', desc: 'Smudging, unfinished linework, or messy sheets' },
-            ].map(b => (
-              <div key={b.name} className={`p-4 rounded-xl border ${b.color} space-y-1`}>
-                <span className="text-xs font-extrabold block">{b.name} Bucket</span>
-                <p className="text-[11px] opacity-80">{b.desc}</p>
+          {/* Sub-view 1: Error Ledger */}
+          {sideUnitTab === 'ledger' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div>
+                <h3 className="text-sm font-black text-[#1e293b]">4-Bucket Error Classification</h3>
+                <p className="text-[11px] text-foreground/50">
+                  Categorize simulation errors into root causes to prevent repeat mistakes in the exam.
+                </p>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {activeTab === 'analytics' && (
-        <TrackerAnalyticsHistory
-          candidateId={effectiveCandidateId}
-          resolvedDays={resolvedDays}
-          tier={enrolment?.tier || 'intensive'}
-          band={profile?.band}
-          diagnostic={profile?.diagnostic}
-        />
-      )}
+              <div className="grid grid-cols-2 gap-2.5">
+                {[
+                  { name: 'Concept', color: 'border-blue-200 bg-blue-50/60 text-blue-900', desc: 'Brief misunderstanding or missed question clause' },
+                  { name: 'Time', color: 'border-amber-200 bg-amber-50/60 text-amber-900', desc: 'Pacing collapse, late start or over-rendering' },
+                  { name: 'Clarity', color: 'border-purple-200 bg-purple-50/60 text-purple-900', desc: 'Illegible callouts or weak visual layout' },
+                  { name: 'Care', color: 'border-rose-200 bg-rose-50/60 text-rose-900', desc: 'Smudges, unfinished sheets, or sloppy execution' },
+                ].map(b => (
+                  <div key={b.name} className={`p-3 rounded-xl border ${b.color} space-y-1`}>
+                    <span className="text-xs font-black block">{b.name}</span>
+                    <p className="text-[10px] opacity-75 leading-snug">{b.desc}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#f8fafc] border border-black/5 space-y-2">
+                <span className="text-xs font-black text-[#1e293b] block">Simulation Error Audits</span>
+                <p className="text-xs text-foreground/50 italic">
+                  Complete Saturday full simulations and run the same-day 45-minute review protocol to log mistakes.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => setShowLedgerModal(true)}
+                  className="w-full bg-[#1e293b] hover:bg-black text-white text-xs font-bold gap-1.5 h-8 mt-1"
+                >
+                  <AlertTriangle className="w-3 h-3 text-amber-400" />
+                  <span>Open Full Mistake Ledger</span>
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Sub-view 2: History & Analytics */}
+          {sideUnitTab === 'analytics' && (
+            <div className="animate-in fade-in duration-200">
+              <TrackerAnalyticsHistory
+                candidateId={effectiveCandidateId || ''}
+                resolvedDays={resolvedDays}
+                tier={enrolment?.tier || 'intensive'}
+                band={profile?.band}
+                diagnostic={profile?.diagnostic}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 92-Day Full Roadmap Modal */}
+      <Dialog open={showRoadmapModal} onOpenChange={setShowRoadmapModal}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary">
+                {currentExam.code || 'EXAM'}
+              </span>
+              <span className="text-xs font-bold text-foreground/50">Full 92-Day Operating Matrix</span>
+            </div>
+            <DialogTitle className="text-xl">
+              {currentExam.label} Curriculum Roadmap
+            </DialogTitle>
+            <DialogDescription>
+              Click any day to jump directly to its workout tasks and exercises.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Board92Day
+              days={resolvedDays}
+              selectedDayNum={selectedDayNum}
+              onSelectDay={dayNum => {
+                setSelectedDayNum(dayNum);
+                setShowRoadmapModal(false);
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Modals Container */}
       <OnboardingModal
@@ -524,28 +602,45 @@ export function PortalPrepTrackerSection({ candidate, onSolvePortalMock }: Porta
         open={showDiaryModal}
         onOpenChange={setShowDiaryModal}
         candidateId={effectiveCandidateId}
+        dayNum={selectedDayNum}
         taskId={activeCaptureTaskId}
+        diaryTheme={currentDay?.diaryTheme}
+        onSaved={() => {
+          refreshData();
+        }}
       />
 
       <ExplanationCardModal
         open={showExplanationModal}
         onOpenChange={setShowExplanationModal}
         candidateId={effectiveCandidateId}
+        dayNum={selectedDayNum}
         taskId={activeCaptureTaskId}
+        onSaved={() => {
+          refreshData();
+        }}
       />
 
       <AwarenessCardModal
         open={showAwarenessModal}
         onOpenChange={setShowAwarenessModal}
         candidateId={effectiveCandidateId}
+        dayNum={selectedDayNum}
         taskId={activeCaptureTaskId}
+        onSaved={() => {
+          refreshData();
+        }}
       />
 
       <PitchLogModal
         open={showPitchModal}
         onOpenChange={setShowPitchModal}
         candidateId={effectiveCandidateId}
+        dayNum={selectedDayNum}
         taskId={activeCaptureTaskId}
+        onSaved={() => {
+          refreshData();
+        }}
       />
     </div>
   );

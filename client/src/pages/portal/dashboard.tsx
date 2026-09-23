@@ -1544,9 +1544,9 @@ export default function PortalDashboard() {
               }`}
             >
               <Calendar className={`w-4 h-4 ${activeTab === 'tracker' ? 'text-white' : 'text-primary'}`} />
-              <span>92-Day Prep Tracker</span>
+              <span>Exam Tracker 2027</span>
               <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ml-auto ${activeTab === 'tracker' ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>
-                NID '27
+                Multi-Exam
               </span>
             </button>
           </div>
@@ -1619,7 +1619,7 @@ export default function PortalDashboard() {
         <div className="max-w-7xl mx-auto p-6 md:p-10 lg:p-12">
           <div className="mb-10">
             <h1 className="text-2xl sm:text-3xl font-bold text-[#262626] tracking-tight">
-              {activeTab === 'overview' ? 'Dashboard Overview' : activeTab === 'tracker' ? 'NID DAT 2027 · 92-Day Prep Tracker' : activeTab === 'progress' ? 'Performance Analytics' : activeTab === 'leaderboard' ? 'Global Leaderboard' : activeTab === 'questions' ? 'Question Bank' : activeTab === 'materials' ? 'Study Materials' : activeTab === 'assignments' ? 'Class Assignments' : activeTab === 'notes' ? 'Class Notes' : 'Profile Settings'}
+              {activeTab === 'overview' ? 'Dashboard Overview' : activeTab === 'tracker' ? 'Exam Tracker 2027' : activeTab === 'progress' ? 'Performance Analytics' : activeTab === 'leaderboard' ? 'Global Leaderboard' : activeTab === 'questions' ? 'Question Bank' : activeTab === 'materials' ? 'Study Materials' : activeTab === 'assignments' ? 'Class Assignments' : activeTab === 'notes' ? 'Class Notes' : 'Profile Settings'}
             </h1>
             <p className="text-foreground/60 mt-1">
               {Array.isArray(candidate?.program_ids) && candidate.program_ids.length > 0 ? `Preparing for ${programs.filter(p => candidate.program_ids.includes(p.id)).map(p => p.name).join(' & ')}` : 'Welcome to the candidate portal'}
