@@ -33,24 +33,42 @@ export function TrackerAnalyticsHistory({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     async function loadData() {
-      if (!candidateId) return;
+      if (!candidateId) {
+        if (active) setLoading(false);
+        return;
+      }
+
+      const withTimeout = (promise: Promise<any>, timeoutMs = 3000, fallback: any = []) =>
+        Promise.race([
+          promise,
+          new Promise(resolve => setTimeout(() => resolve(fallback), timeoutMs)),
+        ]);
+
       try {
         const [diag, errors, sims] = await Promise.all([
-          prepApi.getDiagnostics(candidateId),
-          prepApi.getErrorLedger(candidateId),
-          prepApi.getSimulations(candidateId),
+          withTimeout(prepApi.getDiagnostics(candidateId)),
+          withTimeout(prepApi.getErrorLedger(candidateId)),
+          withTimeout(prepApi.getSimulationLogs(candidateId)),
         ]);
-        setDiagnosticsList(diag || []);
-        setErrorLedger(errors || []);
-        setSimLogs(sims || []);
+        if (active) {
+          setDiagnosticsList(diag || []);
+          setErrorLedger(errors || []);
+          setSimLogs(sims || []);
+        }
       } catch (e) {
-        console.error('Failed to load tracking analytics:', e);
+        console.warn('Failed to load tracking analytics:', e);
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     }
     loadData();
+    return () => {
+      active = false;
+    };
   }, [candidateId]);
 
   // Calculate Streak & Completed Days

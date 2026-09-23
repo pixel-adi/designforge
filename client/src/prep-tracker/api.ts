@@ -325,6 +325,10 @@ export const prepApi = {
     return data || [];
   },
 
+  async getSimulations(candidateId: string) {
+    return this.getSimulationLogs(candidateId);
+  },
+
   async saveSimulationLog(log: {
     candidate_id: string;
     task_id: string;

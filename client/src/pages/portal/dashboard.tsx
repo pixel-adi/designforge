@@ -244,9 +244,15 @@ export default function PortalDashboard() {
     let active = true;
 
     async function initializeAuthAndProfile() {
+      // Safety timeout guarantees the portal never hangs indefinitely in loading state
+      const fallbackTimer = setTimeout(() => {
+        if (active) setLoading(false);
+      }, 3500);
+
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) {
+          clearTimeout(fallbackTimer);
           if (active) {
             setLocation('/portal/login');
           }
@@ -264,6 +270,7 @@ export default function PortalDashboard() {
           setLocation('/portal/login');
         }
       } finally {
+        clearTimeout(fallbackTimer);
         if (active) {
           setLoading(false);
         }
@@ -348,8 +355,8 @@ export default function PortalDashboard() {
           education_level: candidateData.education_level || "bachelors"
         });
 
-        // Register this device session safely
-        await registerSession(candidateData.id);
+        // Register this device session safely in background
+        registerSession(candidateData.id);
 
         fetchDashboardData(candidateData.program_ids || [], candidateData.education_level || "bachelors", candidateData.id);
         fetchAttempts(candidateData.id);
@@ -417,7 +424,7 @@ export default function PortalDashboard() {
   };
 
   const fetchAttempts = async (candidateId: string) => {
-    setLoadingAttempts(true);
+    if (pastAttempts.length === 0) setLoadingAttempts(true);
     try {
       const { data, error } = await supabase
         .from('exam_attempts')
@@ -428,7 +435,9 @@ export default function PortalDashboard() {
       if (!error && data) {
         setPastAttempts(data || []);
         if (data.length > 0) {
-          setSelectedAttemptId(data[0].id);
+          const firstId = data[0].id;
+          setSelectedAttemptId(firstId);
+          fetchAttemptDetails(firstId);
         }
       }
     } catch (err) {
@@ -437,6 +446,12 @@ export default function PortalDashboard() {
       setLoadingAttempts(false);
     }
   };
+
+  useEffect(() => {
+    if (selectedAttemptId && selectedAttemptId !== 'overall' && !attemptDetailsMap[selectedAttemptId]) {
+      fetchAttemptDetails(selectedAttemptId);
+    }
+  }, [selectedAttemptId]);
 
   const fetchAttemptDetails = async (attemptId: string) => {
     if (!attemptId || attemptDetailsMap[attemptId]) return;
@@ -638,12 +653,16 @@ export default function PortalDashboard() {
     } catch (err) {
       console.warn("fetchAttemptDetails error handled:", err);
     } finally {
+      setAttemptDetailsMap(prev => {
+        if (prev[attemptId]) return prev;
+        return { ...prev, [attemptId]: { responses: [] } };
+      });
       setLoadingDetailsMap(prev => ({ ...prev, [attemptId]: false }));
     }
   };
 
   const fetchFeatureRequests = async () => {
-    setLoadingFeatures(true);
+    if (featureRequests.length === 0) setLoadingFeatures(true);
     try {
       const { data, error } = await supabase
         .from('exam_feature_requests')
@@ -1151,7 +1170,7 @@ export default function PortalDashboard() {
   };
 
   const fetchLeaderboard = async () => {
-    setLoadingLeaderboard(true);
+    if (leaderboard.length === 0) setLoadingLeaderboard(true);
     try {
       // Build the query
       let query = supabase
@@ -1342,73 +1361,90 @@ export default function PortalDashboard() {
   }
 
   const fetchQuestions = async () => {
-    setLoadingQuestions(true);
+    if (questions.length === 0) setLoadingQuestions(true);
     try {
       let query = supabase.from('exam_questions').select('*').eq('part', questionPartFilter).order('created_at', { ascending: false });
       if (questionTypeFilter !== 'all') query = query.eq('type', questionTypeFilter);
       if (questionDifficultyFilter !== 'all') query = query.eq('difficulty', questionDifficultyFilter);
       const { data, error } = await query;
       if (error) throw error;
-      setQuestions(data || []);
-      // Fetch options for Part A questions in safe chunks of 40 IDs so PostgREST URI never overflows
-      if (questionPartFilter === 'A' && data && data.length > 0) {
-        const questionIds = data.map(q => q.id);
-        const chunkSize = 40;
-        const chunks: string[][] = [];
-        for (let i = 0; i < questionIds.length; i += chunkSize) {
-          chunks.push(questionIds.slice(i, i + chunkSize));
+      const questionList = data || [];
+      setQuestions(questionList);
+      // Unblock UI immediately so questions render fast
+      setLoadingQuestions(false);
+
+      // Fetch options for active Part A questions in background
+      if (questionPartFilter === 'A' && questionList.length > 0) {
+        const questionIds = questionList.map(q => q.id);
+        const initialBatch = questionIds.slice(0, 30);
+        const { data: optData } = await supabase.from('exam_options').select('*').in('question_id', initialBatch);
+        if (optData) {
+          const optMap: Record<string, any[]> = {};
+          for (const opt of optData) {
+            if (!optMap[opt.question_id]) optMap[opt.question_id] = [];
+            optMap[opt.question_id].push(opt);
+          }
+          setQuestionOptions(prev => ({ ...prev, ...optMap }));
         }
 
-        const optResults = await Promise.all(
-          chunks.map(chunk => supabase.from('exam_options').select('*').in('question_id', chunk))
-        );
-
-        const optMap: Record<string, any[]> = {};
-        for (const res of optResults) {
-          if (res.data) {
-            for (const opt of res.data) {
-              if (!optMap[opt.question_id]) optMap[opt.question_id] = [];
-              optMap[opt.question_id].push(opt);
-            }
+        // Stream remaining options in background without holding the UI
+        if (questionIds.length > 30) {
+          const remainingIds = questionIds.slice(30);
+          const chunkSize = 40;
+          for (let i = 0; i < remainingIds.length; i += chunkSize) {
+            const chunk = remainingIds.slice(i, i + chunkSize);
+            supabase.from('exam_options').select('*').in('question_id', chunk).then(({ data: rData }) => {
+              if (rData) {
+                const rMap: Record<string, any[]> = {};
+                for (const opt of rData) {
+                  if (!rMap[opt.question_id]) rMap[opt.question_id] = [];
+                  rMap[opt.question_id].push(opt);
+                }
+                setQuestionOptions(prev => ({ ...prev, ...rMap }));
+              }
+            });
           }
         }
-        setQuestionOptions(optMap);
       } else {
         setQuestionOptions({});
       }
-    } catch (err) { console.error('Failed to fetch questions/options:', err); } finally { setLoadingQuestions(false); }
+    } catch (err) {
+      console.error('Failed to fetch questions/options:', err);
+    } finally {
+      setLoadingQuestions(false);
+    }
   };
 
   const fetchStudyMaterials = async () => {
-    setLoadingMaterials(true);
+    if (studyMaterials.length === 0) setLoadingMaterials(true);
     try {
       const { data, error } = await supabase.from('study_materials').select('*').eq('is_visible', true).order('display_order').order('created_at', { ascending: false });
-      if (!error) setStudyMaterials(data || []);
+      if (!error && data) setStudyMaterials(data);
     } catch (err) { console.error(err); } finally { setLoadingMaterials(false); }
   };
 
   const fetchAssignments = async () => {
     if (!candidate?.id) return;
-    setLoadingAssignments(true);
+    if (assignments.length === 0) setLoadingAssignments(true);
     try {
       const [assignRes, subRes] = await Promise.all([
         supabase.from('class_assignments').select('*').eq('is_visible', true).order('created_at', { ascending: false }),
         supabase.from('assignment_submissions').select('*').eq('candidate_id', candidate.id)
       ]);
-      if (!assignRes.error) setAssignments(assignRes.data || []);
-      if (!subRes.error) {
+      if (!assignRes.error && assignRes.data) setAssignments(assignRes.data);
+      if (!subRes.error && subRes.data) {
         const subMap: Record<string, any> = {};
-        (subRes.data || []).forEach(s => { subMap[s.assignment_id] = s; });
+        subRes.data.forEach(s => { subMap[s.assignment_id] = s; });
         setAssignmentSubmissions(subMap);
       }
     } catch (err) { console.error(err); } finally { setLoadingAssignments(false); }
   };
 
   const fetchClassNotes = async () => {
-    setLoadingNotes(true);
+    if (classNotes.length === 0) setLoadingNotes(true);
     try {
       const { data, error } = await supabase.from('study_materials').select('*').eq('is_visible', true).order('display_order').order('created_at', { ascending: false });
-      if (!error) setClassNotes(data || []);
+      if (!error && data) setClassNotes(data);
     } catch (err) { console.error(err); } finally { setLoadingNotes(false); }
   };
 
@@ -2048,12 +2084,22 @@ export default function PortalDashboard() {
                   const details = attemptDetailsMap[attemptId];
                   const attemptObj = pastAttempts.find(a => a.id === attemptId);
 
-                  if (loadingDetails || !details) {
+                  if (loadingDetails) {
                     return (
                       <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-24 flex flex-col items-center justify-center">
                         <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
                         <h4 className="font-bold text-[#262626] text-sm">Parsing attempt telemetry data...</h4>
                         <p className="text-xs text-foreground/40 mt-1">Calculating pacing quotients, difficulty matrices and cognitive curves.</p>
+                      </div>
+                    );
+                  }
+
+                  if (!details || (details.responses || []).length === 0) {
+                    return (
+                      <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-16 text-center">
+                        <FileText className="w-10 h-10 text-foreground/20 mx-auto mb-3" />
+                        <h4 className="font-bold text-[#262626] text-sm">Telemetry unavailable for this attempt</h4>
+                        <p className="text-xs text-foreground/50 mt-1">Detailed pacing telemetry is recorded when you complete mock test sessions.</p>
                       </div>
                     );
                   }
