@@ -44,6 +44,7 @@ DROP POLICY IF EXISTS "Public Read Candidate Submissions" ON storage.objects;
 DROP POLICY IF EXISTS "Public Access Candidate Submissions" ON storage.objects;
 DROP POLICY IF EXISTS "Candidates read own submissions" ON storage.objects;
 DROP POLICY IF EXISTS "Authenticated candidates read own submissions" ON storage.objects;
+DROP POLICY IF EXISTS "Admin List Candidate Submissions" ON storage.objects;
 
 -- Allow authenticated admins to list files via API; public direct URLs still serve freely
 CREATE POLICY "Admin List Candidate Submissions"
