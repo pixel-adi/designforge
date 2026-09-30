@@ -153,7 +153,29 @@ Deno.serve(async (req) => {
       return jsonOk(req, { error: "Authorization required for upgrade verification" }, 401);
     }
 
-    const isFocusMocks = upgrade_type === "focus_mocks";
+    // Security check: Fetch authoritative order details from Razorpay to prevent upgrade_type tampering
+    const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID");
+    let verifiedUpgradeType = upgrade_type;
+
+    if (RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET) {
+      try {
+        const basicAuth = btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
+        const orderRes = await fetch(`https://api.razorpay.com/v1/orders/${razorpay_order_id}`, {
+          headers: { Authorization: `Basic ${basicAuth}` },
+        });
+        if (orderRes.ok) {
+          const orderData = await orderRes.json();
+          // Use notes.upgrade_type directly from the authoritative order created by the server
+          if (orderData?.notes?.upgrade_type) {
+            verifiedUpgradeType = orderData.notes.upgrade_type;
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch order from Razorpay API, falling back:", err);
+      }
+    }
+
+    const isFocusMocks = verifiedUpgradeType === "focus_mocks";
     const expires_at = computeAccessExpiry();
 
     const updateFields = isFocusMocks

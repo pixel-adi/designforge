@@ -11,12 +11,12 @@ VALUES (
   'candidate-submissions',
   true,
   26214400, -- 25MB limit
-  ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif', 'application/pdf', 'application/octet-stream']::text[]
+  ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif', 'application/pdf']::text[]
 )
 ON CONFLICT (id) DO UPDATE SET 
   public = true,
   file_size_limit = 26214400,
-  allowed_mime_types = ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif', 'application/pdf', 'application/octet-stream']::text[];
+  allowed_mime_types = ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif', 'application/pdf']::text[];
 
 -- 2. Drop restrictive or conflicting SELECT policies
 DROP POLICY IF EXISTS "Public Access Candidate Submissions" ON storage.objects;
@@ -31,20 +31,19 @@ CREATE POLICY "Public Read Candidate Submissions"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'candidate-submissions');
 
--- 4. Drop and recreate INSERT policy allowing student submission uploads
+-- 4. Secure INSERT policy: allow uploads strictly within the 'submissions/' directory
 DROP POLICY IF EXISTS "Auth Upload Candidate Submissions" ON storage.objects;
 DROP POLICY IF EXISTS "Allow All Submissions Upload" ON storage.objects;
 DROP POLICY IF EXISTS "Candidates upload submissions" ON storage.objects;
 
 CREATE POLICY "Allow All Submissions Upload"
 ON storage.objects FOR INSERT
-WITH CHECK (bucket_id = 'candidate-submissions');
+WITH CHECK (
+  bucket_id = 'candidate-submissions'
+  AND (storage.foldername(name))[1] = 'submissions'
+);
 
--- 5. Drop and recreate UPDATE policy
+-- 5. Revoke blanket UPDATE: Submissions use immutable UUID file paths.
+-- Dropping blanket UPDATE prevents arbitrary overwriting of another candidate's sketches.
 DROP POLICY IF EXISTS "Auth Update Candidate Submissions" ON storage.objects;
 DROP POLICY IF EXISTS "Allow All Submissions Update" ON storage.objects;
-
-CREATE POLICY "Allow All Submissions Update"
-ON storage.objects FOR UPDATE
-USING (bucket_id = 'candidate-submissions')
-WITH CHECK (bucket_id = 'candidate-submissions');

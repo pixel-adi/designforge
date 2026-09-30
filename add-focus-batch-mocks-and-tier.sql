@@ -61,6 +61,8 @@ BEGIN
        OR NEW.access_expires_at IS DISTINCT FROM OLD.access_expires_at
        OR NEW.access_payment_id IS DISTINCT FROM OLD.access_payment_id
        OR NEW.has_focus_mocks_access IS DISTINCT FROM OLD.has_focus_mocks_access
+       OR NEW.focus_mocks_payment_id IS DISTINCT FROM OLD.focus_mocks_payment_id
+       OR NEW.focus_mocks_purchased_at IS DISTINCT FROM OLD.focus_mocks_purchased_at
      )
   THEN
     -- Silently revert the protected columns
@@ -68,6 +70,8 @@ BEGIN
     NEW.access_expires_at := OLD.access_expires_at;
     NEW.access_payment_id := OLD.access_payment_id;
     NEW.has_focus_mocks_access := OLD.has_focus_mocks_access;
+    NEW.focus_mocks_payment_id := OLD.focus_mocks_payment_id;
+    NEW.focus_mocks_purchased_at := OLD.focus_mocks_purchased_at;
   END IF;
   RETURN NEW;
 END;
