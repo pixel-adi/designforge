@@ -84,6 +84,15 @@ export default function PortalDashboard() {
   const [upgradingPayment, setUpgradingPayment] = useState(false);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
 
+  // Focus Batch Mocks States
+  const [showFocusMocksModal, setShowFocusMocksModal] = useState(false);
+  const [upgradingFocusMocks, setUpgradingFocusMocks] = useState(false);
+  const [focusMocksError, setFocusMocksError] = useState<string | null>(null);
+
+  const hasFocusMocksAccess = useMemo(() => {
+    return candidate?.access_level === 'focus_batch' || Boolean(candidate?.has_focus_mocks_access);
+  }, [candidate]);
+
   // Question Bank state
   const [questions, setQuestions] = useState<any[]>([]);
   const [questionOptions, setQuestionOptions] = useState<Record<string, any[]>>({});
@@ -1556,6 +1565,111 @@ export default function PortalDashboard() {
     }
   };
 
+  const handleFocusMocksPayment = async () => {
+    setUpgradingFocusMocks(true);
+    setFocusMocksError(null);
+    try {
+      if (!document.getElementById('razorpay-checkout-js')) {
+        const script = document.createElement('script');
+        script.id = 'razorpay-checkout-js';
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.async = true;
+        document.body.appendChild(script);
+      }
+
+      let orderResponse: any = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const { data } = await invokeEdgeFunction('create-upgrade-order', { upgrade_type: 'focus_mocks' });
+          orderResponse = data;
+          if (orderResponse?.order_id && orderResponse?.key_id) break;
+        } catch (err) {
+          console.warn(`Attempt ${attempt} failed:`, err);
+        }
+        if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
+      }
+
+      if (!orderResponse?.order_id || !orderResponse?.key_id) {
+        setFocusMocksError(orderResponse?.error || 'Could not initiate payment. Please try again.');
+        setUpgradingFocusMocks(false);
+        return;
+      }
+
+      let isLoaded = !!(window as any).Razorpay;
+      if (!isLoaded) {
+        await new Promise<void>((resolve) => {
+          const check = setInterval(() => {
+            if ((window as any).Razorpay) {
+              clearInterval(check);
+              isLoaded = true;
+              resolve();
+            }
+          }, 200);
+          setTimeout(() => { clearInterval(check); resolve(); }, 4000);
+        });
+      }
+      if (!isLoaded) {
+        setFocusMocksError('Failed to load payment gateway. Please disable ad-blockers.');
+        setUpgradingFocusMocks(false);
+        return;
+      }
+
+      const options = {
+        key: orderResponse.key_id,
+        amount: orderResponse.amount,
+        currency: 'INR',
+        name: 'Designforge',
+        description: 'Unlock Unlimited Focus Batch Mocks',
+        order_id: orderResponse.order_id,
+        handler: async function (response: any) {
+          try {
+            const { data: verifyData } = await invokeEdgeFunction('verify-upgrade-payment', {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              upgrade_type: 'focus_mocks'
+            });
+            if (verifyData?.status === 'success') {
+              const { data: updatedCandidate } = await supabase
+                .from('exam_candidates')
+                .select('*')
+                .eq('auth_user_id', authUser.id)
+                .maybeSingle();
+              if (updatedCandidate) setCandidate(updatedCandidate);
+              setShowFocusMocksModal(false);
+              toast({
+                title: '🎉 Focus Batch Mocks Unlocked!',
+                description: 'You now have unlimited access to all weekly Focus Batch mock challenges.'
+              });
+            } else {
+              setFocusMocksError(verifyData?.error || 'Payment verification failed.');
+            }
+          } catch (err: any) {
+            console.error('Verification error:', err);
+            setFocusMocksError('Payment verification failed. If money was deducted, contact support.');
+          }
+          setUpgradingFocusMocks(false);
+        },
+        prefill: { name: candidate?.name, email: candidate?.email },
+        theme: { color: '#E23A25' },
+        modal: {
+          ondismiss: () => {
+            setUpgradingFocusMocks(false);
+            setFocusMocksError('Payment was cancelled.');
+          }
+        },
+      };
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', (r: any) => {
+        setFocusMocksError(`Payment failed: ${r.error.description}`);
+      });
+      rzp.open();
+    } catch (err) {
+      setFocusMocksError('Something went wrong. Please try again.');
+      setUpgradingFocusMocks(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex">
@@ -1805,6 +1919,250 @@ export default function PortalDashboard() {
                     </div>
                   </div>
 
+                  {/* DEDICATED FOCUS BATCH MOCKS SECTION */}
+                  {(() => {
+                    const focusBatchTests = activeTests.filter((t: any) => t.is_focus_batch || t.access_tier === 'focus_batch');
+                    return (
+                      <section className="mb-10 rounded-3xl border border-black/10 bg-gradient-to-br from-neutral-900 via-neutral-950 to-[#111111] text-white p-6 sm:p-8 shadow-xl overflow-hidden relative">
+                        {/* Ambient glow */}
+                        <div className="absolute -top-20 -right-20 w-80 h-80 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
+                        
+                        <div className="relative z-10">
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/10">
+                            <div>
+                              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/20 border border-primary/30 text-primary text-[11px] font-extrabold uppercase tracking-wider mb-2">
+                                <Target className="w-3.5 h-3.5" />
+                                <span>Focus Batch Weekly Series</span>
+                                <span className="text-white/40">•</span>
+                                <span className="text-white/80">Strict 7-Day Window</span>
+                              </div>
+                              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+                                Focus Batch Exclusive Mocks
+                              </h2>
+                              <p className="text-xs sm:text-sm text-neutral-400 mt-1 max-w-2xl">
+                                High-rigor timed simulations calibrated for top-percentile rankers. Strictly limited to a 1-week submission deadline per challenge.
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-3 shrink-0">
+                              {hasFocusMocksAccess ? (
+                                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                  <span>Focus Mocks Unlocked</span>
+                                </div>
+                              ) : (
+                                <Button
+                                  onClick={() => setShowFocusMocksModal(true)}
+                                  className="bg-primary hover:bg-primary/90 text-white font-extrabold text-xs h-10 px-5 rounded-xl shadow-lg shadow-primary/25 gap-2"
+                                >
+                                  <Lock className="w-3.5 h-3.5" />
+                                  <span>Unlock All Mocks • ₹1,000</span>
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Content Area */}
+                          {hasFocusMocksAccess ? (
+                            /* UNLOCKED STATE: Live Focus Batch Tests */
+                            <div className="mt-6">
+                              {focusBatchTests.length === 0 ? (
+                                <div className="py-10 px-6 text-center rounded-2xl bg-white/5 border border-white/10">
+                                  <Target className="w-10 h-10 text-white/30 mx-auto mb-2" />
+                                  <h3 className="text-sm font-semibold text-white">No weekly challenge currently open</h3>
+                                  <p className="text-xs text-neutral-400 mt-1 max-w-md mx-auto">
+                                    The next 7-day timed simulation challenge will be published soon. Keep drilling!
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {focusBatchTests.map((test: any) => {
+                                    const deadlineStr = test.ends_at || test.expires_at;
+                                    const isExpired = deadlineStr ? new Date(deadlineStr).getTime() < Date.now() : false;
+                                    const testAttempts = candidateAttemptsMap[test.id] || [];
+                                    const completedAttempts = testAttempts.filter((a: any) => a.status === 'completed');
+                                    const hasCompletedAttempt = completedAttempts.length > 0;
+                                    const canReattempt = completedAttempts.length < 3;
+                                    
+                                    let deadlineText = "";
+                                    if (deadlineStr) {
+                                      if (isExpired) {
+                                        deadlineText = "Deadline Passed";
+                                      } else {
+                                        const diffHours = Math.round((new Date(deadlineStr).getTime() - Date.now()) / (1000 * 60 * 60));
+                                        if (diffHours > 24) deadlineText = `${Math.floor(diffHours / 24)}d ${diffHours % 24}h remaining`;
+                                        else deadlineText = `${diffHours}h remaining`;
+                                      }
+                                    }
+
+                                    return (
+                                      <div
+                                        key={test.id}
+                                        className={`rounded-2xl border p-5 transition-all flex flex-col justify-between ${
+                                          isExpired && !hasCompletedAttempt
+                                            ? 'bg-white/5 border-white/5 opacity-60'
+                                            : 'bg-white/10 border-white/15 hover:border-primary/50 hover:bg-white/[0.12] shadow-lg'
+                                        }`}
+                                      >
+                                        <div>
+                                          <div className="flex items-center justify-between gap-2 mb-3">
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-primary/20 text-primary border border-primary/30">
+                                              🎯 1-Week Window
+                                            </span>
+                                            {deadlineStr && (
+                                              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                                                isExpired
+                                                  ? 'bg-neutral-800 text-neutral-400'
+                                                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                              }`}>
+                                                ⏳ {deadlineText}
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          <h3 className="font-bold text-base text-white mb-2">{test.title}</h3>
+
+                                          <div className="flex items-center gap-4 text-xs font-medium text-neutral-300 mb-4">
+                                            <div className="flex items-center gap-1.5">
+                                              <Clock className="w-3.5 h-3.5 text-primary" />
+                                              {test.exam_test_sections?.reduce((acc: number, curr: any) => acc + curr.duration_minutes, 0) || 180} Mins
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                              <LayoutDashboard className="w-3.5 h-3.5 text-primary" />
+                                              {test.exam_test_sections?.length || 2} Sections
+                                            </div>
+                                            {hasCompletedAttempt && (
+                                              <span className="text-white/60">
+                                                Attempts: {completedAttempts.length}/3
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          {/* Past attempt review buttons */}
+                                          {completedAttempts.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5 mb-4">
+                                              {completedAttempts.map((att: any) => (
+                                                <button
+                                                  key={att.id}
+                                                  onClick={() => setLocation(`/portal/test/${test.id}?review_attempt=${att.id}`)}
+                                                  className="text-[10px] font-bold bg-white/10 text-white border border-white/20 px-2.5 py-1 rounded-lg hover:bg-white/20 transition-colors"
+                                                >
+                                                  Review Attempt {att.attempt_number || completedAttempts.indexOf(att) + 1}
+                                                </button>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {hasCompletedAttempt && canReattempt && !isExpired ? (
+                                          <Button
+                                            onClick={() => setLocation(`/portal/test/${test.id}`)}
+                                            className="w-full bg-primary hover:bg-primary/90 text-white text-xs font-bold gap-2 h-10 rounded-xl"
+                                          >
+                                            Reattempt (Attempt {completedAttempts.length + 1}) <ChevronRight className="w-4 h-4" />
+                                          </Button>
+                                        ) : hasCompletedAttempt && !canReattempt ? (
+                                          <Button
+                                            disabled
+                                            variant="outline"
+                                            className="w-full border-white/10 text-white/40 cursor-not-allowed bg-transparent text-xs h-10 rounded-xl"
+                                          >
+                                            All 3 Attempts Completed
+                                          </Button>
+                                        ) : isExpired ? (
+                                          <Button
+                                            disabled
+                                            className="w-full bg-neutral-800 text-neutral-500 cursor-not-allowed text-xs h-10 rounded-xl"
+                                          >
+                                            Strict 1-Week Window Expired
+                                          </Button>
+                                        ) : (
+                                          <Button
+                                            onClick={() => setLocation(`/portal/test/${test.id}`)}
+                                            className="w-full bg-primary hover:bg-primary/90 text-white text-xs font-bold gap-2 h-10 rounded-xl shadow-md shadow-primary/20"
+                                          >
+                                            Start Weekly Challenge <ChevronRight className="w-4 h-4" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            /* LOCKED STATE: High-impact locked teaser for generic / materials-only accounts */
+                            <div className="mt-6 space-y-5">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                                  <Sparkles className="w-4 h-4 text-primary mb-2" />
+                                  <h4 className="text-xs font-bold text-white mb-1">Top-Percentile Rigor</h4>
+                                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                                    Fresh questions crafted to stress-test spatial visualization, analytical speed, and Part B sketching.
+                                  </p>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                                  <Clock className="w-4 h-4 text-primary mb-2" />
+                                  <h4 className="text-xs font-bold text-white mb-1">Strict 7-Day Deadlines</h4>
+                                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                                    Tests expire after exactly 7 days to simulate scheduled competitive batches and peer rankings.
+                                  </p>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                                  <Zap className="w-4 h-4 text-primary mb-2" />
+                                  <h4 className="text-xs font-bold text-white mb-1">Lifetime Unlimited Access</h4>
+                                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                                    Single one-time unlock of ₹1,000 grants unlimited access to all present & upcoming Focus Mocks.
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Preview cards with frosted lock effect */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {(focusBatchTests.length > 0 ? focusBatchTests : [
+                                  { id: 'preview-1', title: 'Focus Batch Mock 01: High-Yield Spatial & Observation Challenge', duration: 180 },
+                                  { id: 'preview-2', title: 'Focus Batch Mock 02: Advanced Form Synthesis & Part B Speed Test', duration: 180 }
+                                ]).map((mock: any, idx: number) => (
+                                  <div
+                                    key={mock.id || idx}
+                                    className="relative rounded-2xl border border-white/10 bg-white/[0.04] p-5 overflow-hidden backdrop-blur-sm"
+                                  >
+                                    <div className="filter blur-[1.5px] opacity-40 pointer-events-none select-none space-y-2">
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-primary bg-primary/20 px-2 py-0.5 rounded-full">
+                                          Part A & Part B
+                                        </span>
+                                        <span className="text-[11px] text-neutral-400">7-Day Timed Window</span>
+                                      </div>
+                                      <h4 className="text-sm font-bold text-white line-clamp-1">{mock.title}</h4>
+                                      <div className="flex items-center gap-3 text-xs text-neutral-400">
+                                        <span>⏱️ 180 Mins</span>
+                                        <span>📊 Comparative Analytics</span>
+                                      </div>
+                                    </div>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[1px] p-3 text-center">
+                                      <div className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center mb-1 text-white shadow-sm">
+                                        <Lock className="w-3.5 h-3.5" />
+                                      </div>
+                                      <p className="text-[11px] font-bold text-white mb-2">Locked for Focus Batch</p>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => setShowFocusMocksModal(true)}
+                                        className="h-7 px-3 text-[11px] font-bold bg-primary hover:bg-primary/90 text-white rounded-lg shadow-sm"
+                                      >
+                                        Unlock Access • ₹1,000
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </section>
+                    );
+                  })()}
+
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <h2 className="text-lg font-semibold text-[#262626]">Active Mock & Practice Tests</h2>
                     <div className="flex items-center gap-1.5 bg-black/5 p-1 rounded-xl text-xs font-semibold self-start sm:self-auto">
@@ -1831,7 +2189,8 @@ export default function PortalDashboard() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {(() => {
-                      const displayTests = activeTests.filter((test: any) => {
+                      const generalTests = activeTests.filter((t: any) => !t.is_focus_batch && t.access_tier !== 'focus_batch');
+                      const displayTests = generalTests.filter((test: any) => {
                         if (testCategoryFilter === 'all') return true;
                         if (testCategoryFilter === 'full_length') return test.category === 'full_length' || !test.category;
                         if (testCategoryFilter === 'short') return test.category === 'half_length' || test.category === 'custom_short' || test.category === 'short';
@@ -3756,6 +4115,71 @@ export default function PortalDashboard() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Focus Batch Mocks Unlock Modal */}
+      <Dialog open={showFocusMocksModal} onOpenChange={setShowFocusMocksModal}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Target className="w-5 h-5" />
+              </span>
+              Unlock Focus Batch Mocks
+            </DialogTitle>
+            <DialogDescription>
+              Gain unlimited lifetime access to all weekly Focus Batch mock challenges.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4">
+              <div className="flex items-baseline justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-primary">Unlimited Access</span>
+                <span className="text-2xl font-black text-[#262626]">₹1,000</span>
+              </div>
+              <p className="text-xs text-foreground/60 mb-3">
+                One-time gateway fee. Retain your current materials access while adding unlimited weekly high-rigor mock test challenges.
+              </p>
+              <ul className="text-xs text-foreground/75 space-y-2">
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                  <span>All present and upcoming weekly Focus Batch mock exams</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                  <span>Strict 7-day timed competition window for exam condition calibration</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                  <span>Instant Part A automated grading + Part B critique submission</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                  <span>In-depth cognitive telemetry, speed, and accuracy analytics</span>
+                </li>
+              </ul>
+            </div>
+            {focusMocksError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                <p className="text-sm text-red-700">{focusMocksError}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-col">
+            <Button
+              onClick={handleFocusMocksPayment}
+              disabled={upgradingFocusMocks}
+              className="w-full bg-primary hover:bg-primary/90 text-white gap-2 h-12 rounded-xl text-sm font-bold shadow-lg shadow-primary/20"
+            >
+              {upgradingFocusMocks ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+              {upgradingFocusMocks ? 'Initiating Gateway...' : 'Unlock Unlimited Mocks — ₹1,000'}
+            </Button>
+            <p className="text-[11px] text-center text-foreground/50">
+              Secured by Razorpay. Instant activation upon successful payment.
+            </p>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

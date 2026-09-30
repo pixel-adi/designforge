@@ -122,6 +122,7 @@ export default function AdminExamQuestions() {
   const [filterPart, setFilterPart] = useState<string>("ALL");
   const [filterType, setFilterType] = useState<string>("ALL");
   const [filterPyq, setFilterPyq] = useState<string>("ALL");
+  const [filterDifficulty, setFilterDifficulty] = useState<string>("ALL");
   const [searchTopic, setSearchTopic] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [filterInvalidOnly, setFilterInvalidOnly] = useState<boolean>(false);
@@ -129,9 +130,32 @@ export default function AdminExamQuestions() {
   const itemsPerPage = 20;
   const [hideSample, setHideSample] = useState<boolean>(false);
 
+  // Direct Mock Creation from Bank Selection
+  const [selectedQuestionsForMock, setSelectedQuestionsForMock] = useState<Question[]>([]);
+
+  const toggleSelectForMock = (q: Question) => {
+    setSelectedQuestionsForMock(prev => {
+      const exists = prev.some(item => item.id === q.id);
+      if (exists) return prev.filter(item => item.id !== q.id);
+      return [...prev, q];
+    });
+  };
+
+  const handleCreateMockFromSelected = () => {
+    if (selectedQuestionsForMock.length === 0) {
+      return toast({ title: "No questions selected", description: "Please select questions to create a mock test.", variant: "destructive" });
+    }
+    try {
+      sessionStorage.setItem('df_preselected_questions', JSON.stringify(selectedQuestionsForMock));
+      window.location.href = '/admin/exam-tests';
+    } catch (e: any) {
+      toast({ title: "Error", description: "Failed to forward questions to builder.", variant: "destructive" });
+    }
+  };
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterPart, filterType, filterPyq, searchTopic, searchQuery, filterInvalidOnly]);
+  }, [filterPart, filterType, filterPyq, filterDifficulty, searchTopic, searchQuery, filterInvalidOnly]);
 
   // Bulk Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -979,6 +1003,7 @@ export default function AdminExamQuestions() {
       if (filterPart !== "ALL") query = query.eq("part", filterPart);
       if (filterType !== "ALL") query = query.eq("type", filterType);
       if (filterPyq !== "ALL") query = query.eq("pyq_tag", filterPyq);
+      if (filterDifficulty !== "ALL") query = query.eq("difficulty", filterDifficulty);
       if (searchQuery.trim()) query = query.ilike("content_text", `%${searchQuery.trim()}%`);
 
       const { data, count, error } = await query
@@ -2263,7 +2288,7 @@ export default function AdminExamQuestions() {
 
   useEffect(() => {
     fetchQuestions();
-  }, [currentPage, filterPart, filterType, filterPyq, searchQuery, filterInvalidOnly]);
+  }, [currentPage, filterPart, filterType, filterPyq, filterDifficulty, searchQuery, filterInvalidOnly]);
 
   useEffect(() => {
     fetchAuditSummary();
@@ -2701,12 +2726,38 @@ export default function AdminExamQuestions() {
                   <SelectItem value="SUBJECTIVE">SUB</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={filterDifficulty} onValueChange={(val) => setFilterDifficulty(val)}>
+                <SelectTrigger className="h-8 text-xs bg-white border-black/10 rounded-lg w-full sm:w-28"><SelectValue placeholder="Diff" /></SelectTrigger>
+                <SelectContent className="max-h-52 overflow-y-auto min-w-[120px]">
+                  <SelectItem value="ALL">Diff (All)</SelectItem>
+                  <SelectItem value="Low">Low</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
           {/* List Header */}
-          <div className="grid grid-cols-12 gap-4 border-b border-black/5 p-4 bg-background/50 text-xs font-semibold text-foreground/50 uppercase tracking-widest hidden md:grid">
-            <div className="col-span-1">Part</div>
+          <div className="grid grid-cols-12 gap-4 border-b border-black/5 p-4 bg-background/50 text-xs font-semibold text-foreground/50 uppercase tracking-widest hidden md:grid items-center">
+            <div className="col-span-1 flex items-center gap-2">
+              <input 
+                type="checkbox"
+                aria-label="Select all on this page"
+                checked={displayQuestions.length > 0 && displayQuestions.every(q => selectedQuestionsForMock.some(sq => sq.id === q.id))}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    const toAdd = displayQuestions.filter(q => !selectedQuestionsForMock.some(sq => sq.id === q.id));
+                    setSelectedQuestionsForMock(prev => [...prev, ...toAdd]);
+                  } else {
+                    const pageIds = new Set(displayQuestions.map(q => q.id));
+                    setSelectedQuestionsForMock(prev => prev.filter(q => !pageIds.has(q.id)));
+                  }
+                }}
+                className="w-4 h-4 accent-primary cursor-pointer rounded"
+              />
+              <span>Part</span>
+            </div>
             <div className="col-span-1">Type</div>
             <div className="col-span-4">Content Snippet</div>
             <div className="col-span-1">Media</div>
@@ -2720,8 +2771,15 @@ export default function AdminExamQuestions() {
             {displayQuestions.map((q) => (
               <div key={q.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center hover:bg-background/30 transition-colors text-sm">
                 
-                <div className="col-span-1 font-bold text-foreground/70">
-                   Part {q.part}
+                <div className="col-span-1 font-bold text-foreground/70 flex items-center gap-2">
+                  <input 
+                    type="checkbox"
+                    aria-label={`Select question ${q.id}`}
+                    checked={selectedQuestionsForMock.some(sq => sq.id === q.id)}
+                    onChange={() => toggleSelectForMock(q)}
+                    className="w-4 h-4 accent-primary cursor-pointer rounded shrink-0"
+                  />
+                  <span>Part {q.part}</span>
                 </div>
 
                 <div className="col-span-1">
@@ -2822,6 +2880,41 @@ export default function AdminExamQuestions() {
           </div>
         </div>
       </div>
+
+      {/* FLOATING ACTION BAR FOR MOCK CREATION */}
+      {selectedQuestionsForMock.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-6 py-3 bg-[#111111] text-white rounded-2xl shadow-2xl border border-white/10 backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+              {selectedQuestionsForMock.length}
+            </span>
+            <div className="text-xs">
+              <span className="font-semibold text-white">Questions selected</span>
+              <span className="text-white/60 ml-2">
+                (Part A: {selectedQuestionsForMock.filter(q => q.part === 'A').length}, Part B: {selectedQuestionsForMock.filter(q => q.part === 'B').length})
+              </span>
+            </div>
+          </div>
+          <div className="h-4 w-px bg-white/20" />
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelectedQuestionsForMock([])}
+              className="text-xs text-white/70 hover:text-white hover:bg-white/10 h-8 px-3"
+            >
+              Clear
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleCreateMockFromSelected}
+              className="text-xs bg-primary hover:bg-primary/90 text-white font-medium h-8 px-4 rounded-lg shadow-sm"
+            >
+              Create Mock from Selected →
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* PREVIEW MODAL */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>

@@ -50,10 +50,17 @@ Deno.serve(async (req) => {
       return jsonOk(req, { error: "Invalid or expired token" }, 401);
     }
 
-    // Fetch the candidate's current access level (using service role — bypasses RLS)
+    // Parse optional body parameters
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch (_) {}
+    const upgradeType = body?.upgrade_type === "focus_mocks" ? "focus_mocks" : "materials_only";
+
+    // Fetch the candidate's current access level and entitlements
     const { data: candidate, error: candidateError } = await supabase
       .from("exam_candidates")
-      .select("id, access_level, email, name")
+      .select("id, access_level, email, name, has_focus_mocks_access")
       .eq("auth_user_id", user.id)
       .maybeSingle();
 
@@ -61,9 +68,19 @@ Deno.serve(async (req) => {
       return jsonOk(req, { error: "Candidate profile not found. Please complete onboarding first." });
     }
 
-    // Prevent duplicate upgrades
-    if (candidate.access_level !== "generic") {
-      return jsonOk(req, { error: "You already have an active subscription. No upgrade needed." });
+    let amount = 4999; // default ₹4,999 for full materials & assignments
+
+    if (upgradeType === "focus_mocks") {
+      // Check if candidate already has focus batch or focus mocks access
+      if (candidate.access_level === "focus_batch" || candidate.has_focus_mocks_access) {
+        return jsonOk(req, { error: "You already have active access to Focus Batch mocks." });
+      }
+      amount = 1000; // ₹1,000 for unlimited Focus Batch premium mocks
+    } else {
+      // Prevent duplicate upgrades for materials
+      if (candidate.access_level !== "generic") {
+        return jsonOk(req, { error: "You already have an active subscription. No upgrade needed." });
+      }
     }
 
     // Create Razorpay order
@@ -75,11 +92,10 @@ Deno.serve(async (req) => {
       return jsonOk(req, { error: "Payment configuration error. Please contact support." });
     }
 
-    const amount = 4999; // ₹4,999
     const receipt_id = crypto.randomUUID().substring(0, 40);
     const basicAuth = btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
 
-    console.log(`Creating upgrade order for candidate ${candidate.id} | amount: ${amount}`);
+    console.log(`Creating ${upgradeType} order for candidate ${candidate.id} | amount: ${amount}`);
 
     const razorpayResponse = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
@@ -95,7 +111,7 @@ Deno.serve(async (req) => {
           candidate_id: candidate.id,
           candidate_email: candidate.email,
           candidate_name: candidate.name,
-          upgrade_type: "materials_only",
+          upgrade_type: upgradeType,
         },
       }),
     });

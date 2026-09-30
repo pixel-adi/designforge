@@ -66,6 +66,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   // Timer State
   const [timeLeft, setTimeLeft] = useState(0); // in seconds
   const [timerRunning, setTimerRunning] = useState(false);
+  const testEndTimeRef = useRef<number | null>(null);
+  const hasAutoSubmittedRef = useRef(false);
+  const hasTransitionedPartBRef = useRef(false);
 
   // Network State
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -224,61 +227,107 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [testStep, timeLeft, engineData]);
 
-  // Active Question Time Tracker (Isolated from timeLeft countdown to minimize re-renders)
+  // Active Question Time Tracker (Decoupled from timeLeft countdown to eliminate re-renders)
   useEffect(() => {
     let timerId: any;
     if (timerRunning && testStep === 'test' && engineData?.questions?.[activeQuestionIndex]) {
       const activeQId = engineData.questions[activeQuestionIndex].id;
       timerId = setInterval(() => {
-        setResponses(prev => {
-          const currentQ = prev[activeQId] || {
-            status: 'unseen',
-            selectedOptions: [],
-            answerText: '',
-            fileUrl: '',
-            timeSpent: 0,
-            answerChanges: 0,
-            stateTransitions: []
-          };
-          return {
+        // Accumulate in latestResponsesRef without triggering heavy component re-renders every 1000ms
+        const currentQ = latestResponsesRef.current[activeQId] || {
+          status: 'unseen',
+          selectedOptions: [],
+          answerText: '',
+          fileUrl: '',
+          timeSpent: 0,
+          answerChanges: 0,
+          stateTransitions: []
+        };
+        const updatedTime = (currentQ.timeSpent || 0) + 1;
+        latestResponsesRef.current[activeQId] = {
+          ...currentQ,
+          timeSpent: updatedTime
+        };
+
+        // Sync to React state every 5 seconds or upon navigating questions to keep state fresh
+        if (updatedTime % 5 === 0) {
+          setResponses(prev => ({
             ...prev,
             [activeQId]: {
-              ...currentQ,
-              timeSpent: (currentQ.timeSpent || 0) + 1
+              ...(prev[activeQId] || currentQ),
+              timeSpent: updatedTime
             }
-          };
-        });
+          }));
+        }
       }, 1000);
     }
     return () => clearInterval(timerId);
   }, [timerRunning, testStep, activeQuestionIndex, engineData]);
 
-  // Timer Countdown
+  // Wall-Clock Synchronized Timer Countdown (Guaranteed precision regardless of tab backgrounding or lag)
   useEffect(() => {
-    let timerId: any;
-    if (timerRunning && timeLeft > 0) {
-      timerId = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            setTimerRunning(false);
-            handleAutoSubmit("Time's up! Your test has been automatically submitted.");
-            return 0;
-          }
+    if (!timerRunning || !testEndTimeRef.current) return;
 
-          // Part A to Part B Transition: Auto-lock & score Part A
-          const totalSecs = (engineData?.totalMins || 180) * 60;
-          if (engineData?.hasPartB && engineData.partA_TimeThreshold < totalSecs && prev === engineData.partA_TimeThreshold + 1 && prev < totalSecs) {
-            finalizeAttempt(responses, attemptId, false);
-            setTestStep('part-b-instructions');
-            toast({ title: "Part A Time Up 🔒", description: "Part A has been auto-submitted and locked. Please proceed to Part B.", duration: 8000 });
-          }
+    const checkAndTick = () => {
+      if (!testEndTimeRef.current) return;
+      const now = Date.now();
+      const remaining = Math.max(0, Math.round((testEndTimeRef.current - now) / 1000));
+      setTimeLeft(remaining);
 
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(timerId);
-  }, [timerRunning, timeLeft, engineData, responses, attemptId]);
+      // Auto-submit when time has fully elapsed
+      if (remaining <= 0) {
+        if (!hasAutoSubmittedRef.current) {
+          hasAutoSubmittedRef.current = true;
+          setTimerRunning(false);
+          handleAutoSubmit("Time's up! Your test has been automatically submitted.");
+        }
+        return;
+      }
+
+      // Part A to Part B Transition: Auto-lock & score Part A
+      const totalSecs = (engineData?.totalMins || 180) * 60;
+      if (
+        engineData?.hasPartB &&
+        engineData.partA_TimeThreshold < totalSecs &&
+        remaining <= engineData.partA_TimeThreshold &&
+        !hasTransitionedPartBRef.current &&
+        testStep === 'test'
+      ) {
+        const currentQ = engineData.questions?.[activeQuestionIndex];
+        if (currentQ?.part === 'A') {
+          hasTransitionedPartBRef.current = true;
+          finalizeAttempt(latestResponsesRef.current, attemptId, false);
+          setTestStep('part-b-instructions');
+          toast({
+            title: "Part A Time Up 🔒",
+            description: "Part A has been auto-submitted and locked. Please proceed to Part B.",
+            duration: 8000
+          });
+        }
+      }
+    };
+
+    // Immediate initial sync
+    checkAndTick();
+
+    // 500ms heartbeat guarantees sub-second accuracy without drift
+    const timerId = setInterval(checkAndTick, 500);
+
+    // Instant resync on tab visibility change or window focus
+    const handleSync = () => {
+      if (!document.hidden) {
+        checkAndTick();
+      }
+    };
+    document.addEventListener('visibilitychange', handleSync);
+    window.addEventListener('focus', handleSync);
+
+    return () => {
+      clearInterval(timerId);
+      document.removeEventListener('visibilitychange', handleSync);
+      window.removeEventListener('focus', handleSync);
+    };
+  }, [timerRunning, engineData?.hasPartB, engineData?.partA_TimeThreshold, engineData?.totalMins, testStep, activeQuestionIndex, attemptId]);
 
   const fetchTestEngineData = async () => {
     setLoading(true);
@@ -388,7 +437,22 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         hasPartB
       });
       setResponses(initialResponses);
-      setTimeLeft(totalMins * 60);
+
+      // Check cached session end time for instant reload/crash recovery
+      const cachedEndTimeStr = typeof window !== 'undefined' ? sessionStorage.getItem(`df_test_end_${id}`) : null;
+      if (cachedEndTimeStr) {
+        const cachedEnd = Number(cachedEndTimeStr);
+        if (cachedEnd > Date.now()) {
+          const rem = Math.max(0, Math.round((cachedEnd - Date.now()) / 1000));
+          testEndTimeRef.current = cachedEnd;
+          setTimeLeft(rem);
+        } else {
+          testEndTimeRef.current = null;
+          setTimeLeft(0);
+        }
+      } else {
+        setTimeLeft(totalMins * 60);
+      }
 
     } catch (err: any) {
       toast({ title: "Failed to load test", description: err.message, variant: "destructive" });
@@ -409,15 +473,41 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       // Get candidate record
       const { data: candidate } = await supabase
         .from('exam_candidates')
-        .select('id')
+        .select('id, access_level, has_focus_mocks_access')
         .eq('auth_user_id', user.id)
         .single();
       if (!candidate) throw new Error('Candidate profile not found');
 
+      // Access & 1-week deadline enforcement for Focus Batch tests
+      const currentTest = engineData?.test;
+      if (currentTest && (currentTest.is_focus_batch || currentTest.access_tier === 'focus_batch')) {
+        const hasAccess = candidate.access_level === 'focus_batch' || Boolean(candidate.has_focus_mocks_access);
+        if (!hasAccess) {
+          toast({
+            title: "Access Restricted",
+            description: "This mock is exclusive to Focus Batch accounts. Unlock it from the portal dashboard.",
+            variant: "destructive"
+          });
+          setLocation('/portal/dashboard');
+          return null;
+        }
+
+        const deadline = currentTest.ends_at || currentTest.expires_at;
+        if (deadline && new Date(deadline).getTime() < Date.now()) {
+          toast({
+            title: "Challenge Expired",
+            description: "The 1-week submission deadline for this Focus Batch mock has passed.",
+            variant: "destructive"
+          });
+          setLocation('/portal/dashboard');
+          return null;
+        }
+      }
+
       // Fetch all existing attempts for this candidate + test
       const { data: existingAttempts } = await supabase
         .from('exam_attempts')
-        .select('id, status, attempt_number')
+        .select('id, status, attempt_number, start_time')
         .eq('candidate_id', candidate.id)
         .eq('test_id', id)
         .order('attempt_number', { ascending: true });
@@ -427,6 +517,20 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       // Resume an in-progress attempt if one exists (handles page refresh)
       const inProgress = attempts.find(a => a.status === 'in_progress');
       if (inProgress) {
+        const totalSecs = (engineData?.totalMins || 180) * 60;
+        let remaining = totalSecs;
+        if (inProgress.start_time) {
+          const startTimeMs = new Date(inProgress.start_time).getTime();
+          const elapsedSecs = Math.max(0, Math.floor((Date.now() - startTimeMs) / 1000));
+          remaining = Math.max(0, totalSecs - elapsedSecs);
+        }
+        testEndTimeRef.current = Date.now() + (remaining * 1000);
+        sessionStorage.setItem(`df_test_end_${id}`, String(testEndTimeRef.current));
+        setTimeLeft(remaining);
+
+        if (remaining <= 0) {
+          handleAutoSubmit("Your attempt duration has expired. Test submitted.");
+        }
         return inProgress.id;
       }
 
@@ -443,12 +547,18 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         ? Math.max(...attempts.map(a => a.attempt_number || 1)) + 1
         : 1;
 
+      const nowIso = new Date().toISOString();
+      const totalSecs = (engineData?.totalMins || 180) * 60;
+      testEndTimeRef.current = Date.now() + (totalSecs * 1000);
+      sessionStorage.setItem(`df_test_end_${id}`, String(testEndTimeRef.current));
+      setTimeLeft(totalSecs);
+
       const { data: attempt, error } = await supabase
         .from('exam_attempts')
         .insert({
           candidate_id: candidate.id,
           test_id: id,
-          start_time: new Date().toISOString(),
+          start_time: nowIso,
           status: 'in_progress',
           attempt_number: nextAttemptNumber
         })
@@ -516,6 +626,15 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     const newAttemptId = await createAttempt();
     setAttemptId(newAttemptId);
     setTestStep('test');
+
+    const totalSecs = (engineData?.totalMins || 180) * 60;
+    if (!testEndTimeRef.current || testEndTimeRef.current <= Date.now()) {
+      testEndTimeRef.current = Date.now() + (totalSecs * 1000);
+      sessionStorage.setItem(`df_test_end_${id}`, String(testEndTimeRef.current));
+      setTimeLeft(totalSecs);
+    }
+    hasAutoSubmittedRef.current = false;
+    hasTransitionedPartBRef.current = false;
     setTimerRunning(true);
     setActiveQuestionIndex(0);
 
@@ -741,6 +860,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
   const handleAutoSubmit = async (reason: string) => {
     setLoading(true);
+    testEndTimeRef.current = null;
+    sessionStorage.removeItem(`df_test_end_${id}`);
     await finalizeAttempt();
     setShowSubmitModal(false);
     setTimerRunning(false);
@@ -751,6 +872,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
   const confirmSubmit = async () => {
     setLoading(true);
+    testEndTimeRef.current = null;
+    sessionStorage.removeItem(`df_test_end_${id}`);
     await finalizeAttempt();
     setShowSubmitModal(false);
     setTimerRunning(false);
@@ -797,7 +920,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           selected_options: prevResponse.selectedOptions,
           answer_text: prevResponse.answerText || null,
           file_url: prevResponse.fileUrl || null,
-          time_spent: prevResponse.timeSpent || 0,
+          time_spent: latestResponsesRef.current[prevQId]?.timeSpent ?? prevResponse.timeSpent ?? 0,
           answer_changes: prevResponse.answerChanges || 0,
           state_transitions: prevResponse.stateTransitions || []
         }, { onConflict: 'attempt_id,question_id' }).then(({ error }) => {

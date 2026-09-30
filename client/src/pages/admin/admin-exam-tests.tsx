@@ -115,7 +115,9 @@ export default function AdminExamTests() {
   const [testCategory, setTestCategory] = useState<string>("full_length");
   const [templateCategoryFilter, setTemplateCategoryFilter] = useState<string>("ALL");
   const [testListCategoryFilter, setTestListCategoryFilter] = useState<string>("ALL");
+  const [testListFocusFilter, setTestListFocusFilter] = useState<'ALL' | 'FOCUS' | 'GENERAL'>('ALL');
   const [expiresAt, setExpiresAt] = useState("");
+  const [isFocusBatch, setIsFocusBatch] = useState(false);
   const [testSections, setTestSections] = useState<any[]>([]); // cloned from template so duration can be edited
   const [selectedQuestions, setSelectedQuestions] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
@@ -131,6 +133,8 @@ export default function AdminExamTests() {
   const [questionsBank, setQuestionsBank] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [pickerTypeFilter, setPickerTypeFilter] = useState<string>("ALL");
+  const [pickerDiffFilter, setPickerDiffFilter] = useState<string>("ALL");
+  const [pickerTopicFilter, setPickerTopicFilter] = useState<string>("");
   const [autoDifficulty, setAutoDifficulty] = useState<string>("ALL");
 
   // Replacement specific
@@ -138,6 +142,42 @@ export default function AdminExamTests() {
 
   // Preview State
   const [previewIndex, setPreviewIndex] = useState(0);
+
+  // Auto-import preselected questions from Question Bank if forwarded
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem('df_preselected_questions');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          sessionStorage.removeItem('df_preselected_questions');
+          const customTemplate = TEMPLATES.find(t => t.id === "Custom Short") || TEMPLATES[0];
+          setSelectedTemplate(customTemplate);
+          setTestCategory("custom_short");
+          setTestSections(JSON.parse(JSON.stringify(customTemplate.sections)));
+          setSelectedQuestions(parsed);
+          setTestTitle(`Mock Test (${parsed.length} Questions)`);
+          setCurrentStep('BUILDER');
+          toast({
+            title: "Questions Imported! 🚀",
+            description: `${parsed.length} questions loaded directly from the Question Bank.`
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to import preselected questions:', e);
+    }
+  }, []);
+
+  const handleFocusBatchToggle = (checked: boolean) => {
+    setIsFocusBatch(checked);
+    if (checked) {
+      // Enforce strict 1-week deadline from now
+      const oneWeekLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const iso = oneWeekLater.toISOString().slice(0, 16);
+      setExpiresAt(iso);
+    }
+  };
 
   useEffect(() => {
     if (currentStep === 'LIST') fetchTests();
@@ -434,6 +474,7 @@ export default function AdminExamTests() {
       setProgramFormat(testData.program_format || template.programFormat || "bachelors");
       setTestCategory(testData.category || template.category || "full_length");
       setExpiresAt(testData.expires_at ? new Date(testData.expires_at).toISOString().slice(0, 16) : "");
+      setIsFocusBatch(Boolean(testData.is_focus_batch || testData.access_tier === 'focus_batch'));
       setEditingTestId(testId);
       
       const mergedSections = (sectionsData || []).map((sec: any) => {
@@ -495,12 +536,16 @@ export default function AdminExamTests() {
         status: publish ? 'published' : 'draft', 
         program_format: programFormat, 
         expires_at: expiresAt || null,
-        category: testCategory
+        category: testCategory,
+        is_focus_batch: isFocusBatch,
+        access_tier: isFocusBatch ? 'focus_batch' : 'all'
       };
 
       if (editingTestId) {
         let { error: testErr } = await supabase.from('exam_tests').update(testPayload).eq('id', editingTestId);
-        if (testErr && testErr.message?.includes('category')) {
+        if (testErr && (testErr.message?.includes('category') || testErr.message?.includes('is_focus_batch') || testErr.message?.includes('access_tier'))) {
+          delete testPayload.is_focus_batch;
+          delete testPayload.access_tier;
           delete testPayload.category;
           const retry = await supabase.from('exam_tests').update(testPayload).eq('id', editingTestId);
           if (retry.error) throw retry.error;
@@ -513,7 +558,9 @@ export default function AdminExamTests() {
         await supabase.from('exam_test_questions').delete().eq('test_id', editingTestId);
       } else {
         let { data: testData, error: testErr } = await supabase.from('exam_tests').insert(testPayload).select().single();
-        if (testErr && testErr.message?.includes('category')) {
+        if (testErr && (testErr.message?.includes('category') || testErr.message?.includes('is_focus_batch') || testErr.message?.includes('access_tier'))) {
+          delete testPayload.is_focus_batch;
+          delete testPayload.access_tier;
           delete testPayload.category;
           const retry = await supabase.from('exam_tests').insert(testPayload).select().single();
           if (retry.error) throw retry.error;
@@ -561,9 +608,12 @@ export default function AdminExamTests() {
       ? TEMPLATES 
       : TEMPLATES.filter(t => t.category === templateCategoryFilter);
 
-    const filteredTests = testListCategoryFilter === "ALL" 
-      ? tests 
-      : tests.filter(t => (t.category || "full_length") === testListCategoryFilter);
+    const filteredTests = tests.filter(t => {
+      if (testListCategoryFilter !== "ALL" && (t.category || "full_length") !== testListCategoryFilter) return false;
+      if (testListFocusFilter === "FOCUS" && !t.is_focus_batch && t.access_tier !== 'focus_batch') return false;
+      if (testListFocusFilter === "GENERAL" && (t.is_focus_batch || t.access_tier === 'focus_batch')) return false;
+      return true;
+    });
 
     return (
     <div className="space-y-8 pb-12 animate-in fade-in duration-300">
@@ -631,7 +681,7 @@ export default function AdminExamTests() {
                 <p className="text-sm font-medium text-foreground/60 mb-5">{t.description}</p>
               </div>
               <div className="flex flex-col gap-2">
-                <Button variant="outline" onClick={() => { setSelectedTemplate(t); setTestCategory(t.category || "full_length"); setTestSections(JSON.parse(JSON.stringify(t.sections))); setEditingTestId(null); setTestTitle(""); setExpiresAt(""); setProgramFormat(t.programFormat || "bachelors"); setSelectedQuestions([]); setCurrentStep('BUILDER'); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
+                <Button variant="outline" onClick={() => { setSelectedTemplate(t); setTestCategory(t.category || "full_length"); setTestSections(JSON.parse(JSON.stringify(t.sections))); setEditingTestId(null); setTestTitle(""); setExpiresAt(""); setIsFocusBatch(false); setProgramFormat(t.programFormat || "bachelors"); setSelectedQuestions([]); setCurrentStep('BUILDER'); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
                   <PlusCircle className="w-4 h-4" /> Build Manually
                 </Button>
                 <Button variant="outline" onClick={() => { setSelectedTemplate(t); setTestCategory(t.category || "full_length"); setQuickGenOpen(true); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
@@ -646,33 +696,59 @@ export default function AdminExamTests() {
       <div className="border-t border-black/5" />
 
       <div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
           <h3 className="text-lg font-medium text-[#262626]">Created Tests ({filteredTests.length})</h3>
-          <div className="flex items-center gap-1.5 bg-black/5 p-1 rounded-lg text-xs font-semibold">
-            <button 
-              onClick={() => setTestListCategoryFilter('ALL')} 
-              className={`px-2.5 py-1 rounded-md transition-all ${testListCategoryFilter === 'ALL' ? 'bg-white shadow-sm text-black' : 'text-foreground/60 hover:text-black'}`}
-            >
-              All Tests
-            </button>
-            <button 
-              onClick={() => setTestListCategoryFilter('full_length')} 
-              className={`px-2.5 py-1 rounded-md transition-all ${testListCategoryFilter === 'full_length' ? 'bg-white shadow-sm text-black' : 'text-foreground/60 hover:text-black'}`}
-            >
-              Full Length
-            </button>
-            <button 
-              onClick={() => setTestListCategoryFilter('half_length')} 
-              className={`px-2.5 py-1 rounded-md transition-all ${testListCategoryFilter === 'half_length' ? 'bg-white shadow-sm text-purple-700 font-bold' : 'text-foreground/60 hover:text-black'}`}
-            >
-              ⚡ Half Length
-            </button>
-            <button 
-              onClick={() => setTestListCategoryFilter('custom_short')} 
-              className={`px-2.5 py-1 rounded-md transition-all ${testListCategoryFilter === 'custom_short' ? 'bg-white shadow-sm text-indigo-700 font-bold' : 'text-foreground/60 hover:text-black'}`}
-            >
-              ⚡ Custom Short
-            </button>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Focus Batch vs General Filter */}
+            <div className="flex items-center gap-1 bg-black/5 p-1 rounded-lg text-xs font-semibold">
+              <button 
+                onClick={() => setTestListFocusFilter('ALL')} 
+                className={`px-2.5 py-1 rounded-md transition-all ${testListFocusFilter === 'ALL' ? 'bg-white shadow-sm text-black' : 'text-foreground/60 hover:text-black'}`}
+              >
+                All Audiences
+              </button>
+              <button 
+                onClick={() => setTestListFocusFilter('FOCUS')} 
+                className={`px-2.5 py-1 rounded-md transition-all ${testListFocusFilter === 'FOCUS' ? 'bg-orange-600 text-white shadow-sm font-bold' : 'text-orange-700 hover:bg-orange-50'}`}
+              >
+                🎯 Focus Batch
+              </button>
+              <button 
+                onClick={() => setTestListFocusFilter('GENERAL')} 
+                className={`px-2.5 py-1 rounded-md transition-all ${testListFocusFilter === 'GENERAL' ? 'bg-white shadow-sm text-black' : 'text-foreground/60 hover:text-black'}`}
+              >
+                General Mocks
+              </button>
+            </div>
+
+            {/* Category Filter */}
+            <div className="flex items-center gap-1 bg-black/5 p-1 rounded-lg text-xs font-semibold">
+              <button 
+                onClick={() => setTestListCategoryFilter('ALL')} 
+                className={`px-2.5 py-1 rounded-md transition-all ${testListCategoryFilter === 'ALL' ? 'bg-white shadow-sm text-black' : 'text-foreground/60 hover:text-black'}`}
+              >
+                All Lengths
+              </button>
+              <button 
+                onClick={() => setTestListCategoryFilter('full_length')} 
+                className={`px-2.5 py-1 rounded-md transition-all ${testListCategoryFilter === 'full_length' ? 'bg-white shadow-sm text-black' : 'text-foreground/60 hover:text-black'}`}
+              >
+                Full Length
+              </button>
+              <button 
+                onClick={() => setTestListCategoryFilter('half_length')} 
+                className={`px-2.5 py-1 rounded-md transition-all ${testListCategoryFilter === 'half_length' ? 'bg-white shadow-sm text-purple-700 font-bold' : 'text-foreground/60 hover:text-black'}`}
+              >
+                ⚡ Half Length
+              </button>
+              <button 
+                onClick={() => setTestListCategoryFilter('custom_short')} 
+                className={`px-2.5 py-1 rounded-md transition-all ${testListCategoryFilter === 'custom_short' ? 'bg-white shadow-sm text-indigo-700 font-bold' : 'text-foreground/60 hover:text-black'}`}
+              >
+                ⚡ Custom Short
+              </button>
+            </div>
           </div>
         </div>
 
@@ -687,8 +763,13 @@ export default function AdminExamTests() {
           <div className="divide-y divide-black/5">
             {filteredTests.map(test => (
               <div key={test.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center hover:bg-background/30 transition-colors text-sm">
-                <div className="col-span-4 font-semibold text-[#262626] flex items-center gap-2">
-                  {test.title}
+                <div className="col-span-4 font-semibold text-[#262626] flex items-center gap-2 flex-wrap">
+                  <span className="truncate">{test.title}</span>
+                  {Boolean(test.is_focus_batch || test.access_tier === 'focus_batch') && (
+                    <span className="bg-orange-100 text-orange-800 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full shrink-0 border border-orange-200">
+                      🎯 Focus Batch (1-Wk)
+                    </span>
+                  )}
                 </div>
                 <div className="col-span-2">
                   {test.category === 'half_length' ? (
@@ -803,9 +884,57 @@ export default function AdminExamTests() {
               <option value="both">Both</option>
             </select>
           </div>
+          {/* Focus Batch Tagging Card */}
+          <div className="md:col-span-3 p-4 rounded-xl border border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm text-[#262626]">🎯 Focus Batch Exclusive Mock</span>
+                {isFocusBatch && (
+                  <span className="bg-primary text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full">
+                    Strict 1-Week Deadline
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-foreground/60 max-w-xl">
+                {isFocusBatch 
+                  ? "This mock will strictly be restricted to Focus Batch accounts (and candidates who unlocked the ₹1,000 gateway). Deadlines are strictly enforced to 7 days from release."
+                  : "Standard mock accessible by all registered candidates."}
+              </p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <Label htmlFor="focus-batch-builder-toggle" className="text-xs font-semibold cursor-pointer">
+                {isFocusBatch ? "Focus Batch Enabled" : "Tag for Focus Batch"}
+              </Label>
+              <input 
+                id="focus-batch-builder-toggle"
+                type="checkbox"
+                checked={isFocusBatch}
+                onChange={(e) => handleFocusBatchToggle(e.target.checked)}
+                className="w-5 h-5 accent-primary cursor-pointer rounded"
+              />
+            </div>
+          </div>
+
           <div className="md:col-span-3">
-            <Label className="text-sm font-semibold">Expiry Date & Time (Optional)</Label>
-            <Input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="mt-1 h-10 bg-white max-w-xs" />
+            <div className="flex items-center justify-between max-w-md">
+              <Label className="text-sm font-semibold">
+                {isFocusBatch ? "Strict 1-Week Expiry Deadline" : "Expiry Date & Time (Optional)"}
+              </Label>
+              {isFocusBatch && (
+                <span className="text-[11px] text-primary font-bold">Auto-Enforced 7-Day Window</span>
+              )}
+            </div>
+            <Input 
+              type="datetime-local" 
+              value={expiresAt} 
+              onChange={(e) => setExpiresAt(e.target.value)} 
+              className="mt-1 h-10 bg-white max-w-md" 
+            />
+            {isFocusBatch && (
+              <p className="text-[11px] text-foreground/50 mt-1">
+                ⏳ Students who do not complete this mock within this 7-day window will be marked as "Missed Deadline" to ensure rigorous cohort accountability.
+              </p>
+            )}
           </div>
         </div>
 
@@ -1008,13 +1137,21 @@ export default function AdminExamTests() {
 
     const filteredBank = questionsBank.filter(q => {
       if (pickerTypeFilter !== "ALL" && q.type !== pickerTypeFilter) return false;
-      if (searchQuery && !q.content_text.toLowerCase().includes(searchQuery.toLowerCase()) && !q.topics.some((t: any) => t.toLowerCase().includes(searchQuery.toLowerCase()))) return false;
+      if (pickerDiffFilter !== "ALL" && q.difficulty !== pickerDiffFilter) return false;
+      if (pickerTopicFilter && !q.topics?.some((t: any) => t.toLowerCase().includes(pickerTopicFilter.toLowerCase()))) return false;
+      if (searchQuery) {
+        const queryLower = searchQuery.toLowerCase();
+        const contentMatch = q.content_text?.toLowerCase().includes(queryLower);
+        const topicMatch = q.topics?.some((t: any) => t.toLowerCase().includes(queryLower));
+        const pyqMatch = (q.pyq_tag || '').toLowerCase().includes(queryLower);
+        if (!contentMatch && !topicMatch && !pyqMatch) return false;
+      }
       return true;
     });
 
     return (
       <Dialog open={pickerOpen} onOpenChange={(open) => !open && setPickerOpen(false)}>
-        <DialogContent className="max-w-[75vw] w-[75vw] h-[85vh] flex flex-col p-0 gap-0 overflow-hidden shadow-2xl rounded-2xl">
+        <DialogContent className="max-w-[85vw] w-[85vw] h-[88vh] flex flex-col p-0 gap-0 overflow-hidden shadow-2xl rounded-2xl">
           <div className="p-6 border-b border-black/5 shrink-0 bg-background/80 backdrop-blur-sm z-10">
             <DialogTitle className="text-2xl font-semibold text-[#262626]">
               {replacingQuestionId ? `Replace Question (Part ${pickerSection?.part})` : `Select Questions for Part ${pickerSection?.part}`}
@@ -1025,7 +1162,7 @@ export default function AdminExamTests() {
 
             <div className="flex flex-wrap items-center justify-between gap-4 mt-6">
               {/* Requirements Chips */}
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-2.5 items-center">
                 {replacingQuestionId ? (
                   <div className="px-4 py-2 rounded-lg border-2 border-primary/30 bg-primary/5 text-primary flex items-center gap-2">
                     <span className="font-bold text-sm">Filtering by: {pickerTypeFilter}</span>
@@ -1039,40 +1176,58 @@ export default function AdminExamTests() {
                         <div
                           key={type}
                           onClick={() => setPickerTypeFilter(type)}
-                          className={`cursor-pointer px-4 py-2 rounded-lg border-2 flex items-center gap-2 transition-all ${pickerTypeFilter === type ? 'ring-2 ring-primary/20 shadow-sm' : 'opacity-80'
-                            } ${isMet ? 'border-green-500 bg-green-50 text-green-700' :
-                              isOver ? 'border-red-400 bg-red-50 text-red-700' : 'border-primary/30 bg-white text-[#262626]'
+                          className={`cursor-pointer px-3.5 py-1.5 rounded-lg border-2 flex items-center gap-2 transition-all ${pickerTypeFilter === type ? 'ring-2 ring-primary/20 shadow-xs' : 'opacity-85'
+                            } ${isMet ? 'border-green-500 bg-green-50 text-green-700 font-bold' :
+                              isOver ? 'border-red-400 bg-red-50 text-red-700 font-bold' : 'border-primary/30 bg-white text-[#262626]'
                             }`}
                         >
-                          <span className="font-bold text-sm">{type}</span>
-                          <span className="text-xs bg-white/50 px-2 py-0.5 rounded-full font-medium">{req.selected} / {req.required}</span>
-                          {isMet && <CheckCircle2 className="w-4 h-4" />}
+                          <span className="font-bold text-xs">{type}</span>
+                          <span className="text-[11px] bg-white/70 px-2 py-0.5 rounded-full font-bold">{req.selected} / {req.required}</span>
+                          {isMet && <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />}
                         </div>
                       );
                     })}
-                    <Button variant="ghost" size="sm" onClick={() => setPickerTypeFilter("ALL")} className={`h-10 border-2 ${pickerTypeFilter === 'ALL' ? 'border-black/30 bg-black/5' : 'border-transparent'}`}>Show All</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setPickerTypeFilter("ALL")} className={`h-9 text-xs border ${pickerTypeFilter === 'ALL' ? 'border-black/30 bg-black/5 font-bold' : 'border-transparent'}`}>All Types</Button>
                   </>
                 )}
               </div>
 
-              {/* Search & Auto-Fill */}
-              <div className="flex items-center gap-3">
+              {/* Search, Difficulty & Auto-Fill */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                <select 
+                  className="h-9 text-xs border border-black/10 rounded-lg px-2.5 bg-white font-medium outline-none shadow-xs"
+                  value={pickerDiffFilter}
+                  onChange={(e) => setPickerDiffFilter(e.target.value)}
+                >
+                  <option value="ALL">All Difficulties</option>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+
+                <Input 
+                  placeholder="Filter topic..." 
+                  value={pickerTopicFilter} 
+                  onChange={(e) => setPickerTopicFilter(e.target.value)} 
+                  className="h-9 text-xs bg-white w-32 shadow-xs" 
+                />
+
                 {!replacingQuestionId && (
-                  <div className="flex items-center border border-black/10 rounded-md bg-white px-2 h-10 shadow-sm">
-                    <span className="text-xs text-foreground/50 mr-2 font-medium">Auto-Fill:</span>
-                    <select className="text-sm bg-transparent outline-none pr-2 font-semibold text-[#262626]" value={autoDifficulty} onChange={(e) => setAutoDifficulty(e.target.value)}>
+                  <div className="flex items-center border border-black/10 rounded-lg bg-white px-2 h-9 shadow-xs">
+                    <span className="text-[11px] text-foreground/50 mr-1.5 font-medium">Auto-Fill:</span>
+                    <select className="text-xs bg-transparent outline-none pr-1 font-semibold text-[#262626]" value={autoDifficulty} onChange={(e) => setAutoDifficulty(e.target.value)}>
                       <option value="ALL">Any Diff</option>
                       <option value="Low">Low Diff</option>
                       <option value="Medium">Medium Diff</option>
                       <option value="High">High Diff</option>
                     </select>
-                    <Button variant="outline" size="sm" onClick={autoFillSectionFromPicker} className="h-7 ml-2 text-xs px-3">Generate</Button>
+                    <Button variant="outline" size="sm" onClick={autoFillSectionFromPicker} className="h-6 ml-1.5 text-[11px] px-2.5 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20">Fill</Button>
                   </div>
                 )}
 
-                <div className="relative w-56 shadow-sm rounded-md">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
-                  <Input placeholder="Search content..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-10 bg-white" />
+                <div className="relative w-48 shadow-xs rounded-lg">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/40" />
+                  <Input placeholder="Search text/PYQ..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-8 h-9 text-xs bg-white" />
                 </div>
               </div>
             </div>

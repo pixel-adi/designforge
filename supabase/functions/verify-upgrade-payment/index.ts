@@ -88,9 +88,21 @@ Deno.serve(async (req) => {
         const candidate_id = notes?.candidate_id;
         const order_id = payload.payload?.payment?.entity?.order_id;
 
-        if (candidate_id && order_id) {
-          const expires_at = computeAccessExpiry();
+        const upgrade_type = notes?.upgrade_type;
+        if (upgrade_type === "focus_mocks") {
+          const { error: updateError } = await supabase
+            .from("exam_candidates")
+            .update({
+              has_focus_mocks_access: true,
+              focus_mocks_payment_id: order_id,
+              focus_mocks_purchased_at: new Date().toISOString(),
+            })
+            .eq("id", candidate_id);
 
+          if (updateError) console.error("Webhook DB Update Error:", updateError);
+          else console.log(`Webhook: granted focus_mocks access to candidate ${candidate_id}`);
+        } else {
+          const expires_at = computeAccessExpiry();
           const { error: updateError } = await supabase
             .from("exam_candidates")
             .update({
@@ -111,7 +123,7 @@ Deno.serve(async (req) => {
     // Path B: Client-side Verification
     // =========================================
     const body = await req.json();
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, upgrade_type } = body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return jsonOk(req, { error: "Missing Razorpay verification payload" });
@@ -136,38 +148,43 @@ Deno.serve(async (req) => {
       userId = user?.id || null;
     }
 
-    // Compute rolling expiry
-    const expires_at = computeAccessExpiry();
-
-    // Build update filter — prefer auth-based, fall back to order-id-based
-    let updateQuery;
-    if (userId) {
-      updateQuery = supabase
-        .from("exam_candidates")
-        .update({
-          access_level: "materials_only",
-          access_expires_at: expires_at.toISOString(),
-          access_payment_id: razorpay_order_id,
-        })
-        .eq("auth_user_id", userId);
-    } else {
-      // Fallback: find by payment order in Razorpay notes (less reliable)
-      console.warn("No auth token provided, upgrade may not apply correctly");
+    if (!userId) {
+      console.warn("No auth token provided, upgrade cannot apply");
       return jsonOk(req, { error: "Authorization required for upgrade verification" }, 401);
     }
 
-    const { error: updateError } = await updateQuery;
+    const isFocusMocks = upgrade_type === "focus_mocks";
+    const expires_at = computeAccessExpiry();
+
+    const updateFields = isFocusMocks
+      ? {
+          has_focus_mocks_access: true,
+          focus_mocks_payment_id: razorpay_order_id,
+          focus_mocks_purchased_at: new Date().toISOString(),
+        }
+      : {
+          access_level: "materials_only",
+          access_expires_at: expires_at.toISOString(),
+          access_payment_id: razorpay_order_id,
+        };
+
+    const { error: updateError } = await supabase
+      .from("exam_candidates")
+      .update(updateFields)
+      .eq("auth_user_id", userId);
 
     if (updateError) {
       console.error("Database update error:", updateError);
       return jsonOk(req, { error: "Failed to update access level in database" });
     }
 
-    console.log(`Payment verified & access upgraded: ${razorpay_order_id}, user: ${userId}, expires: ${expires_at.toISOString()}`);
+    console.log(`Payment verified & access upgraded: ${razorpay_order_id}, user: ${userId}, type: ${isFocusMocks ? 'focus_mocks' : 'materials_only'}`);
     return jsonOk(req, {
       status: "success",
-      access_level: "materials_only",
-      access_expires_at: expires_at.toISOString(),
+      upgrade_type: isFocusMocks ? "focus_mocks" : "materials_only",
+      has_focus_mocks_access: isFocusMocks ? true : undefined,
+      access_level: isFocusMocks ? undefined : "materials_only",
+      access_expires_at: isFocusMocks ? undefined : expires_at.toISOString(),
     });
 
   } catch (error) {
