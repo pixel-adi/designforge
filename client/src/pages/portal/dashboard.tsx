@@ -198,12 +198,11 @@ export default function PortalDashboard() {
       if (!error && data && data.active_session_id && data.active_session_id !== currentDeviceId) {
         console.warn("Session conflict: Logged in on another device.");
         setSessionKicked(true);
-        setLocation('/portal/login');
       }
     } catch (err) {
       console.warn("Session check error:", err);
     }
-  }, [setLocation]);
+  }, []);
 
   // Session check interval (optimized for high concurrency: 180s interval)
   useEffect(() => {
@@ -261,10 +260,23 @@ export default function PortalDashboard() {
       // Safety timeout guarantees the portal never hangs indefinitely in loading state
       const fallbackTimer = setTimeout(() => {
         if (active) setLoading(false);
-      }, 3500);
+      }, 4000);
 
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        let { data: { session } } = await supabase.auth.getSession();
+
+        // If session is temporarily pending during cold reload, give it a brief recovery window before redirecting
+        if (!session?.user) {
+          const hasLocalToken = typeof window !== 'undefined' && Object.keys(localStorage).some(k => (k.startsWith('sb-') && k.endsWith('-auth-token')) || k === 'supabase.auth.token');
+          if (hasLocalToken) {
+            await new Promise(r => setTimeout(r, 600));
+            const retryRes = await supabase.auth.getSession();
+            if (retryRes.data?.session?.user) {
+              session = retryRes.data.session;
+            }
+          }
+        }
+
         if (!session?.user) {
           clearTimeout(fallbackTimer);
           if (active) {
@@ -277,12 +289,31 @@ export default function PortalDashboard() {
           setAuthUser(session.user);
         }
 
+        // Instant restore candidate from localStorage cache (0ms page render)
+        const cachedRaw = typeof window !== 'undefined' ? localStorage.getItem(`df_candidate_${session.user.id}`) : null;
+        if (cachedRaw) {
+          try {
+            const cachedCand = JSON.parse(cachedRaw);
+            if (cachedCand && cachedCand.id) {
+              if (active) {
+                setCandidate(cachedCand);
+                setLoading(false);
+                setOnboardingData({
+                  name: cachedCand.name || session.user.user_metadata?.full_name || "",
+                  phone: cachedCand.phone || "",
+                  program_ids: cachedCand.program_ids || [],
+                  avatar_url: cachedCand.avatar_url || "",
+                  education_level: cachedCand.education_level || "bachelors"
+                });
+                fetchDashboardData(cachedCand.program_ids || [], cachedCand.education_level || "bachelors", cachedCand.id);
+              }
+            }
+          } catch (e) {}
+        }
+
         await loadCandidateProfile(session.user, active);
       } catch (err) {
         console.error("Auth init error:", err);
-        if (active) {
-          setLocation('/portal/login');
-        }
       } finally {
         clearTimeout(fallbackTimer);
         if (active) {
@@ -323,13 +354,31 @@ export default function PortalDashboard() {
     try {
       const userEmail = (user.email || '').trim().toLowerCase();
 
-      // Parallel queries: programs and candidate profile
+      // Check programs cache
+      const cachedProgsRaw = typeof window !== 'undefined' ? localStorage.getItem('df_cached_programs') : null;
+      let hasProgramsCache = false;
+      if (cachedProgsRaw) {
+        try {
+          const parsed = JSON.parse(cachedProgsRaw);
+          if (parsed && Array.isArray(parsed.programs) && parsed.programs.length > 0 && Date.now() - parsed.ts < 86400000) {
+            hasProgramsCache = true;
+            if (active) setPrograms(parsed.programs);
+          }
+        } catch (e) {}
+      }
+
+      // Parallel queries: programs (if uncached) and candidate profile
       const [candAuthRes, progRes] = await Promise.all([
         supabase.from('exam_candidates').select('*').eq('auth_user_id', user.id).maybeSingle(),
-        supabase.from('exam_programs').select('*').order('name')
+        hasProgramsCache ? Promise.resolve({ data: null, error: null }) : supabase.from('exam_programs').select('*').order('name')
       ]);
 
-      if (progRes.data && active) setPrograms(progRes.data);
+      if (progRes.data && active) {
+        setPrograms(progRes.data);
+        try {
+          localStorage.setItem('df_cached_programs', JSON.stringify({ programs: progRes.data, ts: Date.now() }));
+        } catch (e) {}
+      }
 
       let candidateData = candAuthRes.data;
 
@@ -358,16 +407,22 @@ export default function PortalDashboard() {
       }
 
       if (!candidateData) {
-        // Needs onboarding (brand new user who does not exist in DB)
-        if (active) {
-          setShowOnboarding(true);
-          if (user.user_metadata?.full_name) {
-            setOnboardingData(prev => ({ ...prev, name: user.user_metadata.full_name }));
+        // Only prompt for onboarding if DB confirmed empty with no error AND no local cache exists
+        const hasCached = typeof window !== 'undefined' && !!localStorage.getItem(`df_candidate_${user.id}`);
+        if (!hasCached && !candAuthRes.error) {
+          if (active) {
+            setShowOnboarding(true);
+            if (user.user_metadata?.full_name) {
+              setOnboardingData(prev => ({ ...prev, name: user.user_metadata.full_name }));
+            }
           }
         }
       } else if (active) {
         setCandidate(candidateData);
         setShowOnboarding(false);
+        try {
+          localStorage.setItem(`df_candidate_${user.id}`, JSON.stringify(candidateData));
+        } catch (e) {}
 
         setOnboardingData({
           name: candidateData.name || user.user_metadata?.full_name || "",
@@ -381,13 +436,9 @@ export default function PortalDashboard() {
         registerSession(candidateData.id);
 
         fetchDashboardData(candidateData.program_ids || [], candidateData.education_level || "bachelors", candidateData.id);
-        fetchAttempts(candidateData.id);
       }
     } catch (err: any) {
       console.error("Profile load error:", err);
-      if (active) {
-        toast({ title: "Notice", description: "Re-verifying profile data...", variant: "default" });
-      }
     } finally {
       profileLoadingRef.current = false;
     }
@@ -506,6 +557,12 @@ export default function PortalDashboard() {
       setLoadingAttempts(false);
     }
   };
+
+  useEffect(() => {
+    if (activeTab === 'progress' && candidate?.id && pastAttempts.length === 0) {
+      fetchAttempts(candidate.id);
+    }
+  }, [activeTab, candidate?.id, pastAttempts.length]);
 
   useEffect(() => {
     if (selectedAttemptId && selectedAttemptId !== 'overall' && !attemptDetailsMap[selectedAttemptId] && activeTab === 'progress') {

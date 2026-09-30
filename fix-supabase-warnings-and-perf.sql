@@ -245,3 +245,19 @@ BEGIN
   END IF;
 END $$;
 
+-- Fast candidate profile lookup by auth_user_id (crucial for concurrency)
+CREATE INDEX IF NOT EXISTS idx_exam_candidates_auth_user_id 
+ON public.exam_candidates(auth_user_id);
+
+-- Fast candidate fallback lookup by lowercase email
+CREATE INDEX IF NOT EXISTS idx_exam_candidates_email_lower 
+ON public.exam_candidates(lower(email));
+
+-- Fast single-device session validation
+CREATE INDEX IF NOT EXISTS idx_exam_candidates_id_session 
+ON public.exam_candidates(id, active_session_id);
+
+-- Fast program listing
+CREATE INDEX IF NOT EXISTS idx_exam_programs_name 
+ON public.exam_programs(name);
+
