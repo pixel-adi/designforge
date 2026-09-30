@@ -2588,26 +2588,32 @@ export default function PortalDashboard() {
                     return m > 0 ? `${m}m ${remSec}s` : `${remSec}s`;
                   };
 
+                  const isNid = (selectedAttempt?.exam_tests?.title || '').toLowerCase().includes('nid');
+                  const hasPartA = responses.some((r: any) => r.exam_questions?.part === 'A');
+                  const currentSubTab = (!hasPartA || isNid) ? 'part-b' : analyticsSubTab;
+
                   return (
                     <div className="space-y-6">
                       {/* Split Sub Tabs */}
                       <div className="flex border-b border-black/10">
-                        <button
-                          onClick={() => setAnalyticsSubTab('part-a')}
-                          className={`px-6 py-3 font-bold text-sm border-b-2 transition-all ${analyticsSubTab === 'part-a' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground'}`}
-                        >
-                          Part A: Objective Pacing & Strategy
-                        </button>
+                        {hasPartA && !isNid && (
+                          <button
+                            onClick={() => setAnalyticsSubTab('part-a')}
+                            className={`px-6 py-3 font-bold text-sm border-b-2 transition-all ${currentSubTab === 'part-a' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground'}`}
+                          >
+                            Part A: Objective Pacing & Strategy
+                          </button>
+                        )}
                         <button
                           onClick={() => setAnalyticsSubTab('part-b')}
-                          className={`px-6 py-3 font-bold text-sm border-b-2 transition-all ${analyticsSubTab === 'part-b' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground'}`}
+                          className={`px-6 py-3 font-bold text-sm border-b-2 transition-all ${currentSubTab === 'part-b' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground'}`}
                         >
-                          Part B: Subjective Design Rubrics
+                          {isNid ? "Subjective Design Rubrics & Feedback" : "Part B: Subjective Design Rubrics"}
                         </button>
                       </div>
 
                       {/* PART A DRILLDOWN */}
-                      {analyticsSubTab === 'part-a' && (
+                      {currentSubTab === 'part-a' && (
                         <div className="space-y-6">
                           {/* Part A Cards Row */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2909,7 +2915,7 @@ export default function PortalDashboard() {
                       )}
 
                       {/* PART B DRILLDOWN */}
-                      {analyticsSubTab === 'part-b' && (
+                      {currentSubTab === 'part-b' && (
                         <div className="space-y-6">
                           {(() => {
                             const partBResponses = responses.filter((r: any) => r.exam_questions?.part === 'B');
@@ -2921,9 +2927,13 @@ export default function PortalDashboard() {
                                   <div className="w-16 h-16 rounded-2xl bg-amber-100 border border-amber-200 text-amber-700 flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm">
                                     🎨
                                   </div>
-                                  <h4 className="font-extrabold text-lg text-amber-950 mb-1">Part B Subjective Questions Not Attempted / Uploaded</h4>
+                                  <h4 className="font-extrabold text-lg text-amber-950 mb-1">
+                                    {isNid ? "Subjective Questions Not Attempted / Uploaded" : "Part B Subjective Questions Not Attempted / Uploaded"}
+                                  </h4>
                                   <p className="text-xs text-amber-900/70 max-w-md mx-auto font-medium leading-relaxed mb-4">
-                                    You did not upload drawing sketches or subjective answers for Part B during this mock test attempt.
+                                    {isNid
+                                      ? "You did not upload drawing sketches or subjective solutions during this mock test attempt."
+                                      : "You did not upload drawing sketches or subjective answers for Part B during this mock test attempt."}
                                   </p>
                                   <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl max-w-md mx-auto text-xs font-bold text-amber-900 flex items-center justify-center gap-2">
                                     <span>💡</span>

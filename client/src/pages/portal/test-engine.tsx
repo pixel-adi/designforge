@@ -30,6 +30,9 @@ interface EngineState {
   partAMins: number;
   partA_TimeThreshold: number;
   hasPartB: boolean;
+  hasPartA: boolean;
+  hasTimedPartALock: boolean;
+  isNid: boolean;
 }
 
 type TestStep = 'instructions' | 'test' | 'part-b-instructions' | 'submitted' | 'review';
@@ -204,19 +207,20 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   };
 
   const checkIsPartBActive = (currentTimeLeft: number) => {
-    if (!engineData?.hasPartB) return false;
+    // If exam does not have a timed Part A lock (e.g. NID papers or tests without Part A), all questions are fully accessible from minute 1
+    if (!engineData?.hasTimedPartALock) return true;
     if (testStep === 'part-b-instructions') return true;
     const totalSecs = (engineData.totalMins || 180) * 60;
     if (engineData.partA_TimeThreshold >= totalSecs) return false;
     return currentTimeLeft <= engineData.partA_TimeThreshold && currentTimeLeft < totalSecs;
   };
 
-  // Tab switching detection (Only monitored during Part A)
+  // Tab switching detection (Only monitored during Part A for exams that strictly enforce timed Part A lockout)
   useEffect(() => {
     const handleVisibilityChange = () => {
       const isPartBActive = checkIsPartBActive(timeLeft);
-      // If Part B is active or test step is part-b-instructions/submitted, do not flag tab switching for uploading sketches
-      if (document.hidden && testStep === 'test' && !isPartBActive) {
+      // Malpractice warning applies only during locked Part A mode (not during Part B or on NID tests where students upload sketches)
+      if (document.hidden && testStep === 'test' && engineData?.hasTimedPartALock && !isPartBActive) {
         setWarningsCount(prev => {
           const newCount = prev + 1;
           if (newCount >= MAX_WARNINGS) {
@@ -294,9 +298,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         return;
       }
 
-      // Part A to Part B Transition: Auto-lock & score Part A
+      // Part A to Part B Transition: Auto-lock & score Part A (only when exam strictly enforces timed Part A lock)
       const totalSecs = (engineData?.totalMins || 180) * 60;
       if (
+        engineData?.hasTimedPartALock &&
         engineData?.hasPartB &&
         engineData.partA_TimeThreshold < totalSecs &&
         remaining <= engineData.partA_TimeThreshold &&
@@ -337,7 +342,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       document.removeEventListener('visibilitychange', handleSync);
       window.removeEventListener('focus', handleSync);
     };
-  }, [timerRunning, engineData?.hasPartB, engineData?.partA_TimeThreshold, engineData?.totalMins, testStep, activeQuestionIndex, attemptId]);
+  }, [timerRunning, engineData?.hasTimedPartALock, engineData?.hasPartB, engineData?.partA_TimeThreshold, engineData?.totalMins, testStep, activeQuestionIndex, attemptId]);
 
   const fetchTestEngineData = async () => {
     setLoading(true);
@@ -426,15 +431,24 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         });
       }
 
-      const totalMins = sectionsData?.reduce((acc: number, sec: any) => acc + sec.duration_minutes, 0) || 180;
-      let partAMins = sectionsData?.find((s: any) => s.part === 'A')?.duration_minutes || 0;
+      const totalMins = sectionsData?.reduce((acc: number, sec: any) => acc + (sec.duration_minutes || 0), 0) || testData?.duration_minutes || 180;
+
+      const titleUpper = (testData?.title || '').toUpperCase();
+      const progNameUpper = (testData?.exam_programs?.name || '').toUpperCase();
+      const isNid = titleUpper.includes('NID') || progNameUpper.includes('NID');
+
+      const hasPartA = questionsData.some(q => q.part === 'A');
       const hasPartB = questionsData.some(q => q.part === 'B');
 
-      if (hasPartB && partAMins === 0) {
-        partAMins = Math.round(totalMins / 2);
+      // For NID exams, there is NO Part A. Candidates have the entire duration for all questions.
+      // A timed Part A lockout is strictly for non-NID exams (like CEED/UCEED) that explicitly configure a separate Part A duration.
+      let partAMins = 0;
+      if (!isNid && hasPartA) {
+        partAMins = sectionsData?.find((s: any) => s.part === 'A')?.duration_minutes || 0;
       }
 
-      const partA_TimeThreshold = (totalMins * 60) - (partAMins * 60);
+      const hasTimedPartALock = !isNid && hasPartA && hasPartB && partAMins > 0 && partAMins < totalMins;
+      const partA_TimeThreshold = hasTimedPartALock ? (totalMins * 60) - (partAMins * 60) : 0;
 
       setEngineData({
         test: testData,
@@ -444,7 +458,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         totalMins,
         partAMins,
         partA_TimeThreshold,
-        hasPartB
+        hasPartB,
+        hasPartA,
+        hasTimedPartALock,
+        isNid
       });
       setResponses(initialResponses);
 
@@ -709,15 +726,19 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         const programNameUpper = (engineData!.test.exam_programs?.name || '').toUpperCase();
         const programFormatUpper = (engineData!.test.program_format || '').toUpperCase();
 
-        // Check UCEED first
-        const isUceed = titleUpper.includes('UCEED') || 
-                        programNameUpper.includes('UCEED') || 
-                        titleUpper.includes('B.DES') || 
-                        titleUpper.includes('BDES') || 
-                        programFormatUpper === 'BACHELORS';
+        const isNid = engineData!.isNid || titleUpper.includes('NID') || programNameUpper.includes('NID');
 
-        // CEED check (only if not UCEED, to avoid UCEED matching "CEED")
-        const isCeed = !isUceed && (
+        // Check UCEED first (excluding NID)
+        const isUceed = !isNid && (
+          titleUpper.includes('UCEED') || 
+          programNameUpper.includes('UCEED') || 
+          titleUpper.includes('B.DES') || 
+          titleUpper.includes('BDES') || 
+          programFormatUpper === 'BACHELORS'
+        );
+
+        // CEED check (only if not UCEED and not NID)
+        const isCeed = !isNid && !isUceed && (
           titleUpper.includes('CEED') || 
           programNameUpper.includes('CEED') || 
           titleUpper.includes('M.DES') || 
@@ -902,18 +923,21 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     const isPartBActive = checkIsPartBActive(timeLeft);
 
     if (!skipChecks && testStep !== 'review' && testStep !== 'submitted') {
-      // Part Locking Logic: Cannot access Part B if Part A time is still running
-      if (q.part === 'B' && !isPartBActive) {
-        const minsLeftForA = Math.ceil((timeLeft - engineData!.partA_TimeThreshold) / 60);
-        setPartBWaitMins(minsLeftForA);
-        setShowPartBLockedModal(true);
-        return;
-      }
+      // Part Locking Logic: Only enforced when the exam has an active timed Part A lock (e.g. CEED/UCEED)
+      if (engineData?.hasTimedPartALock) {
+        // Cannot access Part B if Part A time is still running
+        if (q.part === 'B' && !isPartBActive) {
+          const minsLeftForA = Math.ceil((timeLeft - engineData.partA_TimeThreshold) / 60);
+          setPartBWaitMins(minsLeftForA);
+          setShowPartBLockedModal(true);
+          return;
+        }
 
-      // Part A Logic: Cannot access Part A if Part B has started
-      if (q.part === 'A' && isPartBActive) {
-        toast({ title: "Section Locked 🔒", description: "Time for Part A has ended. You cannot view or modify those answers.", variant: "destructive" });
-        return;
+        // Cannot access Part A if Part B has started
+        if (q.part === 'A' && isPartBActive) {
+          toast({ title: "Section Locked 🔒", description: "Time for Part A has ended. You cannot view or modify those answers.", variant: "destructive" });
+          return;
+        }
       }
     }
 
@@ -978,7 +1002,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     const isPartBActive = checkIsPartBActive(timeLeft);
 
     // Safety check, should be blocked by navigation anyway
-    if (q.part === 'A' && isPartBActive && testStep !== 'review') {
+    if (engineData?.hasTimedPartALock && q.part === 'A' && isPartBActive && testStep !== 'review') {
       toast({ title: "Section Locked", description: "Time for Part A has ended. You cannot modify answers.", variant: "destructive" });
       return;
     }
@@ -1339,7 +1363,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
     const groups: { [key: string]: { q: any, idx: number }[] } = {};
     engineData.questions.forEach((q, idx) => {
-      let groupKey = `Part ${q.part} - ${q.type}`;
+      let groupKey = engineData.isNid || !engineData.hasPartA
+        ? `Questions - ${q.type}`
+        : `Part ${q.part} - ${q.type}`;
       if (!groups[groupKey]) groups[groupKey] = [];
       groups[groupKey].push({ q, idx });
     });
@@ -1350,7 +1376,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         <div className="grid grid-cols-5 gap-1.5">
           {groups[groupName].map(({ q, idx }) => {
             const status = responses[q.id]?.status || 'unseen';
-            const isPartALocked = q.part === 'A' && checkIsPartBActive(timeLeft) && testStep !== 'review';
+            const isPartALocked = engineData.hasTimedPartALock && q.part === 'A' && checkIsPartBActive(timeLeft) && testStep !== 'review';
             let bgClass = "bg-white border-black/20 text-foreground/70 hover:bg-black/5"; // unseen default
 
             if (isPartALocked) {
@@ -1429,7 +1455,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             <div className="prose max-w-none text-foreground/80 space-y-4 mb-10">
               <p>1. Total duration of this examination is <strong>{formatTime(timeLeft)}</strong> hours.</p>
               <p>2. The clock will be set at the server. The countdown timer at the top right of screen will display the remaining time available for you to complete the examination.</p>
-              <p>3. Do not switch tabs, minimize the browser, or open any other applications. The system monitors background activity. Switching tabs will issue a warning, and <strong>repeated offenses (3) will automatically terminate and submit your exam.</strong></p>
+              <p>3. {engineData.hasTimedPartALock 
+                ? "Do not switch tabs, minimize the browser, or open any other applications during Part A. Repeated tab switches (3) will automatically submit your exam. In Part B, tab switching is enabled for uploading your sketch files."
+                : "You may switch windows or tabs to transfer and upload your sketches and answer sheets. Ensure all your work is uploaded and saved before the final countdown ends."}
+              </p>
               <p>4. The Question Palette displayed on the right side of screen will show the status of each question using one of the following symbols:</p>
 
               <div className="grid grid-cols-2 gap-3 mt-4 max-w-lg bg-black/5 p-4 rounded-xl border border-black/10">
@@ -1444,8 +1473,37 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             {(() => {
               const titleUp = (engineData.test.title || '').toUpperCase();
               const progUp = (engineData.test.exam_programs?.name || '').toUpperCase();
-              const isUceed = titleUp.includes('UCEED') || progUp.includes('UCEED') || titleUp.includes('B.DES') || titleUp.includes('BDES');
-              const isCeed = !isUceed && (titleUp.includes('CEED') || progUp.includes('CEED') || titleUp.includes('M.DES') || titleUp.includes('MDES'));
+              const isNid = engineData.isNid || titleUp.includes('NID') || progUp.includes('NID');
+              const isUceed = !isNid && (titleUp.includes('UCEED') || progUp.includes('UCEED') || titleUp.includes('B.DES') || titleUp.includes('BDES'));
+              const isCeed = !isNid && !isUceed && (titleUp.includes('CEED') || progUp.includes('CEED') || titleUp.includes('M.DES') || titleUp.includes('MDES'));
+              
+              if (isNid) {
+                return (
+                  <div className="bg-[#F8F9FA] p-6 rounded-2xl border border-black/10 mb-8">
+                    <h3 className="font-bold text-sm text-[#262626] uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <ClipboardList className="w-4 h-4 text-primary" /> NID DAT Prelims Practice Format
+                    </h3>
+                    <div className="bg-white p-5 rounded-xl border border-black/10 shadow-sm space-y-3 text-xs text-foreground/80 leading-relaxed">
+                      <div className="flex items-center justify-between pb-2 border-b border-black/5">
+                        <span className="font-bold text-[#262626]">Paper Structure:</span>
+                        <span className="font-semibold text-primary">Pen-and-paper Practice Simulation</span>
+                      </div>
+                      <div className="flex items-center justify-between pb-2 border-b border-black/5">
+                        <span className="font-bold text-[#262626]">Section Locking:</span>
+                        <span className="font-semibold text-green-700">None (All questions accessible throughout the test)</span>
+                      </div>
+                      <div className="flex items-center justify-between pb-2 border-b border-black/5">
+                        <span className="font-bold text-[#262626]">Answering Method:</span>
+                        <span className="font-medium text-foreground/70">Solve and sketch on plain paper, take clear photos, and attach them using the upload / camera tool</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[#262626]">Evaluation:</span>
+                        <span className="font-medium text-foreground/70">Rubric-based manual evaluation by mentors with comprehensive feedback</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
               
               return (
                 <div className="bg-[#F8F9FA] p-6 rounded-2xl border border-black/10 mb-8">
@@ -1571,9 +1629,13 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         <div className="bg-white max-w-3xl w-full rounded-2xl border border-black/5 shadow-sm p-10 text-center">
           <FileCheck2 className="w-20 h-20 text-green-500 mx-auto mb-6" />
           <h2 className="text-3xl font-bold text-[#262626] mb-2">Test Submitted!</h2>
-          <p className="text-foreground/60 mb-8 font-medium">Your attempt has been recorded. Here is your preliminary Part A breakdown.</p>
+          <p className="text-foreground/60 mb-8 font-medium">
+            {engineData.isNid || !engineData.hasPartA
+              ? "Your attempt has been recorded. Your sketches and solutions have been securely submitted."
+              : "Your attempt has been recorded. Here is your preliminary Part A breakdown."}
+          </p>
 
-          {scoreBreakdown && (
+          {engineData.hasPartA && scoreBreakdown && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 text-left">
               <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex flex-col items-center justify-center relative">
                 <span className="text-xs font-bold text-foreground/50 uppercase tracking-wider mb-1">NAT Marks</span>
@@ -1600,10 +1662,14 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
           {attemptDetails?.part_b_evaluation_status === 'completed' ? (
             <div className="bg-green-50 border border-green-200 p-6 rounded-xl mb-8 flex flex-col items-center justify-center gap-3">
-               <h3 className="text-xl font-bold text-green-800">Part B Evaluation Complete</h3>
+               <h3 className="text-xl font-bold text-green-800">
+                 {engineData.isNid ? "Subjective Evaluation Complete" : "Part B Evaluation Complete"}
+               </h3>
                <div className="flex items-center gap-6 mt-2">
                  <div className="text-center">
-                    <span className="text-[10px] uppercase font-bold text-green-700/60 block mb-1">Part B Score</span>
+                    <span className="text-[10px] uppercase font-bold text-green-700/60 block mb-1">
+                      {engineData.isNid ? "Subjective Score" : "Part B Score"}
+                    </span>
                     <span className="text-3xl font-black text-green-700">{attemptDetails.score_part_b}</span>
                  </div>
                  <div className="h-10 w-px bg-green-200"></div>
@@ -1616,7 +1682,11 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           ) : engineData.hasPartB ? (
             <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-8 flex items-center justify-center gap-3">
               <AlertCircle className="w-5 h-5 text-orange-600 shrink-0" />
-              <p className="text-sm font-bold text-orange-800">Part B will be evaluated manually and the combined scorecard will be shared later.</p>
+              <p className="text-sm font-bold text-orange-800">
+                {engineData.isNid 
+                  ? "Your submission will be evaluated manually by our mentors and your scorecard with feedback will be shared soon." 
+                  : "Part B will be evaluated manually and the combined scorecard will be shared later."}
+              </p>
             </div>
           ) : null}
 
@@ -1660,7 +1730,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         </div>
         {testStep !== 'review' ? (
           <div className="flex items-center gap-4 md:gap-6">
-            {engineData?.hasPartB && (
+            {engineData?.hasTimedPartALock ? (
               checkIsPartBActive(timeLeft) ? (
                 <div className="hidden sm:flex items-center gap-1.5 text-green-700 bg-green-50 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
                   <UploadCloud className="w-3.5 h-3.5" /> Part B: Tab switching enabled for upload
@@ -1670,8 +1740,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                   <ShieldAlert className="w-3.5 h-3.5" /> Part A: Tab switching monitored
                 </div>
               )
+            ) : (
+              <div className="hidden sm:flex items-center gap-1.5 text-green-700 bg-green-50 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
+                <UploadCloud className="w-3.5 h-3.5" /> Sketch upload enabled
+              </div>
             )}
-            {warningsCount > 0 && timeLeft > engineData.partA_TimeThreshold && (
+            {warningsCount > 0 && engineData?.hasTimedPartALock && timeLeft > engineData.partA_TimeThreshold && (
               <div className="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-1 rounded-md text-xs font-bold border border-red-200 animate-pulse">
                 <AlertTriangle className="w-4 h-4" /> Warnings: {warningsCount}/{MAX_WARNINGS}
               </div>
@@ -1701,7 +1775,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           <div className="flex-1 bg-white rounded-2xl border border-black/5 shadow-sm px-8 pt-6 pb-4 flex flex-col min-h-0 relative">
             <div className="flex justify-between items-center mb-4 border-b border-black/5 pb-4 shrink-0">
               <div className="flex gap-2">
-                <span className="bg-primary/10 text-primary px-3 py-1 rounded text-sm font-bold">Part {currentQ.part}</span>
+                <span className="bg-primary/10 text-primary px-3 py-1 rounded text-sm font-bold">
+                  {engineData.isNid ? "Design Aptitude" : `Part ${currentQ.part}`}
+                </span>
                 <span className="bg-black/5 text-foreground/70 px-3 py-1 rounded text-sm font-bold">{currentQ.type}</span>
                 {currentQ.pyq_tag && <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded text-sm font-bold">{currentQ.pyq_tag}</span>}
               </div>
@@ -1780,7 +1856,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                     <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center justify-between">
                       <div className="flex items-center gap-2 text-xs font-bold text-green-800">
                         <UploadCloud className="w-4 h-4 text-green-600" />
-                        <span>Part B Answer Upload Zone (Tab switching is permitted for photo uploads)</span>
+                        <span>{engineData.isNid ? "Answer / Sketch Upload Zone (Tab switching permitted for photo uploads)" : "Part B Answer Upload Zone (Tab switching is permitted for photo uploads)"}</span>
                       </div>
                       <span className="text-[10px] font-bold bg-green-200/60 text-green-900 px-2 py-0.5 rounded">
                         Multi-page enabled
