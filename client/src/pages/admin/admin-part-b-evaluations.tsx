@@ -5,7 +5,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, ChevronLeft, 
   MessageSquare, Video, FileText, Maximize, X, Shield,
-  ZoomIn, ZoomOut, RotateCw, RefreshCw, ExternalLink, AlertCircle, Download
+  ZoomIn, ZoomOut, RotateCw, RefreshCw, ExternalLink, AlertCircle, Download,
+  UploadCloud, Plus
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -142,6 +143,7 @@ export default function AdminPartBEvaluations() {
   const [imageError, setImageError] = useState(false);
   const [resolvedUrlOverride, setResolvedUrlOverride] = useState<string | null>(null);
   const [retryingSignedUrl, setRetryingSignedUrl] = useState(false);
+  const [adminUploading, setAdminUploading] = useState(false);
 
   useEffect(() => {
     setZoom(1);
@@ -151,9 +153,100 @@ export default function AdminPartBEvaluations() {
     setResolvedUrlOverride(null);
   }, [currentQIndex, selectedFileIndex, evaluatingAttempt?.id]);
 
+  const handleAdminManualUpload = async (file: File) => {
+    if (!evaluatingAttempt) return;
+    const currentResp = responses[currentQIndex];
+    if (!currentResp) return;
+
+    setAdminUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const uniqueId = crypto.randomUUID().slice(0, 8);
+      const filePath = `submissions/${evaluatingAttempt.id}/${currentResp.question_id}_manual_${uniqueId}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('candidate-submissions')
+        .upload(filePath, file, {
+          contentType: file.type || 'image/jpeg',
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('candidate-submissions')
+        .getPublicUrl(filePath);
+
+      // Clean existing filenames from array if any, keeping valid URLs
+      const currentUrls = parseFileUrls(currentResp.file_url);
+      const validUrls = currentUrls.filter(u => !normalizeSubmissionUrl(u).isFilenameOnly);
+      const newUrls = [...validUrls, publicUrl];
+
+      const { error: dbError } = await supabase
+        .from('exam_responses')
+        .update({ file_url: JSON.stringify(newUrls) })
+        .eq('id', currentResp.id);
+
+      if (dbError) throw dbError;
+
+      // Update in-memory responses state
+      const updated = [...responses];
+      updated[currentQIndex] = { ...currentResp, file_url: JSON.stringify(newUrls) };
+      setResponses(updated);
+      setSelectedFileIndex(newUrls.length - 1);
+      setResolvedUrlOverride(publicUrl);
+      setImageError(false);
+      setImageLoading(false);
+
+      toast({ title: "Image Attached!", description: "Candidate submission sketch updated and saved." });
+    } catch (err: any) {
+      console.error("Admin upload failed:", err);
+      toast({ title: "Upload Failed", description: err.message || "Could not attach image", variant: "destructive" });
+    } finally {
+      setAdminUploading(false);
+    }
+  };
+
   const attemptSignedUrlRecovery = async (urlToRecover: string) => {
     try {
       setRetryingSignedUrl(true);
+      const currentResp = responses[currentQIndex];
+
+      // 1. First, search if any file exists in this attempt's storage folder
+      if (evaluatingAttempt?.id) {
+        const { data: listData } = await supabase.storage
+          .from('candidate-submissions')
+          .list(`submissions/${evaluatingAttempt.id}`);
+
+        if (listData && listData.length > 0) {
+          // Look for question ID match or any valid image
+          const qMatch = listData.find(f => currentResp && f.name.includes(currentResp.question_id));
+          const targetFile = qMatch || listData[0];
+          if (targetFile) {
+            const { data: { publicUrl } } = supabase.storage
+              .from('candidate-submissions')
+              .getPublicUrl(`submissions/${evaluatingAttempt.id}/${targetFile.name}`);
+
+            if (currentResp) {
+              await supabase.from('exam_responses').update({
+                file_url: JSON.stringify([publicUrl])
+              }).eq('id', currentResp.id);
+
+              const updated = [...responses];
+              updated[currentQIndex] = { ...currentResp, file_url: JSON.stringify([publicUrl]) };
+              setResponses(updated);
+            }
+
+            setResolvedUrlOverride(publicUrl);
+            setImageError(false);
+            setImageLoading(false);
+            toast({ title: "Found in Storage!", description: `Linked file: ${targetFile.name}` });
+            return;
+          }
+        }
+      }
+
+      // 2. Direct signed URL attempt for path
       let storagePath = '';
       if (urlToRecover.includes('/candidate-submissions/')) {
         storagePath = urlToRecover.split('/candidate-submissions/')[1];
@@ -174,6 +267,12 @@ export default function AdminPartBEvaluations() {
           return;
         }
       }
+
+      toast({ 
+        title: "No file found in cloud", 
+        description: "Please use 'Attach / Upload Image' or paste (Ctrl+V) the sketch directly.", 
+        variant: "destructive" 
+      });
       setImageError(true);
     } catch (e) {
       console.error("Signed URL recovery failed:", e);
@@ -182,6 +281,28 @@ export default function AdminPartBEvaluations() {
       setRetryingSignedUrl(false);
     }
   };
+
+  // Clipboard paste listener: paste student drawing directly into evaluation
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (!evaluatingAttempt || !responses[currentQIndex]) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile();
+          if (file) {
+            e.preventDefault();
+            toast({ title: "Pasting Image...", description: "Attaching sketch from clipboard." });
+            handleAdminManualUpload(file);
+            break;
+          }
+        }
+      }
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [evaluatingAttempt, currentQIndex, responses]);
 
   // Note: fetchAttempts has been replaced by useQuery above
 
@@ -587,25 +708,69 @@ export default function AdminPartBEvaluations() {
 
                    if (normalized.isFilenameOnly) {
                      return (
-                       <div className="flex flex-col items-center justify-center p-8 bg-amber-50/60 rounded-xl border border-amber-200 text-center max-w-md my-auto">
-                         <AlertCircle className="w-12 h-12 text-amber-500 mb-3" />
+                       <div 
+                         className="flex flex-col items-center justify-center p-8 bg-amber-50/60 rounded-xl border-2 border-dashed border-amber-300 text-center max-w-lg my-auto transition-all"
+                         onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                         onDrop={(e) => {
+                           e.preventDefault();
+                           e.stopPropagation();
+                           const droppedFile = e.dataTransfer.files?.[0];
+                           if (droppedFile && droppedFile.type.startsWith('image/')) {
+                             handleAdminManualUpload(droppedFile);
+                           }
+                         }}
+                       >
+                         <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mb-3">
+                           <AlertCircle className="w-6 h-6" />
+                         </div>
                          <h4 className="font-bold text-base text-amber-900 mb-1">Local Filename Recorded</h4>
-                         <p className="font-mono text-xs bg-white px-3 py-1 rounded border border-amber-200 text-amber-800 mb-3 break-all">
+                         <p className="font-mono text-xs bg-white px-3 py-1 rounded border border-amber-200 text-amber-800 mb-3 break-all max-w-sm">
                            {normalized.url}
                          </p>
-                         <p className="text-xs text-amber-700 leading-relaxed mb-4">
-                           During submission, this file was recorded as an attachment by the candidate's browser, but cloud sync was interrupted.
+                         <p className="text-xs text-amber-800 leading-relaxed mb-4 max-w-sm">
+                           During submission, this file was recorded as an attachment by the candidate's browser, but cloud sync was interrupted. You can search storage or attach the sketch directly to evaluate.
                          </p>
-                         <Button
-                           size="sm"
-                           variant="outline"
-                           disabled={retryingSignedUrl}
-                           onClick={() => attemptSignedUrlRecovery(`submissions/${evaluatingAttempt.id}/${currentResponse.question_id}_${normalized.url}`)}
-                           className="text-xs gap-1.5 border-amber-300 text-amber-900 hover:bg-amber-100"
-                         >
-                           {retryingSignedUrl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                           Search Storage for File
-                         </Button>
+
+                         <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
+                           <Button
+                             size="sm"
+                             variant="outline"
+                             disabled={retryingSignedUrl || adminUploading}
+                             onClick={() => attemptSignedUrlRecovery(`submissions/${evaluatingAttempt.id}/${currentResponse.question_id}_${normalized.url}`)}
+                             className="text-xs gap-1.5 border-amber-300 text-amber-900 hover:bg-amber-100 bg-white"
+                           >
+                             {retryingSignedUrl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                             Search Storage
+                           </Button>
+
+                           <label className="cursor-pointer">
+                             <input
+                               type="file"
+                               accept="image/*"
+                               className="hidden"
+                               disabled={adminUploading}
+                               onChange={(e) => {
+                                 const f = e.target.files?.[0];
+                                 if (f) handleAdminManualUpload(f);
+                               }}
+                             />
+                             <Button
+                               size="sm"
+                               disabled={adminUploading}
+                               asChild
+                               className="text-xs gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-medium"
+                             >
+                               <span>
+                                 {adminUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
+                                 Attach Sketch File
+                               </span>
+                             </Button>
+                           </label>
+                         </div>
+
+                         <span className="text-[11px] text-amber-700/80">
+                           Or drag & drop the image here / paste directly (<kbd className="font-mono bg-white px-1 py-0.5 rounded border border-amber-300 text-[10px]">Ctrl+V</kbd>)
+                         </span>
                        </div>
                      );
                    }
@@ -656,6 +821,30 @@ export default function AdminPartBEvaluations() {
                            </div>
 
                            <div className="flex items-center gap-1.5">
+                             <label className="cursor-pointer">
+                               <input
+                                 type="file"
+                                 accept="image/*"
+                                 className="hidden"
+                                 disabled={adminUploading}
+                                 onChange={(e) => {
+                                   const f = e.target.files?.[0];
+                                   if (f) handleAdminManualUpload(f);
+                                 }}
+                               />
+                               <Button
+                                 variant="ghost"
+                                 size="sm"
+                                 asChild
+                                 className="h-8 px-2 text-xs text-primary font-medium hover:bg-primary/5"
+                                 title="Attach an additional or replacement sketch"
+                               >
+                                 <span>
+                                   {adminUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Plus className="w-3.5 h-3.5 mr-1" />}
+                                   Add Page
+                                 </span>
+                               </Button>
+                             </label>
                              <Button
                                variant="ghost"
                                size="sm"
@@ -677,7 +866,18 @@ export default function AdminPartBEvaluations() {
                          </div>
 
                          {/* Image Canvas Container */}
-                         <div className="flex-1 flex items-center justify-center relative overflow-hidden min-h-[380px] bg-[#FAFAFA] rounded-b-xl border border-black/5">
+                         <div
+                           className="flex-1 flex items-center justify-center relative overflow-hidden min-h-[380px] bg-[#FAFAFA] rounded-b-xl border border-black/5"
+                           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                           onDrop={(e) => {
+                             e.preventDefault();
+                             e.stopPropagation();
+                             const droppedFile = e.dataTransfer.files?.[0];
+                             if (droppedFile && droppedFile.type.startsWith('image/')) {
+                               handleAdminManualUpload(droppedFile);
+                             }
+                           }}
+                         >
                            {imageLoading && !imageError && (
                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-xs z-10 transition-opacity">
                                <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
@@ -703,11 +903,34 @@ export default function AdminPartBEvaluations() {
                                    {retryingSignedUrl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                                    Generate Secure Link
                                  </Button>
+                                 <label className="cursor-pointer">
+                                   <input
+                                     type="file"
+                                     accept="image/*"
+                                     className="hidden"
+                                     disabled={adminUploading}
+                                     onChange={(e) => {
+                                       const f = e.target.files?.[0];
+                                       if (f) handleAdminManualUpload(f);
+                                     }}
+                                   />
+                                   <Button
+                                     size="sm"
+                                     disabled={adminUploading}
+                                     asChild
+                                     className="text-xs gap-1.5 bg-primary text-white hover:bg-primary/90"
+                                   >
+                                     <span>
+                                       {adminUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
+                                       Attach Sketch File
+                                     </span>
+                                   </Button>
+                                 </label>
                                  <a
                                    href={displayUrl}
                                    target="_blank"
                                    rel="noreferrer"
-                                   className="text-xs font-bold px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 inline-flex items-center gap-1"
+                                   className="text-xs font-bold px-3 py-1.5 rounded-lg border border-black/10 hover:bg-black/5 inline-flex items-center gap-1"
                                  >
                                    <ExternalLink className="w-3.5 h-3.5" /> Direct URL
                                  </a>

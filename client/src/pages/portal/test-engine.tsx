@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert, WifiOff, Lock, ClipboardList } from "lucide-react";
+import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert, WifiOff, Lock, ClipboardList, Camera, Clipboard, Image as ImageIcon, Sparkles, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -102,6 +102,16 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       }
     }
   }, [responses, attemptId]);
+
+  // Candidate Upload & Camera Enhancement State
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [uploadProgressText, setUploadProgressText] = useState('');
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Scoring Details State
   const [scoreBreakdown, setScoreBreakdown] = useState<Record<string, number>>({ NAT: 0, MSQ: 0, MCQ: 0 });
@@ -1111,73 +1121,203 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     });
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, qId: string) => {
-    const files = e.target.files;
+  const uploadFiles = async (files: FileList | File[], qId: string) => {
     if (!files || files.length === 0) return;
-
+    const fileArray = Array.from(files);
     const maxSizeMB = 15;
     const currentUrls = parseFileUrls(responses[qId]?.fileUrl);
     const newUrls = [...currentUrls];
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (file.size > maxSizeMB * 1024 * 1024) {
-        toast({ title: "File too large", description: `${file.name} exceeds ${maxSizeMB}MB limit.`, variant: "destructive" });
-        continue;
+    setIsUploadingFile(true);
+
+    try {
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        if (file.size > maxSizeMB * 1024 * 1024) {
+          toast({ title: "File too large", description: `${file.name} exceeds ${maxSizeMB}MB limit.`, variant: "destructive" });
+          continue;
+        }
+
+        setUploadProgressText(`Uploading ${i + 1} of ${fileArray.length}: ${file.name}...`);
+        toast({ title: "Optimizing & Uploading...", description: `Preparing ${file.name}...` });
+
+        try {
+          const { blob, dataUrl, ext } = await processSubmissionImage(file);
+          const uniqueId = crypto.randomUUID().slice(0, 8);
+          const filePath = `submissions/${attemptId || 'draft'}/${qId}_${uniqueId}.${ext}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('candidate-submissions')
+            .upload(filePath, blob, { 
+              contentType: 'image/jpeg',
+              cacheControl: '3600',
+              upsert: true 
+            });
+
+          if (uploadError) {
+            console.warn('Storage upload error, using instant data URL fail-safe:', uploadError);
+            if (dataUrl) {
+              newUrls.push(dataUrl);
+              toast({ title: "✅ Saved securely", description: `${file.name} attached.` });
+            } else {
+              throw uploadError;
+            }
+          } else {
+            const { data: urlData } = supabase.storage
+              .from('candidate-submissions')
+              .getPublicUrl(filePath);
+
+            newUrls.push(urlData.publicUrl);
+            toast({ title: "✅ Uploaded successfully", description: `${file.name} saved.` });
+          }
+        } catch (err: any) {
+          console.error('Upload processing failed:', err);
+          try {
+            const reader = new FileReader();
+            const rawDataUrl = await new Promise<string>((res, rej) => {
+              reader.onload = () => res(reader.result as string);
+              reader.onerror = rej;
+              reader.readAsDataURL(file);
+            });
+            newUrls.push(rawDataUrl);
+            toast({ title: "✅ Saved locally", description: `${file.name} attached.` });
+          } catch {
+            toast({ title: "Upload failed", description: `Could not process ${file.name}. Please try again.`, variant: "destructive" });
+          }
+        }
       }
 
-      toast({ title: "Optimizing...", description: `Preparing ${file.name}...` });
+      updateResponse(qId, { fileUrl: JSON.stringify(newUrls) });
+    } finally {
+      setIsUploadingFile(false);
+      setUploadProgressText('');
+    }
+  };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, qId: string) => {
+    if (e.target.files && e.target.files.length > 0) {
+      await uploadFiles(e.target.files, qId);
+      e.target.value = '';
+    }
+  };
+
+  const startCamera = async () => {
+    try {
+      setIsCameraModalOpen(true);
+      setIsCameraReady(false);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false
+      });
+      setCameraStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(e => console.log('Video play error:', e));
+      }
+      setIsCameraReady(true);
+    } catch (err) {
       try {
-        const { blob, dataUrl, ext } = await processSubmissionImage(file);
-        const uniqueId = crypto.randomUUID().slice(0, 8);
-        const filePath = `submissions/${attemptId || 'draft'}/${qId}_${uniqueId}.${ext}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('candidate-submissions')
-          .upload(filePath, blob, { 
-            contentType: 'image/jpeg',
-            cacheControl: '3600',
-            upsert: true 
-          });
-
-        if (uploadError) {
-          console.warn('Storage upload error, using instant data URL fail-safe:', uploadError);
-          // Zero drop of errors: fallback to high-quality compressed dataUrl
-          if (dataUrl) {
-            newUrls.push(dataUrl);
-            toast({ title: "✅ Saved securely", description: `${file.name} attached.` });
-          } else {
-            throw uploadError;
-          }
-        } else {
-          const { data: urlData } = supabase.storage
-            .from('candidate-submissions')
-            .getPublicUrl(filePath);
-
-          newUrls.push(urlData.publicUrl);
-          toast({ title: "✅ Uploaded successfully", description: `${file.name} saved.` });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        setCameraStream(stream);
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(e => console.log('Video play error:', e));
         }
-      } catch (err: any) {
-        console.error('Upload processing failed:', err);
-        // Absolute last resort fail-safe: read raw file as data URL so candidate's drawing is NEVER lost
-        try {
-          const reader = new FileReader();
-          const rawDataUrl = await new Promise<string>((res, rej) => {
-            reader.onload = () => res(reader.result as string);
-            reader.onerror = rej;
-            reader.readAsDataURL(file);
-          });
-          newUrls.push(rawDataUrl);
-          toast({ title: "✅ Saved locally", description: `${file.name} attached.` });
-        } catch {
-          toast({ title: "Upload failed", description: `Could not process ${file.name}. Please try again.`, variant: "destructive" });
-        }
+        setIsCameraReady(true);
+      } catch (fallbackErr) {
+        toast({
+          title: "Camera Access Required",
+          description: "Please enable camera access in your browser or select an image file instead.",
+          variant: "destructive"
+        });
+        setIsCameraModalOpen(false);
       }
     }
-
-    updateResponse(qId, { fileUrl: JSON.stringify(newUrls) });
   };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+      setCameraStream(null);
+    }
+    setIsCameraModalOpen(false);
+    setIsCameraReady(false);
+  };
+
+  const captureSnapshot = async (qId: string) => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    stopCamera();
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      const snapshotFile = new File([blob], `sketch_camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      await uploadFiles([snapshotFile], qId);
+    }, 'image/jpeg', 0.92);
+  };
+
+  const handleClipboardButton = async (qId: string) => {
+    try {
+      if (navigator.clipboard?.read) {
+        const items = await navigator.clipboard.read();
+        const imageFiles: File[] = [];
+        for (const item of items) {
+          const imageType = item.types.find(t => t.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            imageFiles.push(new File([blob], `clipboard_${Date.now()}.${imageType.split('/')[1] || 'jpg'}`, { type: imageType }));
+          }
+        }
+        if (imageFiles.length > 0) {
+          toast({ title: "Pasting image...", description: "Uploading sketch from clipboard." });
+          await uploadFiles(imageFiles, qId);
+          return;
+        }
+      }
+      toast({ title: "Clipboard Ready", description: "Press Ctrl+V (or Cmd+V on Mac) anywhere on this page to paste your copied image." });
+    } catch (e) {
+      toast({ title: "Clipboard Ready", description: "Press Ctrl+V (or Cmd+V on Mac) anywhere on this page to paste your copied image." });
+    }
+  };
+
+  // Keyboard shortcut listener: paste images anytime on Part B questions
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (testStep !== 'active' || !engineData?.questions) return;
+      const curQ = engineData.questions[activeQuestionIndex];
+      if (!curQ || curQ.question_type !== 'drawing_upload') return;
+
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const imageFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) imageFiles.push(file);
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        toast({ title: "Pasting image...", description: "Uploading sketch from clipboard." });
+        uploadFiles(imageFiles, curQ.id);
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [testStep, activeQuestionIndex, engineData, attemptId]);
 
   const handleRemoveFile = (qId: string, indexToRemove: number) => {
     const currentUrls = parseFileUrls(responses[qId]?.fileUrl);
@@ -1650,43 +1790,150 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                     {/* Uploaded files gallery */}
                     {parseFileUrls(currentResponse.fileUrl).length > 0 && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        {parseFileUrls(currentResponse.fileUrl).map((url, imgIdx) => (
-                          <div key={imgIdx} className="border border-primary/30 rounded-xl bg-primary/5 p-3 relative group flex flex-col items-center justify-center min-h-[140px] overflow-hidden shadow-sm">
-                            <span className="absolute top-2 left-2 bg-primary/20 text-primary font-bold text-[10px] px-2 py-0.5 rounded">
-                              Page {imgIdx + 1}
-                            </span>
-                            {testStep !== 'review' && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveFile(currentQ.id, imgIdx)}
-                                className="absolute top-2 right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shadow-md hover:bg-red-600 transition-colors z-10"
-                                title="Delete page"
-                              >
-                                ✕
-                              </button>
-                            )}
-                            {url.match(/\.(jpg|jpeg|png|gif|webp)$/i) || url.startsWith('http') ? (
-                              <img src={url} alt={`Submission ${imgIdx + 1}`} className="max-h-24 object-contain rounded my-2 cursor-pointer hover:scale-105 transition-transform" onClick={() => window.open(url, '_blank')} />
-                            ) : (
-                              <FileCheck2 className="w-10 h-10 text-primary my-2" />
-                            )}
-                            <p className="text-xs font-bold text-primary truncate max-w-full px-2">{url.split('/').pop() || `Page ${imgIdx + 1}`}</p>
-                            <a href={url} target="_blank" rel="noreferrer" className="text-[10px] text-primary underline mt-1 font-semibold">View Full Image ↗</a>
-                          </div>
-                        ))}
+                        {parseFileUrls(currentResponse.fileUrl).map((url, imgIdx) => {
+                          const isImg = url.match(/\.(jpg|jpeg|png|gif|webp)$/i) || url.startsWith('http') || url.startsWith('data:image/');
+                          const displayName = url.startsWith('data:image/') ? `Page ${imgIdx + 1} (Direct)` : (url.split('/').pop()?.split('?')[0] || `Page ${imgIdx + 1}`);
+
+                          return (
+                            <div key={imgIdx} className="border border-primary/30 rounded-xl bg-white p-3 relative group flex flex-col items-center justify-between min-h-[160px] overflow-hidden shadow-sm hover:border-primary/60 transition-all">
+                              <div className="w-full flex items-center justify-between z-10">
+                                <span className="bg-primary/10 text-primary font-bold text-[11px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-primary" />
+                                  Page {imgIdx + 1}
+                                </span>
+                                {testStep !== 'review' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveFile(currentQ.id, imgIdx)}
+                                    className="bg-red-500 hover:bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shadow-sm transition-colors"
+                                    title="Delete page"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                              <div className="my-auto py-2 flex items-center justify-center w-full max-h-[100px] overflow-hidden">
+                                {isImg ? (
+                                  <img 
+                                    src={url} 
+                                    alt={`Submission Page ${imgIdx + 1}`} 
+                                    className="max-h-24 max-w-full object-contain rounded cursor-pointer hover:scale-105 transition-transform" 
+                                    onClick={() => window.open(url, '_blank')} 
+                                  />
+                                ) : (
+                                  <FileCheck2 className="w-10 h-10 text-primary" />
+                                )}
+                              </div>
+                              <div className="w-full flex items-center justify-between border-t border-black/5 pt-1.5 mt-1 text-[11px]">
+                                <p className="font-medium text-foreground/70 truncate max-w-[120px]">{displayName}</p>
+                                <a 
+                                  href={url} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="text-primary hover:underline font-semibold"
+                                >
+                                  View Full ↗
+                                </a>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 
-                    {/* File Upload Dropzone / Button */}
+                    {/* File Upload Dropzone / Quick Actions */}
                     {testStep !== 'review' && (
-                      <label className="border-2 border-dashed border-primary/30 rounded-xl bg-background/50 hover:bg-primary/5 flex flex-col items-center justify-center p-6 text-foreground/50 text-sm cursor-pointer transition-colors group">
-                        <UploadCloud className="w-8 h-8 mb-2 text-primary/60 group-hover:scale-110 transition-transform" />
-                        <p className="font-bold text-[#262626]">
-                          {parseFileUrls(currentResponse.fileUrl).length > 0 ? '+ Add Another Page / Drawing Photo' : 'Click or Drag to Upload Sketches'}
-                        </p>
-                        <p className="text-xs mt-1 font-medium text-foreground/60">Supports JPG, PNG, PDF (Multiple files allowed, Max 10MB per file)</p>
-                        <input type="file" accept="image/*,.pdf" multiple className="hidden" onChange={(e) => handleFileUpload(e, currentQ.id)} />
-                      </label>
+                      <div className="space-y-3">
+                        {isUploadingFile ? (
+                          <div className="border-2 border-primary/40 rounded-xl bg-primary/5 p-8 flex flex-col items-center justify-center text-center animate-pulse">
+                            <Loader2 className="w-9 h-9 animate-spin text-primary mb-3" />
+                            <p className="font-bold text-sm text-[#262626]">{uploadProgressText || 'Compressing & uploading drawing...'}</p>
+                            <p className="text-xs text-foreground/60 mt-1">Zero-loss optimization in progress. Your work will appear momentarily.</p>
+                          </div>
+                        ) : (
+                          <>
+                            {/* Action Buttons Suite */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                              {/* 1. Browse Files / Gallery */}
+                              <label className="cursor-pointer">
+                                <input
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  multiple
+                                  className="hidden"
+                                  onChange={(e) => handleFileUpload(e, currentQ.id)}
+                                />
+                                <div className="h-11 px-4 rounded-xl border border-primary/20 bg-white hover:bg-primary/5 hover:border-primary/40 text-primary font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all">
+                                  <UploadCloud className="w-4 h-4" />
+                                  <span>📁 Browse Files / Gallery</span>
+                                </div>
+                              </label>
+
+                              {/* 2. Take Photo / Live Camera */}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={startCamera}
+                                className="h-11 rounded-xl border-primary/20 bg-white hover:bg-primary/5 hover:border-primary/40 text-primary font-bold text-xs gap-2 shadow-xs"
+                              >
+                                <Camera className="w-4 h-4" />
+                                <span>📸 Snap with Camera</span>
+                              </Button>
+
+                              {/* 3. Paste from Clipboard */}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => handleClipboardButton(currentQ.id)}
+                                className="h-11 rounded-xl border-primary/20 bg-white hover:bg-primary/5 hover:border-primary/40 text-primary font-bold text-xs gap-2 shadow-xs"
+                              >
+                                <Clipboard className="w-4 h-4" />
+                                <span>📋 Paste (Ctrl+V)</span>
+                              </Button>
+                            </div>
+
+                            {/* Dropzone Box */}
+                            <div
+                              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingFile(true); }}
+                              onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingFile(false); }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setIsDraggingFile(false);
+                                if (e.dataTransfer.files?.length) {
+                                  uploadFiles(e.dataTransfer.files, currentQ.id);
+                                }
+                              }}
+                              className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                                isDraggingFile 
+                                  ? 'border-primary bg-primary/10 scale-[1.01]' 
+                                  : 'border-primary/30 bg-background/50 hover:bg-primary/5'
+                              }`}
+                              onClick={() => {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = 'image/*,.pdf';
+                                input.multiple = true;
+                                input.onchange = (e) => {
+                                  const target = e.target as HTMLInputElement;
+                                  if (target.files) uploadFiles(target.files, currentQ.id);
+                                };
+                                input.click();
+                              }}
+                            >
+                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-2">
+                                <UploadCloud className="w-5 h-5" />
+                              </div>
+                              <p className="font-bold text-sm text-[#262626]">
+                                {parseFileUrls(currentResponse.fileUrl).length > 0 ? '+ Add Another Page / Sketch Photo' : 'Drag & Drop Sketches Here or Click to Upload'}
+                              </p>
+                              <p className="text-xs text-foreground/60 mt-1 max-w-sm">
+                                You can upload JPG, PNG, PDF sketches, hold your drawing to the camera, or copy & paste directly with <kbd className="font-mono bg-white px-1.5 py-0.5 rounded border border-black/10 text-[10px] text-foreground font-semibold">Ctrl+V</kbd> / <kbd className="font-mono bg-white px-1.5 py-0.5 rounded border border-black/10 text-[10px] text-foreground font-semibold">Cmd+V</kbd>.
+                              </p>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     )}
 
                     {testStep === 'review' && attemptDetails?.part_b_evaluation_status === 'completed' && (currentResponse.mentorComments || currentResponse.marksAwarded !== undefined) && (
@@ -1870,6 +2117,57 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             )}
             <Button onClick={confirmSubmit} className="w-full font-bold bg-primary text-white hover:bg-primary/90">
               {modalType === 'submit' ? 'Yes, Submit' : 'Submit & Exit'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Live Camera Snapshot Modal */}
+      <Dialog open={isCameraModalOpen} onOpenChange={(open) => !open && stopCamera()}>
+        <DialogContent className="sm:max-w-xl max-w-[95vw] p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+              <Camera className="w-5 h-5 text-primary" />
+              Snap Drawing with Camera
+            </DialogTitle>
+            <DialogDescription className="text-xs text-foreground/60">
+              Hold your physical drawing sheet up to the camera. Make sure lighting is clear and your sheet is framed nicely inside the box.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="relative bg-black rounded-xl overflow-hidden aspect-4/3 flex items-center justify-center my-2 shadow-inner border border-black/10">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+            {!isCameraReady && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-white">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
+                <span className="text-xs font-semibold">Starting camera...</span>
+              </div>
+            )}
+            <div className="absolute inset-4 border-2 border-dashed border-white/40 rounded-lg pointer-events-none flex items-center justify-center">
+              <span className="text-white/80 text-[11px] bg-black/50 px-2.5 py-1 rounded backdrop-blur-xs">
+                Align Drawing Inside Frame
+              </span>
+            </div>
+          </div>
+
+          <DialogFooter className="flex sm:justify-between items-center gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={stopCamera}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={!isCameraReady}
+              onClick={() => currentQ && captureSnapshot(currentQ.id)}
+              className="bg-primary hover:bg-primary/90 text-white gap-2 font-bold px-5"
+            >
+              <Camera className="w-4 h-4" />
+              Capture & Attach
             </Button>
           </DialogFooter>
         </DialogContent>
