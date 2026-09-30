@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, ChevronLeft, MessageSquare, Video, FileText, Maximize, X, Shield } from "lucide-react";
+import { 
+  Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, ChevronLeft, 
+  MessageSquare, Video, FileText, Maximize, X, Shield,
+  ZoomIn, ZoomOut, RotateCw, RefreshCw, ExternalLink, AlertCircle, Download
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -12,15 +16,48 @@ const PAGE_SIZE = 100;
 const parseFileUrls = (fileUrlString: string | undefined | null): string[] => {
   if (!fileUrlString) return [];
   try {
-    const trimmed = fileUrlString.trim();
+    const trimmed = String(fileUrlString).trim();
     if (trimmed.startsWith('[')) {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) return parsed.map(s => String(s)).filter(Boolean);
     }
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+      return [JSON.parse(trimmed)];
+    }
   } catch (e) {
     // Fallback to single URL
   }
-  return fileUrlString ? [fileUrlString] : [];
+  return fileUrlString ? [String(fileUrlString).trim()] : [];
+};
+
+const normalizeSubmissionUrl = (rawUrl: string): { url: string; isDirectImage: boolean; isFilenameOnly: boolean } => {
+  if (!rawUrl) return { url: '', isDirectImage: false, isFilenameOnly: false };
+  const trimmed = rawUrl.trim();
+
+  // If already a base64 / data URL
+  if (trimmed.startsWith('data:image/')) {
+    return { url: trimmed, isDirectImage: true, isFilenameOnly: false };
+  }
+
+  // If full http / https URL
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return { url: trimmed, isDirectImage: true, isFilenameOnly: false };
+  }
+
+  // If relative storage path e.g. submissions/... or candidate-submissions/...
+  const cleanPath = trimmed.replace(/^(\/?candidate-submissions\/|\/)/, '');
+  if (cleanPath.startsWith('submissions/')) {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://tbacsyjfbwaqobtmbwdr.supabase.co';
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/candidate-submissions/${cleanPath}`;
+    return { url: publicUrl, isDirectImage: true, isFilenameOnly: false };
+  }
+
+  // If raw filename without any path (e.g. "DSC_2799.JPG")
+  if (!trimmed.includes('/')) {
+    return { url: trimmed, isDirectImage: false, isFilenameOnly: true };
+  }
+
+  return { url: trimmed, isDirectImage: true, isFilenameOnly: false };
 };
 
 export default function AdminPartBEvaluations() {
@@ -97,6 +134,54 @@ export default function AdminPartBEvaluations() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
+
+  // Zoom, rotation, and progressive image loading states
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
+  const [resolvedUrlOverride, setResolvedUrlOverride] = useState<string | null>(null);
+  const [retryingSignedUrl, setRetryingSignedUrl] = useState(false);
+
+  useEffect(() => {
+    setZoom(1);
+    setRotation(0);
+    setImageLoading(true);
+    setImageError(false);
+    setResolvedUrlOverride(null);
+  }, [currentQIndex, selectedFileIndex, evaluatingAttempt?.id]);
+
+  const attemptSignedUrlRecovery = async (urlToRecover: string) => {
+    try {
+      setRetryingSignedUrl(true);
+      let storagePath = '';
+      if (urlToRecover.includes('/candidate-submissions/')) {
+        storagePath = urlToRecover.split('/candidate-submissions/')[1];
+      } else if (urlToRecover.startsWith('submissions/')) {
+        storagePath = urlToRecover;
+      }
+      
+      if (storagePath) {
+        storagePath = storagePath.split('?')[0];
+        const { data } = await supabase.storage
+          .from('candidate-submissions')
+          .createSignedUrl(storagePath, 7200);
+
+        if (data?.signedUrl) {
+          setResolvedUrlOverride(data.signedUrl);
+          setImageError(false);
+          setImageLoading(true);
+          return;
+        }
+      }
+      setImageError(true);
+    } catch (e) {
+      console.error("Signed URL recovery failed:", e);
+      setImageError(true);
+    } finally {
+      setRetryingSignedUrl(false);
+    }
+  };
 
   // Note: fetchAttempts has been replaced by useQuery above
 
@@ -491,27 +576,184 @@ export default function AdminPartBEvaluations() {
             )}
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-black/5 shadow-sm flex-1 flex flex-col items-center justify-center min-h-[400px] overflow-hidden group relative">
+          <div className="bg-white p-4 rounded-xl border border-black/5 shadow-sm flex-1 flex flex-col items-center justify-center min-h-[400px] overflow-hidden relative">
              {parseFileUrls(currentResponse?.file_url).length > 0 ? (
                <>
                  {(() => {
                    const fileUrls = parseFileUrls(currentResponse?.file_url);
-                   const activeUrl = fileUrls[selectedFileIndex] || fileUrls[0];
-                   const isImg = activeUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) || activeUrl.startsWith('http');
-                   return (
-                     <div className="flex flex-col items-center justify-center w-full h-full relative">
-                       {isImg ? (
-                         <img src={activeUrl} className="max-h-[600px] w-auto object-contain rounded-lg border border-black/10 cursor-pointer" alt={`Page ${selectedFileIndex + 1}`} onClick={() => setFullscreenImage(activeUrl)} />
-                       ) : (
-                         <div className="flex flex-col items-center justify-center p-8 bg-gray-50 rounded-xl border border-gray-200">
-                           <FileText className="w-16 h-16 text-primary mb-3" />
-                           <p className="font-bold text-sm mb-2">{activeUrl.split('/').pop()}</p>
-                           <a href={activeUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold text-xs">Open File ↗</a>
-                         </div>
-                       )}
-                       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                         <Button onClick={() => setFullscreenImage(activeUrl)} variant="secondary" className="shadow-md bg-white text-black hover:bg-gray-100"><Maximize className="w-4 h-4 mr-2" /> Full Screen</Button>
+                   const rawActive = fileUrls[selectedFileIndex] || fileUrls[0] || '';
+                   const normalized = normalizeSubmissionUrl(rawActive);
+                   const displayUrl = resolvedUrlOverride || normalized.url;
+
+                   if (normalized.isFilenameOnly) {
+                     return (
+                       <div className="flex flex-col items-center justify-center p-8 bg-amber-50/60 rounded-xl border border-amber-200 text-center max-w-md my-auto">
+                         <AlertCircle className="w-12 h-12 text-amber-500 mb-3" />
+                         <h4 className="font-bold text-base text-amber-900 mb-1">Local Filename Recorded</h4>
+                         <p className="font-mono text-xs bg-white px-3 py-1 rounded border border-amber-200 text-amber-800 mb-3 break-all">
+                           {normalized.url}
+                         </p>
+                         <p className="text-xs text-amber-700 leading-relaxed mb-4">
+                           During submission, this file was recorded as an attachment by the candidate's browser, but cloud sync was interrupted.
+                         </p>
+                         <Button
+                           size="sm"
+                           variant="outline"
+                           disabled={retryingSignedUrl}
+                           onClick={() => attemptSignedUrlRecovery(`submissions/${evaluatingAttempt.id}/${currentResponse.question_id}_${normalized.url}`)}
+                           className="text-xs gap-1.5 border-amber-300 text-amber-900 hover:bg-amber-100"
+                         >
+                           {retryingSignedUrl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                           Search Storage for File
+                         </Button>
                        </div>
+                     );
+                   }
+
+                   if (normalized.isDirectImage) {
+                     return (
+                       <div className="flex flex-col w-full h-full relative">
+                         {/* Inspection Toolbar */}
+                         <div className="flex items-center justify-between px-3 py-2 bg-black/[0.03] border-b border-black/5 rounded-t-xl mb-2 shrink-0">
+                           <div className="flex items-center gap-1.5">
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => setZoom(prev => Math.min(3, +(prev + 0.25).toFixed(2)))}
+                               className="h-8 px-2 text-xs"
+                               title="Zoom In"
+                             >
+                               <ZoomIn className="w-3.5 h-3.5 mr-1" /> Zoom In
+                             </Button>
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => setZoom(prev => Math.max(0.5, +(prev - 0.25).toFixed(2)))}
+                               className="h-8 px-2 text-xs"
+                               title="Zoom Out"
+                             >
+                               <ZoomOut className="w-3.5 h-3.5 mr-1" /> Zoom Out
+                             </Button>
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => setRotation(prev => (prev + 90) % 360)}
+                               className="h-8 px-2 text-xs"
+                               title="Rotate 90°"
+                             >
+                               <RotateCw className="w-3.5 h-3.5 mr-1" /> Rotate
+                             </Button>
+                             {(zoom !== 1 || rotation !== 0) && (
+                               <Button
+                                 variant="ghost"
+                                 size="sm"
+                                 onClick={() => { setZoom(1); setRotation(0); }}
+                                 className="h-8 px-2 text-[11px] text-foreground/50 hover:text-foreground"
+                               >
+                                 Reset ({Math.round(zoom * 100)}%)
+                               </Button>
+                             )}
+                           </div>
+
+                           <div className="flex items-center gap-1.5">
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => setFullscreenImage(displayUrl)}
+                               className="h-8 px-2 text-xs"
+                             >
+                               <Maximize className="w-3.5 h-3.5 mr-1" /> Full Screen
+                             </Button>
+                             <a
+                               href={displayUrl}
+                               target="_blank"
+                               rel="noreferrer"
+                               className="inline-flex items-center justify-center h-8 px-2 text-xs text-foreground/70 hover:text-foreground rounded-md hover:bg-black/5"
+                               title="Open raw image in new tab"
+                             >
+                               <ExternalLink className="w-3.5 h-3.5 mr-1" /> Open
+                             </a>
+                           </div>
+                         </div>
+
+                         {/* Image Canvas Container */}
+                         <div className="flex-1 flex items-center justify-center relative overflow-hidden min-h-[380px] bg-[#FAFAFA] rounded-b-xl border border-black/5">
+                           {imageLoading && !imageError && (
+                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-xs z-10 transition-opacity">
+                               <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
+                               <span className="text-xs font-semibold text-foreground/60">Loading candidate sketch...</span>
+                             </div>
+                           )}
+
+                           {imageError ? (
+                             <div className="flex flex-col items-center justify-center p-6 text-center max-w-md">
+                               <AlertCircle className="w-10 h-10 text-red-500 mb-2" />
+                               <h4 className="font-bold text-sm text-[#262626] mb-1">Image Could Not Be Loaded</h4>
+                               <p className="text-xs text-foreground/60 mb-4">
+                                 The image URL was not accessible directly via public storage.
+                               </p>
+                               <div className="flex gap-2">
+                                 <Button
+                                   size="sm"
+                                   variant="outline"
+                                   disabled={retryingSignedUrl}
+                                   onClick={() => attemptSignedUrlRecovery(displayUrl)}
+                                   className="text-xs gap-1.5"
+                                 >
+                                   {retryingSignedUrl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                                   Generate Secure Link
+                                 </Button>
+                                 <a
+                                   href={displayUrl}
+                                   target="_blank"
+                                   rel="noreferrer"
+                                   className="text-xs font-bold px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 inline-flex items-center gap-1"
+                                 >
+                                   <ExternalLink className="w-3.5 h-3.5" /> Direct URL
+                                 </a>
+                                </div>
+                             </div>
+                           ) : (
+                             <div className="w-full h-full flex items-center justify-center p-2 overflow-auto">
+                               <img
+                                 src={displayUrl}
+                                 alt={`Candidate Submission Page ${selectedFileIndex + 1}`}
+                                 loading="lazy"
+                                 decoding="async"
+                                 onLoad={() => setImageLoading(false)}
+                                 onError={() => {
+                                   setImageLoading(false);
+                                   if (!resolvedUrlOverride && displayUrl.includes('candidate-submissions')) {
+                                     attemptSignedUrlRecovery(displayUrl);
+                                   } else {
+                                     setImageError(true);
+                                   }
+                                 }}
+                                 style={{
+                                   transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                                   transformOrigin: 'center center',
+                                   transition: 'transform 0.15s ease-out',
+                                   maxHeight: zoom <= 1 ? '560px' : 'none',
+                                   maxWidth: zoom <= 1 ? '100%' : 'none',
+                                   objectFit: 'contain'
+                                 }}
+                                 className="rounded-lg shadow-xs select-none cursor-pointer"
+                                 onClick={() => {
+                                   if (zoom === 1) setFullscreenImage(displayUrl);
+                                 }}
+                               />
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     );
+                   }
+
+                   return (
+                     <div className="flex flex-col items-center justify-center p-8 bg-gray-50 rounded-xl border border-gray-200">
+                       <FileText className="w-16 h-16 text-primary mb-3" />
+                       <p className="font-bold text-sm mb-2">{normalized.url.split('/').pop()}</p>
+                       <a href={normalized.url} target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold text-xs">Open File ↗</a>
                      </div>
                    );
                  })()}
@@ -661,11 +903,33 @@ export default function AdminPartBEvaluations() {
 
       {/* Fullscreen Image Preview */}
       <Dialog open={!!fullscreenImage} onOpenChange={() => setFullscreenImage(null)}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
-          <Button variant="ghost" size="icon" onClick={() => setFullscreenImage(null)} className="absolute top-4 right-4 text-white hover:bg-white/20 z-50">
-            <X className="w-6 h-6" />
-          </Button>
-          <img src={fullscreenImage || ''} className="max-w-full max-h-[90vh] object-contain" />
+        <DialogContent className="max-w-[96vw] max-h-[96vh] w-[96vw] h-[96vh] p-0 overflow-hidden bg-black/95 border-none flex flex-col items-center justify-center">
+          <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
+            <a
+              href={fullscreenImage || ''}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center h-9 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-sm transition-colors"
+              title="Open full image in new tab"
+            >
+              <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Open Tab
+            </a>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setFullscreenImage(null)} 
+              className="text-white hover:bg-white/20 h-9 w-9 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+          <div className="w-full h-full flex items-center justify-center p-6 overflow-auto">
+            <img 
+              src={fullscreenImage || ''} 
+              alt="Candidate sketch fullscreen" 
+              className="max-w-full max-h-[90vh] object-contain rounded shadow-2xl select-none" 
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </div>
