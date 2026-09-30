@@ -123,9 +123,43 @@ export default function AdminExamTests() {
   const [saving, setSaving] = useState(false);
   const [editingTestId, setEditingTestId] = useState<string | null>(null);
 
-  // Quick Gen Modal
+  // Single Entry Point Studio State
+  const [selectedExamKey, setSelectedExamKey] = useState<string>("CEED");
+  const [selectedFormatKey, setSelectedFormatKey] = useState<string>("full_length");
+
+  // Quick Gen Modal State with PYQ & Exam Tag
   const [quickGenOpen, setQuickGenOpen] = useState(false);
   const [quickGenDiff, setQuickGenDiff] = useState("Medium");
+  const [quickGenSource, setQuickGenSource] = useState<"all" | "pyq_only">("all");
+  const [quickGenExamTag, setQuickGenExamTag] = useState<string>("ALL");
+
+  // Helper to resolve the active template
+  const getActiveTemplate = () => {
+    if (selectedExamKey === "CUSTOM" || selectedFormatKey === "custom_short") {
+      return TEMPLATES.find(t => t.id === "Custom Short") || TEMPLATES[0];
+    }
+    if (selectedExamKey === "NID_BDES") {
+      return selectedFormatKey === "half_length" 
+        ? (TEMPLATES.find(t => t.id === "NID Bdes Half") || TEMPLATES[0])
+        : (TEMPLATES.find(t => t.id === "NID Bdes") || TEMPLATES[0]);
+    }
+    if (selectedExamKey === "NID_MDES") {
+      return selectedFormatKey === "half_length" 
+        ? (TEMPLATES.find(t => t.id === "NID Mdes Half") || TEMPLATES[0])
+        : (TEMPLATES.find(t => t.id === "NID Mdes") || TEMPLATES[0]);
+    }
+    if (selectedExamKey === "CEED") {
+      return selectedFormatKey === "half_length" 
+        ? (TEMPLATES.find(t => t.id === "CEED Half") || TEMPLATES[0])
+        : (TEMPLATES.find(t => t.id === "CEED") || TEMPLATES[0]);
+    }
+    if (selectedExamKey === "UCEED") {
+      return selectedFormatKey === "half_length" 
+        ? (TEMPLATES.find(t => t.id === "UCEED Half") || TEMPLATES[0])
+        : (TEMPLATES.find(t => t.id === "UCEED") || TEMPLATES[0]);
+    }
+    return TEMPLATES[0];
+  };
 
   // Question Picker Modal (Used for Adding & Replacing)
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -135,6 +169,8 @@ export default function AdminExamTests() {
   const [pickerTypeFilter, setPickerTypeFilter] = useState<string>("ALL");
   const [pickerDiffFilter, setPickerDiffFilter] = useState<string>("ALL");
   const [pickerTopicFilter, setPickerTopicFilter] = useState<string>("");
+  const [pickerPyqOnly, setPickerPyqOnly] = useState<boolean>(false);
+  const [pickerExamTagFilter, setPickerExamTagFilter] = useState<string>("ALL");
   const [autoDifficulty, setAutoDifficulty] = useState<string>("ALL");
 
   // Replacement specific
@@ -209,7 +245,12 @@ export default function AdminExamTests() {
   // -----------------------------------------------------
   // AUTO GENERATE LOGIC (Used from Dashboard & Builder)
   // -----------------------------------------------------
-  const performAutoGenerate = async (template: any, targetDifficulty: string) => {
+  const performAutoGenerate = async (
+    template: any, 
+    targetDifficulty: string = "ALL", 
+    isPyqOnly: boolean = false, 
+    examTag: string = "ALL"
+  ) => {
     setLoading(true);
     let newSelectedQs: any[] = [];
     let allMet = true;
@@ -222,8 +263,26 @@ export default function AdminExamTests() {
 
       for (const [type, requiredCount] of Object.entries(sec.requirements)) {
         let available = bank.filter(q => q.type === type);
+        
+        // 1. Target Difficulty filter
         if (targetDifficulty !== "ALL") {
           available = available.filter(q => q.difficulty === targetDifficulty);
+        }
+
+        // 2. PYQ filter
+        if (isPyqOnly) {
+          available = available.filter(q => Boolean(q.pyq_tag && q.pyq_tag.trim().length > 0));
+        }
+
+        // 3. Exam Tag filter (NID / CEED / UCEED)
+        if (examTag && examTag !== "ALL") {
+          const tagUpper = examTag.toUpperCase();
+          available = available.filter(q => {
+            const pyqMatch = (q.pyq_tag || '').toUpperCase().includes(tagUpper);
+            const topicMatch = Array.isArray(q.topics) && q.topics.some((t: string) => t.toUpperCase().includes(tagUpper));
+            const textMatch = (q.content_text || '').toUpperCase().includes(tagUpper);
+            return pyqMatch || topicMatch || textMatch;
+          });
         }
 
         // Prevent selecting duplicate questions within the same test
@@ -242,7 +301,13 @@ export default function AdminExamTests() {
     setLoading(false);
 
     if (!allMet) {
-      toast({ title: "Warning", description: `Not enough questions found at ${targetDifficulty} difficulty to fill exact requirements. Some slots left empty.`, variant: "destructive" });
+      const pyqText = isPyqOnly ? " [PYQ Only]" : "";
+      const tagText = examTag !== "ALL" ? ` [${examTag}]` : "";
+      toast({ 
+        title: "Warning", 
+        description: `Not enough questions found for all slots with strict criteria (${targetDifficulty} diff${pyqText}${tagText}). Added all available matches.`, 
+        variant: "destructive" 
+      });
     } else {
       toast({ title: "Success", description: "Test fully generated!" });
     }
@@ -255,7 +320,12 @@ export default function AdminExamTests() {
 
     setSelectedTemplate(template);
     setTestSections(JSON.parse(JSON.stringify(template.sections)));
-    setTestTitle(`${template.name} - ${targetDifficulty} Mock`);
+    
+    const diffLabel = targetDifficulty === "ALL" ? "Mixed" : targetDifficulty;
+    const pyqLabel = isPyqOnly ? " PYQ" : "";
+    const examLabel = examTag !== "ALL" ? ` (${examTag})` : "";
+    setTestTitle(`${template.name} - ${diffLabel}${pyqLabel} Mock${examLabel}`);
+    
     setProgramFormat(template.programFormat || "bachelors");
     setSelectedQuestions(newSelectedQs);
     setCurrentStep('PREVIEW'); // Drop straight into preview
@@ -264,7 +334,7 @@ export default function AdminExamTests() {
 
   const handleQuickGenConfirm = () => {
     setQuickGenOpen(false);
-    performAutoGenerate(selectedTemplate, quickGenDiff);
+    performAutoGenerate(selectedTemplate, quickGenDiff, quickGenSource === "pyq_only", quickGenExamTag);
   };
 
   // -----------------------------------------------------
@@ -320,6 +390,17 @@ export default function AdminExamTests() {
       if (autoDifficulty !== "ALL") {
         available = available.filter(q => q.difficulty === autoDifficulty);
       }
+      if (pickerPyqOnly) {
+        available = available.filter(q => !!q.pyq_tag);
+      }
+      if (pickerExamTagFilter !== "ALL") {
+        const tagUpper = pickerExamTagFilter.toUpperCase();
+        available = available.filter(q =>
+          (q.pyq_tag || '').toUpperCase().includes(tagUpper) ||
+          q.topics?.some((t: any) => t.toUpperCase().includes(tagUpper)) ||
+          (q.content_text || '').toUpperCase().includes(tagUpper)
+        );
+      }
       // Prevent selecting duplicate questions within the same test
       available = available.filter(q => !newSelectedQs.some(ns => ns.id === q.id));
 
@@ -330,7 +411,7 @@ export default function AdminExamTests() {
     }
 
     setSelectedQuestions(newSelectedQs);
-    if (!allMet) toast({ title: "Warning", description: `Could not find enough questions for all requirements at ${autoDifficulty} difficulty.`, variant: "destructive" });
+    if (!allMet) toast({ title: "Warning", description: `Could not find enough questions for all requirements under current filters.`, variant: "destructive" });
     else toast({ title: "Success", description: "Section auto-filled." });
   };
 
@@ -622,76 +703,199 @@ export default function AdminExamTests() {
         <p className="text-sm text-[#262626]/50 mt-1">Select a template to create a new test, or manage existing ones below.</p>
       </div>
 
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground/50">Available Templates</h3>
-          <div className="flex items-center gap-1.5 bg-black/5 p-1 rounded-lg text-xs font-semibold">
-            <button 
-              onClick={() => setTemplateCategoryFilter('ALL')} 
-              className={`px-2.5 py-1 rounded-md transition-all ${templateCategoryFilter === 'ALL' ? 'bg-white shadow-sm text-black' : 'text-foreground/60 hover:text-black'}`}
-            >
-              All Templates
-            </button>
-            <button 
-              onClick={() => setTemplateCategoryFilter('full_length')} 
-              className={`px-2.5 py-1 rounded-md transition-all ${templateCategoryFilter === 'full_length' ? 'bg-white shadow-sm text-black' : 'text-foreground/60 hover:text-black'}`}
-            >
-              Full Length
-            </button>
-            <button 
-              onClick={() => setTemplateCategoryFilter('half_length')} 
-              className={`px-2.5 py-1 rounded-md transition-all ${templateCategoryFilter === 'half_length' ? 'bg-white shadow-sm text-purple-700 font-bold' : 'text-foreground/60 hover:text-black'}`}
-            >
-              ⚡ Half Length
-            </button>
-            <button 
-              onClick={() => setTemplateCategoryFilter('custom_short')} 
-              className={`px-2.5 py-1 rounded-md transition-all ${templateCategoryFilter === 'custom_short' ? 'bg-white shadow-sm text-indigo-700 font-bold' : 'text-foreground/60 hover:text-black'}`}
-            >
-              ⚡ Custom Short
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredTemplates.map(t => (
-            <div key={t.id} className="bg-white border border-black/10 p-6 rounded-xl shadow-sm flex flex-col justify-between hover:border-black/20 transition-all">
+      {/* MOCK CREATION STUDIO: Unified Single Entry Point */}
+      {(() => {
+        const activeTemplate = getActiveTemplate();
+        const totalDuration = activeTemplate?.sections?.reduce((acc: number, s: any) => acc + s.duration, 0) || 180;
+        
+        return (
+          <div className="bg-white border border-black/10 rounded-2xl p-6 sm:p-7 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-black/5">
               <div>
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-10 h-10 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
-                    <ClipboardList className="w-5 h-5" />
-                  </div>
-                  {t.category === 'half_length' && (
-                    <span className="bg-purple-100 text-purple-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <Zap className="w-3 h-3" /> Half Length
-                    </span>
-                  )}
-                  {t.category === 'custom_short' && (
-                    <span className="bg-indigo-100 text-indigo-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <Zap className="w-3 h-3" /> Custom Short
-                    </span>
-                  )}
-                  {t.category === 'full_length' && (
-                    <span className="bg-gray-100 text-gray-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
-                      Full Length
-                    </span>
-                  )}
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-bold uppercase tracking-wider mb-1.5">
+                  <ClipboardList className="w-3.5 h-3.5" />
+                  <span>Mock Creation Studio</span>
                 </div>
-                <h3 className="font-semibold text-lg mb-1">{t.name}</h3>
-                <p className="text-sm font-medium text-foreground/60 mb-5">{t.description}</p>
+                <h2 className="text-xl font-bold text-[#262626]">Create New Mock Test</h2>
+                <p className="text-xs text-foreground/50 mt-0.5">
+                  Configure test structure, duration, and question distribution from a single control point.
+                </p>
               </div>
-              <div className="flex flex-col gap-2">
-                <Button variant="outline" onClick={() => { setSelectedTemplate(t); setTestCategory(t.category || "full_length"); setTestSections(JSON.parse(JSON.stringify(t.sections))); setEditingTestId(null); setTestTitle(""); setExpiresAt(""); setIsFocusBatch(false); setProgramFormat(t.programFormat || "bachelors"); setSelectedQuestions([]); setCurrentStep('BUILDER'); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
-                  <PlusCircle className="w-4 h-4" /> Build Manually
-                </Button>
-                <Button variant="outline" onClick={() => { setSelectedTemplate(t); setTestCategory(t.category || "full_length"); setQuickGenOpen(true); }} className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5">
-                  <Wand2 className="w-4 h-4" /> Quick Generate
-                </Button>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-foreground/40 font-medium">Selected Template:</span>
+                <span className="text-xs font-bold bg-black/5 px-2.5 py-1 rounded-md text-foreground/80">
+                  {activeTemplate?.name}
+                </span>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+              {/* Left Column: Target Exam & Format Selectors */}
+              <div className="space-y-5">
+                {/* 1. Target Exam Selection */}
+                <div>
+                  <Label className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-2.5 block">
+                    1. Target Exam
+                  </Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {[
+                      { key: 'NID_BDES', label: 'NID B.Des', tag: 'UG' },
+                      { key: 'NID_MDES', label: 'NID M.Des', tag: 'PG' },
+                      { key: 'CEED', label: 'CEED', tag: 'M.Des' },
+                      { key: 'UCEED', label: 'UCEED', tag: 'B.Des' },
+                      { key: 'CUSTOM', label: 'Custom Test', tag: 'Flex' }
+                    ].map(exam => {
+                      const isSelected = selectedExamKey === exam.key;
+                      return (
+                        <button
+                          key={exam.key}
+                          type="button"
+                          onClick={() => {
+                            setSelectedExamKey(exam.key);
+                            if (exam.key === 'CUSTOM') setSelectedFormatKey('custom_short');
+                          }}
+                          className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all ${
+                            isSelected
+                              ? 'border-primary bg-primary/5 text-primary shadow-xs font-bold ring-1 ring-primary/20'
+                              : 'border-black/10 bg-white text-foreground/70 hover:border-black/20 hover:bg-black/[0.02]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="text-sm font-semibold">{exam.label}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                              isSelected ? 'bg-primary text-white' : 'bg-black/5 text-foreground/50'
+                            }`}>
+                              {exam.tag}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Format / Duration Selection */}
+                <div>
+                  <Label className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-2.5 block">
+                    2. Test Format & Duration
+                  </Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { key: 'full_length', label: 'Full Length', badge: '180 Mins' },
+                      { key: 'half_length', label: '⚡ Half Length', badge: '90 Mins' },
+                      { key: 'custom_short', label: '⚡ Custom Short', badge: 'Flexible' }
+                    ].map(fmt => {
+                      const isSelected = selectedFormatKey === fmt.key;
+                      return (
+                        <button
+                          key={fmt.key}
+                          type="button"
+                          onClick={() => {
+                            setSelectedFormatKey(fmt.key);
+                            if (fmt.key === 'custom_short') setSelectedExamKey('CUSTOM');
+                          }}
+                          className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all ${
+                            isSelected
+                              ? 'border-primary bg-primary/5 text-primary shadow-xs font-bold ring-1 ring-primary/20'
+                              : 'border-black/10 bg-white text-foreground/70 hover:border-black/20 hover:bg-black/[0.02]'
+                          }`}
+                        >
+                          <span className="text-xs font-semibold">{fmt.label}</span>
+                          <span className="text-[11px] text-foreground/50 mt-0.5">{fmt.badge}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Live Spec Preview & Instant Action Buttons */}
+              <div className="flex flex-col justify-between p-5 sm:p-6 rounded-2xl bg-[#111111] text-white shadow-md relative overflow-hidden">
+                <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/20 rounded-full blur-2xl pointer-events-none" />
+                
+                <div className="relative z-10 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-primary bg-primary/20 px-2 py-0.5 rounded-full">
+                        Structure Preview
+                      </span>
+                      <h3 className="text-lg font-bold text-white mt-1.5">{activeTemplate?.name}</h3>
+                      <p className="text-xs text-neutral-400 mt-0.5">{activeTemplate?.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-2xl font-black text-white">{totalDuration}</span>
+                      <span className="text-xs text-neutral-400 block -mt-1">Minutes</span>
+                    </div>
+                  </div>
+
+                  {/* Sections Breakdown */}
+                  <div className="space-y-2 pt-2 border-t border-white/10">
+                    {activeTemplate?.sections?.map((sec: any) => {
+                      const reqs = sec.requirements || {};
+                      return (
+                        <div key={sec.part} className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs">
+                          <div className="flex justify-between items-center mb-1.5">
+                            <span className="font-bold text-white">Part {sec.part}</span>
+                            <span className="text-neutral-400 font-medium">⏱️ {sec.duration} Mins</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 text-[11px] text-neutral-300">
+                            {Object.entries(reqs).map(([type, count]) => (
+                              <span key={type} className="px-2 py-0.5 rounded bg-white/10 text-white/90">
+                                {count as number} {type}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-white/10 relative z-10">
+                  <Button
+                    onClick={() => {
+                      const t = activeTemplate;
+                      setSelectedTemplate(t);
+                      setTestCategory(t.category || "full_length");
+                      setTestSections(JSON.parse(JSON.stringify(t.sections)));
+                      setEditingTestId(null);
+                      setTestTitle("");
+                      setExpiresAt("");
+                      setIsFocusBatch(false);
+                      setProgramFormat(t.programFormat || "bachelors");
+                      setSelectedQuestions([]);
+                      setCurrentStep('BUILDER');
+                    }}
+                    className="w-full bg-white/10 hover:bg-white/20 text-white text-xs font-bold h-10 rounded-xl border border-white/15 gap-2"
+                  >
+                    <PlusCircle className="w-4 h-4 text-primary" /> Build Manually
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const t = activeTemplate;
+                      setSelectedTemplate(t);
+                      setTestCategory(t.category || "full_length");
+                      
+                      // Auto set exam tag filter for quick gen modal
+                      if (selectedExamKey === 'CEED') setQuickGenExamTag('CEED');
+                      else if (selectedExamKey === 'UCEED') setQuickGenExamTag('UCEED');
+                      else if (selectedExamKey.startsWith('NID')) setQuickGenExamTag('NID');
+                      else setQuickGenExamTag('ALL');
+                      
+                      setQuickGenOpen(true);
+                    }}
+                    className="w-full bg-primary hover:bg-primary/90 text-white text-xs font-bold h-10 rounded-xl shadow-lg shadow-primary/25 gap-2"
+                  >
+                    <Wand2 className="w-4 h-4" /> Quick Generate
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="border-t border-black/5" />
 
@@ -820,23 +1024,98 @@ export default function AdminExamTests() {
       </div>
 
       <Dialog open={quickGenOpen} onOpenChange={setQuickGenOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Wand2 className="w-5 h-5 text-primary" /> Quick Generate Test</DialogTitle>
-            <DialogDescription>Auto-select questions for {selectedTemplate?.name} template.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Wand2 className="w-4 h-4" />
+              </span>
+              Quick Generate Test
+            </DialogTitle>
+            <DialogDescription>
+              Auto-select questions for <span className="font-semibold text-foreground">{selectedTemplate?.name}</span>.
+            </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Label className="mb-2 block">Target Difficulty</Label>
-            <select className="w-full h-10 border border-black/10 rounded-md px-3 bg-white text-sm" value={quickGenDiff} onChange={e => setQuickGenDiff(e.target.value)}>
-              <option value="ALL">Mixed Difficulty</option>
-              <option value="Low">Low Difficulty</option>
-              <option value="Medium">Medium Difficulty</option>
-              <option value="High">High Difficulty</option>
-            </select>
+
+          <div className="py-4 space-y-4">
+            {/* 1. Target Difficulty */}
+            <div>
+              <Label className="text-xs font-bold text-foreground/70 mb-1.5 block">
+                Target Difficulty
+              </Label>
+              <select 
+                className="w-full h-10 border border-black/10 rounded-xl px-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                value={quickGenDiff} 
+                onChange={e => setQuickGenDiff(e.target.value)}
+              >
+                <option value="ALL">Mixed Difficulty (All tiers)</option>
+                <option value="Low">Low Difficulty</option>
+                <option value="Medium">Medium Difficulty</option>
+                <option value="High">High Difficulty</option>
+              </select>
+            </div>
+
+            {/* 2. Create from PYQs */}
+            <div>
+              <Label className="text-xs font-bold text-foreground/70 mb-1.5 block">
+                Question Source / PYQs
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setQuickGenSource("all")}
+                  className={`p-2.5 rounded-xl border text-xs text-left transition-all ${
+                    quickGenSource === "all"
+                      ? "border-primary bg-primary/5 text-primary font-bold shadow-xs"
+                      : "border-black/10 bg-white text-foreground/60 hover:bg-black/5"
+                  }`}
+                >
+                  <span className="block font-semibold">All Questions</span>
+                  <span className="text-[10px] text-foreground/50">Entire question bank</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuickGenSource("pyq_only")}
+                  className={`p-2.5 rounded-xl border text-xs text-left transition-all ${
+                    quickGenSource === "pyq_only"
+                      ? "border-orange-500 bg-orange-50 text-orange-700 font-bold shadow-xs"
+                      : "border-black/10 bg-white text-foreground/60 hover:bg-black/5"
+                  }`}
+                >
+                  <span className="block font-semibold">🎯 Only PYQs</span>
+                  <span className="text-[10px] text-foreground/50">Previous year papers</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 3. Exam Tag */}
+            <div>
+              <Label className="text-xs font-bold text-foreground/70 mb-1.5 block">
+                Exam Tag Filter
+              </Label>
+              <select 
+                className="w-full h-10 border border-black/10 rounded-xl px-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                value={quickGenExamTag} 
+                onChange={e => setQuickGenExamTag(e.target.value)}
+              >
+                <option value="ALL">Any Exam Questions</option>
+                <option value="NID">NID Questions Only</option>
+                <option value="CEED">CEED Questions Only</option>
+                <option value="UCEED">UCEED Questions Only</option>
+              </select>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setQuickGenOpen(false)}>Cancel</Button>
-            <Button variant="outline" onClick={handleQuickGenConfirm} className="gap-2"><Wand2 className="w-4 h-4" /> Generate Now</Button>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setQuickGenOpen(false)} className="rounded-xl h-10">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleQuickGenConfirm} 
+              className="gap-2 bg-primary hover:bg-primary/90 text-white rounded-xl h-10 px-5 shadow-md shadow-primary/20"
+            >
+              <Wand2 className="w-4 h-4" /> Generate & Load Mock
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1139,6 +1418,14 @@ export default function AdminExamTests() {
       if (pickerTypeFilter !== "ALL" && q.type !== pickerTypeFilter) return false;
       if (pickerDiffFilter !== "ALL" && q.difficulty !== pickerDiffFilter) return false;
       if (pickerTopicFilter && !q.topics?.some((t: any) => t.toLowerCase().includes(pickerTopicFilter.toLowerCase()))) return false;
+      if (pickerPyqOnly && !q.pyq_tag) return false;
+      if (pickerExamTagFilter !== "ALL") {
+        const tagUpper = pickerExamTagFilter.toUpperCase();
+        const hasTagInPyq = (q.pyq_tag || '').toUpperCase().includes(tagUpper);
+        const hasTagInTopics = q.topics?.some((t: any) => t.toUpperCase().includes(tagUpper));
+        const hasTagInContent = (q.content_text || '').toUpperCase().includes(tagUpper);
+        if (!hasTagInPyq && !hasTagInTopics && !hasTagInContent) return false;
+      }
       if (searchQuery) {
         const queryLower = searchQuery.toLowerCase();
         const contentMatch = q.content_text?.toLowerCase().includes(queryLower);
@@ -1192,8 +1479,29 @@ export default function AdminExamTests() {
                 )}
               </div>
 
-              {/* Search, Difficulty & Auto-Fill */}
+              {/* Search, Exam Tag, Difficulty, PYQ & Auto-Fill */}
               <div className="flex flex-wrap items-center gap-2.5">
+                <select 
+                  className="h-9 text-xs border border-black/10 rounded-lg px-2.5 bg-white font-medium outline-none shadow-xs"
+                  value={pickerExamTagFilter}
+                  onChange={(e) => setPickerExamTagFilter(e.target.value)}
+                >
+                  <option value="ALL">All Exams</option>
+                  <option value="NID">NID</option>
+                  <option value="CEED">CEED</option>
+                  <option value="UCEED">UCEED</option>
+                </select>
+
+                <Button
+                  type="button"
+                  variant={pickerPyqOnly ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setPickerPyqOnly(!pickerPyqOnly)}
+                  className={`h-9 text-xs px-2.5 rounded-lg border font-medium transition-colors ${pickerPyqOnly ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600' : 'bg-white text-foreground/70 border-black/10'}`}
+                >
+                  {pickerPyqOnly ? '🎯 PYQs Only' : 'All Sources'}
+                </Button>
+
                 <select 
                   className="h-9 text-xs border border-black/10 rounded-lg px-2.5 bg-white font-medium outline-none shadow-xs"
                   value={pickerDiffFilter}
@@ -1209,7 +1517,7 @@ export default function AdminExamTests() {
                   placeholder="Filter topic..." 
                   value={pickerTopicFilter} 
                   onChange={(e) => setPickerTopicFilter(e.target.value)} 
-                  className="h-9 text-xs bg-white w-32 shadow-xs" 
+                  className="h-9 text-xs bg-white w-28 shadow-xs" 
                 />
 
                 {!replacingQuestionId && (
@@ -1225,7 +1533,7 @@ export default function AdminExamTests() {
                   </div>
                 )}
 
-                <div className="relative w-48 shadow-xs rounded-lg">
+                <div className="relative w-40 shadow-xs rounded-lg">
                   <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/40" />
                   <Input placeholder="Search text/PYQ..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-8 h-9 text-xs bg-white" />
                 </div>

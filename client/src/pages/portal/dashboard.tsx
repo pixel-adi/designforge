@@ -312,35 +312,42 @@ export default function PortalDashboard() {
   }, [setLocation]);
 
   const loadCandidateProfile = async (user: any, active = true) => {
+    if (!user?.id) return;
     if (profileLoadingRef.current) return;
     profileLoadingRef.current = true;
     try {
-      // Fetch candidate profile and programs concurrently
-      const [candRes, progRes] = await Promise.all([
-        supabase.from('exam_candidates').select(`*`).eq('auth_user_id', user.id).maybeSingle(),
+      const userEmail = (user.email || '').trim().toLowerCase();
+
+      // Parallel queries: programs and candidate profile
+      const [candAuthRes, progRes] = await Promise.all([
+        supabase.from('exam_candidates').select('*').eq('auth_user_id', user.id).maybeSingle(),
         supabase.from('exam_programs').select('*').order('name')
       ]);
 
-      if (candRes.error) throw candRes.error;
       if (progRes.data && active) setPrograms(progRes.data);
 
-      let candidateData = candRes.data;
+      let candidateData = candAuthRes.data;
 
-      // Fallback: If not found by auth_user_id, search by email and auto-link
-      if (!candidateData && user.email) {
+      // Fallback: If not found by auth_user_id, search by case-insensitive email and auto-link
+      if (!candidateData && userEmail) {
         const { data: emailMatch } = await supabase
           .from('exam_candidates')
           .select('*')
-          .eq('email', user.email)
+          .ilike('email', userEmail)
           .maybeSingle();
 
         if (emailMatch) {
           candidateData = emailMatch;
           if (!emailMatch.auth_user_id) {
-            await supabase
-              .from('exam_candidates')
-              .update({ auth_user_id: user.id })
-              .eq('id', emailMatch.id);
+            try {
+              await supabase
+                .from('exam_candidates')
+                .update({ auth_user_id: user.id })
+                .eq('id', emailMatch.id);
+              candidateData.auth_user_id = user.id;
+            } catch (linkErr) {
+              console.warn("Could not auto-link auth_user_id:", linkErr);
+            }
           }
         }
       }
@@ -355,6 +362,7 @@ export default function PortalDashboard() {
         }
       } else if (active) {
         setCandidate(candidateData);
+        setShowOnboarding(false);
 
         setOnboardingData({
           name: candidateData.name || user.user_metadata?.full_name || "",
@@ -373,7 +381,7 @@ export default function PortalDashboard() {
     } catch (err: any) {
       console.error("Profile load error:", err);
       if (active) {
-        toast({ title: "Error", description: "Failed to load candidate profile.", variant: "destructive" });
+        toast({ title: "Notice", description: "Re-verifying profile data...", variant: "default" });
       }
     } finally {
       profileLoadingRef.current = false;
@@ -1251,56 +1259,59 @@ export default function PortalDashboard() {
     }
     setSavingOnboarding(true);
     try {
-      let result;
-      if (candidate?.id) {
-        // Update existing profile
-        result = await supabase.from('exam_candidates').update({
-          auth_user_id: authUser.id,
-          name: onboardingData.name.trim(),
-          phone: rawPhone,
-          program_ids: onboardingData.program_ids,
-          avatar_url: onboardingData.avatar_url || null,
-          education_level: onboardingData.education_level
-        }).eq('id', candidate.id).select().single();
-      } else {
-        // Check if an existing row matches auth_user_id or email
+      // Guaranteed resolution of active user to eliminate "Cannot read properties of null (reading 'id')"
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user || authUser;
+      if (!currentUser?.id) {
+        throw new Error("Your login session has expired. Please refresh the page and sign in again.");
+      }
+      setAuthUser(currentUser);
+      const userEmail = (currentUser.email || '').trim().toLowerCase();
+
+      let targetId = candidate?.id;
+      if (!targetId) {
         const { data: existingCand } = await supabase
           .from('exam_candidates')
           .select('id')
-          .or(`auth_user_id.eq.${authUser.id},email.eq.${authUser.email}`)
+          .or(`auth_user_id.eq.${currentUser.id},email.ilike.${userEmail}`)
           .maybeSingle();
+        targetId = existingCand?.id;
+      }
 
-        if (existingCand) {
-          result = await supabase.from('exam_candidates').update({
-            auth_user_id: authUser.id,
-            name: onboardingData.name.trim(),
-            phone: rawPhone,
-            program_ids: onboardingData.program_ids,
-            avatar_url: onboardingData.avatar_url || null,
-            education_level: onboardingData.education_level
-          }).eq('id', existingCand.id).select().single();
-        } else {
-          // Insert new profile
-          result = await supabase.from('exam_candidates').insert({
-            auth_user_id: authUser.id,
-            email: authUser.email,
-            name: onboardingData.name.trim(),
-            phone: rawPhone,
-            program_ids: onboardingData.program_ids || [],
-            avatar_url: onboardingData.avatar_url || null,
-            education_level: onboardingData.education_level || "bachelors"
-          }).select().single();
-        }
+      let result;
+      if (targetId) {
+        // Update existing profile
+        result = await supabase.from('exam_candidates').update({
+          auth_user_id: currentUser.id,
+          name: onboardingData.name.trim(),
+          phone: rawPhone,
+          program_ids: onboardingData.program_ids || [],
+          avatar_url: onboardingData.avatar_url || null,
+          education_level: onboardingData.education_level || "bachelors"
+        }).eq('id', targetId).select().single();
+      } else {
+        // Insert new profile
+        result = await supabase.from('exam_candidates').insert({
+          auth_user_id: currentUser.id,
+          email: userEmail,
+          name: onboardingData.name.trim(),
+          phone: rawPhone,
+          program_ids: onboardingData.program_ids || [],
+          avatar_url: onboardingData.avatar_url || null,
+          education_level: onboardingData.education_level || "bachelors"
+        }).select().single();
       }
 
       if (result.error) throw result.error;
+      if (!result.data) throw new Error("Could not save profile. Please try again.");
 
       setCandidate(result.data);
       setShowOnboarding(false);
       toast({ title: "Success!", description: "Your profile has been saved." });
       fetchDashboardData(result.data.program_ids || [], result.data.education_level || onboardingData.education_level, result.data.id);
+      fetchAttempts(result.data.id);
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message || "Failed to save profile", variant: "destructive" });
     } finally {
       setSavingOnboarding(false);
     }
