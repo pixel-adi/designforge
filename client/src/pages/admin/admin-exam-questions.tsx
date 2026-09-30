@@ -72,7 +72,9 @@ const normalizeText = (text: string) => {
 export default function AdminExamQuestions() {
   const { toast } = useToast();
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [masterPyqTags, setMasterPyqTags] = useState<string[]>([]);
   
   const [newQuestion, setNewQuestion] = useState<Omit<Question, "id">>(emptyQuestion);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -125,6 +127,18 @@ export default function AdminExamQuestions() {
   const [filterDifficulty, setFilterDifficulty] = useState<string>("ALL");
   const [searchTopic, setSearchTopic] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>("");
+  const [debouncedSearchTopic, setDebouncedSearchTopic] = useState<string>("");
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearchTopic(searchTopic), 350);
+    return () => clearTimeout(handler);
+  }, [searchTopic]);
   const [filterInvalidOnly, setFilterInvalidOnly] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 20;
@@ -153,9 +167,27 @@ export default function AdminExamQuestions() {
     }
   };
 
+  // Load Master PYQ tags once independently to prevent dropdown items from resetting on pagination
   useEffect(() => {
-    setCurrentPage(1);
-  }, [filterPart, filterType, filterPyq, filterDifficulty, searchTopic, searchQuery, filterInvalidOnly]);
+    const loadMasterPyqTags = async () => {
+      try {
+        const { data } = await supabase
+          .from("exam_questions")
+          .select("pyq_tag")
+          .not("pyq_tag", "is", null);
+        if (data) {
+          const tags = new Set<string>();
+          data.forEach((r: any) => {
+            if (r.pyq_tag && r.pyq_tag.trim()) tags.add(r.pyq_tag.trim());
+          });
+          setMasterPyqTags(Array.from(tags).sort());
+        }
+      } catch (e) {
+        console.warn("Could not load master pyq tags:", e);
+      }
+    };
+    loadMasterPyqTags();
+  }, []);
 
   // Bulk Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -990,11 +1022,14 @@ export default function AdminExamQuestions() {
   const [totalServerQuestionsCount, setTotalServerQuestionsCount] = useState<number>(0);
   const [allAuditQuestions, setAllAuditQuestions] = useState<Question[]>([]);
 
-  const fetchQuestions = async () => {
+  const fetchRequestIdRef = useRef(0);
+
+  const fetchQuestions = async (pageToFetch = currentPage) => {
+    const requestId = ++fetchRequestIdRef.current;
+    setTableLoading(true);
     try {
-      setLoading(true);
-      const from = (currentPage - 1) * itemsPerPage;
-      const to = currentPage * itemsPerPage - 1;
+      const from = (pageToFetch - 1) * itemsPerPage;
+      const to = pageToFetch * itemsPerPage - 1;
 
       let query = supabase
         .from("exam_questions")
@@ -1004,20 +1039,29 @@ export default function AdminExamQuestions() {
       if (filterType !== "ALL") query = query.eq("type", filterType);
       if (filterPyq !== "ALL") query = query.eq("pyq_tag", filterPyq);
       if (filterDifficulty !== "ALL") query = query.eq("difficulty", filterDifficulty);
-      if (searchQuery.trim()) query = query.ilike("content_text", `%${searchQuery.trim()}%`);
+      if (debouncedSearchQuery.trim()) query = query.ilike("content_text", `%${debouncedSearchQuery.trim()}%`);
+      if (debouncedSearchTopic.trim()) query = query.contains("topics", [debouncedSearchTopic.trim()]);
 
       const { data, count, error } = await query
         .order("created_at", { ascending: false })
         .range(from, to);
+
+      // Discard stale out-of-order responses
+      if (requestId !== fetchRequestIdRef.current) return;
 
       if (error) throw error;
 
       setQuestions(data || []);
       setTotalServerQuestionsCount(count || 0);
     } catch (error: any) {
-      toast({ title: "Error fetching questions", description: error.message, variant: "destructive" });
+      if (requestId === fetchRequestIdRef.current) {
+        toast({ title: "Error fetching questions", description: error.message, variant: "destructive" });
+      }
     } finally {
-      setLoading(false);
+      if (requestId === fetchRequestIdRef.current) {
+        setTableLoading(false);
+        setInitialLoading(false);
+      }
     }
   };
 
@@ -1674,12 +1718,12 @@ export default function AdminExamQuestions() {
   }, [allAuditQuestions, questions]);
 
   const uniquePyqTags = useMemo(() => {
-    const tags = new Set<string>();
+    const tags = new Set<string>(masterPyqTags);
     auditTargetList.forEach(q => {
       if (q.pyq_tag) tags.add(q.pyq_tag.trim());
     });
     return Array.from(tags).sort();
-  }, [auditTargetList]);
+  }, [masterPyqTags, auditTargetList]);
 
   const isSubstantialTextForDuplicate = (text: string) => {
     const norm = normalizeText(text || '');
@@ -2286,9 +2330,24 @@ export default function AdminExamQuestions() {
     return auditTargetList.filter(isQuestionInvalid).length;
   }, [auditTargetList]);
 
+  // Synchronized Filter & Pagination Trigger (Prevents race conditions)
+  const isInitialFilterMount = useRef(true);
   useEffect(() => {
-    fetchQuestions();
-  }, [currentPage, filterPart, filterType, filterPyq, filterDifficulty, searchQuery, filterInvalidOnly]);
+    if (isInitialFilterMount.current) {
+      isInitialFilterMount.current = false;
+      return;
+    }
+    // When filters change, reset page to 1
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    } else {
+      fetchQuestions(1);
+    }
+  }, [filterPart, filterType, filterPyq, filterDifficulty, debouncedSearchQuery, debouncedSearchTopic, filterInvalidOnly]);
+
+  useEffect(() => {
+    fetchQuestions(currentPage);
+  }, [currentPage]);
 
   useEffect(() => {
     fetchAuditSummary();
@@ -2299,7 +2358,8 @@ export default function AdminExamQuestions() {
     ? questions
     : (hideSample ? [] : [sampleQuestion]);
 
-  if (loading) return <div className="flex items-center justify-center py-20 text-foreground/40"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  // Initial loading only; subsequent filter changes keep the controls mounted
+  if (initialLoading) return <div className="flex items-center justify-center py-20 text-foreground/40"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-4 pb-8">
@@ -2683,6 +2743,11 @@ export default function AdminExamQuestions() {
               <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
                 {questions.length} of {totalServerQuestionsCount} Items
               </span>
+              {tableLoading && (
+                <span className="flex items-center gap-1 text-[11px] font-semibold text-primary animate-pulse">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Loading...
+                </span>
+              )}
             </div>
             
             {/* Integrated Compact Filters */}
@@ -2767,7 +2832,12 @@ export default function AdminExamQuestions() {
           </div>
 
           {/* List Body */}
-          <div className="divide-y divide-black/5">
+          <div className="divide-y divide-black/5 relative min-h-[160px]">
+            {tableLoading && (
+              <div className="absolute inset-0 bg-white/60 backdrop-blur-xs flex items-center justify-center z-10">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            )}
             {displayQuestions.map((q) => (
               <div key={q.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center hover:bg-background/30 transition-colors text-sm">
                 

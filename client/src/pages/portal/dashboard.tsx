@@ -205,19 +205,24 @@ export default function PortalDashboard() {
     }
   }, [setLocation]);
 
-  // Session check interval (optimized for 1000 concurrent users: 60s interval)
+  // Session check interval (optimized for high concurrency: 180s interval)
   useEffect(() => {
     if (!candidate?.id || sessionKicked) return;
-    const interval = setInterval(() => checkSession(candidate.id), 60000); // Check every 60s
+    const interval = setInterval(() => checkSession(candidate.id), 180000); // Check every 3 mins
     return () => clearInterval(interval);
   }, [candidate?.id, sessionKicked, checkSession]);
 
-  // --- 7. Periodic server-side access re-validation ---
+  // --- 7. Periodic server-side access re-validation (Throttled for high concurrency) ---
+  const lastRevalidateRef = useRef(Date.now());
   useEffect(() => {
     if (!candidate?.id) return;
 
-    const performRevalidate = async () => {
+    const performRevalidate = async (isFocus = false) => {
       if (typeof document !== 'undefined' && document.hidden) return;
+      const now = Date.now();
+      if (isFocus && now - lastRevalidateRef.current < 300000) return; // 5 min cooldown on window focus
+      lastRevalidateRef.current = now;
+
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
@@ -229,7 +234,6 @@ export default function PortalDashboard() {
           .maybeSingle();
 
         if (!error && data) {
-          // If access was revoked/downgraded server-side, update client state
           if (data.access_level !== candidate.access_level) {
             setCandidate((prev: any) => prev ? { ...prev, access_level: data.access_level, access_expires_at: data.access_expires_at } : prev);
           }
@@ -239,12 +243,13 @@ export default function PortalDashboard() {
       }
     };
 
-    const revalidate = setInterval(performRevalidate, 120000); // Re-validate every 2m
-    window.addEventListener('focus', performRevalidate);
+    const revalidate = setInterval(() => performRevalidate(false), 300000); // Re-validate every 5m
+    const handleFocus = () => performRevalidate(true);
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       clearInterval(revalidate);
-      window.removeEventListener('focus', performRevalidate);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [candidate?.id, candidate?.access_level]);
 
@@ -390,15 +395,30 @@ export default function PortalDashboard() {
 
   const fetchDashboardData = async (programIds: string[], educationLevel: string, candidateId: string) => {
     try {
-      // Run queries individually so one failure doesn't block all data
-      const [testsRes, attemptsRes, programsRes] = await Promise.allSettled([
+      // 1. Instant sessionStorage cache check for published tests to minimize concurrent DB load
+      try {
+        const cachedTestsRaw = sessionStorage.getItem('df_cached_published_tests');
+        if (cachedTestsRaw) {
+          const parsed = JSON.parse(cachedTestsRaw);
+          if (parsed && Date.now() - parsed.ts < 180000 && Array.isArray(parsed.tests)) {
+            const filtered = parsed.tests.filter((test: any) => {
+              if (test.program_format === 'both') return true;
+              if (test.program_format === educationLevel) return true;
+              return false;
+            });
+            if (filtered.length > 0) setActiveTests(filtered);
+          }
+        }
+      } catch (cacheErr) {}
+
+      // Parallel fetch without duplicate program queries
+      const [testsRes, attemptsRes] = await Promise.allSettled([
         supabase
           .from('exam_tests')
           .select(`*, exam_test_sections(part, duration_minutes)`)
           .eq('status', 'published')
           .order('created_at', { ascending: false }),
-        supabase.from('exam_attempts').select('id, test_id, status, attempt_number').eq('candidate_id', candidateId).order('attempt_number', { ascending: true }),
-        supabase.from('exam_programs').select('id, name')
+        supabase.from('exam_attempts').select('id, test_id, status, attempt_number').eq('candidate_id', candidateId).order('attempt_number', { ascending: true })
       ]);
 
       const tests = testsRes.status === 'fulfilled' && !testsRes.value.error ? testsRes.value.data : [];
@@ -438,6 +458,11 @@ export default function PortalDashboard() {
       });
 
       setActiveTests(filteredTests);
+      try {
+        if (tests && tests.length > 0) {
+          sessionStorage.setItem('df_cached_published_tests', JSON.stringify({ tests, ts: Date.now() }));
+        }
+      } catch (e) {}
     } catch (err) {
       console.error(err);
     }
@@ -457,7 +482,10 @@ export default function PortalDashboard() {
         if (data.length > 0) {
           const firstId = data[0].id;
           setSelectedAttemptId(firstId);
-          fetchAttemptDetails(firstId);
+          // High concurrency optimization: only fetch detailed responses if student is on progress tab
+          if (activeTab === 'progress') {
+            fetchAttemptDetails(firstId);
+          }
         }
       }
     } catch (err) {
@@ -468,10 +496,10 @@ export default function PortalDashboard() {
   };
 
   useEffect(() => {
-    if (selectedAttemptId && selectedAttemptId !== 'overall' && !attemptDetailsMap[selectedAttemptId]) {
+    if (selectedAttemptId && selectedAttemptId !== 'overall' && !attemptDetailsMap[selectedAttemptId] && activeTab === 'progress') {
       fetchAttemptDetails(selectedAttemptId);
     }
-  }, [selectedAttemptId]);
+  }, [selectedAttemptId, activeTab]);
 
   const fetchAttemptDetails = async (attemptId: string) => {
     if (!attemptId || attemptDetailsMap[attemptId]) return;

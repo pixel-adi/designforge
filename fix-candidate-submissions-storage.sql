@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- FIX: candidate-submissions Storage Bucket & Access Policies
--- Ensures Part B subjective image uploads never get blocked by RLS
--- and images load immediately in the Admin Evaluation panel without 403 / hanging.
+-- Ensures Part B subjective image uploads never get blocked by RLS,
+-- images load immediately via public URL, and satisfies Supabase linter.
 -- ==============================================================================
 
 -- 1. Ensure candidate-submissions bucket exists, is public, and accepts all image formats
@@ -18,18 +18,28 @@ ON CONFLICT (id) DO UPDATE SET
   file_size_limit = 26214400,
   allowed_mime_types = ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif', 'application/pdf']::text[];
 
--- 2. Drop restrictive or conflicting SELECT policies
+-- 2. Drop broad SELECT policies that cause 'public_bucket_allows_listing' linter warning
+-- Note: Because public=true, public image URLs work automatically without a SELECT policy.
 DROP POLICY IF EXISTS "Public Access Candidate Submissions" ON storage.objects;
 DROP POLICY IF EXISTS "Authenticated candidates read own submissions" ON storage.objects;
 DROP POLICY IF EXISTS "Candidates read own submissions" ON storage.objects;
 DROP POLICY IF EXISTS "Candidates can read own submissions 1obzjod_0" ON storage.objects;
 DROP POLICY IF EXISTS "Public Read Candidate Submissions" ON storage.objects;
 
--- 3. Public Read access for candidate-submissions bucket
--- Needed so that admin evaluation <img> tags and candidates can view submitted sketches without auth token dropouts
-CREATE POLICY "Public Read Candidate Submissions"
+-- 3. Scoped SELECT policy for authenticated staff to list attempt files
+CREATE POLICY "Admin List Candidate Submissions"
 ON storage.objects FOR SELECT
-USING (bucket_id = 'candidate-submissions');
+TO authenticated
+USING (
+  bucket_id = 'candidate-submissions'
+  AND (
+    auth.jwt()->>'email' LIKE '%@designforge.co.in'
+    OR EXISTS (
+      SELECT 1 FROM public.staff_users 
+      WHERE auth_user_id = auth.uid() AND role IN ('admin', 'sme')
+    )
+  )
+);
 
 -- 4. Secure INSERT policy: allow uploads strictly within the 'submissions/' directory
 DROP POLICY IF EXISTS "Auth Upload Candidate Submissions" ON storage.objects;
@@ -44,6 +54,5 @@ WITH CHECK (
 );
 
 -- 5. Revoke blanket UPDATE: Submissions use immutable UUID file paths.
--- Dropping blanket UPDATE prevents arbitrary overwriting of another candidate's sketches.
 DROP POLICY IF EXISTS "Auth Update Candidate Submissions" ON storage.objects;
 DROP POLICY IF EXISTS "Allow All Submissions Update" ON storage.objects;
