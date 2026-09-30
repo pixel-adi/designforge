@@ -1,5 +1,5 @@
 -- ==============================================================================
--- FIX: Supabase Linter Warnings & High-Concurrency Performance Optimization
+-- FIX: Supabase Linter Warnings, Student Portal Access & High-Concurrency Performance
 -- 
 -- 1. public_bucket_allows_listing:
 --    Removes broad SELECT policy on storage.objects for public bucket 'candidate-submissions'.
@@ -10,7 +10,12 @@
 --    Switches public.is_admin() and public.is_sme_or_admin() to SECURITY INVOKER
 --    and revokes EXECUTE from anon role so they are not exposed as public RPC endpoints.
 --
--- 3. Concurrent User Performance Indexes:
+-- 3. Restore Candidate Access to Tests & Content:
+--    Fixes the issue where generic tests were hidden because earlier scripts only
+--    granted SELECT on exam_tests to admins.
+--    Allows candidates to view all published tests, sections, questions, and study materials.
+--
+-- 4. Concurrent User Performance Indexes:
 --    Adds high-speed composite indexes for published tests, question filtering,
 --    candidate attempts, test questions, and active sessions.
 -- ==============================================================================
@@ -40,7 +45,7 @@ DROP POLICY IF EXISTS "Public Access Candidate Submissions" ON storage.objects;
 DROP POLICY IF EXISTS "Candidates read own submissions" ON storage.objects;
 DROP POLICY IF EXISTS "Authenticated candidates read own submissions" ON storage.objects;
 
--- Allow only authenticated admins to list files via API; public direct URLs still serve freely
+-- Allow authenticated admins to list files via API; public direct URLs still serve freely
 CREATE POLICY "Admin List Candidate Submissions"
 ON storage.objects FOR SELECT
 TO authenticated
@@ -134,7 +139,70 @@ GRANT EXECUTE ON FUNCTION public.is_sme_or_admin() TO authenticated, postgres, s
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 3. High-Concurrency Performance Indexes for Student Portal
+-- 3. Restore Candidate Access to Tests & Content
+-- (Fixes: generic tests not visible to students in the portal)
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Published tests: All candidates can view published tests (Focus Batch + Generic)
+DROP POLICY IF EXISTS "Candidates can view published tests" ON public.exam_tests;
+CREATE POLICY "Candidates can view published tests"
+  ON public.exam_tests FOR SELECT TO authenticated
+  USING (status = 'published');
+
+-- Test sections: Candidates can read sections of published tests
+DROP POLICY IF EXISTS "Candidates can view published test sections" ON public.exam_test_sections;
+CREATE POLICY "Candidates can view published test sections"
+  ON public.exam_test_sections FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.exam_tests 
+      WHERE id = exam_test_sections.test_id AND status = 'published'
+    )
+  );
+
+-- Test question links: Candidates can read question links of published tests
+DROP POLICY IF EXISTS "Candidates can view published test questions links" ON public.exam_test_questions;
+CREATE POLICY "Candidates can view published test questions links"
+  ON public.exam_test_questions FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.exam_tests 
+      WHERE id = exam_test_questions.test_id AND status = 'published'
+    )
+  );
+
+-- Questions & Options: Candidates can read question text and options during practice & tests
+DROP POLICY IF EXISTS "Candidates can read exam questions" ON public.exam_questions;
+CREATE POLICY "Candidates can read exam questions"
+  ON public.exam_questions FOR SELECT TO authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "Candidates can read exam options" ON public.exam_options;
+CREATE POLICY "Candidates can read exam options"
+  ON public.exam_options FOR SELECT TO authenticated
+  USING (true);
+
+-- Programs: Candidates can view programs list
+GRANT SELECT ON public.exam_programs TO authenticated, anon;
+
+-- Study materials, notes, and assignments: Visible to candidates
+DROP POLICY IF EXISTS "Candidates can read visible study materials" ON public.study_materials;
+CREATE POLICY "Candidates can read visible study materials"
+  ON public.study_materials FOR SELECT TO authenticated
+  USING (is_visible = true);
+
+DROP POLICY IF EXISTS "Candidates can read visible assignments" ON public.class_assignments;
+CREATE POLICY "Candidates can read visible assignments"
+  ON public.class_assignments FOR SELECT TO authenticated
+  USING (is_visible = true);
+
+DROP POLICY IF EXISTS "Candidates can read visible notes" ON public.class_notes;
+CREATE POLICY "Candidates can read visible notes"
+  ON public.class_notes FOR SELECT TO authenticated
+  USING (is_visible = true);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4. High-Concurrency Performance Indexes for Student Portal
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Fast test loading for hundreds of concurrent candidates
 CREATE INDEX IF NOT EXISTS idx_exam_tests_status_created 

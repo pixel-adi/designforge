@@ -400,11 +400,17 @@ export default function PortalDashboard() {
         const cachedTestsRaw = sessionStorage.getItem('df_cached_published_tests');
         if (cachedTestsRaw) {
           const parsed = JSON.parse(cachedTestsRaw);
-          if (parsed && Date.now() - parsed.ts < 180000 && Array.isArray(parsed.tests)) {
+          if (parsed && Date.now() - parsed.ts < 180000 && Array.isArray(parsed.tests) && parsed.tests.length > 0) {
             const filtered = parsed.tests.filter((test: any) => {
-              if (test.program_format === 'both') return true;
+              if (test.is_focus_batch || test.access_tier === 'focus_batch') return true;
+              if (!test.program_format || test.program_format === 'both' || test.program_format === 'all' || test.program_format === 'general') return true;
               if (test.program_format === educationLevel) return true;
-              return false;
+              const title = (test.title || '').toLowerCase();
+              const isBdes = title.includes('b.des') || title.includes('bdes') || title.includes('uceed') || title.includes('nid b');
+              const isMdes = title.includes('m.des') || title.includes('mdes') || (title.includes('ceed') && !title.includes('uceed')) || title.includes('nid m');
+              if (educationLevel === 'bachelors' && isBdes) return true;
+              if (educationLevel === 'masters' && isMdes) return true;
+              return !isBdes && !isMdes;
             });
             if (filtered.length > 0) setActiveTests(filtered);
           }
@@ -441,19 +447,21 @@ export default function PortalDashboard() {
       (allPrograms || []).forEach(p => { programsMap[p.id] = p.name; });
 
       const filteredTests = (tests || []).filter(test => {
-        if (test.program_format === 'both') return true;
+        // Focus batch tests are always included so Focus Batch section can display them
+        if (test.is_focus_batch || test.access_tier === 'focus_batch') return true;
+
+        // Generic / regular tests: visible to all students
+        if (!test.program_format || test.program_format === 'both' || test.program_format === 'all' || test.program_format === 'general') return true;
         if (test.program_format === educationLevel) return true;
 
-        if (!test.program_format) {
-          const testTitle = test.title.toLowerCase();
-          const isBdesTest = testTitle.includes('b.des') || testTitle.includes('bdes') || testTitle.includes('uceed') || testTitle.includes('nid b');
-          const isMdesTest = testTitle.includes('m.des') || testTitle.includes('mdes') || (testTitle.includes('ceed') && !testTitle.includes('uceed')) || testTitle.includes('nid m');
+        const testTitle = (test.title || '').toLowerCase();
+        const isBdesTest = testTitle.includes('b.des') || testTitle.includes('bdes') || testTitle.includes('uceed') || testTitle.includes('nid b');
+        const isMdesTest = testTitle.includes('m.des') || testTitle.includes('mdes') || (testTitle.includes('ceed') && !testTitle.includes('uceed')) || testTitle.includes('nid m');
 
-          if (educationLevel === 'bachelors' && isBdesTest) return true;
-          if (educationLevel === 'masters' && isMdesTest) return true;
-          if (!isBdesTest && !isMdesTest) return true;
-        }
-        
+        if (educationLevel === 'bachelors' && isBdesTest) return true;
+        if (educationLevel === 'masters' && isMdesTest) return true;
+        if (!isBdesTest && !isMdesTest) return true;
+
         return false;
       });
 
