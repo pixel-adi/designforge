@@ -26,6 +26,8 @@ interface ModalProps {
   onOpenChange: (open: boolean) => void;
   candidateId: string;
   taskId?: string;
+  dayNum?: number;
+  diaryTheme?: string;
   onSaved?: () => void;
 }
 

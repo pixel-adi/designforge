@@ -118,6 +118,8 @@ export interface ResolvedDay {
   weekday: string;
   week: number;
   phaseId: string;
+  phaseName?: string;
+  diaryTheme?: string;
   title: string;
   tasks: ResolvedTask[];
   isLocked: boolean;

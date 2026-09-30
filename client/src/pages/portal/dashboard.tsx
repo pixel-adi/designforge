@@ -2588,7 +2588,7 @@ export default function PortalDashboard() {
                     return m > 0 ? `${m}m ${remSec}s` : `${remSec}s`;
                   };
 
-                  const isNid = (selectedAttempt?.exam_tests?.title || '').toLowerCase().includes('nid');
+                  const isNid = (attemptObj?.exam_tests?.title || details?.attempt?.exam_tests?.title || '').toLowerCase().includes('nid');
                   const hasPartA = responses.some((r: any) => r.exam_questions?.part === 'A');
                   const currentSubTab = (!hasPartA || isNid) ? 'part-b' : analyticsSubTab;
 

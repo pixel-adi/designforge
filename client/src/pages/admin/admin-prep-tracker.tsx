@@ -1596,8 +1596,14 @@ export default function AdminPrepTracker() {
                         <Label className="text-xs">Light Minutes</Label>
                         <Input
                           type="number"
-                          value={taskFormData.minutes?.light || 45}
-                          onChange={e => setTaskFormData({ ...taskFormData, minutes: { ...taskFormData.minutes, light: parseInt(e.target.value) || 45 } })}
+                          value={taskFormData.minutes?.light ?? 45}
+                          onChange={e => setTaskFormData({ 
+                            ...taskFormData, 
+                            minutes: { 
+                              light: parseInt(e.target.value) || 45,
+                              intensive: taskFormData.minutes?.intensive ?? 45 
+                            } 
+                          })}
                           className="h-8 text-xs"
                         />
                       </div>
@@ -1605,8 +1611,14 @@ export default function AdminPrepTracker() {
                         <Label className="text-xs">Intensive Minutes</Label>
                         <Input
                           type="number"
-                          value={taskFormData.minutes?.intensive || 45}
-                          onChange={e => setTaskFormData({ ...taskFormData, minutes: { ...taskFormData.minutes, intensive: parseInt(e.target.value) || 45 } })}
+                          value={taskFormData.minutes?.intensive ?? 45}
+                          onChange={e => setTaskFormData({ 
+                            ...taskFormData, 
+                            minutes: { 
+                              light: taskFormData.minutes?.light ?? 45,
+                              intensive: parseInt(e.target.value) || 45 
+                            } 
+                          })}
                           className="h-8 text-xs"
                         />
                       </div>

@@ -1314,9 +1314,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   // Keyboard shortcut listener: paste images anytime on Part B questions
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
-      if (testStep !== 'active' || !engineData?.questions) return;
+      if (testStep !== 'test' || !engineData?.questions) return;
       const curQ = engineData.questions[activeQuestionIndex];
-      if (!curQ || curQ.question_type !== 'drawing_upload') return;
+      if (!curQ || (curQ.type !== 'SUBJECTIVE' && curQ.question_type !== 'drawing_upload')) return;
 
       const activeEl = document.activeElement;
       if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
