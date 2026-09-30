@@ -395,21 +395,24 @@ export default function PortalDashboard() {
 
   const fetchDashboardData = async (programIds: string[], educationLevel: string, candidateId: string) => {
     try {
+      const normEd = (educationLevel || 'bachelors').toLowerCase().trim();
+
       // 1. Instant sessionStorage cache check for published tests to minimize concurrent DB load
       try {
-        const cachedTestsRaw = sessionStorage.getItem('df_cached_published_tests');
+        const cachedTestsRaw = sessionStorage.getItem('df_cached_published_tests_v2');
         if (cachedTestsRaw) {
           const parsed = JSON.parse(cachedTestsRaw);
           if (parsed && Date.now() - parsed.ts < 180000 && Array.isArray(parsed.tests) && parsed.tests.length > 0) {
             const filtered = parsed.tests.filter((test: any) => {
               if (test.is_focus_batch || test.access_tier === 'focus_batch') return true;
-              if (!test.program_format || test.program_format === 'both' || test.program_format === 'all' || test.program_format === 'general') return true;
-              if (test.program_format === educationLevel) return true;
+              const format = (test.program_format || '').toLowerCase().trim();
+              if (!format || format === 'both' || format === 'all' || format === 'general') return true;
+              if (format === normEd) return true;
               const title = (test.title || '').toLowerCase();
               const isBdes = title.includes('b.des') || title.includes('bdes') || title.includes('uceed') || title.includes('nid b');
               const isMdes = title.includes('m.des') || title.includes('mdes') || (title.includes('ceed') && !title.includes('uceed')) || title.includes('nid m');
-              if (educationLevel === 'bachelors' && isBdes) return true;
-              if (educationLevel === 'masters' && isMdes) return true;
+              if (normEd === 'bachelors' && isBdes) return true;
+              if (normEd === 'masters' && isMdes) return true;
               return !isBdes && !isMdes;
             });
             if (filtered.length > 0) setActiveTests(filtered);
@@ -429,7 +432,10 @@ export default function PortalDashboard() {
 
       const tests = testsRes.status === 'fulfilled' && !testsRes.value.error ? testsRes.value.data : [];
       const attempts = attemptsRes.status === 'fulfilled' && !attemptsRes.value.error ? attemptsRes.value.data : [];
-      const allPrograms = programsRes.status === 'fulfilled' && !programsRes.value.error ? programsRes.value.data : [];
+
+      if (testsRes.status === 'fulfilled' && testsRes.value.error) {
+        console.warn('exam_tests query failed (RLS?):', testsRes.value.error.message);
+      }
 
       if (attemptsRes.status === 'fulfilled' && attemptsRes.value.error) {
         console.warn('exam_attempts query failed (RLS?):', attemptsRes.value.error.message);
@@ -443,23 +449,21 @@ export default function PortalDashboard() {
       });
       setCandidateAttemptsMap(attemptMap);
 
-      const programsMap: Record<string, string> = {};
-      (allPrograms || []).forEach(p => { programsMap[p.id] = p.name; });
-
       const filteredTests = (tests || []).filter(test => {
         // Focus batch tests are always included so Focus Batch section can display them
         if (test.is_focus_batch || test.access_tier === 'focus_batch') return true;
 
         // Generic / regular tests: visible to all students
-        if (!test.program_format || test.program_format === 'both' || test.program_format === 'all' || test.program_format === 'general') return true;
-        if (test.program_format === educationLevel) return true;
+        const format = (test.program_format || '').toLowerCase().trim();
+        if (!format || format === 'both' || format === 'all' || format === 'general') return true;
+        if (format === normEd) return true;
 
         const testTitle = (test.title || '').toLowerCase();
         const isBdesTest = testTitle.includes('b.des') || testTitle.includes('bdes') || testTitle.includes('uceed') || testTitle.includes('nid b');
         const isMdesTest = testTitle.includes('m.des') || testTitle.includes('mdes') || (testTitle.includes('ceed') && !testTitle.includes('uceed')) || testTitle.includes('nid m');
 
-        if (educationLevel === 'bachelors' && isBdesTest) return true;
-        if (educationLevel === 'masters' && isMdesTest) return true;
+        if (normEd === 'bachelors' && isBdesTest) return true;
+        if (normEd === 'masters' && isMdesTest) return true;
         if (!isBdesTest && !isMdesTest) return true;
 
         return false;
@@ -468,7 +472,7 @@ export default function PortalDashboard() {
       setActiveTests(filteredTests);
       try {
         if (tests && tests.length > 0) {
-          sessionStorage.setItem('df_cached_published_tests', JSON.stringify({ tests, ts: Date.now() }));
+          sessionStorage.setItem('df_cached_published_tests_v2', JSON.stringify({ tests, ts: Date.now() }));
         }
       } catch (e) {}
     } catch (err) {

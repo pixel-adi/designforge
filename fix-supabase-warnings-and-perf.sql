@@ -20,7 +20,6 @@
 --    candidate attempts, test questions, and active sessions.
 -- ==============================================================================
 
-BEGIN;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1. Fix Storage Bucket Listing Warning
@@ -146,13 +145,13 @@ GRANT EXECUTE ON FUNCTION public.is_sme_or_admin() TO authenticated, postgres, s
 -- Published tests: All candidates can view published tests (Focus Batch + Generic)
 DROP POLICY IF EXISTS "Candidates can view published tests" ON public.exam_tests;
 CREATE POLICY "Candidates can view published tests"
-  ON public.exam_tests FOR SELECT TO authenticated
+  ON public.exam_tests FOR SELECT TO authenticated, anon
   USING (status = 'published');
 
 -- Test sections: Candidates can read sections of published tests
 DROP POLICY IF EXISTS "Candidates can view published test sections" ON public.exam_test_sections;
 CREATE POLICY "Candidates can view published test sections"
-  ON public.exam_test_sections FOR SELECT TO authenticated
+  ON public.exam_test_sections FOR SELECT TO authenticated, anon
   USING (
     EXISTS (
       SELECT 1 FROM public.exam_tests 
@@ -163,7 +162,7 @@ CREATE POLICY "Candidates can view published test sections"
 -- Test question links: Candidates can read question links of published tests
 DROP POLICY IF EXISTS "Candidates can view published test questions links" ON public.exam_test_questions;
 CREATE POLICY "Candidates can view published test questions links"
-  ON public.exam_test_questions FOR SELECT TO authenticated
+  ON public.exam_test_questions FOR SELECT TO authenticated, anon
   USING (
     EXISTS (
       SELECT 1 FROM public.exam_tests 
@@ -246,4 +245,3 @@ BEGIN
   END IF;
 END $$;
 
-COMMIT;
