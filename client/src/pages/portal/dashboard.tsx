@@ -1965,8 +1965,8 @@ export default function PortalDashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-7xl mx-auto p-6 md:p-10 lg:p-12">
+      <div className="flex-1 overflow-auto min-w-0">
+        <div className="max-w-[96%] xl:max-w-[94%] 2xl:max-w-[92%] mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8">
           <div className={activeTab === 'tracker' ? 'mb-5' : 'mb-10'}>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#262626] tracking-tight">
               {activeTab === 'overview' ? 'Dashboard Overview' : activeTab === 'tracker' ? 'Exam Tracker 2027' : activeTab === 'progress' ? 'Performance Analytics' : activeTab === 'leaderboard' ? 'Global Leaderboard' : activeTab === 'questions' ? 'Question Bank' : activeTab === 'materials' ? 'Study Materials' : activeTab === 'assignments' ? 'Class Assignments' : activeTab === 'notes' ? 'Class Notes' : 'Profile Settings'}
@@ -3550,10 +3550,10 @@ export default function PortalDashboard() {
                         return (
                           <div
                             key={q.id}
-                            className="bg-white rounded-2xl border border-black/10 p-6 shadow-xs space-y-4"
+                            className="bg-white rounded-2xl border border-black/10 p-5 sm:p-6 shadow-xs space-y-4 w-full min-w-0 overflow-hidden"
                           >
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 min-w-0 w-full">
+                              <div className="flex flex-wrap items-center gap-2 min-w-0">
                                 <span className="font-mono text-xs font-black text-foreground/40">
                                   Q{qIndex + 1}
                                 </span>
@@ -3578,11 +3578,11 @@ export default function PortalDashboard() {
                                 )}
                               </div>
 
-                              <div className="flex flex-wrap gap-1.5 justify-end">
+                              <div className="flex flex-wrap gap-1.5 sm:justify-end min-w-0">
                                 {(q.topics || []).map((t: string) => (
                                   <span
                                     key={t}
-                                    className="px-2 py-0.5 rounded text-[10px] font-medium bg-black/5 text-foreground/60"
+                                    className="px-2 py-0.5 rounded text-[10px] font-medium bg-black/5 text-foreground/60 break-words"
                                   >
                                     {t}
                                   </span>
@@ -3591,8 +3591,11 @@ export default function PortalDashboard() {
                             </div>
 
                             <div
-                              className="prose prose-sm max-w-none text-[#262626] font-medium"
-                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(q.content_text) }}
+                              className="prose prose-sm max-w-none text-[#262626] font-medium w-full min-w-0 break-words whitespace-normal [overflow-wrap:anywhere] [word-break:break-word] [&_*]:max-w-full [&_*]:break-words [&_p]:break-words [&_pre]:whitespace-pre-wrap [&_pre]:break-words"
+                              style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                              dangerouslySetInnerHTML={{
+                                __html: sanitizeHtml((q.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ').replace(/\n/g, '<br/>'))
+                              }}
                             />
 
                             {q.media_url && (
@@ -3791,9 +3794,11 @@ export default function PortalDashboard() {
                                     </h4>
 
                                     {q.sample_answer && (
-                                      <div className="p-3 bg-white rounded-lg border border-black/10 space-y-1">
+                                      <div className="p-3 bg-white rounded-lg border border-black/10 space-y-1 w-full min-w-0 overflow-hidden">
                                         <strong className="text-foreground/90 block">Model Approach:</strong>
-                                        <p className="text-foreground/75 leading-relaxed">{q.sample_answer}</p>
+                                        <p className="text-foreground/75 leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] whitespace-normal">
+                                          {(q.sample_answer || '').replace(/(?:&nbsp;|\u00A0)/g, ' ')}
+                                        </p>
                                       </div>
                                     )}
 
@@ -3981,7 +3986,15 @@ export default function PortalDashboard() {
                           </div>
                         </div>
                         {a.description && <p className="text-sm text-foreground/60 mb-4">{a.description}</p>}
-                        {a.content_text && <div className="prose prose-sm max-w-none text-foreground/70 mb-4 border-l-2 border-primary/20 pl-4" dangerouslySetInnerHTML={{ __html: sanitizeHtml(a.content_text) }} />}
+                        {a.content_text && (
+                          <div
+                            className="prose prose-sm max-w-none text-foreground/70 mb-4 border-l-2 border-primary/20 pl-4 w-full min-w-0 break-words whitespace-normal [overflow-wrap:anywhere] [word-break:break-word] [&_*]:max-w-full [&_*]:break-words"
+                            style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                            dangerouslySetInnerHTML={{
+                              __html: sanitizeHtml((a.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ').replace(/\n/g, '<br/>'))
+                            }}
+                          />
+                        )}
                         {a.file_url && <a href={a.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors mb-4"><Download className="w-3.5 h-3.5" /> Download Brief</a>}
                         
                         {/* Mentor Feedback (Focus Batch only gets detailed) */}
