@@ -349,11 +349,19 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     try {
       if (!id) throw new Error("Invalid Test ID");
       
-      // Parallel Batch 1: Fetch Test Details, Sections, and Question Links simultaneously
+      // Parallel Batch 1: Fetch Test Details, Sections, and Question Links with embedded Questions & Options
       const [testRes, sectionsRes, tqRes] = await Promise.all([
         supabase.from('exam_tests').select('*, exam_programs(name)').eq('id', id).single(),
         supabase.from('exam_test_sections').select('*').eq('test_id', id),
-        supabase.from('exam_test_questions').select('question_id').eq('test_id', id)
+        supabase.from('exam_test_questions')
+          .select(`
+            question_id,
+            exam_questions (
+              id, part, type, content_text, media_url, marks, negative_marks, created_at,
+              exam_options (id, question_id, content_text, media_url, created_at)
+            )
+          `)
+          .eq('test_id', id)
       ]);
 
       if (testRes.error) throw new Error(`DB Error: ${testRes.error.message}`);
@@ -368,16 +376,36 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       let initialResponses: Record<string, ResponseData> = {};
 
       if (questionIds.length > 0) {
-        // Parallel Batch 2: Fetch Questions and Options simultaneously
-        const [qRes, optRes] = await Promise.all([
-          supabase.from('exam_questions').select('*').in('id', questionIds),
-          supabase.from('exam_options')
-            .select('id, question_id, content_text, media_url, created_at')
-            .in('question_id', questionIds)
-            .order('id', { ascending: true })
-        ]);
+        // Check if nested PostgREST join returned questions in a single roundtrip (Fast Path)
+        const embeddedQuestions = tqRes.data
+          ?.map((t: any) => t.exam_questions)
+          ?.filter(Boolean) || [];
 
-        questionsData = qRes.data || [];
+        if (embeddedQuestions.length > 0 && embeddedQuestions.length === questionIds.length) {
+          // FAST PATH: All questions and options fetched in 1 single roundtrip
+          questionsData = embeddedQuestions;
+          embeddedQuestions.forEach((q: any) => {
+            if (q.exam_options && Array.isArray(q.exam_options)) {
+              optionsMap[q.id] = [...q.exam_options].sort((a: any, b: any) => String(a.id).localeCompare(String(b.id)));
+            }
+          });
+        } else {
+          // FALLBACK PATH: Sequential batch if foreign key embedding was unavailable
+          const [qRes, optRes] = await Promise.all([
+            supabase.from('exam_questions').select('*').in('id', questionIds),
+            supabase.from('exam_options')
+              .select('id, question_id, content_text, media_url, created_at')
+              .in('question_id', questionIds)
+              .order('id', { ascending: true })
+          ]);
+
+          questionsData = qRes.data || [];
+          const optData = optRes.data || [];
+          optData.forEach(opt => {
+            if (!optionsMap[opt.question_id]) optionsMap[opt.question_id] = [];
+            optionsMap[opt.question_id].push(opt);
+          });
+        }
 
         // Sort questions by Part, then strictly NAT -> MSQ -> MCQ -> SUBJECTIVE, then ID for determinism
         const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3, 'SUBJECTIVE': 4 };
@@ -385,12 +413,6 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           if (a.part !== b.part) return a.part.localeCompare(b.part);
           if (a.type !== b.type) return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
           return a.id.localeCompare(b.id);
-        });
-
-        const optData = optRes.data || [];
-        optData.forEach(opt => {
-          if (!optionsMap[opt.question_id]) optionsMap[opt.question_id] = [];
-          optionsMap[opt.question_id].push(opt);
         });
 
         // Image Preloader: Cache all media URLs in memory for instant rendering without flickering
@@ -407,8 +429,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             }
           }
         });
-        optData.forEach(opt => {
-          if (opt.media_url) imageUrlsToPreload.push(opt.media_url);
+        Object.values(optionsMap).forEach(opts => {
+          opts.forEach(opt => {
+            if (opt.media_url) imageUrlsToPreload.push(opt.media_url);
+          });
         });
 
         // Trigger asynchronous image preloading

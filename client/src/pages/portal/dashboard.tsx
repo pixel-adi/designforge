@@ -475,7 +475,7 @@ export default function PortalDashboard() {
       const [testsRes, attemptsRes] = await Promise.allSettled([
         supabase
           .from('exam_tests')
-          .select(`*, exam_test_sections(part, duration_minutes)`)
+          .select(`id, title, category, is_focus_batch, access_tier, program_format, expires_at, created_at, exam_test_sections(part, duration_minutes)`)
           .eq('status', 'published')
           .order('created_at', { ascending: false }),
         supabase.from('exam_attempts').select('id, test_id, status, attempt_number').eq('candidate_id', candidateId).order('attempt_number', { ascending: true })
@@ -1561,7 +1561,12 @@ export default function PortalDashboard() {
   };
 
   const fetchClassNotes = async () => {
-    if (classNotes.length === 0) setLoadingNotes(true);
+    if (classNotes.length > 0) return;
+    if (studyMaterials.length > 0) {
+      setClassNotes(studyMaterials);
+      return;
+    }
+    setLoadingNotes(true);
     try {
       const { data, error } = await supabase.from('study_materials').select('*').eq('is_visible', true).order('display_order').order('created_at', { ascending: false });
       if (!error && data) setClassNotes(data);
