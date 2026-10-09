@@ -61,6 +61,17 @@ const normalizeSubmissionUrl = (rawUrl: string): { url: string; isDirectImage: b
   return { url: trimmed, isDirectImage: true, isFilenameOnly: false };
 };
 
+const resolveQuestionMediaUrl = (rawUrl: string | null | undefined): string => {
+  if (!rawUrl) return '';
+  const trimmed = rawUrl.trim();
+  if (trimmed.startsWith('data:image/') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  const cleanPath = trimmed.replace(/^(\/?question-media\/|\/)/, '');
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://tbacsyjfbwaqobtmbwdr.supabase.co';
+  return `${supabaseUrl}/storage/v1/object/public/question-media/${cleanPath}`;
+};
+
 export default function AdminPartBEvaluations() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -675,8 +686,31 @@ export default function AdminPartBEvaluations() {
           </div>
           
           {currentQ && (
-            <div className="bg-white p-5 rounded-xl border border-black/5 shadow-sm mb-6">
-               <div className="text-sm text-[#262626] leading-relaxed max-w-full overflow-hidden prose prose-sm prose-p:my-1 prose-img:max-h-40 prose-img:w-auto" dangerouslySetInnerHTML={{ __html: sanitizeHtml((currentQ.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ')) }}></div>
+            <div className="bg-white p-5 rounded-xl border border-black/5 shadow-sm mb-6 space-y-4">
+              <div 
+                className="text-sm text-[#262626] leading-relaxed max-w-full prose prose-sm prose-p:my-1 prose-img:max-h-[500px] prose-img:w-auto prose-img:rounded-xl prose-img:shadow-sm prose-img:my-2" 
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml((currentQ.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ')) }} 
+              />
+              {currentQ.media_url && (
+                <div className="pt-3 border-t border-black/5">
+                  <div className="text-xs font-bold text-foreground/50 mb-2 uppercase tracking-wider">
+                    Question Reference Image
+                  </div>
+                  <div className="rounded-xl border border-black/10 overflow-hidden bg-neutral-50/50 p-2 max-w-2xl">
+                    <img
+                      src={resolveQuestionMediaUrl(currentQ.media_url)}
+                      alt="Question Reference"
+                      className="max-h-[450px] w-auto max-w-full rounded-lg object-contain mx-auto"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (!target.src.includes('candidate-submissions')) {
+                          target.src = normalizeSubmissionUrl(currentQ.media_url).url;
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
           
