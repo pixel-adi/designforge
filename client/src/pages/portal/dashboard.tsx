@@ -35,18 +35,75 @@ const CustomScatterTooltip = ({ active, payload }: any) => {
 export default function PortalDashboard() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      for (const k of Object.keys(localStorage)) {
+        if (k.startsWith('df_candidate_')) return false;
+      }
+    }
+    return true;
+  });
   const [authUser, setAuthUser] = useState<any>(null);
-  const [candidate, setCandidate] = useState<any>(null);
+  const [candidate, setCandidate] = useState<any>(() => {
+    if (typeof window !== 'undefined') {
+      for (const k of Object.keys(localStorage)) {
+        if (k.startsWith('df_candidate_')) {
+          try {
+            const parsed = JSON.parse(localStorage.getItem(k) || '');
+            if (parsed && parsed.id) return parsed;
+          } catch (e) {}
+        }
+      }
+    }
+    return null;
+  });
 
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [programs, setPrograms] = useState<any[]>([]);
-  const [onboardingData, setOnboardingData] = useState<{ name: string, phone: string, program_ids: string[], avatar_url: string, education_level: string }>({ name: "", phone: "", program_ids: [], avatar_url: "", education_level: "bachelors" });
+  const [programs, setPrograms] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('df_cached_programs');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.programs)) return parsed.programs;
+        }
+      } catch (e) {}
+    }
+    return [];
+  });
+  const [onboardingData, setOnboardingData] = useState<{ name: string, phone: string, program_ids: string[], avatar_url: string, education_level: string }>(() => {
+    let cand: any = null;
+    if (typeof window !== 'undefined') {
+      for (const k of Object.keys(localStorage)) {
+        if (k.startsWith('df_candidate_')) {
+          try { cand = JSON.parse(localStorage.getItem(k) || ''); break; } catch (e) {}
+        }
+      }
+    }
+    return {
+      name: cand?.name || "",
+      phone: cand?.phone || "",
+      program_ids: cand?.program_ids || [],
+      avatar_url: cand?.avatar_url || "",
+      education_level: cand?.education_level || "bachelors"
+    };
+  });
   const [savingOnboarding, setSavingOnboarding] = useState(false);
 
   // Dashboard Data
-  const [activeTests, setActiveTests] = useState<any[]>([]);
+  const [activeTests, setActiveTests] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('df_cached_published_tests_v2') || sessionStorage.getItem('df_cached_published_tests_v2');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.tests)) return parsed.tests;
+        }
+      } catch (e) {}
+    }
+    return [];
+  });
   const [testCategoryFilter, setTestCategoryFilter] = useState<'all' | 'full_length' | 'short'>('all');
   const [candidateAttemptsMap, setCandidateAttemptsMap] = useState<Record<string, any[]>>({});
   const [activeTab, setActiveTab] = useState(() => {
@@ -269,7 +326,7 @@ export default function PortalDashboard() {
         if (!session?.user) {
           const hasLocalToken = typeof window !== 'undefined' && Object.keys(localStorage).some(k => (k.startsWith('sb-') && k.endsWith('-auth-token')) || k === 'supabase.auth.token');
           if (hasLocalToken) {
-            await new Promise(r => setTimeout(r, 600));
+            await new Promise(r => setTimeout(r, 100));
             const retryRes = await supabase.auth.getSession();
             if (retryRes.data?.session?.user) {
               session = retryRes.data.session;
@@ -311,14 +368,15 @@ export default function PortalDashboard() {
           } catch (e) {}
         }
 
-        await loadCandidateProfile(session.user, active);
+        // Load or verify latest candidate profile in background without blocking UI
+        loadCandidateProfile(session.user, active).finally(() => {
+          clearTimeout(fallbackTimer);
+          if (active) setLoading(false);
+        });
       } catch (err) {
         console.error("Auth init error:", err);
-      } finally {
         clearTimeout(fallbackTimer);
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     }
 
@@ -432,8 +490,8 @@ export default function PortalDashboard() {
           education_level: candidateData.education_level || "bachelors"
         });
 
-        // Register this device session safely in background
-        registerSession(candidateData.id);
+        // Register this device session safely in background (non-blocking)
+        void registerSession(candidateData.id);
 
         fetchDashboardData(candidateData.program_ids || [], candidateData.education_level || "bachelors", candidateData.id);
       }
@@ -448,12 +506,14 @@ export default function PortalDashboard() {
     try {
       const normEd = (educationLevel || 'bachelors').toLowerCase().trim();
 
-      // 1. Instant sessionStorage cache check for published tests to minimize concurrent DB load
+      // 1. Instant localStorage & sessionStorage cache check for published tests
       try {
-        const cachedTestsRaw = sessionStorage.getItem('df_cached_published_tests_v2');
+        const cachedTestsRaw = typeof window !== 'undefined'
+          ? (localStorage.getItem('df_cached_published_tests_v2') || sessionStorage.getItem('df_cached_published_tests_v2'))
+          : null;
         if (cachedTestsRaw) {
           const parsed = JSON.parse(cachedTestsRaw);
-          if (parsed && Date.now() - parsed.ts < 180000 && Array.isArray(parsed.tests) && parsed.tests.length > 0) {
+          if (parsed && Date.now() - parsed.ts < 3600000 && Array.isArray(parsed.tests) && parsed.tests.length > 0) {
             const filtered = parsed.tests.filter((test: any) => {
               if (test.is_focus_batch || test.access_tier === 'focus_batch') return true;
               const format = (test.program_format || '').toLowerCase().trim();
@@ -522,8 +582,10 @@ export default function PortalDashboard() {
 
       setActiveTests(filteredTests);
       try {
-        if (tests && tests.length > 0) {
-          sessionStorage.setItem('df_cached_published_tests_v2', JSON.stringify({ tests, ts: Date.now() }));
+        if (tests && tests.length > 0 && typeof window !== 'undefined') {
+          const payload = JSON.stringify({ tests, ts: Date.now() });
+          localStorage.setItem('df_cached_published_tests_v2', payload);
+          sessionStorage.setItem('df_cached_published_tests_v2', payload);
         }
       } catch (e) {}
     } catch (err) {
