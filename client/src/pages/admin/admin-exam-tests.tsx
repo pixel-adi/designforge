@@ -3,7 +3,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ClipboardList, PlusCircle, CheckCircle2, Search, ArrowLeft, Loader2, FileText, Clock, Trash2, Filter, Settings, Wand2, RefreshCw, FileDown, Zap } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { ClipboardList, PlusCircle, CheckCircle2, Search, ArrowLeft, Loader2, FileText, Clock, Trash2, Filter, Settings, Wand2, RefreshCw, FileDown, Zap, Plus, Sparkles, Upload, Image as ImageIcon, AlertCircle, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -179,6 +180,207 @@ export default function AdminExamTests() {
   // Preview State
   const [previewIndex, setPreviewIndex] = useState(0);
 
+  // Target Part B Marks based on category (full = 100, half = 50, custom = 50)
+  const getTargetPartBMarks = (cat?: string) => {
+    const category = cat || testCategory;
+    if (category === 'half_length') return 50;
+    if (category === 'custom_short') return 50;
+    return 100;
+  };
+
+  const getPartBTotalMarks = (qs?: any[]) => {
+    const list = qs || selectedQuestions;
+    return list
+      .filter(q => q.part === 'B')
+      .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
+  };
+
+  const distributePartBMarks = (targetTotal?: number) => {
+    const target = targetTotal ?? getTargetPartBMarks(testCategory);
+    const partBIndices: number[] = [];
+    selectedQuestions.forEach((q, idx) => {
+      if (q.part === 'B') partBIndices.push(idx);
+    });
+    if (partBIndices.length === 0) {
+      toast({ title: "No Part B questions", description: "Please add Part B questions before distributing marks.", variant: "destructive" });
+      return;
+    }
+    const base = Math.floor(target / partBIndices.length);
+    const remainder = target % partBIndices.length;
+    const updated = [...selectedQuestions];
+    partBIndices.forEach((qIdx, i) => {
+      updated[qIdx] = {
+        ...updated[qIdx],
+        marks: Math.max(1, base + (i < remainder ? 1 : 0))
+      };
+    });
+    setSelectedQuestions(updated);
+    toast({
+      title: "Marks Distributed Evenly ✨",
+      description: `Part B marks evenly split among ${partBIndices.length} questions to sum to ${target} marks.`
+    });
+  };
+
+  // Inline Question Creation Modal State (Part A & Part B)
+  const [createQModalOpen, setCreateQModalOpen] = useState(false);
+  const [createQPart, setCreateQPart] = useState<'A' | 'B'>('B');
+  const [createQType, setCreateQType] = useState<'MCQ' | 'MSQ' | 'NAT' | 'SUBJECTIVE'>('SUBJECTIVE');
+  const [createQDifficulty, setCreateQDifficulty] = useState<'Low' | 'Medium' | 'High'>('Medium');
+  const [createQContent, setCreateQContent] = useState('');
+  const [createQMediaFile, setCreateQMediaFile] = useState<File | null>(null);
+  const [createQMediaPreview, setCreateQMediaPreview] = useState<string | null>(null);
+  const [createQPyqTag, setCreateQPyqTag] = useState('');
+  const [createQTopics, setCreateQTopics] = useState('');
+  const [createQMarks, setCreateQMarks] = useState<number>(20);
+  const [createQSaving, setCreateQSaving] = useState(false);
+  const [createQOptions, setCreateQOptions] = useState<Array<{ content_text: string; is_correct: boolean }>>([
+    { content_text: '', is_correct: false },
+    { content_text: '', is_correct: false },
+    { content_text: '', is_correct: false },
+    { content_text: '', is_correct: false }
+  ]);
+
+  const openCreateQuestion = (part: 'A' | 'B', preferredType?: string) => {
+    setCreateQPart(part);
+    if (part === 'B') {
+      setCreateQType('SUBJECTIVE');
+      const currentSum = getPartBTotalMarks();
+      const target = getTargetPartBMarks(testCategory);
+      const remaining = target - currentSum;
+      setCreateQMarks(remaining > 0 ? remaining : 20);
+    } else {
+      const pType = (preferredType as any) || 'MCQ';
+      setCreateQType(pType);
+      setCreateQOptions([
+        { content_text: '', is_correct: pType === 'NAT' ? true : false },
+        { content_text: '', is_correct: false },
+        { content_text: '', is_correct: false },
+        { content_text: '', is_correct: false }
+      ]);
+    }
+    setCreateQDifficulty('Medium');
+    setCreateQContent('');
+    setCreateQMediaFile(null);
+    setCreateQMediaPreview(null);
+    setCreateQPyqTag('');
+    setCreateQTopics('');
+    setCreateQModalOpen(true);
+  };
+
+  const handleCreateQuestionSubmit = async () => {
+    if (!createQContent.trim()) {
+      return toast({ title: "Validation Error", description: "Question prompt text is required.", variant: "destructive" });
+    }
+
+    if (createQPart === 'B') {
+      const parsedMarks = Number(createQMarks);
+      if (!createQMarks || isNaN(parsedMarks) || parsedMarks <= 0) {
+        return toast({ 
+          title: "Invalid Marks", 
+          description: "Marks must be strictly greater than 0. Zero or negative marks are not allowed.", 
+          variant: "destructive" 
+        });
+      }
+    } else {
+      if (createQType === 'MCQ') {
+        const correctCount = createQOptions.filter(o => o.is_correct).length;
+        if (correctCount !== 1) {
+          return toast({ title: "Validation Error", description: "MCQ questions must have exactly 1 correct option selected.", variant: "destructive" });
+        }
+        if (createQOptions.some(o => !o.content_text.trim())) {
+          return toast({ title: "Validation Error", description: "All 4 options must contain content text.", variant: "destructive" });
+        }
+      } else if (createQType === 'MSQ') {
+        const correctCount = createQOptions.filter(o => o.is_correct).length;
+        if (correctCount < 1) {
+          return toast({ title: "Validation Error", description: "MSQ questions must have at least 1 correct option selected.", variant: "destructive" });
+        }
+        if (createQOptions.some(o => !o.content_text.trim())) {
+          return toast({ title: "Validation Error", description: "All 4 options must contain content text.", variant: "destructive" });
+        }
+      } else if (createQType === 'NAT') {
+        if (!createQOptions[0]?.content_text.trim()) {
+          return toast({ title: "Validation Error", description: "Please enter the acceptable numerical answer or range for NAT.", variant: "destructive" });
+        }
+      }
+    }
+
+    setCreateQSaving(true);
+    try {
+      let uploadedMediaUrl: string | null = null;
+      if (createQMediaFile) {
+        const fileExt = createQMediaFile.name.split('.').pop();
+        const cleanTag = (createQPyqTag || 'INLINE').replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+        const fileName = `${cleanTag}_${Math.random().toString(36).substring(2, 10)}_${Date.now()}.${fileExt}`;
+        const { error: upErr } = await supabase.storage.from('question-media').upload(fileName, createQMediaFile);
+        if (!upErr) {
+          const { data: urlData } = supabase.storage.from('question-media').getPublicUrl(fileName);
+          uploadedMediaUrl = urlData.publicUrl;
+        }
+      }
+
+      const topicsArr = createQTopics.split(',').map(t => t.trim()).filter(Boolean);
+      const questionPayload = {
+        type: createQType,
+        part: createQPart,
+        difficulty: createQDifficulty,
+        content_text: createQContent.trim(),
+        media_url: uploadedMediaUrl,
+        topics: topicsArr,
+        pyq_tag: createQPyqTag.trim() || null
+      };
+
+      const { data: insertedQ, error: insErr } = await supabase.from('exam_questions').insert(questionPayload).select().single();
+      if (insErr) throw insErr;
+
+      if (createQPart === 'A' && insertedQ) {
+        const optsToInsert = (createQType === 'NAT' ? [createQOptions[0]] : createQOptions).map(opt => ({
+          question_id: insertedQ.id,
+          content_text: opt.content_text.trim(),
+          is_correct: createQType === 'NAT' ? true : opt.is_correct
+        }));
+        await supabase.from('exam_options').insert(optsToInsert);
+      }
+
+      const newQuestionObj = {
+        ...insertedQ,
+        marks: createQPart === 'B' ? Number(createQMarks) : undefined
+      };
+
+      // Add to selected questions in current test
+      setSelectedQuestions(prev => [...prev, newQuestionObj]);
+
+      // Automatically adjust section requirements count so validation passes smoothly
+      setTestSections(prev => prev.map(s => {
+        if (s.part === createQPart) {
+          const currentCount = s.requirements[createQType] || 0;
+          return {
+            ...s,
+            requirements: {
+              ...s.requirements,
+              [createQType]: currentCount + 1
+            }
+          };
+        }
+        return s;
+      }));
+
+      // Update question bank cache
+      setQuestionsBank(prev => [insertedQ, ...prev]);
+
+      toast({
+        title: "Question Created & Attached! 🎉",
+        description: `Saved to central Question Bank and added to Part ${createQPart} of this test.`
+      });
+      setCreateQModalOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "Failed to create question", description: err.message, variant: "destructive" });
+    } finally {
+      setCreateQSaving(false);
+    }
+  };
+
   // Auto-import preselected questions from Question Bank if forwarded
   useEffect(() => {
     try {
@@ -317,6 +519,21 @@ export default function AdminExamTests() {
       if (a.part !== b.part) return a.part.localeCompare(b.part);
       return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
     });
+
+    // Auto-distribute Part B marks according to target format total (100 for Full, 50 for Half)
+    const targetPartBMarks = getTargetPartBMarks(template.category || "full_length");
+    const partBCount = newSelectedQs.filter(q => q.part === 'B').length;
+    if (partBCount > 0) {
+      const base = Math.floor(targetPartBMarks / partBCount);
+      const remainder = targetPartBMarks % partBCount;
+      let bIdx = 0;
+      newSelectedQs.forEach(q => {
+        if (q.part === 'B') {
+          q.marks = Math.max(1, base + (bIdx < remainder ? 1 : 0));
+          bIdx++;
+        }
+      });
+    }
 
     setSelectedTemplate(template);
     setTestSections(JSON.parse(JSON.stringify(template.sections)));
@@ -531,13 +748,30 @@ export default function AdminExamTests() {
       if (!testData) return;
       
       const { data: sectionsData } = await supabase.from('exam_test_sections').select('*').eq('test_id', testId);
-      const { data: tqData } = await supabase.from('exam_test_questions').select('question_id').eq('test_id', testId);
+      
+      // Load question_id and marks defensively with zero-downtime fallback
+      let tqData: any[] = [];
+      const tqRes = await supabase.from('exam_test_questions').select('question_id, marks').eq('test_id', testId);
+      if (tqRes.error && (tqRes.error.message?.includes('marks') || tqRes.error.code === '42703')) {
+        const fallbackRes = await supabase.from('exam_test_questions').select('question_id').eq('test_id', testId);
+        tqData = fallbackRes.data || [];
+      } else {
+        tqData = tqRes.data || [];
+      }
       
       const questionIds = tqData?.map((t: any) => t.question_id) || [];
       let questionsData: any[] = [];
       if (questionIds.length > 0) {
         const { data: qData } = await supabase.from('exam_questions').select('*').in('id', questionIds);
-        questionsData = qData || [];
+        const marksMap = new Map((tqData || []).map((t: any) => [t.question_id, t.marks]));
+        const categoryTarget = getTargetPartBMarks(testData.category);
+        const partBCount = (qData || []).filter((q: any) => q.part === 'B').length;
+        const defaultPerQ = partBCount > 0 ? Math.floor(categoryTarget / partBCount) : 20;
+
+        questionsData = (qData || []).map((q: any) => ({
+          ...q,
+          marks: marksMap.get(q.id) != null ? Number(marksMap.get(q.id)) : (q.part === 'B' ? defaultPerQ : undefined)
+        }));
         
         const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3, 'SUBJECTIVE': 4 };
         questionsData.sort((a, b) => {
@@ -584,6 +818,29 @@ export default function AdminExamTests() {
       for (const [type, requiredCount] of Object.entries(sec.requirements)) {
         const count = sectionQs.filter(q => q.type === type).length;
         if (count !== requiredCount) return toast({ title: "Error", description: `Part ${sec.part} requires exactly ${requiredCount} ${type}. Found ${count}.`, variant: "destructive" });
+      }
+    }
+
+    // Strict Part B marks validation: non-zero, non-negative, and sums to paper target
+    const partBQuestions = selectedQuestions.filter(q => q.part === 'B');
+    if (partBQuestions.length > 0) {
+      const invalidMarksQ = partBQuestions.find(q => !q.marks || Number(q.marks) <= 0 || isNaN(Number(q.marks)));
+      if (invalidMarksQ) {
+        return toast({
+          title: "Invalid Part B Marks",
+          description: "All Part B questions must have strictly positive marks (> 0). Zero or negative marks are not allowed.",
+          variant: "destructive"
+        });
+      }
+
+      const targetPartBMarks = getTargetPartBMarks(testCategory);
+      const totalPartBMarks = partBQuestions.reduce((acc, q) => acc + (Number(q.marks) || 0), 0);
+      if (totalPartBMarks !== targetPartBMarks) {
+        return toast({
+          title: "Part B Marks Total Mismatch",
+          description: `Part B questions must sum to exactly ${targetPartBMarks} marks for this paper format. Current sum: ${totalPartBMarks} marks. Please adjust marks or click "Auto-Distribute Evenly".`,
+          variant: "destructive"
+        });
       }
     }
 
@@ -658,11 +915,21 @@ export default function AdminExamTests() {
         });
       }
 
-      const questionsToLink = selectedQuestions.map((q, idx) => ({
-        test_id: testRecordId, question_id: q.id,
+      const questionsToLink = selectedQuestions.map((q) => ({
+        test_id: testRecordId, 
+        question_id: q.id,
+        marks: q.part === 'B' ? (Number(q.marks) || null) : null
       }));
       if (questionsToLink.length > 0) {
-        await supabase.from('exam_test_questions').insert(questionsToLink);
+        let { error: insertErr } = await supabase.from('exam_test_questions').insert(questionsToLink);
+        if (insertErr && (insertErr.message?.includes('marks') || insertErr.code === '42703')) {
+          // Zero-downtime fallback: if marks column not yet in DB, link without marks
+          const fallbackLinks = questionsToLink.map(({ test_id, question_id }) => ({ test_id, question_id }));
+          const retry = await supabase.from('exam_test_questions').insert(fallbackLinks);
+          if (retry.error) throw retry.error;
+        } else if (insertErr) {
+          throw insertErr;
+        }
       }
 
       toast({ title: "Success", description: `Test ${publish ? 'published' : 'saved as draft'}!` });
@@ -1225,12 +1492,17 @@ export default function AdminExamTests() {
               if (sectionQuestions.filter(q => q.type === type).length !== requiredCount) isSectionValid = false;
             }
 
+            const isPartB = sec.part === 'B';
+            const targetPartBMarks = getTargetPartBMarks(testCategory);
+            const partBSum = isPartB ? getPartBTotalMarks(sectionQuestions) : 0;
+            const isPartBSumMatched = isPartB ? partBSum === targetPartBMarks : true;
+
             return (
-              <div key={sec.part} className={`border ${isSectionValid ? 'border-green-300' : 'border-black/10'} rounded-xl overflow-hidden`}>
-                <div className={`p-4 flex flex-col md:flex-row md:items-center justify-between border-b gap-4 ${isSectionValid ? 'bg-green-50 border-green-200' : 'bg-background border-black/10'}`}>
+              <div key={sec.part} className={`border ${isSectionValid && (!isPartB || isPartBSumMatched) ? 'border-green-300' : 'border-black/10'} rounded-xl overflow-hidden`}>
+                <div className={`p-4 flex flex-col md:flex-row md:items-center justify-between border-b gap-4 ${isSectionValid && (!isPartB || isPartBSumMatched) ? 'bg-green-50 border-green-200' : 'bg-background border-black/10'}`}>
                   <div>
                     <h3 className="font-semibold text-[#262626] flex items-center gap-2">
-                      Part {sec.part} Section {isSectionValid && <CheckCircle2 className="w-4 h-4 text-green-600" />}
+                      Part {sec.part} Section {isSectionValid && (!isPartB || isPartBSumMatched) && <CheckCircle2 className="w-4 h-4 text-green-600" />}
                     </h3>
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
                       <div className="flex items-center gap-2 text-xs text-foreground/60 font-medium">
@@ -1255,29 +1527,92 @@ export default function AdminExamTests() {
                         ))}
                       </div>
                     </div>
+
+                    {isPartB && (
+                      <div className="flex items-center gap-2.5 mt-2.5 pt-2.5 border-t border-black/5 flex-wrap">
+                        <span className="text-xs font-semibold text-foreground/70">Part B Marks Total:</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-black transition-colors ${
+                          isPartBSumMatched 
+                            ? 'bg-green-100 text-green-700 border border-green-300' 
+                            : 'bg-amber-100 text-amber-800 border border-amber-300'
+                        }`}>
+                          {partBSum} / {targetPartBMarks} Marks
+                        </span>
+                        {!isPartBSumMatched && (
+                          <span className="text-[11px] text-amber-700 font-medium">
+                            (Paper requires exactly {targetPartBMarks} marks)
+                          </span>
+                        )}
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => distributePartBMarks()} 
+                          className="h-6 text-[11px] px-2 text-primary hover:bg-primary/10 font-bold ml-auto gap-1"
+                          title={`Split ${targetPartBMarks} marks evenly among Part B questions`}
+                        >
+                          <Sparkles className="w-3 h-3" /> Auto-Distribute Evenly ({targetPartBMarks}M)
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                  <Button size="sm" onClick={() => openPicker(sec)} className="gap-2 bg-primary/10 text-primary hover:bg-primary/20 shadow-none border-0 shrink-0">
-                    <PlusCircle className="w-4 h-4" /> Add Questions
-                  </Button>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => openCreateQuestion(sec.part)} 
+                      className="gap-1.5 text-xs h-8 border-primary/30 text-primary hover:bg-primary/5 font-semibold"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> + Create Question
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={() => openPicker(sec)} 
+                      className="gap-1.5 bg-primary/10 text-primary hover:bg-primary/20 shadow-none border-0 h-8 text-xs font-semibold"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" /> From Bank
+                    </Button>
+                  </div>
                 </div>
+
                 <div className="p-4 bg-white min-h-[100px]">
                   {sectionQuestions.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-foreground/30 py-6">
                       <FileText className="w-8 h-8 mb-2 opacity-50" />
-                      <p className="text-sm">Click "Add Questions" to select from the bank or auto-generate.</p>
+                      <p className="text-sm">Click "+ Create Question" or "From Bank" to populate this section.</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
                       {sectionQuestions.map((q, idx) => (
                         <div key={q.id} className="flex items-center justify-between p-3 border border-black/5 rounded-lg text-sm bg-background/50">
-                          <div className="flex items-center gap-3">
-                            <span className="font-semibold text-foreground/40 w-6">{idx + 1}.</span>
-                            <span className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded font-bold">{q.type}</span>
+                          <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
+                            <span className="font-semibold text-foreground/40 w-6 shrink-0">{idx + 1}.</span>
+                            <span className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded font-bold shrink-0">{q.type}</span>
                             <span className="text-foreground/80 line-clamp-1 max-w-xl break-words whitespace-normal [&_p]:inline [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4" dangerouslySetInnerHTML={{ __html: sanitizeHtml((q.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ').replace(/\n/g, '<br/>')) }}></span>
                           </div>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:bg-red-50" onClick={() => toggleQuestionSelection(q)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isPartB && (
+                              <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-md border border-black/10 shadow-xs">
+                                <span className="text-[10px] font-bold text-foreground/60 uppercase">Marks:</span>
+                                <input 
+                                  type="number" 
+                                  min="1" 
+                                  value={q.marks ?? ''} 
+                                  onChange={(e) => { 
+                                    const val = parseInt(e.target.value, 10); 
+                                    setSelectedQuestions(prev => prev.map(sq => sq.id === q.id ? { ...sq, marks: isNaN(val) ? '' : Math.max(1, val) } : sq)); 
+                                  }} 
+                                  className="w-12 h-6 text-xs font-bold text-center border-0 focus:outline-none bg-transparent" 
+                                  placeholder="Marks"
+                                />
+                              </div>
+                            )}
+
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:bg-red-50" onClick={() => toggleQuestionSelection(q)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1309,7 +1644,14 @@ export default function AdminExamTests() {
             <Button variant="ghost" size="sm" onClick={() => setCurrentStep('BUILDER')} className="text-foreground/50"><ArrowLeft className="w-4 h-4 mr-2" /> Back to Builder</Button>
             <div>
               <h2 className="text-xl font-semibold text-[#262626]">Candidate Preview: {testTitle || "Untitled Test"}</h2>
-              <p className="text-xs text-foreground/50">{selectedQuestions.length} Total Questions | {testSections.reduce((acc, s) => acc + s.duration, 0)} Min</p>
+              <p className="text-xs text-foreground/50">
+                {selectedQuestions.length} Total Questions | {testSections.reduce((acc, s) => acc + s.duration, 0)} Min
+                {selectedQuestions.some(q => q.part === 'B') && (
+                  <span className="ml-2 font-bold text-primary">
+                    • Part B Total: {getPartBTotalMarks()} / {getTargetPartBMarks()} Marks
+                  </span>
+                )}
+              </p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -1348,10 +1690,25 @@ export default function AdminExamTests() {
                 </Button>
               </div>
 
-              <div className="flex gap-2 mb-6">
+              <div className="flex items-center gap-2 mb-6 flex-wrap">
                 <span className="bg-primary/10 text-primary px-2 py-1 rounded text-xs font-bold">Part {currentQ.part}</span>
                 <span className="bg-black/5 text-foreground/70 px-2 py-1 rounded text-xs font-bold">{currentQ.type}</span>
                 {currentQ.pyq_tag && <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold">{currentQ.pyq_tag}</span>}
+                {currentQ.part === 'B' && (
+                  <div className="flex items-center gap-1.5 bg-primary/5 text-primary border border-primary/20 px-2.5 py-1 rounded text-xs font-bold ml-auto">
+                    <span>Marks:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={currentQ.marks ?? ''}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setSelectedQuestions(prev => prev.map(sq => sq.id === currentQ.id ? { ...sq, marks: isNaN(val) ? '' : Math.max(1, val) } : sq));
+                      }}
+                      className="w-14 h-6 text-center font-bold bg-white text-[#262626] border border-primary/30 rounded px-1"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="text-lg text-[#262626] font-medium leading-relaxed mb-8 flex items-start w-full overflow-hidden">
@@ -1537,6 +1894,17 @@ export default function AdminExamTests() {
                   <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/40" />
                   <Input placeholder="Search text/PYQ..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-8 h-9 text-xs bg-white" />
                 </div>
+
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setPickerOpen(false);
+                    openCreateQuestion(pickerSection?.part || 'A');
+                  }}
+                  className="h-9 text-xs px-3 rounded-lg bg-primary hover:bg-primary/90 text-white font-bold gap-1 shadow-xs shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" /> + New Question
+                </Button>
               </div>
             </div>
           </div>
@@ -1618,8 +1986,306 @@ export default function AdminExamTests() {
     );
   };
 
-  if (currentStep === 'LIST') return renderList();
-  if (currentStep === 'BUILDER') return renderBuilder();
-  if (currentStep === 'PREVIEW') return renderPreview();
-  return null;
+  const renderCreateQuestionModal = () => (
+    <Dialog open={createQModalOpen} onOpenChange={setCreateQModalOpen}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Plus className="w-4 h-4" />
+            </span>
+            Create New Question (Part {createQPart})
+          </DialogTitle>
+          <DialogDescription>
+            This question will be saved into the central Question Bank and immediately attached to this test.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-3">
+          {/* Section Part & Type Selector */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs font-bold text-foreground/70 mb-1.5 block">Part</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateQPart('A');
+                    setCreateQType('MCQ');
+                  }}
+                  className={`flex-1 h-9 rounded-lg border text-xs font-bold transition-all ${
+                    createQPart === 'A' ? 'bg-primary text-white border-primary shadow-xs' : 'bg-background hover:bg-black/5 text-[#262626]'
+                  }`}
+                >
+                  Part A (Objective)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateQPart('B');
+                    setCreateQType('SUBJECTIVE');
+                  }}
+                  className={`flex-1 h-9 rounded-lg border text-xs font-bold transition-all ${
+                    createQPart === 'B' ? 'bg-primary text-white border-primary shadow-xs' : 'bg-background hover:bg-black/5 text-[#262626]'
+                  }`}
+                >
+                  Part B (Subjective)
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs font-bold text-foreground/70 mb-1.5 block">Question Type</Label>
+              {createQPart === 'B' ? (
+                <div className="h-9 px-3 rounded-lg border border-black/10 bg-black/5 text-xs font-bold flex items-center text-[#262626]">
+                  SUBJECTIVE (Design / Sketching Prompt)
+                </div>
+              ) : (
+                <select
+                  value={createQType}
+                  onChange={(e) => {
+                    const t = e.target.value as any;
+                    setCreateQType(t);
+                    if (t === 'NAT') {
+                      setCreateQOptions([{ content_text: '', is_correct: true }]);
+                    } else if (createQOptions.length < 4) {
+                      setCreateQOptions([
+                        { content_text: '', is_correct: false },
+                        { content_text: '', is_correct: false },
+                        { content_text: '', is_correct: false },
+                        { content_text: '', is_correct: false }
+                      ]);
+                    }
+                  }}
+                  className="w-full h-9 rounded-lg border border-black/10 px-3 bg-white text-xs font-semibold outline-none"
+                >
+                  <option value="MCQ">MCQ (Multiple Choice - 1 Correct)</option>
+                  <option value="MSQ">MSQ (Multiple Select - Multiple Correct)</option>
+                  <option value="NAT">NAT (Numerical Answer Type)</option>
+                </select>
+              )}
+            </div>
+          </div>
+
+          {/* Difficulty & PYQ Tag */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs font-bold text-foreground/70 mb-1.5 block">Difficulty</Label>
+              <select
+                value={createQDifficulty}
+                onChange={(e) => setCreateQDifficulty(e.target.value as any)}
+                className="w-full h-9 rounded-lg border border-black/10 px-3 bg-white text-xs font-semibold outline-none"
+              >
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+              </select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-bold text-foreground/70 mb-1.5 block">PYQ / Exam Tag (Optional)</Label>
+              <Input
+                placeholder="e.g. CEED 2024 or Practice"
+                value={createQPyqTag}
+                onChange={(e) => setCreateQPyqTag(e.target.value)}
+                className="h-9 text-xs"
+              />
+            </div>
+          </div>
+
+          {/* Part B Marks Allotment */}
+          {createQPart === 'B' && (
+            <div className="p-3 bg-primary/5 rounded-xl border border-primary/20 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-primary flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" /> Marks Allotted for this Question:
+                </Label>
+                <span className="text-[11px] text-foreground/60">
+                  Target Total: {getTargetPartBMarks()} Marks
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="number"
+                  min="1"
+                  value={createQMarks}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    setCreateQMarks(isNaN(val) ? ('' as any) : Math.max(1, val));
+                  }}
+                  className="h-9 text-sm font-bold bg-white text-center w-28 border-primary/30"
+                  placeholder="20"
+                />
+                <p className="text-[11px] text-foreground/60 leading-tight">
+                  Must be strictly greater than 0. The total for all Part B questions will sum to {getTargetPartBMarks()} marks.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Content Textarea */}
+          <div>
+            <Label className="text-xs font-bold text-foreground/70 mb-1.5 block">
+              {createQPart === 'B' ? "Subjective Question Prompt / Brief" : "Question Text"}
+            </Label>
+            <Textarea
+              placeholder={createQPart === 'B' ? "Describe the design problem, user scenario, sketching requirements..." : "Type the question statement here..."}
+              value={createQContent}
+              onChange={(e) => setCreateQContent(e.target.value)}
+              className="min-h-[90px] text-xs font-medium"
+            />
+          </div>
+
+          {/* Media / Diagram Upload */}
+          <div>
+            <Label className="text-xs font-bold text-foreground/70 mb-1.5 block flex items-center justify-between">
+              <span>Reference Diagram / Media (Optional)</span>
+              {createQMediaFile && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateQMediaFile(null);
+                    setCreateQMediaPreview(null);
+                  }}
+                  className="text-red-500 hover:underline text-[11px]"
+                >
+                  Remove Image
+                </button>
+              )}
+            </Label>
+            {createQMediaPreview ? (
+              <div className="relative border rounded-xl overflow-hidden p-2 bg-background/50 flex items-center gap-3">
+                <img src={createQMediaPreview} alt="Preview" className="h-16 w-16 object-cover rounded-lg border" />
+                <span className="text-xs text-foreground/60 truncate">{createQMediaFile?.name}</span>
+              </div>
+            ) : (
+              <label className="flex items-center justify-center gap-2 border-2 border-dashed border-black/10 rounded-xl p-3 bg-background/30 hover:bg-black/5 cursor-pointer text-xs text-foreground/60 transition-colors">
+                <Upload className="w-4 h-4 text-primary" />
+                <span>Upload sketch or question diagram (PNG, JPG)</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      const f = e.target.files[0];
+                      setCreateQMediaFile(f);
+                      setCreateQMediaPreview(URL.createObjectURL(f));
+                    }
+                  }}
+                />
+              </label>
+            )}
+          </div>
+
+          {/* Topics */}
+          <div>
+            <Label className="text-xs font-bold text-foreground/70 mb-1.5 block">Topics (Comma separated)</Label>
+            <Input
+              placeholder="e.g. Sketching, Spatial Design, Perspective"
+              value={createQTopics}
+              onChange={(e) => setCreateQTopics(e.target.value)}
+              className="h-9 text-xs"
+            />
+          </div>
+
+          {/* Part A Options Section */}
+          {createQPart === 'A' && (
+            <div className="pt-2 border-t border-black/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-foreground/80">
+                  {createQType === 'NAT' ? "Numerical Answer Key" : "Options (Check the correct answer)"}
+                </Label>
+                <span className="text-[11px] text-foreground/50">
+                  {createQType === 'MCQ' ? "Select exactly 1 correct" : createQType === 'MSQ' ? "Select all correct options" : "Exact match or range"}
+                </span>
+              </div>
+
+              {createQType === 'NAT' ? (
+                <div>
+                  <Input
+                    placeholder="e.g. 14.5 or 14-16"
+                    value={createQOptions[0]?.content_text || ''}
+                    onChange={(e) => {
+                      setCreateQOptions([{ content_text: e.target.value, is_correct: true }]);
+                    }}
+                    className="h-9 text-xs font-bold"
+                  />
+                  <p className="text-[10px] text-foreground/50 mt-1">
+                    Enter the numerical value (e.g. 24) or range (e.g. 23.5-24.5).
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {createQOptions.map((opt, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        type={createQType === 'MCQ' ? 'radio' : 'checkbox'}
+                        name="correct_option"
+                        checked={opt.is_correct}
+                        onChange={(e) => {
+                          if (createQType === 'MCQ') {
+                            setCreateQOptions(prev => prev.map((o, i) => ({ ...o, is_correct: i === idx })));
+                          } else {
+                            setCreateQOptions(prev => prev.map((o, i) => i === idx ? { ...o, is_correct: e.target.checked } : o));
+                          }
+                        }}
+                        className="w-4 h-4 text-primary cursor-pointer"
+                        title="Mark as correct answer"
+                      />
+                      <span className="text-xs font-bold text-foreground/60 w-5">
+                        {String.fromCharCode(65 + idx)}.
+                      </span>
+                      <Input
+                        placeholder={`Option ${String.fromCharCode(65 + idx)} text...`}
+                        value={opt.content_text}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCreateQOptions(prev => prev.map((o, i) => i === idx ? { ...o, content_text: val } : o));
+                        }}
+                        className="h-8 text-xs flex-1"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-black/10">
+          <Button variant="outline" onClick={() => setCreateQModalOpen(false)} disabled={createQSaving} className="rounded-xl h-9 text-xs">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreateQuestionSubmit}
+            disabled={createQSaving}
+            className="gap-2 bg-primary hover:bg-primary/90 text-white rounded-xl h-9 px-5 text-xs shadow-md shadow-primary/20"
+          >
+            {createQSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+            Save to Bank & Add to Test
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  return (
+    <>
+      {currentStep === 'LIST' && renderList()}
+      {currentStep === 'BUILDER' && (
+        <>
+          {renderBuilder()}
+          {renderCreateQuestionModal()}
+        </>
+      )}
+      {currentStep === 'PREVIEW' && (
+        <>
+          {renderPreview()}
+          {renderPickerModal()}
+          {renderCreateQuestionModal()}
+        </>
+      )}
+    </>
+  );
 }

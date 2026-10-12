@@ -321,12 +321,23 @@ export default function AdminPartBEvaluations() {
     setLoading(true);
     setEvaluatingAttempt(attempt);
     try {
-      // Get all Part B questions for this test
-      const { data: tqData } = await supabase.from('exam_test_questions').select('question_id').eq('test_id', attempt.test_id);
+      // Get all Part B questions for this test with defensive marks retrieval
+      let tqData: any[] = [];
+      const tqRes = await supabase.from('exam_test_questions').select('question_id, marks').eq('test_id', attempt.test_id);
+      if (tqRes.error && (tqRes.error.message?.includes('marks') || tqRes.error.code === '42703')) {
+        const fallbackRes = await supabase.from('exam_test_questions').select('question_id').eq('test_id', attempt.test_id);
+        tqData = fallbackRes.data || [];
+      } else {
+        tqData = tqRes.data || [];
+      }
       const questionIds = tqData?.map(t => t.question_id) || [];
       
       const { data: qData } = await supabase.from('exam_questions').select('*').in('id', questionIds).eq('part', 'B');
-      const partBQs = qData || [];
+      const marksMap = new Map((tqData || []).map(t => [t.question_id, t.marks]));
+      const partBQs = (qData || []).map((q: any) => ({
+        ...q,
+        marks: marksMap.get(q.id) != null ? Number(marksMap.get(q.id)) : q.marks
+      }));
       
       // Sort questions so it's consistent
       partBQs.sort((a, b) => a.id.localeCompare(b.id));

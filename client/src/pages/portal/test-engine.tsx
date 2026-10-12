@@ -349,11 +349,20 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     try {
       if (!id) throw new Error("Invalid Test ID");
       
+      // Safe defensive query for exam_test_questions (with marks)
+      const fetchTqDefensive = async () => {
+        const res = await supabase.from('exam_test_questions').select('question_id, marks').eq('test_id', id);
+        if (res.error && (res.error.message?.includes('marks') || res.error.code === '42703')) {
+          return supabase.from('exam_test_questions').select('question_id').eq('test_id', id);
+        }
+        return res;
+      };
+
       // Parallel Batch 1: Fetch Test Details, Sections, and Question Links simultaneously
       const [testRes, sectionsRes, tqRes] = await Promise.all([
         supabase.from('exam_tests').select('*, exam_programs(name)').eq('id', id).single(),
         supabase.from('exam_test_sections').select('*').eq('test_id', id),
-        supabase.from('exam_test_questions').select('question_id').eq('test_id', id)
+        fetchTqDefensive()
       ]);
 
       if (testRes.error) throw new Error(`DB Error: ${testRes.error.message}`);
@@ -377,7 +386,11 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             .order('id', { ascending: true })
         ]);
 
-        questionsData = qRes.data || [];
+        const tqMarksMap = new Map((tqRes.data || []).map((t: any) => [t.question_id, t.marks]));
+        questionsData = (qRes.data || []).map((q: any) => ({
+          ...q,
+          marks: tqMarksMap.get(q.id) != null ? Number(tqMarksMap.get(q.id)) : q.marks
+        }));
         const optData = optRes.data || [];
         optData.forEach(opt => {
           if (!optionsMap[opt.question_id]) optionsMap[opt.question_id] = [];
@@ -1775,12 +1788,17 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         {currentQ && currentResponse ? (
           <div className="flex-1 bg-white rounded-2xl border border-black/5 shadow-sm px-8 pt-6 pb-4 flex flex-col min-h-0 relative">
             <div className="flex justify-between items-center mb-4 border-b border-black/5 pb-4 shrink-0">
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center flex-wrap">
                 <span className="bg-primary/10 text-primary px-3 py-1 rounded text-sm font-bold">
                   {engineData.isNid ? "Design Aptitude" : `Part ${currentQ.part}`}
                 </span>
                 <span className="bg-black/5 text-foreground/70 px-3 py-1 rounded text-sm font-bold">{currentQ.type}</span>
                 {currentQ.pyq_tag && <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded text-sm font-bold">{currentQ.pyq_tag}</span>}
+                {currentQ.marks && (
+                  <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded text-sm font-bold">
+                    {currentQ.marks} {Number(currentQ.marks) === 1 ? 'Mark' : 'Marks'}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-4">
                 {testStep === 'review' && currentQ.part === 'A' && questionScores[currentQ.id] !== undefined && (
