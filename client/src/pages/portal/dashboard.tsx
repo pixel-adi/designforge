@@ -203,6 +203,8 @@ export default function PortalDashboard() {
   // Session enforcement state
   const sessionIdRef = useRef<string>('');
   const profileLoadingRef = useRef<boolean>(false);
+  const authUserRef = useRef<any>(null);
+  const lastRegisteredAtRef = useRef<number>(0);
   const [sessionKicked, setSessionKicked] = useState(false);
   const [contentBlurred, setContentBlurred] = useState(false);
 
@@ -229,7 +231,9 @@ export default function PortalDashboard() {
         .update({ active_session_id: localDeviceId })
         .eq('id', candidateId);
 
-      if (error) {
+      if (!error) {
+        lastRegisteredAtRef.current = Date.now();
+      } else {
         console.warn("Could not set active_session_id in DB:", error.message);
       }
       return localDeviceId;
@@ -240,6 +244,9 @@ export default function PortalDashboard() {
 
   const checkSession = useCallback(async (candidateId: string) => {
     if (typeof document !== 'undefined' && document.hidden) return;
+    // Grace period: do not kick within 90s of registering this device session
+    if (Date.now() - lastRegisteredAtRef.current < 90000) return;
+
     const currentDeviceId = sessionIdRef.current || (typeof window !== 'undefined' ? localStorage.getItem('df_device_id') : null);
     if (!currentDeviceId) return;
     try {
@@ -253,7 +260,8 @@ export default function PortalDashboard() {
         .maybeSingle();
 
       // Only kick if database has a valid, non-null active_session_id AND it does not match our local device
-      if (!error && data && data.active_session_id && data.active_session_id !== currentDeviceId) {
+      // AND this device successfully registered at least once
+      if (!error && data && data.active_session_id && data.active_session_id !== currentDeviceId && lastRegisteredAtRef.current > 0) {
         console.warn("Session conflict: Logged in on another device.");
         setSessionKicked(true);
       }
@@ -310,27 +318,41 @@ export default function PortalDashboard() {
     };
   }, [candidate?.id, candidate?.access_level]);
 
-  // Robust Auth & Candidate Profile Initialization (Prevents Logout on Refresh)
+  // Robust Auth & Candidate Profile Initialization (Prevents Logout on Refresh / Google OAuth)
   useEffect(() => {
     let active = true;
 
     async function initializeAuthAndProfile() {
+      // Check if we are landing on an OAuth callback (Google redirect with hash or query)
+      const isOAuthHash = typeof window !== 'undefined' && (
+        window.location.hash.includes('access_token=') ||
+        window.location.hash.includes('error=') ||
+        window.location.search.includes('code=') ||
+        window.location.search.includes('error=')
+      );
+
       // Safety timeout guarantees the portal never hangs indefinitely in loading state
       const fallbackTimer = setTimeout(() => {
         if (active) setLoading(false);
-      }, 4000);
+      }, 6000);
 
       try {
         let { data: { session } } = await supabase.auth.getSession();
 
-        // If session is temporarily pending during cold reload, give it a brief recovery window before redirecting
+        // If landing on OAuth redirect or cold reload, give Supabase a proper window to complete token exchange
         if (!session?.user) {
           const hasLocalToken = typeof window !== 'undefined' && Object.keys(localStorage).some(k => (k.startsWith('sb-') && k.endsWith('-auth-token')) || k === 'supabase.auth.token');
-          if (hasLocalToken) {
-            await new Promise(r => setTimeout(r, 100));
-            const retryRes = await supabase.auth.getSession();
-            if (retryRes.data?.session?.user) {
-              session = retryRes.data.session;
+          
+          if (isOAuthHash || hasLocalToken) {
+            // Loop up to 15 times (3.0s total) waiting for Supabase session to parse/exchange
+            for (let i = 0; i < 15; i++) {
+              await new Promise(r => setTimeout(r, 200));
+              if (!active) return;
+              const retryRes = await supabase.auth.getSession();
+              if (retryRes.data?.session?.user) {
+                session = retryRes.data.session;
+                break;
+              }
             }
           }
         }
@@ -338,13 +360,31 @@ export default function PortalDashboard() {
         if (!session?.user) {
           clearTimeout(fallbackTimer);
           if (active) {
+            // Check if there was an explicit OAuth error in hash
+            if (typeof window !== 'undefined' && window.location.hash.includes('error_description=')) {
+              try {
+                const params = new URLSearchParams(window.location.hash.substring(1));
+                const errorDesc = params.get('error_description');
+                if (errorDesc) {
+                  toast({ title: "Google Sign-In Error", description: decodeURIComponent(errorDesc), variant: "destructive" });
+                }
+              } catch (e) {}
+            }
             setLocation('/portal/login');
           }
           return;
         }
 
         if (active) {
+          authUserRef.current = session.user;
           setAuthUser(session.user);
+        }
+
+        // Clean up OAuth hash or code from URL once successfully authenticated so back/refresh works cleanly
+        if (typeof window !== 'undefined' && isOAuthHash) {
+          try {
+            window.history.replaceState(null, '', window.location.pathname);
+          } catch (e) {}
         }
 
         // Instant restore candidate from localStorage cache (0ms page render)
@@ -385,15 +425,19 @@ export default function PortalDashboard() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
-        if (active) {
+        // Only redirect to login if the user was genuinely logged in in this session
+        // (Prevents premature kickoff during unverified initial state)
+        if (active && authUserRef.current) {
+          authUserRef.current = null;
           setAuthUser(null);
           setCandidate(null);
           setLocation('/portal/login');
         }
-      } else if (event === 'SIGNED_IN') {
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         if (session?.user && active) {
+          authUserRef.current = session.user;
           setAuthUser(session.user);
-          if (!candidate && !profileLoadingRef.current) {
+          if (!profileLoadingRef.current) {
             await loadCandidateProfile(session.user, active);
           }
         }
@@ -451,13 +495,17 @@ export default function PortalDashboard() {
 
         if (emailMatch) {
           candidateData = emailMatch;
-          if (!emailMatch.auth_user_id) {
+          if (emailMatch.auth_user_id !== user.id) {
             try {
-              await supabase
+              const { error: linkErr } = await supabase
                 .from('exam_candidates')
                 .update({ auth_user_id: user.id })
                 .eq('id', emailMatch.id);
-              candidateData.auth_user_id = user.id;
+              if (!linkErr) {
+                candidateData.auth_user_id = user.id;
+              } else {
+                console.warn("Could not auto-link auth_user_id:", linkErr.message);
+              }
             } catch (linkErr) {
               console.warn("Could not auto-link auth_user_id:", linkErr);
             }
@@ -491,8 +539,8 @@ export default function PortalDashboard() {
           education_level: candidateData.education_level || "bachelors"
         });
 
-        // Register this device session safely in background (non-blocking)
-        void registerSession(candidateData.id);
+        // Register this device session safely
+        await registerSession(candidateData.id);
 
         fetchDashboardData(candidateData.program_ids || [], candidateData.education_level || "bachelors", candidateData.id);
       }

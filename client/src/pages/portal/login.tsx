@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,25 @@ export default function PortalLogin() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // If user already has an active session, redirect straight to dashboard
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setLocation('/portal/dashboard');
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setLocation('/portal/dashboard');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [setLocation]);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
