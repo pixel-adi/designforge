@@ -121,6 +121,22 @@ export function Board92Day({ days, selectedDayNum, onSelectDay }: Board92DayProp
                         {d.weekday.slice(0, 3)} · {d.date.slice(5)}
                       </span>
 
+                      {/* Specific Topic / Milestone snippet */}
+                      <span className="text-[10px] text-[#262626] font-bold line-clamp-1 mt-0.5" title={d.title}>
+                        {(() => {
+                          if (d.title === 'Critique') return `Critique W${d.week}`;
+                          if (d.title === 'Rest and Sunday review') return `Sunday Review`;
+                          if (d.title.startsWith('Build:')) {
+                            const bTask = d.tasks.find(t => t.block === 'build');
+                            if (bTask) {
+                              const sub = bTask.title.includes(':') ? bTask.title.split(':')[1].trim() : bTask.title;
+                              return sub;
+                            }
+                          }
+                          return d.title;
+                        })()}
+                      </span>
+
                       {/* Markers */}
                       <div className="flex items-center gap-1 mt-1.5 min-h-[16px]">
                         {hasSimulation && (

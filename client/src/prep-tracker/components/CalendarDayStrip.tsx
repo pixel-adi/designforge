@@ -50,6 +50,12 @@ export function CalendarDayStrip({
   const [viewYear, setViewYear] = useState<number>(() => activeDateObj.getFullYear());
   const [viewMonth, setViewMonth] = useState<number>(() => activeDateObj.getMonth()); // 0-indexed
 
+  // Keep view in sync when selected day changes across months
+  React.useEffect(() => {
+    setViewYear(activeDateObj.getFullYear());
+    setViewMonth(activeDateObj.getMonth());
+  }, [activeDateObj]);
+
   // Format header month year (e.g. "October 2026")
   const monthYearLabel = useMemo(() => {
     const d = new Date(viewYear, viewMonth, 1);

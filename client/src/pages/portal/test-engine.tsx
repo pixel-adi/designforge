@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert, WifiOff, Lock, ClipboardList, Camera, Clipboard, Image as ImageIcon, Sparkles, CheckCircle2 } from "lucide-react";
+import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert, WifiOff, Lock, ClipboardList, Camera, Clipboard, Image as ImageIcon, Sparkles, CheckCircle2, PauseCircle, Play, Bookmark } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -72,6 +72,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   const testEndTimeRef = useRef<number | null>(null);
   const hasAutoSubmittedRef = useRef(false);
   const hasTransitionedPartBRef = useRef(false);
+
+  // Pause & Resume State (Max 2 resumes allowed)
+  const [isPaused, setIsPaused] = useState(false);
+  const [resumesUsed, setResumesUsed] = useState(0); // 0, 1, or 2
+  const [pausedAt, setPausedAt] = useState<number | null>(null);
+  const [totalPausedSecs, setTotalPausedSecs] = useState(0);
 
   // Network State
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -218,6 +224,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   // Tab switching detection (Only monitored during Part A for exams that strictly enforce timed Part A lockout)
   useEffect(() => {
     const handleVisibilityChange = () => {
+      // Malpractice check is suspended while examination is paused
+      if (isPaused) return;
+
       const isPartBActive = checkIsPartBActive(timeLeft);
       // Malpractice warning applies only during locked Part A mode (not during Part B or on NID tests where students upload sketches)
       if (document.hidden && testStep === 'test' && engineData?.hasTimedPartALock && !isPartBActive) {
@@ -239,12 +248,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [testStep, timeLeft, engineData]);
+  }, [testStep, timeLeft, engineData, isPaused]);
 
   // Active Question Time Tracker (Decoupled from timeLeft countdown to eliminate re-renders)
   useEffect(() => {
     let timerId: any;
-    if (timerRunning && testStep === 'test' && engineData?.questions?.[activeQuestionIndex]) {
+    if (timerRunning && !isPaused && testStep === 'test' && engineData?.questions?.[activeQuestionIndex]) {
       const activeQId = engineData.questions[activeQuestionIndex].id;
       timerId = setInterval(() => {
         // Accumulate in latestResponsesRef without triggering heavy component re-renders every 1000ms
@@ -276,14 +285,14 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       }, 1000);
     }
     return () => clearInterval(timerId);
-  }, [timerRunning, testStep, activeQuestionIndex, engineData]);
+  }, [timerRunning, isPaused, testStep, activeQuestionIndex, engineData]);
 
   // Wall-Clock Synchronized Timer Countdown (Guaranteed precision regardless of tab backgrounding or lag)
   useEffect(() => {
-    if (!timerRunning || !testEndTimeRef.current) return;
+    if (!timerRunning || isPaused || !testEndTimeRef.current) return;
 
     const checkAndTick = () => {
-      if (!testEndTimeRef.current) return;
+      if (isPaused || !testEndTimeRef.current) return;
       const now = Date.now();
       const remaining = Math.max(0, Math.round((testEndTimeRef.current - now) / 1000));
       setTimeLeft(remaining);
@@ -548,7 +557,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       // Fetch all existing attempts for this candidate + test
       const { data: existingAttempts } = await supabase
         .from('exam_attempts')
-        .select('id, status, attempt_number, start_time')
+        .select('*')
         .eq('candidate_id', candidate.id)
         .eq('test_id', id)
         .order('attempt_number', { ascending: true });
@@ -560,16 +569,32 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       if (inProgress) {
         const totalSecs = (engineData?.totalMins || 180) * 60;
         let remaining = totalSecs;
+
+        // Restore pause metadata
+        const storedResumes = (inProgress as any).pause_count ?? (Number(sessionStorage.getItem(`df_resumes_used_${inProgress.id}`)) || 0);
+        const storedTotalPaused = (inProgress as any).total_paused_seconds ?? (Number(sessionStorage.getItem(`df_total_paused_${inProgress.id}`)) || 0);
+        const isCurrentlyPaused = Boolean((inProgress as any).paused_at) || sessionStorage.getItem(`df_is_paused_${inProgress.id}`) === 'true';
+
+        setResumesUsed(storedResumes);
+        setTotalPausedSecs(storedTotalPaused);
+
         if (inProgress.start_time) {
           const startTimeMs = new Date(inProgress.start_time).getTime();
-          const elapsedSecs = Math.max(0, Math.floor((Date.now() - startTimeMs) / 1000));
+          let elapsedSecs = Math.max(0, Math.floor((Date.now() - startTimeMs) / 1000));
+          // Deduct paused time so student is not penalized for time spent while paused
+          elapsedSecs = Math.max(0, elapsedSecs - storedTotalPaused);
           remaining = Math.max(0, totalSecs - elapsedSecs);
         }
         testEndTimeRef.current = Date.now() + (remaining * 1000);
         sessionStorage.setItem(`df_test_end_${id}`, String(testEndTimeRef.current));
         setTimeLeft(remaining);
 
-        if (remaining <= 0) {
+        if (isCurrentlyPaused) {
+          setIsPaused(true);
+          setPausedAt(Date.now());
+        }
+
+        if (remaining <= 0 && !isCurrentlyPaused) {
           handleAutoSubmit("Your attempt duration has expired. Test submitted.");
         }
         return inProgress.id;
@@ -1068,33 +1093,210 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     });
   };
 
+  // Pause & Resume Handlers (Allowed maximum 2 resumes)
+  const handlePauseExam = async () => {
+    if (resumesUsed >= 2) {
+      toast({
+        title: "Pause Limit Reached",
+        description: "You have used both of your allowed 2 resumes for this examination.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const now = Date.now();
+    setIsPaused(true);
+    setPausedAt(now);
+
+    if (attemptId) {
+      sessionStorage.setItem(`df_is_paused_${attemptId}`, 'true');
+      sessionStorage.setItem(`df_paused_at_${attemptId}`, String(now));
+      sessionStorage.setItem(`df_resumes_used_${attemptId}`, String(resumesUsed));
+      sessionStorage.setItem(`df_total_paused_${attemptId}`, String(totalPausedSecs));
+
+      try {
+        await supabase.from('exam_attempts').update({
+          paused_at: new Date(now).toISOString(),
+          pause_count: resumesUsed,
+          total_paused_seconds: totalPausedSecs
+        }).eq('id', attemptId);
+      } catch (e) {
+        // Defensive fallback
+      }
+    }
+
+    toast({
+      title: "Exam Paused ⏸️",
+      description: `Timer frozen. You have ${2 - resumesUsed} resume${2 - resumesUsed === 1 ? '' : 's'} remaining.`,
+      duration: 4000
+    });
+  };
+
+  const handleResumeExam = async () => {
+    if (!isPaused) return;
+
+    const now = Date.now();
+    const pauseStart = pausedAt || now;
+    const pausedDurationMs = Math.max(0, now - pauseStart);
+    const addedSecs = Math.round(pausedDurationMs / 1000);
+    const newTotalPaused = totalPausedSecs + addedSecs;
+    const newResumesUsed = resumesUsed + 1;
+
+    // Adjust test end time by the paused duration so no time is lost
+    if (testEndTimeRef.current) {
+      testEndTimeRef.current += pausedDurationMs;
+      sessionStorage.setItem(`df_test_end_${id}`, String(testEndTimeRef.current));
+    }
+
+    setIsPaused(false);
+    setPausedAt(null);
+    setTotalPausedSecs(newTotalPaused);
+    setResumesUsed(newResumesUsed);
+
+    if (attemptId) {
+      sessionStorage.removeItem(`df_is_paused_${attemptId}`);
+      sessionStorage.removeItem(`df_paused_at_${attemptId}`);
+      sessionStorage.setItem(`df_resumes_used_${attemptId}`, String(newResumesUsed));
+      sessionStorage.setItem(`df_total_paused_${attemptId}`, String(newTotalPaused));
+
+      try {
+        await supabase.from('exam_attempts').update({
+          paused_at: null,
+          pause_count: newResumesUsed,
+          total_paused_seconds: newTotalPaused
+        }).eq('id', attemptId);
+      } catch (e) {
+        // Defensive fallback
+      }
+    }
+
+    toast({
+      title: "Exam Resumed ▶",
+      description: `Timer resumed. You have ${2 - newResumesUsed} resume${2 - newResumesUsed === 1 ? '' : 's'} remaining.`,
+      duration: 4000
+    });
+  };
+
   const handleMarkForReview = () => {
-    const qId = engineData!.questions[activeQuestionIndex].id;
-    setResponses(prev => ({
-      ...prev,
-      [qId]: { ...prev[qId], status: 'marked' }
-    }));
+    if (!engineData?.questions?.[activeQuestionIndex]) return;
+    const qId = engineData.questions[activeQuestionIndex].id;
+    let isNowMarked = false;
+
+    setResponses(prev => {
+      const current = prev[qId] || {
+        status: 'unseen',
+        selectedOptions: [],
+        answerText: '',
+        fileUrl: '',
+        timeSpent: 0,
+        answerChanges: 0,
+        stateTransitions: []
+      };
+
+      const hasAnswer = (current.selectedOptions?.length || 0) > 0 || (current.answerText?.trim() || '') !== '' || (current.fileUrl || '') !== '';
+      const isCurrentlyMarked = current.status === 'marked';
+      isNowMarked = !isCurrentlyMarked;
+      const nextStatus: QuestionStatus = isCurrentlyMarked
+        ? (hasAnswer ? 'answered' : 'visited')
+        : 'marked';
+
+      const updated: ResponseData = {
+        ...current,
+        status: nextStatus,
+        stateTransitions: [
+          ...(current.stateTransitions || []),
+          { action: nextStatus, timestamp: new Date().toISOString() }
+        ]
+      };
+
+      latestResponsesRef.current[qId] = updated;
+
+      if (attemptId) {
+        try {
+          const stored = { ...prev, [qId]: updated };
+          localStorage.setItem(`df_attempt_${attemptId}`, JSON.stringify(stored));
+        } catch (e) {}
+
+        supabase.from('exam_responses').upsert({
+          attempt_id: attemptId,
+          question_id: qId,
+          status: nextStatus,
+          selected_options: updated.selectedOptions,
+          answer_text: updated.answerText || null,
+          file_url: updated.fileUrl || null,
+          time_spent: latestResponsesRef.current[qId]?.timeSpent ?? updated.timeSpent ?? 0,
+          answer_changes: updated.answerChanges || 0,
+          state_transitions: updated.stateTransitions || []
+        }, { onConflict: 'attempt_id,question_id' }).then(({ error }) => {
+          if (error) console.warn("Mark save warning:", error);
+        });
+      }
+
+      return {
+        ...prev,
+        [qId]: updated
+      };
+    });
+
+    toast({
+      title: isNowMarked ? 'Question Marked for Review 🔖' : 'Question Unmarked',
+      description: isNowMarked
+        ? 'Question highlighted in purple on the palette for review before submission.'
+        : 'Question returned to standard status.',
+      duration: 2500
+    });
 
     // Auto-advance
-    if (activeQuestionIndex < engineData!.questions.length - 1) {
+    if (activeQuestionIndex < engineData.questions.length - 1) {
       handleNavigateQuestion(activeQuestionIndex + 1);
     }
   };
 
   const handleSaveAndNext = () => {
-    const qId = engineData!.questions[activeQuestionIndex].id;
+    if (!engineData?.questions?.[activeQuestionIndex]) return;
+    const qId = engineData.questions[activeQuestionIndex].id;
 
-    // If it was marked, hitting save removes the marked status if there's an answer
     setResponses(prev => {
       const r = prev[qId];
-      const hasAnswer = r.selectedOptions.length > 0 || r.answerText.trim() !== '' || r.fileUrl !== '';
+      const hasAnswer = (r?.selectedOptions?.length || 0) > 0 || (r?.answerText?.trim() || '') !== '' || (r?.fileUrl || '') !== '';
+      const nextStatus: QuestionStatus = r?.status === 'marked' ? 'marked' : (hasAnswer ? 'answered' : 'visited');
+      const updated: ResponseData = {
+        ...(r || {
+          status: 'unseen',
+          selectedOptions: [],
+          answerText: '',
+          fileUrl: '',
+          timeSpent: 0,
+          answerChanges: 0,
+          stateTransitions: []
+        }),
+        status: nextStatus
+      };
+      latestResponsesRef.current[qId] = updated;
+
+      if (attemptId) {
+        supabase.from('exam_responses').upsert({
+          attempt_id: attemptId,
+          question_id: qId,
+          status: nextStatus,
+          selected_options: updated.selectedOptions,
+          answer_text: updated.answerText || null,
+          file_url: updated.fileUrl || null,
+          time_spent: latestResponsesRef.current[qId]?.timeSpent ?? updated.timeSpent ?? 0,
+          answer_changes: updated.answerChanges || 0,
+          state_transitions: updated.stateTransitions || []
+        }, { onConflict: 'attempt_id,question_id' }).then(({ error }) => {
+          if (error) console.warn("Save response warning:", error);
+        });
+      }
+
       return {
         ...prev,
-        [qId]: { ...r, status: hasAnswer ? 'answered' : 'visited' }
+        [qId]: updated
       };
     });
 
-    if (activeQuestionIndex < engineData!.questions.length - 1) {
+    if (activeQuestionIndex < engineData.questions.length - 1) {
       handleNavigateQuestion(activeQuestionIndex + 1);
     }
   };
@@ -1391,6 +1593,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           {groups[groupName].map(({ q, idx }) => {
             const status = responses[q.id]?.status || 'unseen';
             const isPartALocked = engineData.hasTimedPartALock && q.part === 'A' && checkIsPartBActive(timeLeft) && testStep !== 'review';
+            const isMarked = status === 'marked';
+            const hasAnswer = (responses[q.id]?.selectedOptions?.length || 0) > 0 || 
+                              (responses[q.id]?.answerText?.trim() || '') !== '' || 
+                              (responses[q.id]?.fileUrl || '') !== '';
             let bgClass = "bg-white border-black/20 text-foreground/70 hover:bg-black/5"; // unseen default
 
             if (isPartALocked) {
@@ -1406,8 +1612,14 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               }
             } else {
               if (status === 'visited') bgClass = "bg-red-50 border-red-200 text-red-600";
-              if (status === 'answered') bgClass = "bg-green-100 border-green-200 text-green-700";
-              if (status === 'marked') bgClass = "bg-purple-100 border-purple-200 text-purple-700";
+              if (status === 'answered') bgClass = "bg-green-100 border-green-300 text-green-800 font-bold";
+              if (isMarked) {
+                if (hasAnswer) {
+                  bgClass = "bg-purple-100 border-purple-400 text-purple-800 font-extrabold";
+                } else {
+                  bgClass = "bg-purple-50 border-purple-300 text-purple-700 font-bold";
+                }
+              }
             }
 
             const isActive = idx === activeQuestionIndex;
@@ -1421,6 +1633,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                     ? "Part A is locked" 
                     : testStep === 'review'
                     ? `Question ${idx + 1}: ${questionCorrectness[q.id] === 'correct' ? 'Correct (+' + (questionScores[q.id] || 0) + ' Marks)' : questionCorrectness[q.id] === 'incorrect' ? 'Incorrect (' + (questionScores[q.id] || 0) + ' Marks)' : 'Unattempted (0 Marks)'}`
+                    : isMarked && hasAnswer
+                    ? `Question ${idx + 1}: Answered & Marked for Review`
+                    : isMarked
+                    ? `Question ${idx + 1}: Marked for Review`
                     : `Question ${idx + 1}`
                 }
                 className={`relative h-8 rounded-lg border flex flex-col items-center justify-center text-xs font-bold transition-all ${bgClass} ${isActive ? 'ring-2 ring-primary ring-offset-1 scale-105 shadow-sm' : ''}`}
@@ -1428,7 +1644,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                 {isPartALocked ? (
                   <Lock className="w-3 h-3 text-gray-400" />
                 ) : (
-                  <span>{idx + 1}</span>
+                  <>
+                    <span>{idx + 1}</span>
+                    {isMarked && hasAnswer && (
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white shadow-2xs" title="Answered & Marked for Review" />
+                    )}
+                  </>
                 )}
               </button>
             );
@@ -1771,6 +1992,18 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               <Clock className="w-4 h-4" />
               {formatTime(timeLeft)}
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePauseExam}
+              disabled={resumesUsed >= 2 || isPaused}
+              className="rounded-full px-4 h-9 font-bold border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+              title={resumesUsed >= 2 ? "All 2 resumes used" : `Pause examination (${2 - resumesUsed} resume${2 - resumesUsed === 1 ? '' : 's'} remaining)`}
+            >
+              <PauseCircle className="w-4 h-4" />
+              <span className="hidden sm:inline">Pause</span>
+              <span className="text-[10px] bg-amber-200/80 px-1.5 py-0.2 rounded-full font-mono">{2 - resumesUsed}</span>
+            </Button>
             <Button variant="destructive" onClick={() => openSubmitModal('submit')} className="rounded-full px-6 font-bold shadow-sm">
               Submit Test
             </Button>
@@ -1787,6 +2020,46 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         {/* Left Side: Question Area */}
         {currentQ && currentResponse ? (
           <div className="flex-1 bg-white rounded-2xl border border-black/5 shadow-sm px-8 pt-6 pb-4 flex flex-col min-h-0 relative">
+            {/* Pause Screen Overlay */}
+            {isPaused && (
+              <div className="absolute inset-0 z-50 bg-white/98 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center rounded-2xl border border-black/10 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+                <div className="w-20 h-20 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mb-6 shadow-sm">
+                  <PauseCircle className="w-10 h-10 text-amber-600" />
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 mb-3">
+                  Examination Temporarily Paused
+                </span>
+                <h2 className="text-2xl font-black text-[#262626] mb-2">Timer Frozen & Questions Hidden</h2>
+                <p className="text-sm text-foreground/60 max-w-md mb-6 leading-relaxed">
+                  Your countdown timer is paused at <span className="font-mono font-bold text-[#262626]">{formatTime(timeLeft)}</span>. Anti-malpractice monitoring is suspended while paused.
+                </p>
+
+                <div className="bg-[#f8fafc] border border-black/10 rounded-xl p-4 max-w-sm w-full mb-6 text-left space-y-2">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-foreground/60">Resumes Allowed:</span>
+                    <span className="text-[#262626]">Maximum 2</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-foreground/60">Resumes Used:</span>
+                    <span className="text-amber-700">{resumesUsed} of 2</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs font-extrabold border-t border-black/5 pt-2">
+                    <span className="text-foreground/70">Remaining Resumes:</span>
+                    <span className={`px-2 py-0.5 rounded text-[11px] ${2 - resumesUsed > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {2 - resumesUsed} Remaining
+                    </span>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleResumeExam}
+                  className="bg-primary hover:bg-primary/90 text-white font-extrabold px-10 py-6 text-base rounded-xl shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <Play className="w-5 h-5 fill-white" />
+                  Resume Examination
+                </Button>
+              </div>
+            )}
             <div className="flex justify-between items-center mb-4 border-b border-black/5 pb-4 shrink-0">
               <div className="flex gap-2 items-center flex-wrap">
                 <span className="bg-primary/10 text-primary px-3 py-1 rounded text-sm font-bold">
@@ -2145,8 +2418,17 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               </Button>
               <div className="flex gap-3">
                 {testStep !== 'review' && (
-                  <Button variant="outline" onClick={handleMarkForReview} className="border-purple-200 text-purple-700 hover:bg-purple-50 shadow-sm font-bold">
-                    Mark for Review & Next
+                  <Button
+                    variant="outline"
+                    onClick={handleMarkForReview}
+                    className={`font-bold shadow-sm transition-all ${
+                      currentResponse?.status === 'marked'
+                        ? 'border-purple-400 text-purple-800 bg-purple-100 hover:bg-purple-200'
+                        : 'border-purple-200 text-purple-700 hover:bg-purple-50'
+                    }`}
+                  >
+                    <Bookmark className={`w-3.5 h-3.5 mr-1.5 ${currentResponse?.status === 'marked' ? 'fill-purple-700' : ''}`} />
+                    {currentResponse?.status === 'marked' ? 'Unmark Question' : 'Mark for Review & Next'}
                   </Button>
                 )}
                 <Button onClick={testStep === 'review' ? () => handleNavigateQuestion(Math.min(totalQuestions - 1, activeQuestionIndex + 1)) : handleSaveAndNext} disabled={activeQuestionIndex === totalQuestions - 1} className="bg-primary text-white hover:bg-primary/90 px-8 shadow-md font-bold">
@@ -2171,11 +2453,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           </div>
 
           <div className="mt-auto pt-4 border-t border-black/5 shrink-0">
-            <div className="grid grid-cols-2 gap-x-2 gap-y-3">
-              <div className="flex items-center gap-2 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-green-100 border border-green-200 text-green-700">3</div> Answered</div>
-              <div className="flex items-center gap-2 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-red-50 border border-red-200 text-red-600">2</div> Not Answered</div>
-              <div className="flex items-center gap-2 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-purple-100 border border-purple-200 text-purple-700">4</div> Marked</div>
-              <div className="flex items-center gap-2 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center border border-black/20 bg-white">1</div> Not Visited</div>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-2.5">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-green-100 border border-green-300 text-green-700">✓</div> Answered</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-red-50 border border-red-200 text-red-600">✕</div> Not Answered</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-purple-50 border border-purple-200 text-purple-700">★</div> Marked</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="relative w-4 h-4 rounded flex items-center justify-center bg-purple-100 border border-purple-400 text-purple-800 font-bold">★<span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full" /></div> Ans & Marked</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70 col-span-2"><div className="w-4 h-4 rounded flex items-center justify-center border border-black/20 bg-white">○</div> Not Visited</div>
             </div>
           </div>
         </div>
@@ -2198,7 +2481,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-start gap-3 my-4">
             <AlertCircle className="w-5 h-5 text-primary shrink-0" />
             <div className="text-sm font-bold text-primary">
-              Answered: {Object.values(responses).filter(r => r.status === 'answered').length} / {totalQuestions}
+              Answered: {Object.values(responses).filter(r => r.status === 'answered' || (r.status === 'marked' && (r.selectedOptions?.length || r.answerText || r.fileUrl))).length} / {totalQuestions}
             </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-3 sm:space-x-0 mt-2">
@@ -2206,8 +2489,17 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               Cancel
             </Button>
             {modalType === 'exit' && (
-              <Button variant="outline" onClick={() => setLocation('/portal/dashboard')} className="w-full font-bold border-orange-200 text-orange-600 hover:bg-orange-50">
-                Resume Later
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  if (resumesUsed < 2) {
+                    await handlePauseExam();
+                  }
+                  setLocation('/portal/dashboard');
+                }}
+                className="w-full font-bold border-orange-200 text-orange-600 hover:bg-orange-50"
+              >
+                {resumesUsed < 2 ? `Pause & Resume Later (${2 - resumesUsed} left)` : 'Exit to Dashboard'}
               </Button>
             )}
             <Button onClick={confirmSubmit} className="w-full font-bold bg-primary text-white hover:bg-primary/90">

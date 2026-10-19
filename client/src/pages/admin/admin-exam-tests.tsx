@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ClipboardList, PlusCircle, CheckCircle2, Search, ArrowLeft, Loader2, FileText, Clock, Trash2, Filter, Settings, Wand2, RefreshCw, FileDown, Zap, Plus, Sparkles, Upload, Image as ImageIcon, AlertCircle, Check } from "lucide-react";
+import { ClipboardList, PlusCircle, CheckCircle2, Search, ArrowLeft, Loader2, FileText, Clock, Trash2, Filter, Settings, Wand2, RefreshCw, FileDown, Zap, Plus, Sparkles, Upload, Image as ImageIcon, AlertCircle, Check, CalendarPlus, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -133,6 +133,69 @@ export default function AdminExamTests() {
   const [quickGenDiff, setQuickGenDiff] = useState("Medium");
   const [quickGenSource, setQuickGenSource] = useState<"all" | "pyq_only">("all");
   const [quickGenExamTag, setQuickGenExamTag] = useState<string>("ALL");
+
+  // Quick Extend Expiry Modal State (Admin list quick action)
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
+  const [testToExtend, setTestToExtend] = useState<any | null>(null);
+  const [extendPresetDays, setExtendPresetDays] = useState<number | 'custom' | 'clear'>(7);
+  const [customExtendDate, setCustomExtendDate] = useState("");
+  const [extendingExpiry, setExtendingExpiry] = useState(false);
+
+  const openExtendModal = (test: any) => {
+    setTestToExtend(test);
+    setExtendPresetDays(7);
+    const base = test.expires_at ? new Date(test.expires_at).getTime() : Date.now();
+    const plusWeek = new Date(base + 7 * 24 * 60 * 60 * 1000);
+    setCustomExtendDate(plusWeek.toISOString().slice(0, 16));
+    setExtendModalOpen(true);
+  };
+
+  const handleConfirmExtendExpiry = async () => {
+    if (!testToExtend) return;
+    setExtendingExpiry(true);
+
+    try {
+      let finalExpiresAt: string | null = null;
+      if (extendPresetDays === 'clear') {
+        finalExpiresAt = null;
+      } else if (extendPresetDays === 'custom') {
+        finalExpiresAt = customExtendDate ? new Date(customExtendDate).toISOString() : null;
+      } else {
+        const base = testToExtend.expires_at ? new Date(testToExtend.expires_at).getTime() : Date.now();
+        finalExpiresAt = new Date(base + (Number(extendPresetDays) || 7) * 24 * 60 * 60 * 1000).toISOString();
+      }
+
+      const { error } = await supabase
+        .from('exam_tests')
+        .update({ expires_at: finalExpiresAt })
+        .eq('id', testToExtend.id);
+
+      if (error) throw error;
+
+      // Update local state in tests list
+      setTests(prev => prev.map(t => t.id === testToExtend.id ? { ...t, expires_at: finalExpiresAt } : t));
+
+      const formattedLabel = finalExpiresAt
+        ? new Date(finalExpiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : 'Removed (No Expiry)';
+
+      toast({
+        title: "Test Expiry Updated! ⏰",
+        description: `New deadline for "${testToExtend.title}": ${formattedLabel}`,
+      });
+
+      setExtendModalOpen(false);
+      setTestToExtend(null);
+    } catch (err: any) {
+      toast({
+        title: "Failed to Extend Expiry",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setExtendingExpiry(false);
+    }
+  };
 
   // Helper to resolve the active template
   const getActiveTemplate = () => {
@@ -1241,6 +1304,12 @@ export default function AdminExamTests() {
                       🎯 Focus Batch (1-Wk)
                     </span>
                   )}
+                  {test.expires_at && (
+                    <span className="bg-amber-50 text-amber-800 text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 border border-amber-200 inline-flex items-center gap-1">
+                      <Calendar className="w-2.5 h-2.5" />
+                      Exp: {new Date(test.expires_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    </span>
+                  )}
                 </div>
                 <div className="col-span-2">
                   {test.category === 'half_length' ? (
@@ -1265,12 +1334,22 @@ export default function AdminExamTests() {
                     {test.status.toUpperCase()}
                   </span>
                 </div>
-                <div className="col-span-2 flex justify-end gap-2">
+                <div className="col-span-2 flex justify-end gap-1.5 flex-wrap">
                   {test.status === 'published' && (
                     <Button variant="outline" size="sm" onClick={() => downloadAnswerKey(test.id, testTitle || test.title)} className="h-8 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200" title="Download Answer Key">
                       <FileDown className="w-4 h-4" />
                     </Button>
                   )}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => openExtendModal(test)} 
+                    className="h-8 text-amber-700 hover:text-amber-800 hover:bg-amber-50 border-amber-200 gap-1 text-xs px-2 font-medium" 
+                    title="Extend Test Expiry (+1 Week / Custom)"
+                  >
+                    <CalendarPlus className="w-3.5 h-3.5" />
+                    <span className="hidden xl:inline">+1 Wk</span>
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => handleEditTest(test.id)} className="h-8 text-primary hover:text-primary hover:bg-primary/5 border-primary/20">
                     <Settings className="w-4 h-4" />
                   </Button>
@@ -1386,6 +1465,160 @@ export default function AdminExamTests() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Quick Extend Test Expiry Dialog */}
+      <Dialog open={extendModalOpen} onOpenChange={setExtendModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
+                <CalendarPlus className="w-4 h-4" />
+              </span>
+              Extend Test Expiry
+            </DialogTitle>
+            <DialogDescription className="text-xs text-foreground/60">
+              Quickly extend or adjust the access window for this test without opening the full builder.
+            </DialogDescription>
+          </DialogHeader>
+
+          {testToExtend && (
+            <div className="space-y-4 py-2">
+              <div className="p-3 bg-muted/40 rounded-xl border border-black/5 space-y-1">
+                <p className="text-xs text-foreground/50 font-semibold uppercase tracking-wider">Test</p>
+                <p className="text-sm font-bold text-[#262626] line-clamp-1">{testToExtend.title}</p>
+                <div className="flex items-center gap-2 pt-1 text-xs">
+                  <span className="text-foreground/50">Current Expiry:</span>
+                  {testToExtend.expires_at ? (
+                    <span className="font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                      {new Date(testToExtend.expires_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground font-medium italic">No expiry set (Open indefinitely)</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-foreground/70">Select Extension</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExtendPresetDays(7)}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      extendPresetDays === 7 
+                        ? 'border-primary bg-primary/5 ring-2 ring-primary/20 font-bold text-primary' 
+                        : 'border-black/10 hover:border-black/20 text-foreground/80'
+                    }`}
+                  >
+                    <div className="text-xs font-bold flex items-center justify-between">
+                      <span>+1 Week</span>
+                      <span className="text-[10px] bg-primary/10 text-primary font-bold px-1.5 py-0.2 rounded">Recommended</span>
+                    </div>
+                    <div className="text-[11px] text-foreground/50 mt-0.5">+7 calendar days</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setExtendPresetDays(14)}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      extendPresetDays === 14 
+                        ? 'border-primary bg-primary/5 ring-2 ring-primary/20 font-bold text-primary' 
+                        : 'border-black/10 hover:border-black/20 text-foreground/80'
+                    }`}
+                  >
+                    <div className="text-xs font-bold">+2 Weeks</div>
+                    <div className="text-[11px] text-foreground/50 mt-0.5">+14 calendar days</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setExtendPresetDays(30)}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      extendPresetDays === 30 
+                        ? 'border-primary bg-primary/5 ring-2 ring-primary/20 font-bold text-primary' 
+                        : 'border-black/10 hover:border-black/20 text-foreground/80'
+                    }`}
+                  >
+                    <div className="text-xs font-bold">+30 Days</div>
+                    <div className="text-[11px] text-foreground/50 mt-0.5">+1 full month</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setExtendPresetDays('clear')}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      extendPresetDays === 'clear' 
+                        ? 'border-red-500 bg-red-50 ring-2 ring-red-200 font-bold text-red-700' 
+                        : 'border-black/10 hover:border-black/20 text-foreground/80'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-red-600">Clear Expiry</div>
+                    <div className="text-[11px] text-foreground/50 mt-0.5">Keep open indefinitely</div>
+                  </button>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setExtendPresetDays('custom')}
+                    className={`w-full p-2.5 rounded-xl border text-left transition-all ${
+                      extendPresetDays === 'custom' 
+                        ? 'border-primary bg-primary/5 ring-2 ring-primary/20 font-bold text-primary' 
+                        : 'border-black/10 hover:border-black/20 text-foreground/80'
+                    }`}
+                  >
+                    <div className="text-xs font-bold">Pick Custom Date & Time</div>
+                    <div className="text-[11px] text-foreground/50 mt-0.5">Specify an exact deadline</div>
+                  </button>
+                </div>
+
+                {extendPresetDays === 'custom' && (
+                  <div className="pt-2 animate-in fade-in duration-200">
+                    <Label className="text-xs font-semibold">Custom Expiry Date</Label>
+                    <Input
+                      type="datetime-local"
+                      value={customExtendDate}
+                      onChange={(e) => setCustomExtendDate(e.target.value)}
+                      className="mt-1 h-10 bg-white"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Calculated preview */}
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs flex items-center justify-between">
+                <span className="font-semibold text-amber-900">New Deadline:</span>
+                <span className="font-bold text-amber-950">
+                  {extendPresetDays === 'clear'
+                    ? 'No Expiry (Open Indefinitely)'
+                    : extendPresetDays === 'custom'
+                    ? (customExtendDate ? new Date(customExtendDate).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Select Date')
+                    : (() => {
+                        const base = testToExtend.expires_at ? new Date(testToExtend.expires_at).getTime() : Date.now();
+                        const next = new Date(base + (Number(extendPresetDays) || 7) * 24 * 60 * 60 * 1000);
+                        return next.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+                      })()
+                  }
+                </span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setExtendModalOpen(false)} disabled={extendingExpiry} className="rounded-xl h-10">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmExtendExpiry}
+              disabled={extendingExpiry}
+              className="gap-2 bg-primary hover:bg-primary/90 text-white rounded-xl h-10 px-5 shadow-md shadow-primary/20 font-semibold"
+            >
+              <CalendarPlus className="w-4 h-4" />
+              {extendingExpiry ? "Updating..." : "Save New Expiry"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     );
   };
@@ -1470,12 +1703,34 @@ export default function AdminExamTests() {
                 <span className="text-[11px] text-primary font-bold">Auto-Enforced 7-Day Window</span>
               )}
             </div>
-            <Input 
-              type="datetime-local" 
-              value={expiresAt} 
-              onChange={(e) => setExpiresAt(e.target.value)} 
-              className="mt-1 h-10 bg-white max-w-md" 
-            />
+            <div className="flex items-center gap-2 mt-1 max-w-md">
+              <Input 
+                type="datetime-local" 
+                value={expiresAt} 
+                onChange={(e) => setExpiresAt(e.target.value)} 
+                className="h-10 bg-white flex-1" 
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const base = expiresAt ? new Date(expiresAt).getTime() : Date.now();
+                  const next = new Date(base + 7 * 24 * 60 * 60 * 1000);
+                  const localIso = new Date(next.getTime() - next.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                  setExpiresAt(localIso);
+                  toast({
+                    title: "Deadline Extended by 1 Week",
+                    description: `New expiry set to ${next.toLocaleDateString('en-IN', { dateStyle: 'medium' })}`,
+                  });
+                }}
+                className="h-10 text-xs font-semibold whitespace-nowrap shrink-0 border-amber-300 text-amber-800 hover:bg-amber-50 gap-1"
+                title="Add 7 days from current expiry date"
+              >
+                <CalendarPlus className="w-3.5 h-3.5" />
+                +1 Week
+              </Button>
+            </div>
             {isFocusBatch && (
               <p className="text-[11px] text-foreground/50 mt-1">
                 ⏳ Students who do not complete this mock within this 7-day window will be marked as "Missed Deadline" to ensure rigorous cohort accountability.

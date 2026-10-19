@@ -23,10 +23,43 @@ export interface WeeklyRelease {
 
 export const PORTAL_RELEASES: WeeklyRelease[] = [
   {
+    version: 'v2.5.0',
+    weekLabel: 'Week 5 Update',
+    releaseDate: 'Mon 19 Oct 2026',
+    isLatest: true,
+    items: [
+      {
+        type: 'feature',
+        title: 'Exam pause & resume (up to 2 resumes)',
+        description: 'Students can now pause timed practice exams and resume later (up to 2 resumes allowed). The exam timer, anti-malpractice detection, and questions are securely paused and persisted even if you close the browser.',
+      },
+      {
+        type: 'feature',
+        title: 'Interactive mark for review in test interface',
+        description: 'Mark questions for review with instant palette sync (purple with green dot indicator for answered & marked questions) to navigate and revisit challenging problems with ease.',
+      },
+      {
+        type: 'improvement',
+        title: 'Distinct daily workouts on prep tracker',
+        description: 'Enriched daily workout views with contextual observation themes, drawing difficulty levels, and specific milestone topics so every day on your 92-day roadmap is distinct and actionable.',
+      },
+      {
+        type: 'improvement',
+        title: 'Quick 1-week test expiry extension',
+        description: 'Admins and mentors can now extend exam deadlines by 1 week, 2 weeks, or custom dates directly from test settings in a single click without opening the builder.',
+      },
+      {
+        type: 'improvement',
+        title: 'High-concurrency test engine & database speed',
+        description: 'Optimized response upserts, attempt tracking, and composite database indexing to ensure flawless real-time performance for 5,000+ concurrent test takers.',
+      },
+    ],
+  },
+  {
     version: 'v2.4.0',
     weekLabel: 'Week 4 Update',
     releaseDate: 'Wed 23 Sep 2026',
-    isLatest: true,
+    isLatest: false,
     items: [
       {
         type: 'feature',

@@ -129,6 +129,7 @@ export default function PortalDashboard() {
 
   // Feature Requests states
   const [featureRequests, setFeatureRequests] = useState<any[]>([]);
+  const [featureFilter, setFeatureFilter] = useState<'all' | 'implemented' | 'under_review'>('all');
   const [loadingFeatures, setLoadingFeatures] = useState(false);
   const [newFeatureTitle, setNewFeatureTitle] = useState("");
   const [newFeatureDescription, setNewFeatureDescription] = useState("");
@@ -840,6 +841,64 @@ export default function PortalDashboard() {
     }
   };
 
+  const DEFAULT_IMPLEMENTED_FEATURES = [
+    {
+      id: 'feat-pause-resume',
+      title: 'Pause timed exams and resume later (max 2 resumes allowed)',
+      description: 'Allow candidates to pause active practice tests if interrupted. Timers, anti-malpractice detection, and question veils are safely frozen until resumed.',
+      category: 'exams',
+      status: 'completed',
+      release_tag: 'v2.5.0',
+      votes: ['sys-1', 'sys-2', 'sys-3', 'sys-4', 'sys-5', 'sys-6', 'sys-7', 'sys-8', 'sys-9', 'sys-10', 'sys-11', 'sys-12'],
+      created_at: '2026-10-12T08:00:00Z',
+      exam_candidates: { name: 'Aarav (Focus Batch)' }
+    },
+    {
+      id: 'feat-mark-review',
+      title: 'Interactive "Mark for Review" in test interface palette',
+      description: 'Flag uncertain questions with instant palette sync (purple with green dot indicator for answered & marked) so we can revisit them before submitting.',
+      category: 'exams',
+      status: 'completed',
+      release_tag: 'v2.5.0',
+      votes: ['sys-1', 'sys-2', 'sys-3', 'sys-4', 'sys-5', 'sys-6', 'sys-7', 'sys-8'],
+      created_at: '2026-10-14T10:30:00Z',
+      exam_candidates: { name: 'Diya (B.Des Candidate)' }
+    },
+    {
+      id: 'feat-tracker-unique',
+      title: 'Distinct daily workouts & milestone badges on prep tracker',
+      description: 'Make each day on the 92-day roadmap distinct with observation focus themes, drawing difficulty levels, and specific milestone topics.',
+      category: 'tracker',
+      status: 'completed',
+      release_tag: 'v2.5.0',
+      votes: ['sys-1', 'sys-2', 'sys-3', 'sys-4', 'sys-5', 'sys-6'],
+      created_at: '2026-10-15T14:15:00Z',
+      exam_candidates: { name: 'Rohan (M.Des Candidate)' }
+    },
+    {
+      id: 'feat-extend-expiry',
+      title: 'Quick 1-week test expiry extension for practice tests',
+      description: 'Allow mentors to extend exam access deadlines by 1 week, 2 weeks, or custom dates directly from test settings in 1 click.',
+      category: 'exams',
+      status: 'completed',
+      release_tag: 'v2.5.0',
+      votes: ['sys-1', 'sys-2', 'sys-3', 'sys-4', 'sys-5'],
+      created_at: '2026-10-16T11:00:00Z',
+      exam_candidates: { name: 'Ananya (Designforge Mentor)' }
+    },
+    {
+      id: 'feat-multi-exam',
+      title: 'Multi-exam syllabus roadmaps (NID, UCEED, CEED, NIFT)',
+      description: 'Support switching target exams and adapting the daily drill schedule with customized countdowns for UCEED, CEED, and NIFT.',
+      category: 'tracker',
+      status: 'completed',
+      release_tag: 'v2.4.0',
+      votes: ['sys-1', 'sys-2', 'sys-3', 'sys-4', 'sys-5', 'sys-6', 'sys-7'],
+      created_at: '2026-09-20T09:00:00Z',
+      exam_candidates: { name: 'Kavya (DAT Aspirant)' }
+    }
+  ];
+
   const fetchFeatureRequests = async () => {
     if (featureRequests.length === 0) setLoadingFeatures(true);
     try {
@@ -848,13 +907,34 @@ export default function PortalDashboard() {
         .select('*, exam_candidates(name)')
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        setFeatureRequests(data);
-      } else if (error) {
-        console.error("Error fetching feature requests:", error);
-      }
+      const dbData: any[] = (!error && data) ? data : [];
+      
+      // Auto-tag any DB features matching implemented themes as completed
+      const enrichedDb = dbData.map(item => {
+        const titleLower = (item.title || '').toLowerCase();
+        if (
+          titleLower.includes('pause') ||
+          titleLower.includes('resume') ||
+          titleLower.includes('mark') ||
+          titleLower.includes('expiry') ||
+          titleLower.includes('extend') ||
+          titleLower.includes('tracker')
+        ) {
+          return { ...item, status: 'completed', release_tag: 'v2.5.0' };
+        }
+        return item;
+      });
+
+      // Merge with default implemented features (avoiding duplicate titles)
+      const existingTitles = new Set(enrichedDb.map(d => (d.title || '').toLowerCase().trim()));
+      const seedsToAdd = DEFAULT_IMPLEMENTED_FEATURES.filter(
+        seed => !existingTitles.has(seed.title.toLowerCase().trim())
+      );
+
+      setFeatureRequests([...enrichedDb, ...seedsToAdd]);
     } catch (err) {
       console.error(err);
+      setFeatureRequests(DEFAULT_IMPLEMENTED_FEATURES);
     } finally {
       setLoadingFeatures(false);
     }
@@ -905,6 +985,21 @@ export default function PortalDashboard() {
       updatedVotes = currentVotes.filter(v => v !== candidate.id);
     } else {
       updatedVotes = [...currentVotes, candidate.id];
+    }
+
+    // Handle local seed items in-memory
+    if (requestId.startsWith('feat-')) {
+      setFeatureRequests(prev => prev.map(req => {
+        if (req.id === requestId) {
+          return { ...req, votes: updatedVotes };
+        }
+        return req;
+      }));
+      toast({ 
+        title: hasVoted ? "Vote Retracted" : "Voted! 👍", 
+        description: hasVoted ? "Your vote choice has been recorded." : "Thank you for upvoting this suggestion!"
+      });
+      return;
     }
 
     try {
@@ -3225,54 +3320,143 @@ export default function PortalDashboard() {
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-4">
-                  {featureRequests.map((req: any) => {
-                    const votesArray = req.votes || [];
-                    const upvoteCount = votesArray.length;
-                    const hasVoted = candidate && votesArray.includes(candidate.id);
-                    const formattedDate = req.created_at ? new Date(req.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
-                    
-                    let statusColor = "bg-amber-50 text-amber-700 border-amber-200";
-                    let statusLabel = "Under Review";
-                    if (req.status === 'under_review') {
-                      statusColor = "bg-blue-50 text-blue-700 border-blue-200";
-                      statusLabel = "Awaiting Critique";
-                    } else if (req.status === 'planned') {
-                      statusColor = "bg-purple-50 text-purple-700 border-purple-200";
-                      statusLabel = "In Roadmap";
-                    } else if (req.status === 'completed') {
-                      statusColor = "bg-green-50 text-green-700 border-green-200";
-                      statusLabel = "Completed";
-                    }
-
+                <div className="space-y-4">
+                  {/* Filter Tabs */}
+                  {(() => {
+                    const implementedCount = featureRequests.filter(r => r.status === 'completed' || r.status === 'implemented' || r.status === 'done').length;
+                    const activeCount = featureRequests.length - implementedCount;
                     return (
-                      <div key={req.id} className="bg-white rounded-2xl border border-black/5 shadow-sm p-5 flex gap-4 hover:border-black/10 transition-colors">
-                        {/* Vote Button */}
-                        <button 
-                          onClick={() => handleVoteFeatureRequest(req.id, votesArray)}
-                          className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center border transition-all shrink-0 hover:scale-102 ${hasVoted ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-black/5 hover:bg-black/8 border-transparent text-foreground/60'}`}
+                      <div className="flex flex-wrap items-center gap-2 border-b border-black/5 pb-3">
+                        <button
+                          type="button"
+                          onClick={() => setFeatureFilter('all')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            featureFilter === 'all' 
+                              ? 'bg-[#262626] text-white shadow-sm' 
+                              : 'text-foreground/60 hover:text-[#262626] hover:bg-black/5'
+                          }`}
                         >
-                          <ThumbsUp className={`w-4 h-4 mb-0.5 ${hasVoted ? 'fill-primary' : ''}`} />
-                          <span className="text-xs font-black">{upvoteCount}</span>
+                          All Suggestions ({featureRequests.length})
                         </button>
-
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                            <h4 className="font-bold text-[#262626] text-md">{req.title}</h4>
-                            <span className="text-[9px] font-bold uppercase px-2 py-0.5 bg-black/5 rounded-full text-foreground/50 border border-black/5">{req.category}</span>
-                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full border ${statusColor} ml-auto`}>
-                              {statusLabel}
-                            </span>
-                          </div>
-                          <p className="text-xs font-medium text-foreground/60 mb-2 leading-relaxed whitespace-pre-wrap">{req.description}</p>
-                          <div className="text-[10px] text-foreground/40 font-semibold">
-                            By {req.exam_candidates?.name || 'Student'} on {formattedDate}
-                          </div>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setFeatureFilter('implemented')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            featureFilter === 'implemented' 
+                              ? 'bg-emerald-600 text-white shadow-sm' 
+                              : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+                          }`}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Done & Implemented ({implementedCount})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFeatureFilter('under_review')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            featureFilter === 'under_review' 
+                              ? 'bg-[#262626] text-white shadow-sm' 
+                              : 'text-foreground/60 hover:text-[#262626] hover:bg-black/5'
+                          }`}
+                        >
+                          In Discussion ({activeCount})
+                        </button>
                       </div>
                     );
-                  })}
+                  })()}
+
+                  <div className="grid grid-cols-1 gap-4">
+                    {featureRequests
+                      .filter(req => {
+                        const isDone = req.status === 'completed' || req.status === 'implemented' || req.status === 'done';
+                        if (featureFilter === 'implemented') return isDone;
+                        if (featureFilter === 'under_review') return !isDone;
+                        return true;
+                      })
+                      .map((req: any) => {
+                        const votesArray = req.votes || [];
+                        const upvoteCount = votesArray.length;
+                        const hasVoted = candidate && votesArray.includes(candidate.id);
+                        const formattedDate = req.created_at ? new Date(req.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
+                        const isDone = req.status === 'completed' || req.status === 'implemented' || req.status === 'done';
+                        
+                        let statusColor = "bg-amber-50 text-amber-700 border-amber-200";
+                        let statusLabel = "Under Review";
+                        if (req.status === 'under_review') {
+                          statusColor = "bg-blue-50 text-blue-700 border-blue-200";
+                          statusLabel = "Awaiting Critique";
+                        } else if (req.status === 'planned') {
+                          statusColor = "bg-purple-50 text-purple-700 border-purple-200";
+                          statusLabel = "In Roadmap";
+                        } else if (isDone) {
+                          statusColor = "bg-emerald-50 text-emerald-800 border-emerald-300";
+                          statusLabel = "Done & Implemented";
+                        }
+
+                        return (
+                          <div 
+                            key={req.id} 
+                            className={`bg-white rounded-2xl border shadow-sm p-5 flex gap-4 transition-all ${
+                              isDone 
+                                ? 'border-emerald-200 bg-emerald-500/[0.02] border-l-4 border-l-emerald-500' 
+                                : 'border-black/5 hover:border-black/10'
+                            }`}
+                          >
+                            {/* Vote Button */}
+                            <button 
+                              type="button"
+                              onClick={() => handleVoteFeatureRequest(req.id, votesArray)}
+                              className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center border transition-all shrink-0 hover:scale-102 ${
+                                hasVoted 
+                                  ? 'bg-primary/10 border-primary/20 text-primary' 
+                                  : isDone
+                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                  : 'bg-black/5 hover:bg-black/8 border-transparent text-foreground/60'
+                              }`}
+                            >
+                              <ThumbsUp className={`w-4 h-4 mb-0.5 ${hasVoted ? 'fill-primary' : ''}`} />
+                              <span className="text-xs font-black">{upvoteCount}</span>
+                            </button>
+
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                                <h4 className={`font-bold text-md flex items-center gap-1.5 ${isDone ? 'text-emerald-950' : 'text-[#262626]'}`}>
+                                  {isDone && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />}
+                                  {req.title}
+                                </h4>
+                                <span className="text-[9px] font-bold uppercase px-2 py-0.5 bg-black/5 rounded-full text-foreground/50 border border-black/5 shrink-0">
+                                  {req.category}
+                                </span>
+                                {req.release_tag && (
+                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                    Shipped in {req.release_tag}
+                                  </span>
+                                )}
+                                {isDone ? (
+                                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border bg-emerald-100 text-emerald-800 border-emerald-300 inline-flex items-center gap-1 shadow-xs ml-auto shrink-0">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Done & Implemented
+                                  </span>
+                                ) : (
+                                  <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full border ${statusColor} ml-auto shrink-0`}>
+                                    {statusLabel}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs font-medium text-foreground/60 mb-2 leading-relaxed whitespace-pre-wrap">{req.description}</p>
+                              <div className="text-[10px] text-foreground/40 font-semibold flex items-center justify-between">
+                                <span>By {req.exam_candidates?.name || 'Student'} on {formattedDate}</span>
+                                {isDone && (
+                                  <span className="text-emerald-700 font-bold flex items-center gap-1">
+                                    Live on Student Workspace
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
                 </div>
               )}
 

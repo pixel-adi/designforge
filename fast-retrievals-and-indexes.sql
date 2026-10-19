@@ -20,6 +20,13 @@ $$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public;
 GRANT EXECUTE ON FUNCTION private.prep_is_owner(UUID) TO authenticated, postgres, service_role;
 
 
+-- 1B. EXAM ATTEMPTS PAUSE AND RESUME SCHEMA EXTENSION
+ALTER TABLE public.exam_attempts
+  ADD COLUMN IF NOT EXISTS pause_count INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_paused_seconds INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS paused_at TIMESTAMPTZ DEFAULT NULL;
+
+
 -- 2. HIGH-CONCURRENCY COMPOSITE INDEXES (HOT QUERY PATHS)
 
 -- A. Fast lookup for candidate attempts by status & date (Dashboard / Results tab)
@@ -53,6 +60,10 @@ CREATE INDEX IF NOT EXISTS idx_prep_comp_cand_task
 
 CREATE INDEX IF NOT EXISTS idx_prep_sim_cand_date
   ON public.prep_simulation_logs(candidate_id, date DESC);
+
+-- G. Feature Requests Board fast index
+CREATE INDEX IF NOT EXISTS idx_exam_feature_requests_created_status
+  ON public.exam_feature_requests(status, created_at DESC);
 
 
 -- 3. REFRESH POSTGRES PLANNER STATISTICS

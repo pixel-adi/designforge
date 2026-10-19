@@ -64,6 +64,51 @@ export function TodayDayView({
     year: 'numeric',
   });
 
+  // Contextual enriched day title so different days never look identical
+  const enrichedDayTitle = (() => {
+    const raw = day.title;
+    if (raw === 'Critique') {
+      return `Week ${day.week} Critique & Studio Review`;
+    }
+    if (raw === 'Rest and Sunday review') {
+      return `Week ${day.week} Sunday Review & Weekly Reflection`;
+    }
+    if (raw === 'Drill and weak-axis work') {
+      return `Week ${day.week} Drill & Targeted Weak-Axis Work`;
+    }
+    if (raw.startsWith('Build:')) {
+      const buildTask = day.tasks.find(t => t.block === 'build');
+      if (buildTask) {
+        if (buildTask.title.includes(':')) {
+          const sub = buildTask.title.split(':')[1].trim();
+          return `Build: ${sub.charAt(0).toUpperCase() + sub.slice(1)}`;
+        }
+        return `Build: ${buildTask.title}`;
+      }
+    }
+    return raw;
+  })();
+
+  // Helper to extract specific theme from task detail
+  const getTaskFocusLabel = (task: ResolvedTask) => {
+    if (task.block === 'drill' || task.title.toLowerCase().includes('daily drill')) {
+      const mTheme = task.detail.match(/this week on [‘'](.*?)['’]/i);
+      const mDraw = task.detail.match(/Drawing (L\d+[^,.]*)/i);
+      const theme = mTheme ? mTheme[1] : '';
+      const draw = mDraw ? mDraw[1] : '';
+      const parts = [theme, draw].filter(Boolean);
+      if (parts.length > 0) return parts.join(' · ');
+      if (task.title.toLowerCase().includes('lighter')) return 'Taper & Consolidation';
+    }
+    if (task.block === 'critique') {
+      return `Week ${day.week} Output Review`;
+    }
+    if (task.block === 'sunday_review') {
+      return `Week ${day.week} Written Audit`;
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-6">
       {/* Day Header Bar */}
@@ -87,7 +132,7 @@ export function TodayDayView({
               </span>
             )}
           </div>
-          <h2 className="text-xl font-extrabold text-[#262626] mt-1.5">{day.title}</h2>
+          <h2 className="text-xl font-extrabold text-[#262626] mt-1.5">{enrichedDayTitle}</h2>
           <p className="text-xs text-foreground/60">{formattedDate}</p>
         </div>
 
@@ -213,13 +258,23 @@ export function TodayDayView({
                       )}
                     </div>
 
-                    <h3
-                      className={`text-base font-bold text-[#262626] ${
-                        task.completed ? 'line-through text-foreground/50' : ''
-                      }`}
-                    >
-                      {task.title}
-                    </h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3
+                        className={`text-base font-bold text-[#262626] ${
+                          task.completed ? 'line-through text-foreground/50' : ''
+                        }`}
+                      >
+                        {task.title}
+                      </h3>
+                      {(() => {
+                        const taskFocus = getTaskFocusLabel(task);
+                        return taskFocus ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+                            🎯 {taskFocus}
+                          </span>
+                        ) : null;
+                      })()}
+                    </div>
 
                     <p className="text-xs text-foreground/70 leading-relaxed max-w-3xl">
                       {task.detail}
