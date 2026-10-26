@@ -28,40 +28,59 @@ export interface AISettings {
  * Fetch AI configuration from system_settings (OpenAI & Gemini)
  */
 export async function getAISettings(): Promise<AISettings> {
+  let openaiKey = "";
+  let openaiModel = "gpt-4o-mini";
+  let geminiKey = "";
+  let geminiModel = "gemini-flash-latest";
+  let provider: "openai" | "gemini" = "openai";
+
+  // Check localStorage first
+  try {
+    if (typeof window !== "undefined") {
+      const localOpenaiKey = localStorage.getItem("df_openai_api_key");
+      if (localOpenaiKey) openaiKey = localOpenaiKey;
+      const localOpenaiModel = localStorage.getItem("df_openai_api_model");
+      if (localOpenaiModel) openaiModel = localOpenaiModel;
+      const localGeminiKey = localStorage.getItem("df_gemini_api_key");
+      if (localGeminiKey) geminiKey = localGeminiKey;
+      const localGeminiModel = localStorage.getItem("df_gemini_api_model");
+      if (localGeminiModel) geminiModel = localGeminiModel;
+      const localProvider = localStorage.getItem("df_ai_provider") as "openai" | "gemini" | null;
+      if (localProvider) provider = localProvider;
+    }
+  } catch (e) {}
+
   try {
     const { data } = await supabase
       .from("system_settings")
       .select("key, value");
 
-    const openaiKey = data?.find(d => d.key === "openai_api_key")?.value || "";
-    const openaiModel = data?.find(d => d.key === "openai_api_model")?.value || "gpt-4o-mini";
-    const geminiKey = data?.find(d => d.key === "gemini_api_key")?.value || "";
-    let geminiModel = data?.find(d => d.key === "gemini_api_model")?.value || "gemini-flash-latest";
-
-    if (geminiModel.startsWith("gemini-1.5") || geminiModel === "gemini-2.5-flash") {
-      geminiModel = "gemini-flash-latest";
-    }
+    const dbOpenai = data?.find(d => d.key === "openai_api_key")?.value;
+    if (dbOpenai) openaiKey = dbOpenai;
+    const dbOpenaiModel = data?.find(d => d.key === "openai_api_model")?.value;
+    if (dbOpenaiModel) openaiModel = dbOpenaiModel;
+    const dbGemini = data?.find(d => d.key === "gemini_api_key")?.value;
+    if (dbGemini) geminiKey = dbGemini;
+    const dbGeminiModel = data?.find(d => d.key === "gemini_api_model")?.value;
+    if (dbGeminiModel) geminiModel = dbGeminiModel;
 
     const explicitProvider = data?.find(d => d.key === "ai_evaluation_provider")?.value as "openai" | "gemini" | undefined;
-    const provider: "openai" | "gemini" = explicitProvider || (openaiKey ? "openai" : "gemini");
-
-    return {
-      provider,
-      openaiKey,
-      openaiModel,
-      geminiKey,
-      geminiModel
-    };
+    if (explicitProvider) provider = explicitProvider;
   } catch (err) {
-    console.error("Failed to fetch AI settings:", err);
-    return {
-      provider: "openai",
-      openaiKey: "",
-      openaiModel: "gpt-4o-mini",
-      geminiKey: "",
-      geminiModel: "gemini-flash-latest"
-    };
+    console.warn("Could not read settings from DB, using cached/default settings:", err);
   }
+
+  if (geminiModel.startsWith("gemini-1.5") || geminiModel === "gemini-2.5-flash") {
+    geminiModel = "gemini-flash-latest";
+  }
+
+  return {
+    provider,
+    openaiKey,
+    openaiModel,
+    geminiKey,
+    geminiModel
+  };
 }
 
 /**

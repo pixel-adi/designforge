@@ -6,7 +6,7 @@ import {
   Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, ChevronLeft, 
   MessageSquare, Video, FileText, Maximize, X, Shield,
   ZoomIn, ZoomOut, RotateCw, RefreshCw, ExternalLink, AlertCircle, Download,
-  UploadCloud, Plus
+  UploadCloud, Plus, Settings, Sparkles, Key
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -160,6 +160,119 @@ export default function AdminPartBEvaluations() {
   const [aiEvaluatingBatch, setAiEvaluatingBatch] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentQuestion: "" });
   const [showBatchModal, setShowBatchModal] = useState(false);
+
+  // AI Configuration Modal state
+  const [showAiSettingsModal, setShowAiSettingsModal] = useState(false);
+  const [activeAiProvider, setActiveAiProvider] = useState<'openai' | 'gemini'>('openai');
+  const [configOpenaiKey, setConfigOpenaiKey] = useState('');
+  const [configOpenaiModel, setConfigOpenaiModel] = useState('gpt-4o-mini');
+  const [configGeminiKey, setConfigGeminiKey] = useState('');
+  const [configGeminiModel, setConfigGeminiModel] = useState('gemini-flash-latest');
+  const [testingAiKey, setTestingAiKey] = useState(false);
+  const [testAiResult, setTestAiResult] = useState<string | null>(null);
+  const [savingAiSettings, setSavingAiSettings] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const s = await getAISettings();
+        setActiveAiProvider(s.provider);
+        setConfigOpenaiKey(s.openaiKey);
+        setConfigOpenaiModel(s.openaiModel || 'gpt-4o-mini');
+        setConfigGeminiKey(s.geminiKey);
+        setConfigGeminiModel(s.geminiModel || 'gemini-flash-latest');
+      } catch (e) {
+        console.warn("Could not pre-load AI settings:", e);
+      }
+    })();
+  }, []);
+
+  const handleSaveAiSettings = async () => {
+    setSavingAiSettings(true);
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("df_openai_api_key", configOpenaiKey.trim());
+        localStorage.setItem("df_openai_api_model", configOpenaiModel);
+        localStorage.setItem("df_gemini_api_key", configGeminiKey.trim());
+        localStorage.setItem("df_gemini_api_model", configGeminiModel);
+        localStorage.setItem("df_ai_provider", activeAiProvider);
+      }
+
+      await supabase.from("system_settings").upsert([
+        { key: "openai_api_key", value: configOpenaiKey.trim() },
+        { key: "openai_api_model", value: configOpenaiModel },
+        { key: "gemini_api_key", value: configGeminiKey.trim() },
+        { key: "gemini_api_model", value: configGeminiModel },
+        { key: "ai_evaluation_provider", value: activeAiProvider }
+      ]);
+
+      toast({ 
+        title: "AI Settings Saved", 
+        description: `Active Evaluator: ${activeAiProvider === 'openai' ? `OpenAI (${configOpenaiModel})` : 'Google Gemini'}` 
+      });
+      setShowAiSettingsModal(false);
+    } catch (e: any) {
+      console.warn("Could not persist to DB, saved to browser session:", e);
+      toast({ title: "Saved to Browser", description: "Settings updated for your active session." });
+      setShowAiSettingsModal(false);
+    } finally {
+      setSavingAiSettings(false);
+    }
+  };
+
+  const handleTestAiKey = async () => {
+    setTestingAiKey(true);
+    setTestAiResult(null);
+    try {
+      if (activeAiProvider === 'openai') {
+        const keyToTest = configOpenaiKey.trim();
+        if (!keyToTest) {
+          setTestAiResult("❌ Please enter your OpenAI API key first.");
+          return;
+        }
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${keyToTest}`
+          },
+          body: JSON.stringify({
+            model: configOpenaiModel || "gpt-4o-mini",
+            messages: [{ role: "user", content: "test" }],
+            max_tokens: 5
+          })
+        });
+
+        if (res.ok) {
+          setTestAiResult("✅ Connected! OpenAI is active and ready to evaluate sketches.");
+        } else {
+          const errData = await res.json();
+          if (errData?.error?.code === "credit_balance_exhausted" || errData?.error?.code === "insufficient_quota") {
+            setTestAiResult("⚠️ Key is VALID, but credit balance is $0. Please add $5 credits at platform.openai.com/settings/organization/billing/ to start evaluating.");
+          } else {
+            setTestAiResult(`❌ Error (${res.status}): ${errData?.error?.message || res.statusText}`);
+          }
+        }
+      } else {
+        const keyToTest = configGeminiKey.trim();
+        if (!keyToTest) {
+          setTestAiResult("❌ Please enter your Gemini API key first.");
+          return;
+        }
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${keyToTest}`);
+        if (res.ok) {
+          setTestAiResult("✅ Connected to Google Gemini!");
+        } else {
+          const errText = await res.text();
+          setTestAiResult(`❌ Gemini Connection Failed: ${errText}`);
+        }
+      }
+    } catch (err: any) {
+      setTestAiResult(`❌ Connection Failed: ${err.message}`);
+    } finally {
+      setTestingAiKey(false);
+    }
+  };
 
   useEffect(() => {
     setZoom(1);
@@ -1252,9 +1365,19 @@ export default function AdminPartBEvaluations() {
                  <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
                    <Sparkles className="w-4 h-4 text-purple-600" /> AI Auto-Evaluation
                  </span>
-                 <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100/70 border border-purple-200 px-2 py-0.5 rounded">
-                   Gemini Multimodal
-                 </span>
+                 <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100/70 border border-purple-200 px-2 py-0.5 rounded">
+                      {activeAiProvider === "openai" ? `ChatGPT (${configOpenaiModel})` : "Gemini"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setTestAiResult(null); setShowAiSettingsModal(true); }}
+                      className="p-1 rounded text-purple-700 hover:text-purple-950 hover:bg-purple-100 transition-colors"
+                      title="AI Settings & API Key"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                </div>
                <p className="text-[11px] text-purple-900/70 leading-snug">
                  Evaluates sketch against 5 design rubrics and crafts a 20–25 word critique.
@@ -1468,6 +1591,150 @@ export default function AdminPartBEvaluations() {
               className="max-w-full max-h-[90vh] object-contain rounded shadow-2xl select-none" 
             />
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Settings Modal */}
+      <Dialog open={showAiSettingsModal} onOpenChange={setShowAiSettingsModal}>
+        <DialogContent className="max-w-lg rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+              <Key className="w-5 h-5 text-purple-600" />
+              AI Evaluator Settings
+            </DialogTitle>
+            <DialogDescription>
+              Choose your AI provider and configure secret API keys for subjective design evaluation.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="block text-xs font-bold text-foreground/70 uppercase mb-2">Active AI Provider</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setActiveAiProvider("openai"); setTestAiResult(null); }}
+                  className={`p-3 rounded-xl border text-left font-bold text-xs transition-all ${
+                    activeAiProvider === "openai" 
+                      ? "border-purple-600 bg-purple-50/60 text-purple-950 shadow-xs ring-1 ring-purple-600" 
+                      : "border-black/10 hover:border-black/20 text-foreground/70"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span>OpenAI (ChatGPT)</span>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-semibold">Recommended</span>
+                  </div>
+                  <p className="text-[11px] font-normal text-foreground/60">GPT-4o-mini & GPT-4o Vision. No 20/day cap.</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setActiveAiProvider("gemini"); setTestAiResult(null); }}
+                  className={`p-3 rounded-xl border text-left font-bold text-xs transition-all ${
+                    activeAiProvider === "gemini" 
+                      ? "border-purple-600 bg-purple-50/60 text-purple-950 shadow-xs ring-1 ring-purple-600" 
+                      : "border-black/10 hover:border-black/20 text-foreground/70"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span>Google Gemini</span>
+                  </div>
+                  <p className="text-[11px] font-normal text-foreground/60">Gemini Flash Multimodal via AI Studio.</p>
+                </button>
+              </div>
+            </div>
+
+            {activeAiProvider === "openai" ? (
+              <div className="space-y-3 bg-black/5 p-4 rounded-xl border border-black/5">
+                <div>
+                  <label className="block text-xs font-semibold text-foreground/80 mb-1">OpenAI API Key (sk-...)</label>
+                  <input
+                    type="password"
+                    value={configOpenaiKey}
+                    onChange={(e) => setConfigOpenaiKey(e.target.value)}
+                    placeholder="sk-proj-..."
+                    className="w-full text-xs font-mono p-2.5 rounded-lg border border-black/15 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <p className="text-[11px] text-foreground/50 mt-1">
+                    From <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-purple-600 underline">platform.openai.com/api-keys</a>
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-foreground/80 mb-1">Model</label>
+                  <select
+                    value={configOpenaiModel}
+                    onChange={(e) => setConfigOpenaiModel(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-lg border border-black/15 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="gpt-4o-mini">gpt-4o-mini (Fastest, High Vision Quality, ~$0.001/eval)</option>
+                    <option value="gpt-4o">gpt-4o (Elite Reasoning & Highest Detail Vision)</option>
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 bg-black/5 p-4 rounded-xl border border-black/5">
+                <div>
+                  <label className="block text-xs font-semibold text-foreground/80 mb-1">Gemini API Key</label>
+                  <input
+                    type="password"
+                    value={configGeminiKey}
+                    onChange={(e) => setConfigGeminiKey(e.target.value)}
+                    placeholder="AIzaSy..."
+                    className="w-full text-xs font-mono p-2.5 rounded-lg border border-black/15 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-foreground/80 mb-1">Gemini Model</label>
+                  <select
+                    value={configGeminiModel}
+                    onChange={(e) => setConfigGeminiModel(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-lg border border-black/15 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="gemini-flash-latest">gemini-flash-latest (Recommended)</option>
+                    <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {testAiResult && (
+              <div className={`p-3 rounded-lg text-xs leading-relaxed ${
+                testAiResult.startsWith("✅") 
+                  ? "bg-emerald-50 text-emerald-900 border border-emerald-200" 
+                  : testAiResult.startsWith("⚠️")
+                  ? "bg-amber-50 text-amber-900 border border-amber-200 font-medium"
+                  : "bg-red-50 text-red-900 border border-red-200"
+              }`}>
+                {testAiResult}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={testingAiKey}
+              onClick={handleTestAiKey}
+              className="text-xs font-semibold"
+            >
+              {testingAiKey ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+              Test Connection
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={savingAiSettings}
+              onClick={handleSaveAiSettings}
+              className="text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              {savingAiSettings ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+              Save Settings
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
