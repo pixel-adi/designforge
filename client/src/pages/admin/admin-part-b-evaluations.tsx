@@ -394,11 +394,15 @@ export default function AdminPartBEvaluations() {
     const currentResponse = responses[currentQIndex];
     if (!currentResponse) return;
     
+    const roundedMarks = evalForm.marks_awarded !== "" && !isNaN(parseFloat(evalForm.marks_awarded))
+      ? Math.max(0, Math.round(parseFloat(evalForm.marks_awarded) * 100) / 100)
+      : null;
+
     // Update local state
     const updatedResponses = [...responses];
     updatedResponses[currentQIndex] = {
       ...currentResponse,
-      marks_awarded: evalForm.marks_awarded !== "" ? parseFloat(evalForm.marks_awarded) : null,
+      marks_awarded: roundedMarks,
       rubric_marks: evalForm.rubric_marks,
       mentor_comments: evalForm.mentor_comments,
       mentor_improvements: evalForm.mentor_improvements,
@@ -409,7 +413,7 @@ export default function AdminPartBEvaluations() {
     // Save to DB
     try {
       await supabase.from('exam_responses').update({
-        marks_awarded: evalForm.marks_awarded !== "" ? parseFloat(evalForm.marks_awarded) : null,
+        marks_awarded: roundedMarks,
         rubric_marks: evalForm.rubric_marks,
         mentor_comments: evalForm.mentor_comments || null,
         mentor_improvements: evalForm.mentor_improvements || null,
@@ -452,10 +456,10 @@ export default function AdminPartBEvaluations() {
     await saveCurrentQuestionDraft();
     setSaving(true);
     try {
-      // Calculate total score
+      // Calculate total score rounded to 2 decimal places
       let scorePartB = 0;
       responses.forEach(r => {
-        if (r.marks_awarded) scorePartB += parseFloat(r.marks_awarded);
+        if (r.marks_awarded) scorePartB += Math.max(0, parseFloat(r.marks_awarded));
       });
       // Add the currently viewed one just in case state isn't synced yet
       if (evalForm.marks_awarded !== "" && !isNaN(parseFloat(evalForm.marks_awarded))) {
@@ -463,12 +467,13 @@ export default function AdminPartBEvaluations() {
          const currentRespId = responses[currentQIndex].id;
          scorePartB = 0;
          responses.forEach(r => {
-            if (r.id === currentRespId) scorePartB += parseFloat(evalForm.marks_awarded);
-            else if (r.marks_awarded) scorePartB += parseFloat(r.marks_awarded);
+            if (r.id === currentRespId) scorePartB += Math.max(0, parseFloat(evalForm.marks_awarded));
+            else if (r.marks_awarded) scorePartB += Math.max(0, parseFloat(r.marks_awarded));
          });
       }
       
-      const totalScore = (evaluatingAttempt.score_part_a || 0) + scorePartB;
+      scorePartB = Math.max(0, Math.round(scorePartB * 100) / 100);
+      const totalScore = Math.max(0, Math.round(((evaluatingAttempt.score_part_a || 0) + scorePartB) * 100) / 100);
       
       // Update attempt
       await supabase.from('exam_attempts').update({
@@ -1252,8 +1257,10 @@ export default function AdminPartBEvaluations() {
                <div className="flex items-center justify-between mb-3">
                  <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider">Rubric Evaluation</label>
                  <div className="text-right">
-                   <span className="text-lg font-black text-primary">{evalForm.marks_awarded || '0'}</span>
-                   <span className="text-xs font-bold text-foreground/40 ml-1">/ {Number.isInteger(maxMarksPerQ) ? maxMarksPerQ : maxMarksPerQ.toFixed(2)}</span>
+                   <span className="text-lg font-black text-primary">
+                     {evalForm.marks_awarded ? (Math.round(parseFloat(evalForm.marks_awarded) * 100) / 100).toFixed(2).replace(/\.?0+$/, '') : '0'}
+                   </span>
+                   <span className="text-xs font-bold text-foreground/40 ml-1">/ {Number.isInteger(maxMarksPerQ) ? maxMarksPerQ : (Math.round(maxMarksPerQ * 100) / 100).toFixed(2)}</span>
                  </div>
                </div>
                
@@ -1270,27 +1277,40 @@ export default function AdminPartBEvaluations() {
                      <div className="relative">
                        <input 
                          type="number" 
+                         min="0"
+                         step="0.01"
                          aria-label={`Score for ${criteria.label}`}
                          value={(evalForm.rubric_marks as any)[criteria.key]}
                          onChange={e => {
-                           const maxPerCriteria = maxMarksPerQ / 5;
-                           let val = e.target.value;
-                           if (parseFloat(val) > maxPerCriteria) val = maxPerCriteria.toString();
+                           const maxPerCriteria = Math.round((maxMarksPerQ / 5) * 100) / 100;
+                           let rawVal = e.target.value;
+                           let cleanVal = "";
+                           if (rawVal !== "") {
+                             let num = parseFloat(rawVal);
+                             if (isNaN(num) || num < 0) num = 0;
+                             if (num > maxPerCriteria) num = maxPerCriteria;
+                             // Limit strictly to 2 decimal places
+                             num = Math.round(num * 100) / 100;
+                             cleanVal = num.toString();
+                           }
                            
-                           const newRubric = { ...evalForm.rubric_marks, [criteria.key]: val };
+                           const newRubric = { ...evalForm.rubric_marks, [criteria.key]: cleanVal };
                            
                            // Calculate total
                            let sum = 0;
                            Object.values(newRubric).forEach(v => {
-                             if (v !== "" && !isNaN(parseFloat(v as string))) sum += parseFloat(v as string);
+                             if (v !== "" && !isNaN(parseFloat(v as string))) {
+                               sum += Math.max(0, parseFloat(v as string));
+                             }
                            });
                            
-                           setEvalForm({ ...evalForm, rubric_marks: newRubric, marks_awarded: sum.toString() });
+                           const roundedSum = Math.max(0, Math.round(sum * 100) / 100);
+                           setEvalForm({ ...evalForm, rubric_marks: newRubric, marks_awarded: roundedSum.toString() });
                          }}
                          className="w-full h-9 border-2 border-primary/10 rounded-lg px-2 text-sm font-bold bg-primary/5 focus:outline-none focus:border-primary text-primary text-left [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                          placeholder="0"
                        />
-                       <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-foreground/30 pointer-events-none">/ {(maxMarksPerQ / 5).toFixed(1).replace(/\.0$/, '')}</div>
+                       <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-foreground/30 pointer-events-none">/ {(maxMarksPerQ / 5).toFixed(2).replace(/\.?0+$/, '')}</div>
                      </div>
                    </div>
                  ))}

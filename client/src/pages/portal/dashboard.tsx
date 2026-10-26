@@ -1522,29 +1522,40 @@ export default function PortalDashboard() {
 
   const fetchLeaderboard = async () => {
     if (leaderboard.length === 0) setLoadingLeaderboard(true);
+    const safetyTimer = setTimeout(() => setLoadingLeaderboard(false), 4000);
     try {
-      // Build the query
+      // Build defensive query without fragile !inner constraints
       let query = supabase
         .from('exam_attempts')
-        .select(`id, score_part_a, total_part_a, score_part_b, total_score, part_b_evaluation_status, candidate_id, test_id, exam_candidates!inner(name, avatar_url, education_level, access_level), exam_tests!inner(title, program_format)`)
+        .select(`id, score_part_a, total_part_a, score_part_b, total_score, part_b_evaluation_status, candidate_id, test_id, exam_candidates(name, avatar_url, education_level, access_level), exam_tests(title, program_format)`)
         .eq('status', 'completed')
         .order('total_score', { ascending: false, nullsFirst: false })
-        .order('score_part_a', { ascending: false, nullsFirst: false });
+        .order('score_part_a', { ascending: false, nullsFirst: false })
+        .limit(100);
 
       if (leaderboardFilterTestId !== 'all') {
          query = query.eq('test_id', leaderboardFilterTestId);
       }
 
-      // Filter by profile education level
-      if (candidate?.education_level) {
-         query = query.eq('exam_tests.program_format', candidate.education_level);
-      }
-
       const { data, error } = await query;
       
-      if (!error && data) {
-        // Sort in Javascript by actual score descending: (total_score !== null ? total_score : score_part_a)
-        const sortedData = [...data].sort((a, b) => {
+      if (error) {
+        console.warn('Leaderboard fetch warning:', error);
+      }
+
+      if (data && data.length > 0) {
+        const normEd = (candidate?.education_level || '').toLowerCase().trim();
+
+        // Filter by program format gracefully in JS
+        const formatFiltered = data.filter((attempt: any) => {
+          if (!normEd) return true;
+          const format = (attempt.exam_tests?.program_format || '').toLowerCase().trim();
+          if (!format || format === 'both' || format === 'all' || format === 'general') return true;
+          return format === normEd;
+        });
+
+        // Sort by actual score descending: (total_score !== null ? total_score : score_part_a)
+        const sortedData = [...formatFiltered].sort((a: any, b: any) => {
           const scoreA = a.total_score !== null ? Number(a.total_score) : Number(a.score_part_a || 0);
           const scoreB = b.total_score !== null ? Number(b.total_score) : Number(b.score_part_a || 0);
           return scoreB - scoreA;
@@ -1552,25 +1563,26 @@ export default function PortalDashboard() {
 
         // Group by candidate to only show their best attempt
         const seenCandidates = new Set();
-        const uniqueTopAttempts = sortedData.filter(attempt => {
-          if (seenCandidates.has(attempt.candidate_id)) return false;
+        const uniqueTopAttempts = sortedData.filter((attempt: any) => {
+          if (!attempt.candidate_id || seenCandidates.has(attempt.candidate_id)) return false;
           seenCandidates.add(attempt.candidate_id);
           return true;
-        }).slice(0, 10); // Keep top 10 after unique filtering
+        }).slice(0, 10);
         setLeaderboard(uniqueTopAttempts);
       }
     } catch (err) {
       console.error('Failed to fetch leaderboard:', err);
     } finally {
+      clearTimeout(safetyTimer);
       setLoadingLeaderboard(false);
     }
   };
 
   useEffect(() => {
-    if (activeTab === 'leaderboard' && candidate) {
+    if (activeTab === 'leaderboard') {
       fetchLeaderboard();
     }
-  }, [activeTab, leaderboardFilterTestId, candidate]);
+  }, [activeTab, leaderboardFilterTestId, candidate?.education_level]);
 
   const handleOnboardingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1716,12 +1728,21 @@ export default function PortalDashboard() {
 
   const fetchQuestions = async () => {
     if (questions.length === 0) setLoadingQuestions(true);
+    const safetyTimer = setTimeout(() => setLoadingQuestions(false), 4000);
     try {
-      let query = supabase.from('exam_questions').select('*').eq('part', questionPartFilter).order('created_at', { ascending: false });
+      let query = supabase.from('exam_questions')
+        .select('id, type, part, difficulty, content_text, media_url, topics, pyq_tag, created_at')
+        .eq('part', questionPartFilter)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
       if (questionTypeFilter !== 'all') query = query.eq('type', questionTypeFilter);
       if (questionDifficultyFilter !== 'all') query = query.eq('difficulty', questionDifficultyFilter);
+
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.warn('Failed to fetch questions:', error);
+      }
       const questionList = data || [];
       setQuestions(questionList);
       // Unblock UI immediately so questions render fast
@@ -1731,7 +1752,7 @@ export default function PortalDashboard() {
       if (questionPartFilter === 'A' && questionList.length > 0) {
         const questionIds = questionList.map(q => q.id);
         const initialBatch = questionIds.slice(0, 30);
-        const { data: optData } = await supabase.from('exam_options').select('*').in('question_id', initialBatch);
+        const { data: optData } = await supabase.from('exam_options').select('id, question_id, content_text, media_url, is_correct').in('question_id', initialBatch);
         if (optData) {
           const optMap: Record<string, any[]> = {};
           for (const opt of optData) {
@@ -1747,7 +1768,7 @@ export default function PortalDashboard() {
           const chunkSize = 40;
           for (let i = 0; i < remainingIds.length; i += chunkSize) {
             const chunk = remainingIds.slice(i, i + chunkSize);
-            supabase.from('exam_options').select('*').in('question_id', chunk).then(({ data: rData }) => {
+            supabase.from('exam_options').select('id, question_id, content_text, media_url, is_correct').in('question_id', chunk).then(({ data: rData }) => {
               if (rData) {
                 const rMap: Record<string, any[]> = {};
                 for (const opt of rData) {
@@ -1765,21 +1786,24 @@ export default function PortalDashboard() {
     } catch (err) {
       console.error('Failed to fetch questions/options:', err);
     } finally {
+      clearTimeout(safetyTimer);
       setLoadingQuestions(false);
     }
   };
 
   const fetchStudyMaterials = async () => {
     if (studyMaterials.length === 0) setLoadingMaterials(true);
+    const safetyTimer = setTimeout(() => setLoadingMaterials(false), 4000);
     try {
       const { data, error } = await supabase.from('study_materials').select('*').eq('is_visible', true).order('display_order').order('created_at', { ascending: false });
       if (!error && data) setStudyMaterials(data);
-    } catch (err) { console.error(err); } finally { setLoadingMaterials(false); }
+    } catch (err) { console.error(err); } finally { clearTimeout(safetyTimer); setLoadingMaterials(false); }
   };
 
   const fetchAssignments = async () => {
     if (!candidate?.id) return;
     if (assignments.length === 0) setLoadingAssignments(true);
+    const safetyTimer = setTimeout(() => setLoadingAssignments(false), 4000);
     try {
       const [assignRes, subRes] = await Promise.all([
         supabase.from('class_assignments').select('*').eq('is_visible', true).order('created_at', { ascending: false }),
@@ -1791,7 +1815,7 @@ export default function PortalDashboard() {
         subRes.data.forEach(s => { subMap[s.assignment_id] = s; });
         setAssignmentSubmissions(subMap);
       }
-    } catch (err) { console.error(err); } finally { setLoadingAssignments(false); }
+    } catch (err) { console.error(err); } finally { clearTimeout(safetyTimer); setLoadingAssignments(false); }
   };
 
   const fetchClassNotes = async () => {
@@ -1801,11 +1825,37 @@ export default function PortalDashboard() {
       return;
     }
     setLoadingNotes(true);
+    const safetyTimer = setTimeout(() => setLoadingNotes(false), 4000);
     try {
       const { data, error } = await supabase.from('study_materials').select('*').eq('is_visible', true).order('display_order').order('created_at', { ascending: false });
       if (!error && data) setClassNotes(data);
-    } catch (err) { console.error(err); } finally { setLoadingNotes(false); }
+    } catch (err) { console.error(err); } finally { clearTimeout(safetyTimer); setLoadingNotes(false); }
   };
+
+  // Reactive auto-fetch hooks ensuring tabs never hang in loading state
+  useEffect(() => {
+    if (activeTab === 'questions') {
+      fetchQuestions();
+    }
+  }, [activeTab, questionPartFilter, questionTypeFilter, questionDifficultyFilter]);
+
+  useEffect(() => {
+    if (activeTab === 'materials') {
+      fetchStudyMaterials();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'assignments' && candidate?.id) {
+      fetchAssignments();
+    }
+  }, [activeTab, candidate?.id]);
+
+  useEffect(() => {
+    if (activeTab === 'notes') {
+      fetchClassNotes();
+    }
+  }, [activeTab]);
 
   const handleSubmitAssignment = async () => {
     if (!submissionFile || !selectedAssignment || !candidate?.id) return;
@@ -3774,7 +3824,6 @@ export default function PortalDashboard() {
                           setQuestionDomainFilter(sec.id);
                           if (sec.part !== questionPartFilter) {
                             setQuestionPartFilter(sec.part as any);
-                            setTimeout(fetchQuestions, 0);
                           }
                         }}
                         className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
@@ -3815,7 +3864,6 @@ export default function PortalDashboard() {
                         onClick={() => {
                           setQuestionTypeFilter(tag.id);
                           setQuestionPage(1);
-                          setTimeout(fetchQuestions, 0);
                         }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                           isSelected
@@ -3836,7 +3884,6 @@ export default function PortalDashboard() {
                     onChange={e => {
                       setQuestionDifficultyFilter(e.target.value);
                       setQuestionPage(1);
-                      setTimeout(fetchQuestions, 0);
                     }}
                     className="h-9 px-3 rounded-lg border border-black/10 bg-white text-xs font-semibold"
                   >

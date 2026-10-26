@@ -292,11 +292,11 @@ ACTIONABLE REMEDIATION ('mentor_improvements'):
 
   const parsed = JSON.parse(rawText);
 
-  // Clamp and format rubric values
+  // Clamp and format rubric values strictly to 2 decimal places and min 0
   const clampScore = (val: any) => {
     const num = parseFloat(val);
     if (isNaN(num)) return 0;
-    return Math.max(0, Math.min(maxPerCriteria, Math.round(num * 10) / 10));
+    return Math.max(0, Math.min(maxPerCriteria, Math.round(num * 100) / 100));
   };
 
   const critical_thinking = clampScore(parsed.critical_thinking);
@@ -305,18 +305,18 @@ ACTIONABLE REMEDIATION ('mentor_improvements'):
   const conceptualisation = clampScore(parsed.conceptualisation);
   const representation = clampScore(parsed.representation);
 
-  const totalSum = Math.round((critical_thinking + ideation + storytelling + conceptualisation + representation) * 10) / 10;
+  const totalSum = Math.max(0, Math.round((critical_thinking + ideation + storytelling + conceptualisation + representation) * 100) / 100);
 
   // Enforce 20-25 word constraint strictly
   const { text: validatedComments, wordCount } = adjustToWordLimit(parsed.mentor_comments || "", 20, 25);
 
   return {
     rubric_marks: {
-      critical_thinking: critical_thinking.toString(),
-      ideation: ideation.toString(),
-      storytelling: storytelling.toString(),
-      conceptualisation: conceptualisation.toString(),
-      representation: representation.toString()
+      critical_thinking: critical_thinking.toFixed(2).replace(/\.?0+$/, ''),
+      ideation: ideation.toFixed(2).replace(/\.?0+$/, ''),
+      storytelling: storytelling.toFixed(2).replace(/\.?0+$/, ''),
+      conceptualisation: conceptualisation.toFixed(2).replace(/\.?0+$/, ''),
+      representation: representation.toFixed(2).replace(/\.?0+$/, '')
     },
     marks_awarded: totalSum,
     mentor_comments: validatedComments,
