@@ -26,16 +26,17 @@ export async function getGeminiSettings(): Promise<{ apiKey: string; model: stri
       .select("key, value");
 
     const apiKey = data?.find(d => d.key === "gemini_api_key")?.value || "";
-    let model = data?.find(d => d.key === "gemini_api_model")?.value || "gemini-flash-latest";
+    let model = data?.find(d => d.key === "gemini_api_model")?.value || "gemini-1.5-flash";
 
-    if (model.startsWith("gemini-1.5") || model === "gemini-2.5-flash") {
-      model = "gemini-flash-latest";
+    // Normalize legacy, preview, or experimental strings to stable gemini-1.5-flash (which has 1,500 free requests/day)
+    if (!model || model === "gemini-flash-latest" || model.includes("3.8") || model.includes("2.5")) {
+      model = "gemini-1.5-flash";
     }
 
     return { apiKey, model };
   } catch (err) {
     console.error("Failed to fetch Gemini settings:", err);
-    return { apiKey: "", model: "gemini-flash-latest" };
+    return { apiKey: "", model: "gemini-1.5-flash" };
   }
 }
 
@@ -196,12 +197,16 @@ export async function evaluatePartBWithGemini(params: {
   const { questionText, questionMediaUrl, candidateFileUrl, candidateAnswerText, maxMarks } = params;
 
   let apiKey = params.apiKey;
-  let model = params.model || "gemini-flash-latest";
+  let model = params.model;
 
   if (!apiKey) {
     const settings = await getGeminiSettings();
     apiKey = settings.apiKey;
-    if (settings.model) model = settings.model;
+    if (!model) model = settings.model;
+  }
+
+  if (!model || model === "gemini-flash-latest" || model.includes("3.8") || model.includes("2.5")) {
+    model = "gemini-1.5-flash";
   }
 
   if (!apiKey) {
@@ -322,7 +327,7 @@ ACTIONABLE REMEDIATION ('mentor_improvements'):
     contents: [{ parts: contentParts }],
     generationConfig: {
       temperature: 0.2,
-      maxOutputTokens: 600,
+      maxOutputTokens: 1024,
       responseMimeType: "application/json",
       responseSchema
     }
@@ -337,9 +342,9 @@ ACTIONABLE REMEDIATION ('mentor_improvements'):
     }
   );
 
-  if (!response.ok && model !== "gemini-flash-latest") {
+  if (!response.ok && model !== "gemini-1.5-flash") {
     response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -29,7 +29,10 @@ serve(async (req) => {
       .select("key, value");
 
     const geminiKey = Deno.env.get("GEMINI_API_KEY") || settings?.find((d: any) => d.key === "gemini_api_key")?.value;
-    let geminiModel = settings?.find((d: any) => d.key === "gemini_api_model")?.value || "gemini-flash-latest";
+    let geminiModel = settings?.find((d: any) => d.key === "gemini_api_model")?.value || "gemini-1.5-flash";
+    if (!geminiModel || geminiModel === "gemini-flash-latest" || geminiModel.includes("3.8") || geminiModel.includes("2.5")) {
+      geminiModel = "gemini-1.5-flash";
+    }
 
     if (!geminiKey) {
       return new Response(JSON.stringify({ error: "Gemini API key is not configured" }), {
@@ -119,7 +122,7 @@ Write an honest, constructive reality-check critique strictly between 20 and 25 
               contents: [{ parts: contentParts }],
               generationConfig: {
                 temperature: 0.2,
-                maxOutputTokens: 600,
+                maxOutputTokens: 1024,
                 responseMimeType: "application/json",
                 responseSchema
               }

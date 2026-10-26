@@ -598,6 +598,9 @@ export default function AdminPartBEvaluations() {
       const updatedResponses = [...responses];
 
       let completedCount = 0;
+      let successCount = 0;
+      const failureErrors: string[] = [];
+
       setBatchProgress({
         current: 0,
         total: responses.length,
@@ -629,6 +632,7 @@ export default function AdminPartBEvaluations() {
               mentor_comments: result.mentor_comments,
               mentor_improvements: result.mentor_improvements || resp.mentor_improvements
             };
+            successCount++;
 
             // Save to database
             await supabase.from('exam_responses').update({
@@ -640,6 +644,8 @@ export default function AdminPartBEvaluations() {
             }).eq('id', resp.id);
 
           } catch (qErr: any) {
+            const errMsg = qErr?.message || String(qErr);
+            failureErrors.push(`Question ${i + 1}: ${errMsg}`);
             console.error(`AI failed for question ${i + 1}:`, qErr);
           } finally {
             completedCount++;
@@ -657,15 +663,29 @@ export default function AdminPartBEvaluations() {
         populateForm(updatedResponses[currentQIndex]);
       }
 
-      if (evaluatingAttempt.part_b_evaluation_status === 'pending') {
+      if (successCount > 0 && evaluatingAttempt.part_b_evaluation_status === 'pending') {
         await supabase.from('exam_attempts').update({ part_b_evaluation_status: 'draft' }).eq('id', evaluatingAttempt.id);
         setEvaluatingAttempt({ ...evaluatingAttempt, part_b_evaluation_status: 'draft' });
       }
 
-      toast({ 
-        title: "Batch AI Evaluation Finished!", 
-        description: `All ${responses.length} Part B questions evaluated. Review responses and verify.` 
-      });
+      if (failureErrors.length === responses.length) {
+        toast({ 
+          title: "Batch AI Evaluation Failed", 
+          description: failureErrors[0] || "All questions failed evaluation.", 
+          variant: "destructive" 
+        });
+      } else if (failureErrors.length > 0) {
+        toast({ 
+          title: "Batch AI Evaluation Partial", 
+          description: `${successCount} evaluated successfully, ${failureErrors.length} failed. (${failureErrors[0]})`, 
+          variant: "destructive" 
+        });
+      } else {
+        toast({ 
+          title: "Batch AI Evaluation Finished!", 
+          description: `All ${responses.length} Part B questions evaluated. Review responses and verify.` 
+        });
+      }
     } catch (err: any) {
       toast({ title: "Batch Evaluation Error", description: err.message, variant: "destructive" });
     } finally {
