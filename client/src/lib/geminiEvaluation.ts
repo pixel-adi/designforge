@@ -481,6 +481,8 @@ export async function evaluatePartBWithOpenAI(params: {
     throw new Error("OpenAI API key is not configured. Please add it in AI Settings.");
   }
 
+  const maxPerCriteria = Math.round((maxMarks / 5) * 10) / 10;
+
   const systemPrompt = `${buildMentorEvaluationPrompt(questionText, maxMarks, maxPerCriteria)}
 
 OUTPUT FORMAT:
