@@ -158,7 +158,7 @@ export default function CustomTestCreatorModal({
       const cat = CATEGORIES.find(c => c.id === selectedCategory);
 
       // 1. Fetch matching question IDs
-      let qQuery = supabase.from("exam_questions").select("id, marks, part, type");
+      let qQuery = supabase.from("exam_questions").select("id, part, type");
 
       if (cat?.defaultPart === "A") qQuery = qQuery.eq("part", "A");
       else if (cat?.defaultPart === "B") qQuery = qQuery.eq("part", "B");
@@ -181,7 +181,7 @@ export default function CustomTestCreatorModal({
       let pickedQs = qData || [];
       if (pickedQs.length === 0) {
         // Fallback: pick any available questions
-        const { data: fallbackData } = await supabase.from("exam_questions").select("id, marks, part, type").limit(questionCount);
+        const { data: fallbackData } = await supabase.from("exam_questions").select("id, part, type").limit(questionCount);
         pickedQs = fallbackData || [];
       }
 
@@ -246,7 +246,7 @@ export default function CustomTestCreatorModal({
           const links = shuffled.map(q => ({
             test_id: newTestId,
             question_id: q.id,
-            marks: q.marks || (q.part === "B" ? 10 : 1)
+            marks: q.part === "B" ? 10 : 2
           }));
           await supabase.from("exam_test_questions").insert(links);
         }

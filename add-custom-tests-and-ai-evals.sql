@@ -84,6 +84,7 @@ DECLARE
   v_new_test_id UUID;
   v_new_attempt_id UUID;
   v_qid UUID;
+  v_q_part TEXT;
   v_q_marks NUMERIC;
 BEGIN
   -- 1. Validate candidate & check quota
@@ -157,9 +158,11 @@ BEGIN
   IF array_length(p_question_ids, 1) > 0 THEN
     FOREACH v_qid IN ARRAY p_question_ids
     LOOP
-      SELECT marks INTO v_q_marks FROM public.exam_questions WHERE id = v_qid;
-      IF v_q_marks IS NULL OR v_q_marks <= 0 THEN
-        v_q_marks := 1;
+      SELECT part::text INTO v_q_part FROM public.exam_questions WHERE id = v_qid;
+      IF v_q_part = 'B' THEN
+        v_q_marks := 10;
+      ELSE
+        v_q_marks := 2;
       END IF;
 
       INSERT INTO public.exam_test_questions (test_id, question_id, marks)
