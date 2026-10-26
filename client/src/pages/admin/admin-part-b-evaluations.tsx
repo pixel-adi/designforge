@@ -597,51 +597,60 @@ export default function AdminPartBEvaluations() {
     try {
       const updatedResponses = [...responses];
 
-      for (let i = 0; i < responses.length; i++) {
-        const resp = responses[i];
-        const q = questions.find(item => item.id === resp.question_id);
-        if (!q) continue;
+      let completedCount = 0;
+      setBatchProgress({
+        current: 0,
+        total: responses.length,
+        currentQuestion: `Evaluating ${responses.length} questions in parallel...`
+      });
 
-        setBatchProgress({
-          current: i + 1,
-          total: responses.length,
-          currentQuestion: `Evaluating Question ${i + 1} of ${responses.length}...`
-        });
+      await Promise.allSettled(
+        responses.map(async (resp, i) => {
+          const q = questions.find(item => item.id === resp.question_id);
+          if (!q) return;
 
-        const fileUrls = parseFileUrls(resp.file_url);
-        const activeFileUrl = fileUrls.length > 0 ? normalizeSubmissionUrl(fileUrls[0]).url : null;
-        const qMaxMarks = getQuestionMaxMarks(q);
+          const fileUrls = parseFileUrls(resp.file_url);
+          const activeFileUrl = fileUrls.length > 0 ? normalizeSubmissionUrl(fileUrls[0]).url : null;
+          const qMaxMarks = getQuestionMaxMarks(q);
 
-        try {
-          const result = await evaluatePartBWithGemini({
-            questionText: q.content_text || "",
-            questionMediaUrl: q.media_url ? resolveQuestionMediaUrl(q.media_url) : null,
-            candidateFileUrl: activeFileUrl,
-            candidateAnswerText: resp.answer_text,
-            maxMarks: qMaxMarks
-          });
+          try {
+            const result = await evaluatePartBWithGemini({
+              questionText: q.content_text || "",
+              questionMediaUrl: q.media_url ? resolveQuestionMediaUrl(q.media_url) : null,
+              candidateFileUrl: activeFileUrl,
+              candidateAnswerText: resp.answer_text,
+              maxMarks: qMaxMarks
+            });
 
-          updatedResponses[i] = {
-            ...resp,
-            marks_awarded: result.marks_awarded,
-            rubric_marks: result.rubric_marks,
-            mentor_comments: result.mentor_comments,
-            mentor_improvements: result.mentor_improvements || resp.mentor_improvements
-          };
+            updatedResponses[i] = {
+              ...resp,
+              marks_awarded: result.marks_awarded,
+              rubric_marks: result.rubric_marks,
+              mentor_comments: result.mentor_comments,
+              mentor_improvements: result.mentor_improvements || resp.mentor_improvements
+            };
 
-          // Save to database
-          await supabase.from('exam_responses').update({
-            marks_awarded: result.marks_awarded,
-            rubric_marks: result.rubric_marks,
-            mentor_comments: result.mentor_comments,
-            mentor_improvements: result.mentor_improvements || null,
-            ai_evaluated: true
-          }).eq('id', resp.id);
+            // Save to database
+            await supabase.from('exam_responses').update({
+              marks_awarded: result.marks_awarded,
+              rubric_marks: result.rubric_marks,
+              mentor_comments: result.mentor_comments,
+              mentor_improvements: result.mentor_improvements || null,
+              ai_evaluated: true
+            }).eq('id', resp.id);
 
-        } catch (qErr: any) {
-          console.error(`AI failed for question ${i + 1}:`, qErr);
-        }
-      }
+          } catch (qErr: any) {
+            console.error(`AI failed for question ${i + 1}:`, qErr);
+          } finally {
+            completedCount++;
+            setBatchProgress({
+              current: completedCount,
+              total: responses.length,
+              currentQuestion: `Evaluated ${completedCount} of ${responses.length} questions...`
+            });
+          }
+        })
+      );
 
       setResponses(updatedResponses);
       if (updatedResponses[currentQIndex]) {

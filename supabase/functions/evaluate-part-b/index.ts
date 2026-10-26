@@ -60,16 +60,17 @@ serve(async (req) => {
 
     let totalScoreB = 0;
 
-    for (const resp of partBResponses) {
-      const q = resp.exam_questions;
-      if (!q) continue;
+    const results = await Promise.allSettled(
+      partBResponses.map(async (resp: any) => {
+        const q = resp.exam_questions;
+        if (!q) return 0;
 
-      const maxMarks = q.marks || 50;
-      const maxPerCriteria = Math.round((maxMarks / 5) * 10) / 10;
+        const maxMarks = q.marks || 50;
+        const maxPerCriteria = Math.round((maxMarks / 5) * 10) / 10;
 
-      const contentParts: any[] = [
-        {
-          text: `You are an elite, notoriously rigorous chief design jury evaluator for premier national design institutes (NID, CEED, UCEED).
+        const contentParts: any[] = [
+          {
+            text: `You are an elite, notoriously rigorous chief design jury evaluator for premier national design institutes (NID, CEED, UCEED).
 QUESTION: ${q.content_text || ""}
 MAX MARKS: ${maxMarks} (Max ${maxPerCriteria} per criteria)
 
@@ -88,77 +89,87 @@ Score 0.0 to ${maxPerCriteria}:
 
 CRITIQUE ('mentor_comments'):
 Write an honest, constructive reality-check critique strictly between 20 and 25 words that pinpoints the critical flaw holding this submission back while clearly motivating the student to level up their craft.`
-        }
-      ];
-
-      if (resp.answer_text) {
-        contentParts.push({ text: `Student Concept Explanation:\n${resp.answer_text}` });
-      }
-
-      const responseSchema = {
-        type: "OBJECT",
-        properties: {
-          critical_thinking: { type: "NUMBER" },
-          ideation: { type: "NUMBER" },
-          storytelling: { type: "NUMBER" },
-          conceptualisation: { type: "NUMBER" },
-          representation: { type: "NUMBER" },
-          mentor_comments: { type: "STRING" },
-          mentor_improvements: { type: "STRING" }
-        },
-        required: ["critical_thinking", "ideation", "storytelling", "conceptualisation", "representation", "mentor_comments"]
-      };
-
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: contentParts }],
-            generationConfig: {
-              temperature: 0.2,
-              responseMimeType: "application/json",
-              responseSchema
-            }
-          })
-        }
-      );
-
-      if (geminiRes.ok) {
-        const geminiJson = await geminiRes.json();
-        const rawText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (rawText) {
-          const evalResult = JSON.parse(rawText);
-          const ct = Math.min(maxPerCriteria, Number(evalResult.critical_thinking) || 0);
-          const id = Math.min(maxPerCriteria, Number(evalResult.ideation) || 0);
-          const st = Math.min(maxPerCriteria, Number(evalResult.storytelling) || 0);
-          const co = Math.min(maxPerCriteria, Number(evalResult.conceptualisation) || 0);
-          const re = Math.min(maxPerCriteria, Number(evalResult.representation) || 0);
-          const qScore = Math.round((ct + id + st + co + re) * 10) / 10;
-          totalScoreB += qScore;
-
-          // Enforce 20-25 word boundary
-          let comment = evalResult.mentor_comments || "";
-          const words = comment.trim().split(/\s+/).filter(Boolean);
-          if (words.length > 25) {
-            comment = words.slice(0, 24).join(" ") + ".";
           }
+        ];
 
-          await supabase.from("exam_responses").update({
-            marks_awarded: qScore,
-            rubric_marks: {
-              critical_thinking: ct.toString(),
-              ideation: id.toString(),
-              storytelling: st.toString(),
-              conceptualisation: co.toString(),
-              representation: re.toString()
-            },
-            mentor_comments: comment,
-            mentor_improvements: evalResult.mentor_improvements || null,
-            ai_evaluated: true
-          }).eq("id", resp.id);
+        if (resp.answer_text) {
+          contentParts.push({ text: `Student Concept Explanation:\n${resp.answer_text}` });
         }
+
+        const responseSchema = {
+          type: "OBJECT",
+          properties: {
+            critical_thinking: { type: "NUMBER" },
+            ideation: { type: "NUMBER" },
+            storytelling: { type: "NUMBER" },
+            conceptualisation: { type: "NUMBER" },
+            representation: { type: "NUMBER" },
+            mentor_comments: { type: "STRING" },
+            mentor_improvements: { type: "STRING" }
+          },
+          required: ["critical_thinking", "ideation", "storytelling", "conceptualisation", "representation", "mentor_comments"]
+        };
+
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: contentParts }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 600,
+                responseMimeType: "application/json",
+                responseSchema
+              }
+            })
+          }
+        );
+
+        if (geminiRes.ok) {
+          const geminiJson = await geminiRes.json();
+          const rawText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            const evalResult = JSON.parse(rawText);
+            const ct = Math.min(maxPerCriteria, Math.max(0, Number(evalResult.critical_thinking) || 0));
+            const id = Math.min(maxPerCriteria, Math.max(0, Number(evalResult.ideation) || 0));
+            const st = Math.min(maxPerCriteria, Math.max(0, Number(evalResult.storytelling) || 0));
+            const co = Math.min(maxPerCriteria, Math.max(0, Number(evalResult.conceptualisation) || 0));
+            const re = Math.min(maxPerCriteria, Math.max(0, Number(evalResult.representation) || 0));
+            const qScore = Math.max(0, Math.round((ct + id + st + co + re) * 100) / 100);
+
+            // Enforce 20-25 word boundary
+            let comment = evalResult.mentor_comments || "";
+            const words = comment.trim().split(/\s+/).filter(Boolean);
+            if (words.length > 25) {
+              comment = words.slice(0, 24).join(" ") + ".";
+            }
+
+            await supabase.from("exam_responses").update({
+              marks_awarded: qScore,
+              rubric_marks: {
+                critical_thinking: ct.toString(),
+                ideation: id.toString(),
+                storytelling: st.toString(),
+                conceptualisation: co.toString(),
+                representation: re.toString()
+              },
+              mentor_comments: comment,
+              mentor_improvements: evalResult.mentor_improvements || null,
+              ai_evaluated: true
+            }).eq("id", resp.id);
+
+            return qScore;
+          }
+        }
+        return 0;
+      })
+    );
+
+    for (const res of results) {
+      if (res.status === "fulfilled") {
+        totalScoreB += res.value;
       }
     }
 
