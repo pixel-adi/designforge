@@ -70,27 +70,68 @@ serve(async (req) => {
 
         const contentParts: any[] = [
           {
-            text: `You are an elite, notoriously rigorous chief design jury evaluator for premier national design institutes (NID, CEED, UCEED).
-QUESTION: ${q.content_text || ""}
+            text: `You are an esteemed Senior Professor and Design Mentor with 30+ years of studio teaching and jury experience at India's premier design institutes (NID Ahmedabad and IIT Bombay IDC).
+You are reviewing a candidate's subjective design and sketch submission for Part B of national entrance exams (NID DAT / CEED / UCEED).
+
+QUESTION:
+${q.content_text || ""}
 MAX MARKS: ${maxMarks} (Max ${maxPerCriteria} per criteria)
 
-STRICT GRADING PHILOSOPHY:
-- National entrance standards are uncompromising. Do NOT give inflated marks.
-- High marks (75%+) are reserved strictly for exceptional portfolio-caliber work.
-- Average/mediocre attempts without clear scale or perspective get 30% to 50%.
-- Penalize cliché ideas, floating objects, incorrect vanishing points, and lack of human ergonomics.
+EVALUATION PRINCIPLES:
+1. TALK LIKE A REAL HUMAN MENTOR:
+   - Speak in simple, clear, conversational human English—the way you would speak to a student at their drafting table in a studio critique.
+   - Warm, observant, encouraging, yet honest about flaws.
+   - NEVER use generic AI buzzwords or cliché fillers (NEVER say "delve", "testament", "tapestry", "blend of", "good effort", "nice attempt", "commendable", "it is imperative").
+2. DO JUSTICE TO THIS SPECIFIC SUBMISSION:
+   - Look closely at what the student has actually drawn and written.
+   - You MUST explicitly reference 1 or 2 specific visual or functional details from their actual submission (e.g., the exact object form, the angle of perspective, a specific handle or hinge, the scale human figure, line weight contrast, cross-hatching, or specific annotations).
+   - Never write a generic critique that could apply to any random drawing.
+3. SCORING CRITERIA (0.0 to ${maxPerCriteria} each, evaluate independently without giving uniform scores):
+   1. Critical Thinking: Root problem grasp, real user pain points, unstated constraints.
+   2. Ideation: Genuine novelty, divergence from obvious first ideas.
+   3. Storytelling: Contextual empathy, interaction sequence, clear narrative.
+   4. Conceptualisation: Ergonomics, functional feasibility, structural logic.
+   5. Representation: Line weight hierarchy, correct perspective, proportions, tonal contrast.
 
-Score 0.0 to ${maxPerCriteria}:
-1. Critical Thinking
-2. Ideation
-3. Storytelling
-4. Conceptualisation
-5. Representation
-
-CRITIQUE ('mentor_comments'):
-Write an honest, constructive reality-check critique strictly between 20 and 25 words that pinpoints the critical flaw holding this submission back while clearly motivating the student to level up their craft.`
+MENTOR FEEDBACK REQUIREMENTS:
+- 'mentor_comments': 2 to 3 natural, observant sentences (approx 30 to 55 words) addressed directly to the student ("you"). Mention what works in their specific concept, and pinpoint the exact functional or visual flaw that holds it back.
+- 'mentor_improvements': One actionable studio exercise or technique tip (15 to 25 words).`
           }
         ];
+
+        if (resp.file_url) {
+          try {
+            let urls: string[] = [];
+            if (resp.file_url.startsWith("[")) {
+              urls = JSON.parse(resp.file_url);
+            } else {
+              urls = [resp.file_url];
+            }
+            for (let idx = 0; idx < Math.min(urls.length, 2); idx++) {
+              const imgRes = await fetch(urls[idx]);
+              if (imgRes.ok) {
+                const arrayBuffer = await imgRes.arrayBuffer();
+                const bytes = new Uint8Array(arrayBuffer);
+                let binary = "";
+                for (let b = 0; b < bytes.byteLength; b++) {
+                  binary += String.fromCharCode(bytes[b]);
+                }
+                const b64 = btoa(binary);
+                contentParts.push({
+                  text: `[Candidate Submission Sketch Page ${idx + 1}]:`
+                });
+                contentParts.push({
+                  inlineData: {
+                    mimeType: imgRes.headers.get("content-type") || "image/jpeg",
+                    data: b64
+                  }
+                });
+              }
+            }
+          } catch (e) {
+            console.warn("Could not attach candidate image in Edge Function:", e);
+          }
+        }
 
         if (resp.answer_text) {
           contentParts.push({ text: `Student Concept Explanation:\n${resp.answer_text}` });
@@ -118,7 +159,7 @@ Write an honest, constructive reality-check critique strictly between 20 and 25 
             body: JSON.stringify({
               contents: [{ parts: contentParts }],
               generationConfig: {
-                temperature: 0.2,
+                temperature: 0.4,
                 maxOutputTokens: 1024,
                 responseMimeType: "application/json",
                 responseSchema
@@ -139,11 +180,11 @@ Write an honest, constructive reality-check critique strictly between 20 and 25 
             const re = Math.min(maxPerCriteria, Math.max(0, Number(evalResult.representation) || 0));
             const qScore = Math.max(0, Math.round((ct + id + st + co + re) * 100) / 100);
 
-            // Enforce 20-25 word boundary
-            let comment = evalResult.mentor_comments || "";
-            const words = comment.trim().split(/\s+/).filter(Boolean);
-            if (words.length > 25) {
-              comment = words.slice(0, 24).join(" ") + ".";
+            // Clean comment without artificial truncate
+            let comment = (evalResult.mentor_comments || "").trim();
+            const words = comment.split(/\s+/).filter(Boolean);
+            if (words.length > 75) {
+              comment = words.slice(0, 75).join(" ") + ".";
             }
 
             await supabase.from("exam_responses").update({

@@ -204,48 +204,64 @@ async function optimizeImageForGemini(url: string, maxDim = 1200, quality = 0.8)
 }
 
 /**
- * Enforce strict 20-25 word limit on review comments
+ * Word count helper
  */
 export function countWords(text: string): number {
   if (!text) return 0;
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-export function adjustToWordLimit(text: string, minWords = 20, maxWords = 25): { text: string; wordCount: number } {
+/**
+ * Ensures mentor comments have a clean, natural length without artificial fillers.
+ * Replaces hardcoded repetitive phrases with genuine mentor observations.
+ */
+export function adjustToWordLimit(text: string, minWords = 20, maxWords = 75): { text: string; wordCount: number } {
+  if (!text) return { text: "", wordCount: 0 };
   const words = text.trim().split(/\s+/).filter(Boolean);
   const count = words.length;
 
-  if (count >= minWords && count <= maxWords) {
+  if (count <= maxWords) {
     return { text: words.join(" "), wordCount: count };
   }
 
-  if (count > maxWords) {
-    // Truncate cleanly at 24 or 25 words with a period
-    const truncated = words.slice(0, 24).join(" ");
-    const cleanText = truncated.replace(/[,;:\-\s]+$/, "") + ".";
-    return { text: cleanText, wordCount: countWords(cleanText) };
-  }
+  // Truncate cleanly if the response is excessively verbose
+  const truncated = words.slice(0, maxWords).join(" ");
+  const cleanText = truncated.replace(/[,;:\-\s]+$/, "") + ".";
+  return { text: cleanText, wordCount: countWords(cleanText) };
+}
 
-  // If slightly under 20 words, pad thoughtfully with design feedback
-  const fillers = [
-    "Ground your concept in real ergonomic dimensions and sharpen perspective convergence.",
-    "Eliminate cliché solutions; push for deeper user pain points and crisp tonal contrast.",
-    "Prioritize functional proportion and articulate mechanism details over superficial styling."
-  ];
+/**
+ * Builds a deeply observant, human-mentor evaluation prompt reflecting 30+ years of NID / IIT IDC studio teaching.
+ */
+export function buildMentorEvaluationPrompt(questionText: string, maxMarks: number, maxPerCriteria: number): string {
+  return `You are an esteemed Senior Professor and Design Mentor with 30+ years of studio teaching and grand jury experience at India's premier design institutes (NID Ahmedabad and IIT Bombay IDC).
+You are evaluating a student's subjective design & sketching submission for Part B of national entrance exams (NID DAT / CEED / UCEED).
 
-  let current = words.join(" ");
-  for (const filler of fillers) {
-    if (countWords(current) >= minWords) break;
-    current = `${current.replace(/\.?$/, ".")} ${filler}`;
-  }
+EXAM QUESTION:
+${questionText.replace(/<[^>]*>/g, " ")}
 
-  const finalWords = current.split(/\s+/).filter(Boolean);
-  if (finalWords.length > maxWords) {
-    const trimmed = finalWords.slice(0, 24).join(" ").replace(/[,;:\-\s]+$/, "") + ".";
-    return { text: trimmed, wordCount: countWords(trimmed) };
-  }
+YOUR CORE EVALUATION PRINCIPLES:
+1. TALK LIKE A REAL HUMAN MENTOR:
+   - Speak in simple, clear, conversational human English—the way you would speak to a student at their drafting table in a studio critique.
+   - Warm, perceptive, encouraging, yet honest about flaws.
+   - NEVER use generic AI buzzwords or cliché fillers (NEVER say "delve", "testament", "tapestry", "blend of", "good effort", "nice attempt", "commendable", "it is imperative").
+2. DO JUSTICE TO THIS SPECIFIC SUBMISSION (DEEP VISUAL GROUNDING):
+   - Look closely at what the student has actually drawn and written.
+   - You MUST explicitly reference 1 or 2 specific visual or functional details from their actual submission (e.g., the exact object form, the angle of perspective, a specific handle or hinge, the scale human figure or hand, line weight contrast, cross-hatching, or specific explanatory callouts).
+   - Never write a generic critique that could apply to any random drawing. If they designed an umbrella, critique the ribs, runner, and wet-grip. If they drew a storyboard, critique the character posture, camera framing, and action flow.
+   - If the student provided no sketch or a blank page, state that clearly and score representation and storytelling accordingly.
+3. AUTHENTIC RUBRIC SCORING (Total: ${maxMarks}, Max ${maxPerCriteria} per criteria):
+   Score each criterion independently based on concrete visual and conceptual evidence (do NOT assign identical marks across all 5):
+   - Critical Thinking (0 to ${maxPerCriteria}): Did they understand real user needs, context, and unstated constraints?
+   - Ideation (0 to ${maxPerCriteria}): Freshness, divergence, and originality—did they move beyond the most obvious first cliché?
+   - Storytelling (0 to ${maxPerCriteria}): Human context, scale figures, interaction sequence, and clear narrative.
+   - Conceptualisation (0 to ${maxPerCriteria}): Ergonomic dimensions, mechanical feasibility, and physical logic.
+   - Representation (0 to ${maxPerCriteria}): 2D/3D perspective, line weight hierarchy, proportions, and visual communicative clarity.
+   * Marking Benchmark: 75%+ is for exceptional, portfolio-ready work; 45%-65% for standard attempts with typical perspective or scale gaps; below 40% for superficial or distorted attempts.
 
-  return { text: finalWords.join(" "), wordCount: finalWords.length };
+MENTOR FEEDBACK REQUIREMENTS:
+- 'mentor_comments': 2 to 3 natural, observant sentences (approximately 30 to 55 words) addressed directly to the student ("you"). Mention what works in their specific concept, and pinpoint the exact functional or visual flaw that holds it back.
+- 'mentor_improvements': One actionable studio exercise or technique tip (15 to 25 words) that a veteran NID/IIT mentor would ask them to practice on paper today.`;
 }
 
 /**
@@ -280,34 +296,8 @@ export async function evaluatePartBWithGemini(params: {
   // Build multimodal content parts
   const contentParts: any[] = [];
 
-  // Add system instruction / prompt with strict, rigorous national exam standards
-  const systemPrompt = `You are an elite, notoriously rigorous chief design jury evaluator for premier national design institutes (NID, CEED, UCEED).
-You are evaluating a student's subjective design & sketching submission for Part B.
-
-EXAM QUESTION:
-${questionText.replace(/<[^>]*>/g, " ")}
-
-STRICT GRADING PHILOSOPHY & CALIBRATION (Total Max Marks: ${maxMarks}, Max ${maxPerCriteria} per criteria):
-- Premier national design entrance exams have uncompromising standards. Do NOT award lenient or inflated marks.
-- Full or high marks (75%+ of criteria) are reserved STRICTLY for exceptional, portfolio-grade work exhibiting lateral breakthrough thinking and masterclass perspective/craft.
-- Typical or surface-level attempts that lack user context, human figures for scale, or rigorous perspective must be marked strictly in the 30% to 50% range.
-- Heavily penalize: generic/cliché ideas, floating objects without scale, inaccurate vanishing points, muddy linework, and unfeasible styling without usability logic.
-- Rubric criteria:
-  1. Critical Thinking: Root problem grasp, real user pain points, unstated constraints.
-  2. Ideation: Genuine novelty, divergence from obvious first ideas, depth.
-  3. Storytelling: Contextual empathy, interaction sequence, clear narrative.
-  4. Conceptualisation: Ergonomics, functional feasibility, structural logic.
-  5. Representation: Line weight hierarchy, correct perspective, proportions, tonal contrast.
-
-CRITIQUE & REALITY-CHECK INSTRUCTIONS ('mentor_comments'):
-- Deliver an honest, uncompromising reality-check critique that clearly pinpoints the exact flaw preventing this from reaching top-rank caliber.
-- Balance the hard reality check with sharp, actionable, and forward-looking guidance that drives the student to elevate their craft rather than demotivating them.
-- Avoid hollow praise or sugarcoating (e.g. NEVER say "good effort", "nice attempt"). Speak like an authentic design mentor.
-- WORD COUNT REQUIREMENT: Write strictly between 20 and 25 words in length. Count your words meticulously.
-
-ACTIONABLE REMEDIATION ('mentor_improvements'):
-- In 'mentor_improvements', provide exactly one concise, high-impact tactical advice sentence (10-15 words).`;
-
+  // Add system instruction / prompt with veteran 30-yr NID/IIT mentor persona
+  const systemPrompt = buildMentorEvaluationPrompt(questionText, maxMarks, maxPerCriteria);
   contentParts.push({ text: systemPrompt });
 
   // Attach reference image if question has one (optimized & downscaled)
@@ -371,8 +361,8 @@ ACTIONABLE REMEDIATION ('mentor_improvements'):
       storytelling: { type: "NUMBER", description: `Score between 0 and ${maxPerCriteria}` },
       conceptualisation: { type: "NUMBER", description: `Score between 0 and ${maxPerCriteria}` },
       representation: { type: "NUMBER", description: `Score between 0 and ${maxPerCriteria}` },
-      mentor_comments: { type: "STRING", description: "Feedback strictly between 20 and 25 words" },
-      mentor_improvements: { type: "STRING", description: "Single-sentence actionable improvement tip" }
+      mentor_comments: { type: "STRING", description: "Direct, observant human mentor feedback referencing specific details in student submission (approx 30-55 words)" },
+      mentor_improvements: { type: "STRING", description: "Single practical studio exercise or sketch technique (15-25 words)" }
     },
     required: [
       "critical_thinking",
@@ -388,7 +378,7 @@ ACTIONABLE REMEDIATION ('mentor_improvements'):
   const payload = {
     contents: [{ parts: contentParts }],
     generationConfig: {
-      temperature: 0.2,
+      temperature: 0.4,
       maxOutputTokens: 1024,
       responseMimeType: "application/json",
       responseSchema
@@ -444,8 +434,8 @@ ACTIONABLE REMEDIATION ('mentor_improvements'):
 
   const totalSum = Math.max(0, Math.round((critical_thinking + ideation + storytelling + conceptualisation + representation) * 100) / 100);
 
-  // Enforce 20-25 word constraint strictly
-  const { text: validatedComments, wordCount } = adjustToWordLimit(parsed.mentor_comments || "", 20, 25);
+  // Ensure clean mentor comments length without artificial repetitive fillers
+  const { text: validatedComments, wordCount } = adjustToWordLimit(parsed.mentor_comments || "", 20, 75);
 
   return {
     rubric_marks: {
@@ -491,34 +481,7 @@ export async function evaluatePartBWithOpenAI(params: {
     throw new Error("OpenAI API key is not configured. Please add it in AI Settings.");
   }
 
-  const maxPerCriteria = Math.round((maxMarks / 5) * 10) / 10;
-
-  const systemPrompt = `You are an elite, notoriously rigorous chief design jury evaluator for premier national design institutes (NID, CEED, UCEED).
-You are evaluating a student's subjective design & sketching submission for Part B.
-
-EXAM QUESTION:
-${questionText.replace(/<[^>]*>/g, " ")}
-
-STRICT GRADING PHILOSOPHY & CALIBRATION (Total Max Marks: ${maxMarks}, Max ${maxPerCriteria} per criteria):
-- Premier national design entrance exams have uncompromising standards. Do NOT award lenient or inflated marks.
-- Full or high marks (75%+ of criteria) are reserved STRICTLY for exceptional, portfolio-grade work exhibiting lateral breakthrough thinking and masterclass perspective/craft.
-- Typical or surface-level attempts that lack user context, human figures for scale, or rigorous perspective must be marked strictly in the 30% to 50% range.
-- Heavily penalize: generic/cliché ideas, floating objects without scale, inaccurate vanishing points, muddy linework, and unfeasible styling without usability logic.
-- Rubric criteria:
-  1. Critical Thinking: Root problem grasp, real user pain points, unstated constraints.
-  2. Ideation: Genuine novelty, divergence from obvious first ideas, depth.
-  3. Storytelling: Contextual empathy, interaction sequence, clear narrative.
-  4. Conceptualisation: Ergonomics, functional feasibility, structural logic.
-  5. Representation: Line weight hierarchy, correct perspective, proportions, tonal contrast.
-
-CRITIQUE & REALITY-CHECK INSTRUCTIONS ('mentor_comments'):
-- Deliver an honest, uncompromising reality-check critique that clearly pinpoints the exact flaw preventing this from reaching top-rank caliber.
-- Balance the hard reality check with sharp, actionable, and forward-looking guidance that drives the student to elevate their craft rather than demotivating them.
-- Avoid hollow praise or sugarcoating (e.g. NEVER say "good effort", "nice attempt"). Speak like an authentic design mentor.
-- WORD COUNT REQUIREMENT: Write strictly between 20 and 25 words in length. Count your words meticulously.
-
-ACTIONABLE REMEDIATION ('mentor_improvements'):
-- In 'mentor_improvements', provide exactly one concise, high-impact tactical advice sentence (10-15 words).
+  const systemPrompt = `${buildMentorEvaluationPrompt(questionText, maxMarks, maxPerCriteria)}
 
 OUTPUT FORMAT:
 Return a strictly valid JSON object with EXACTLY these keys:
@@ -528,8 +491,8 @@ Return a strictly valid JSON object with EXACTLY these keys:
   "storytelling": number (0 to ${maxPerCriteria}),
   "conceptualisation": number (0 to ${maxPerCriteria}),
   "representation": number (0 to ${maxPerCriteria}),
-  "mentor_comments": string (strictly 20-25 words),
-  "mentor_improvements": string (10-15 words)
+  "mentor_comments": string (observant, direct human mentor feedback referencing specific submission details, approx 30-55 words),
+  "mentor_improvements": string (one practical studio exercise or sketch technique, 15-25 words)
 }`;
 
   const userContent: any[] = [];
@@ -605,7 +568,7 @@ Return a strictly valid JSON object with EXACTLY these keys:
         { role: "user", content: userContent }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.2,
+      temperature: 0.4,
       max_tokens: 1024
     })
   });
@@ -637,7 +600,7 @@ Return a strictly valid JSON object with EXACTLY these keys:
 
   const totalSum = Math.max(0, Math.round((critical_thinking + ideation + storytelling + conceptualisation + representation) * 100) / 100);
 
-  const { text: validatedComments, wordCount } = adjustToWordLimit(parsed.mentor_comments || "", 20, 25);
+  const { text: validatedComments, wordCount } = adjustToWordLimit(parsed.mentor_comments || "", 20, 75);
 
   return {
     rubric_marks: {

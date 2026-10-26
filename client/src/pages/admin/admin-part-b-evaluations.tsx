@@ -1476,16 +1476,16 @@ export default function AdminPartBEvaluations() {
                  </label>
                  {(() => {
                    const wc = countWords(evalForm.mentor_comments);
-                   const isExact = wc >= 20 && wc <= 25;
+                   const isOptimal = wc >= 25 && wc <= 65;
                    return (
                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors ${
-                       isExact 
+                       isOptimal 
                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
                          : wc > 0 
-                         ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                         ? 'bg-blue-50 text-blue-700 border border-blue-200'
                          : 'text-foreground/40'
                      }`}>
-                       {wc} / 25 words {isExact ? '✓ Optimal' : '(Target: 20-25)'}
+                       {wc} words {isOptimal ? '✓ Studio Critique' : '(Guideline: 30–55 words)'}
                      </span>
                    );
                  })()}
