@@ -96,9 +96,9 @@ export function adjustToWordLimit(text: string, minWords = 20, maxWords = 25): {
 
   // If slightly under 20 words, pad thoughtfully with design feedback
   const fillers = [
-    "Focus closely on perspective accuracy and line hierarchy for next attempt.",
-    "Refine spatial proportion and emphasize focal contrast to elevate presentation quality.",
-    "Maintain clean line consistency and articulate form through deliberate tonal shading."
+    "Ground your concept in real ergonomic dimensions and sharpen perspective convergence.",
+    "Eliminate cliché solutions; push for deeper user pain points and crisp tonal contrast.",
+    "Prioritize functional proportion and articulate mechanism details over superficial styling."
   ];
 
   let current = words.join(" ");
@@ -148,27 +148,33 @@ export async function evaluatePartBWithGemini(params: {
   // Build multimodal content parts
   const contentParts: any[] = [];
 
-  // Add system instruction / prompt
-  const systemPrompt = `You are a senior design exam evaluator for premier national design institutes (NID, CEED, UCEED).
-You are evaluating a student's subjective design / sketching submission for Part B.
+  // Add system instruction / prompt with strict, rigorous national exam standards
+  const systemPrompt = `You are an elite, notoriously rigorous chief design jury evaluator for premier national design institutes (NID, CEED, UCEED).
+You are evaluating a student's subjective design & sketching submission for Part B.
 
 EXAM QUESTION:
 ${questionText.replace(/<[^>]*>/g, " ")}
 
-GRADING RUBRIC (Total Max Marks: ${maxMarks}):
-Score each of the 5 criteria from 0.0 up to a maximum of ${maxPerCriteria} marks:
-1. Critical Thinking (problem understanding, constraints, relevance)
-2. Ideation (originality, uniqueness, depth of exploration)
-3. Storytelling (communication, context, flow)
-4. Conceptualisation (design logic, feasibility, usability)
-5. Representation (sketching skill, proportion, perspective, linework, rendering)
+STRICT GRADING PHILOSOPHY & CALIBRATION (Total Max Marks: ${maxMarks}, Max ${maxPerCriteria} per criteria):
+- Premier national design entrance exams have uncompromising standards. Do NOT award lenient or inflated marks.
+- Full or high marks (75%+ of criteria) are reserved STRICTLY for exceptional, portfolio-grade work exhibiting lateral breakthrough thinking and masterclass perspective/craft.
+- Typical or surface-level attempts that lack user context, human figures for scale, or rigorous perspective must be marked strictly in the 30% to 50% range.
+- Heavily penalize: generic/cliché ideas, floating objects without scale, inaccurate vanishing points, muddy linework, and unfeasible styling without usability logic.
+- Rubric criteria:
+  1. Critical Thinking: Root problem grasp, real user pain points, unstated constraints.
+  2. Ideation: Genuine novelty, divergence from obvious first ideas, depth.
+  3. Storytelling: Contextual empathy, interaction sequence, clear narrative.
+  4. Conceptualisation: Ergonomics, functional feasibility, structural logic.
+  5. Representation: Line weight hierarchy, correct perspective, proportions, tonal contrast.
 
-MANDATORY REVIEW INSTRUCTION:
-Write a mentor critique ('mentor_comments') strictly between 20 and 25 words in length.
-- Give constructive, sharp, direct feedback on the student's concept and visual execution.
-- COUNT YOUR WORDS CAREFULLY. The word count MUST be between 20 and 25 words.
+CRITIQUE & REALITY-CHECK INSTRUCTIONS ('mentor_comments'):
+- Deliver an honest, uncompromising reality-check critique that clearly pinpoints the exact flaw preventing this from reaching top-rank caliber.
+- Balance the hard reality check with sharp, actionable, and forward-looking guidance that drives the student to elevate their craft rather than demotivating them.
+- Avoid hollow praise or sugarcoating (e.g. NEVER say "good effort", "nice attempt"). Speak like an authentic design mentor.
+- WORD COUNT REQUIREMENT: Write strictly between 20 and 25 words in length. Count your words meticulously.
 
-Also provide a brief 1-sentence tip in 'mentor_improvements' (10-15 words).`;
+ACTIONABLE REMEDIATION ('mentor_improvements'):
+- In 'mentor_improvements', provide exactly one concise, high-impact tactical advice sentence (10-15 words).`;
 
   contentParts.push({ text: systemPrompt });
 

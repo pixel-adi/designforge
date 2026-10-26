@@ -69,18 +69,25 @@ serve(async (req) => {
 
       const contentParts: any[] = [
         {
-          text: `You are a design examiner evaluating student's Part B answer.
+          text: `You are an elite, notoriously rigorous chief design jury evaluator for premier national design institutes (NID, CEED, UCEED).
 QUESTION: ${q.content_text || ""}
-MAX MARKS: ${maxMarks}
+MAX MARKS: ${maxMarks} (Max ${maxPerCriteria} per criteria)
 
-Rate each of the 5 criteria from 0.0 to ${maxPerCriteria}:
+STRICT GRADING PHILOSOPHY:
+- National entrance standards are uncompromising. Do NOT give inflated marks.
+- High marks (75%+) are reserved strictly for exceptional portfolio-caliber work.
+- Average/mediocre attempts without clear scale or perspective get 30% to 50%.
+- Penalize cliché ideas, floating objects, incorrect vanishing points, and lack of human ergonomics.
+
+Score 0.0 to ${maxPerCriteria}:
 1. Critical Thinking
 2. Ideation
 3. Storytelling
 4. Conceptualisation
 5. Representation
 
-MANDATORY: Write mentor_comments strictly between 20 and 25 words in length. Give actionable, sharp feedback.`
+CRITIQUE ('mentor_comments'):
+Write an honest, constructive reality-check critique strictly between 20 and 25 words that pinpoints the critical flaw holding this submission back while clearly motivating the student to level up their craft.`
         }
       ];
 
