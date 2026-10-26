@@ -16,8 +16,56 @@ export interface EvaluationResult {
   word_count: number;
 }
 
+export interface AISettings {
+  provider: "openai" | "gemini";
+  openaiKey: string;
+  openaiModel: string;
+  geminiKey: string;
+  geminiModel: string;
+}
+
 /**
- * Fetch Gemini API configurations from system_settings
+ * Fetch AI configuration from system_settings (OpenAI & Gemini)
+ */
+export async function getAISettings(): Promise<AISettings> {
+  try {
+    const { data } = await supabase
+      .from("system_settings")
+      .select("key, value");
+
+    const openaiKey = data?.find(d => d.key === "openai_api_key")?.value || "";
+    const openaiModel = data?.find(d => d.key === "openai_api_model")?.value || "gpt-4o-mini";
+    const geminiKey = data?.find(d => d.key === "gemini_api_key")?.value || "";
+    let geminiModel = data?.find(d => d.key === "gemini_api_model")?.value || "gemini-flash-latest";
+
+    if (geminiModel.startsWith("gemini-1.5") || geminiModel === "gemini-2.5-flash") {
+      geminiModel = "gemini-flash-latest";
+    }
+
+    const explicitProvider = data?.find(d => d.key === "ai_evaluation_provider")?.value as "openai" | "gemini" | undefined;
+    const provider: "openai" | "gemini" = explicitProvider || (openaiKey ? "openai" : "gemini");
+
+    return {
+      provider,
+      openaiKey,
+      openaiModel,
+      geminiKey,
+      geminiModel
+    };
+  } catch (err) {
+    console.error("Failed to fetch AI settings:", err);
+    return {
+      provider: "openai",
+      openaiKey: "",
+      openaiModel: "gpt-4o-mini",
+      geminiKey: "",
+      geminiModel: "gemini-flash-latest"
+    };
+  }
+}
+
+/**
+ * Fetch Gemini API configurations from system_settings (legacy wrapper)
  */
 export async function getGeminiSettings(): Promise<{ apiKey: string; model: string }> {
   try {
@@ -26,17 +74,16 @@ export async function getGeminiSettings(): Promise<{ apiKey: string; model: stri
       .select("key, value");
 
     const apiKey = data?.find(d => d.key === "gemini_api_key")?.value || "";
-    let model = data?.find(d => d.key === "gemini_api_model")?.value || "gemini-1.5-flash";
+    let model = data?.find(d => d.key === "gemini_api_model")?.value || "gemini-flash-latest";
 
-    // Normalize legacy, preview, or experimental strings to stable gemini-1.5-flash (which has 1,500 free requests/day)
-    if (!model || model === "gemini-flash-latest" || model.includes("3.8") || model.includes("2.5")) {
-      model = "gemini-1.5-flash";
+    if (model.startsWith("gemini-1.5") || model === "gemini-2.5-flash") {
+      model = "gemini-flash-latest";
     }
 
     return { apiKey, model };
   } catch (err) {
     console.error("Failed to fetch Gemini settings:", err);
-    return { apiKey: "", model: "gemini-1.5-flash" };
+    return { apiKey: "", model: "gemini-flash-latest" };
   }
 }
 
@@ -197,16 +244,12 @@ export async function evaluatePartBWithGemini(params: {
   const { questionText, questionMediaUrl, candidateFileUrl, candidateAnswerText, maxMarks } = params;
 
   let apiKey = params.apiKey;
-  let model = params.model;
+  let model = params.model || "gemini-flash-latest";
 
   if (!apiKey) {
     const settings = await getGeminiSettings();
     apiKey = settings.apiKey;
-    if (!model) model = settings.model;
-  }
-
-  if (!model || model === "gemini-flash-latest" || model.includes("3.8") || model.includes("2.5")) {
-    model = "gemini-1.5-flash";
+    if (settings.model) model = settings.model;
   }
 
   if (!apiKey) {
@@ -342,9 +385,9 @@ ACTIONABLE REMEDIATION ('mentor_improvements'):
     }
   );
 
-  if (!response.ok && model !== "gemini-1.5-flash") {
+  if (!response.ok && model !== "gemini-flash-latest") {
     response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -398,4 +441,241 @@ ACTIONABLE REMEDIATION ('mentor_improvements'):
     mentor_improvements: parsed.mentor_improvements || "",
     word_count: wordCount
   };
+}
+
+/**
+ * Evaluate a single Part B subjective response using OpenAI (ChatGPT / GPT-4o / GPT-4o-mini)
+ */
+export async function evaluatePartBWithOpenAI(params: {
+  questionText: string;
+  questionMediaUrl?: string | null;
+  candidateFileUrl?: string | null;
+  candidateAnswerText?: string | null;
+  maxMarks: number;
+  apiKey?: string;
+  model?: string;
+}): Promise<EvaluationResult> {
+  const { questionText, questionMediaUrl, candidateFileUrl, candidateAnswerText, maxMarks } = params;
+
+  let apiKey = params.apiKey;
+  let model = params.model;
+
+  if (!apiKey) {
+    const settings = await getAISettings();
+    apiKey = settings.openaiKey;
+    if (!model) model = settings.openaiModel;
+  }
+
+  if (!model) model = "gpt-4o-mini";
+
+  if (!apiKey) {
+    throw new Error("OpenAI API key is not configured. Please add it in AI Settings.");
+  }
+
+  const maxPerCriteria = Math.round((maxMarks / 5) * 10) / 10;
+
+  const systemPrompt = `You are an elite, notoriously rigorous chief design jury evaluator for premier national design institutes (NID, CEED, UCEED).
+You are evaluating a student's subjective design & sketching submission for Part B.
+
+EXAM QUESTION:
+${questionText.replace(/<[^>]*>/g, " ")}
+
+STRICT GRADING PHILOSOPHY & CALIBRATION (Total Max Marks: ${maxMarks}, Max ${maxPerCriteria} per criteria):
+- Premier national design entrance exams have uncompromising standards. Do NOT award lenient or inflated marks.
+- Full or high marks (75%+ of criteria) are reserved STRICTLY for exceptional, portfolio-grade work exhibiting lateral breakthrough thinking and masterclass perspective/craft.
+- Typical or surface-level attempts that lack user context, human figures for scale, or rigorous perspective must be marked strictly in the 30% to 50% range.
+- Heavily penalize: generic/cliché ideas, floating objects without scale, inaccurate vanishing points, muddy linework, and unfeasible styling without usability logic.
+- Rubric criteria:
+  1. Critical Thinking: Root problem grasp, real user pain points, unstated constraints.
+  2. Ideation: Genuine novelty, divergence from obvious first ideas, depth.
+  3. Storytelling: Contextual empathy, interaction sequence, clear narrative.
+  4. Conceptualisation: Ergonomics, functional feasibility, structural logic.
+  5. Representation: Line weight hierarchy, correct perspective, proportions, tonal contrast.
+
+CRITIQUE & REALITY-CHECK INSTRUCTIONS ('mentor_comments'):
+- Deliver an honest, uncompromising reality-check critique that clearly pinpoints the exact flaw preventing this from reaching top-rank caliber.
+- Balance the hard reality check with sharp, actionable, and forward-looking guidance that drives the student to elevate their craft rather than demotivating them.
+- Avoid hollow praise or sugarcoating (e.g. NEVER say "good effort", "nice attempt"). Speak like an authentic design mentor.
+- WORD COUNT REQUIREMENT: Write strictly between 20 and 25 words in length. Count your words meticulously.
+
+ACTIONABLE REMEDIATION ('mentor_improvements'):
+- In 'mentor_improvements', provide exactly one concise, high-impact tactical advice sentence (10-15 words).
+
+OUTPUT FORMAT:
+Return a strictly valid JSON object with EXACTLY these keys:
+{
+  "critical_thinking": number (0 to ${maxPerCriteria}),
+  "ideation": number (0 to ${maxPerCriteria}),
+  "storytelling": number (0 to ${maxPerCriteria}),
+  "conceptualisation": number (0 to ${maxPerCriteria}),
+  "representation": number (0 to ${maxPerCriteria}),
+  "mentor_comments": string (strictly 20-25 words),
+  "mentor_improvements": string (10-15 words)
+}`;
+
+  const userContent: any[] = [];
+  userContent.push({
+    type: "text",
+    text: `Please evaluate this student submission strictly according to the exam rubric.`
+  });
+
+  if (questionMediaUrl) {
+    const refImg = await optimizeImageForGemini(questionMediaUrl);
+    if (refImg) {
+      userContent.push({
+        type: "image_url",
+        image_url: {
+          url: `data:${refImg.mimeType};base64,${refImg.data}`,
+          detail: "low"
+        }
+      });
+    }
+  }
+
+  if (candidateFileUrl) {
+    let rawUrls: string[] = [];
+    try {
+      if (candidateFileUrl.startsWith("[")) {
+        rawUrls = JSON.parse(candidateFileUrl);
+      } else {
+        rawUrls = [candidateFileUrl];
+      }
+    } catch {
+      rawUrls = [candidateFileUrl];
+    }
+
+    const urlsToFetch = rawUrls.slice(0, 3);
+    const optimizedSketches = await Promise.all(
+      urlsToFetch.map(u => optimizeImageForGemini(u))
+    );
+
+    optimizedSketches.forEach((sketchImg, i) => {
+      if (sketchImg) {
+        userContent.push({
+          type: "text",
+          text: `[Student Submission Sketch Page ${i + 1}]:`
+        });
+        userContent.push({
+          type: "image_url",
+          image_url: {
+            url: `data:${sketchImg.mimeType};base64,${sketchImg.data}`,
+            detail: "high"
+          }
+        });
+      }
+    });
+  }
+
+  if (candidateAnswerText && candidateAnswerText.trim()) {
+    userContent.push({
+      type: "text",
+      text: `[Student Written Explanation / Concept Note]:\n${candidateAnswerText}`
+    });
+  }
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: model || "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+      max_tokens: 1024
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI API Error (${response.status}): ${errorText}`);
+  }
+
+  const resData = await response.json();
+  const rawText = resData.choices?.[0]?.message?.content;
+  if (!rawText) {
+    throw new Error("No evaluation response received from OpenAI.");
+  }
+
+  const parsed = JSON.parse(rawText);
+
+  const clampScore = (val: any) => {
+    const num = parseFloat(val);
+    if (isNaN(num)) return 0;
+    return Math.max(0, Math.min(maxPerCriteria, Math.round(num * 100) / 100));
+  };
+
+  const critical_thinking = clampScore(parsed.critical_thinking);
+  const ideation = clampScore(parsed.ideation);
+  const storytelling = clampScore(parsed.storytelling);
+  const conceptualisation = clampScore(parsed.conceptualisation);
+  const representation = clampScore(parsed.representation);
+
+  const totalSum = Math.max(0, Math.round((critical_thinking + ideation + storytelling + conceptualisation + representation) * 100) / 100);
+
+  const { text: validatedComments, wordCount } = adjustToWordLimit(parsed.mentor_comments || "", 20, 25);
+
+  return {
+    rubric_marks: {
+      critical_thinking: critical_thinking.toFixed(2).replace(/\.?0+$/, ''),
+      ideation: ideation.toFixed(2).replace(/\.?0+$/, ''),
+      storytelling: storytelling.toFixed(2).replace(/\.?0+$/, ''),
+      conceptualisation: conceptualisation.toFixed(2).replace(/\.?0+$/, ''),
+      representation: representation.toFixed(2).replace(/\.?0+$/, '')
+    },
+    marks_awarded: totalSum,
+    mentor_comments: validatedComments,
+    mentor_improvements: parsed.mentor_improvements || "",
+    word_count: wordCount
+  };
+}
+
+/**
+ * Unified Part B Evaluator: Automatically routes to OpenAI (ChatGPT) or Gemini based on active configuration
+ */
+export async function evaluatePartBWithAI(params: {
+  questionText: string;
+  questionMediaUrl?: string | null;
+  candidateFileUrl?: string | null;
+  candidateAnswerText?: string | null;
+  maxMarks: number;
+}): Promise<EvaluationResult> {
+  const settings = await getAISettings();
+
+  // Prefer OpenAI if configured or selected as provider
+  if (settings.provider === "openai" || (!settings.geminiKey && settings.openaiKey)) {
+    if (!settings.openaiKey) {
+      throw new Error("OpenAI API key is missing. Please add your ChatGPT/OpenAI API key in AI Settings.");
+    }
+    return evaluatePartBWithOpenAI({
+      ...params,
+      apiKey: settings.openaiKey,
+      model: settings.openaiModel
+    });
+  }
+
+  // Fallback to Gemini if configured
+  if (settings.geminiKey) {
+    return evaluatePartBWithGemini({
+      ...params,
+      apiKey: settings.geminiKey,
+      model: settings.geminiModel
+    });
+  }
+
+  // If OpenAI key is present even if provider wasn't explicitly switched
+  if (settings.openaiKey) {
+    return evaluatePartBWithOpenAI({
+      ...params,
+      apiKey: settings.openaiKey,
+      model: settings.openaiModel
+    });
+  }
+
+  throw new Error("No AI API key found. Please configure OpenAI (ChatGPT) or Gemini in AI Settings.");
 }

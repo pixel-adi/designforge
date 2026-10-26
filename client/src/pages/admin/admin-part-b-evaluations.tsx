@@ -11,8 +11,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { sanitizeHtml } from "@/lib/sanitize";
-import { Sparkles, Bot } from "lucide-react";
-import { evaluatePartBWithGemini, countWords } from "@/lib/geminiEvaluation";
+import { evaluatePartBWithAI, evaluatePartBWithGemini, getAISettings, countWords } from "@/lib/geminiEvaluation";
 
 const PAGE_SIZE = 100;
 
@@ -537,13 +536,13 @@ export default function AdminPartBEvaluations() {
 
     setAiEvaluatingSingle(true);
     try {
-      toast({ title: "Gemini AI Evaluating...", description: "Analyzing submission and formulating 20-25 word review." });
+      toast({ title: "AI Evaluating Submission...", description: "Analyzing sketch and formulating 20-25 word review." });
 
       const fileUrls = parseFileUrls(currentResp.file_url);
       const activeFileUrl = fileUrls.length > 0 ? normalizeSubmissionUrl(fileUrls[0]).url : null;
       const qMaxMarks = getQuestionMaxMarks(currentQ);
 
-      const result = await evaluatePartBWithGemini({
+      const result = await evaluatePartBWithAI({
         questionText: currentQ.content_text || "",
         questionMediaUrl: currentQ.media_url ? resolveQuestionMediaUrl(currentQ.media_url) : null,
         candidateFileUrl: activeFileUrl,
@@ -617,7 +616,7 @@ export default function AdminPartBEvaluations() {
           const qMaxMarks = getQuestionMaxMarks(q);
 
           try {
-            const result = await evaluatePartBWithGemini({
+            const result = await evaluatePartBWithAI({
               questionText: q.content_text || "",
               questionMediaUrl: q.media_url ? resolveQuestionMediaUrl(q.media_url) : null,
               candidateFileUrl: activeFileUrl,

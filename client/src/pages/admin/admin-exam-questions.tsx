@@ -203,7 +203,7 @@ export default function AdminExamQuestions() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [geminiKey, setGeminiKey] = useState("");
-  const [geminiModel, setGeminiModel] = useState("gemini-1.5-flash");
+  const [geminiModel, setGeminiModel] = useState("gemini-flash-latest");
   const [aiImporterOpen, setAiImporterOpen] = useState(false);
   const [questionPdfFile, setQuestionPdfFile] = useState<File | null>(null);
   const [answerKeyPdfFile, setAnswerKeyPdfFile] = useState<File | null>(null);
@@ -361,9 +361,9 @@ export default function AdminExamQuestions() {
       .from("system_settings")
       .select("key, value");
     const key = data?.find(d => d.key === "gemini_api_key")?.value || "";
-    let model = data?.find(d => d.key === "gemini_api_model")?.value || "gemini-1.5-flash";
-    if (!model || model === "gemini-flash-latest" || model.includes("3.8") || model.includes("2.5")) {
-      model = "gemini-1.5-flash";
+    let model = data?.find(d => d.key === "gemini_api_model")?.value || "gemini-flash-latest";
+    if (model.startsWith("gemini-1.5") || model === "gemini-2.5-flash") {
+      model = "gemini-flash-latest";
     }
     return { key, model };
   };
@@ -3339,10 +3339,10 @@ export default function AdminExamQuestions() {
                   <SelectValue placeholder="Select model" />
                 </SelectTrigger>
                 <SelectContent className="max-h-52 overflow-y-auto">
-                  <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash (Recommended — 1,500 Free Requests/Day)</SelectItem>
-                  <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash (Fast & Modern)</SelectItem>
-                  <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro (Best Reasoning)</SelectItem>
-                  <SelectItem value="gemini-flash-latest">Gemini Flash Latest (Dynamic Preview)</SelectItem>
+                  <SelectItem value="gemini-flash-latest">Gemini Flash Latest (Recommended — Always Active & Free)</SelectItem>
+                  <SelectItem value="gemini-pro-latest">Gemini Pro Latest (Best Quality — Free with limits)</SelectItem>
+                  <SelectItem value="gemini-3.5-flash">Gemini 3.5 Flash (Newest Release)</SelectItem>
+                  <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash (Fast Alternative)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

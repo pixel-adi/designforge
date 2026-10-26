@@ -29,10 +29,7 @@ serve(async (req) => {
       .select("key, value");
 
     const geminiKey = Deno.env.get("GEMINI_API_KEY") || settings?.find((d: any) => d.key === "gemini_api_key")?.value;
-    let geminiModel = settings?.find((d: any) => d.key === "gemini_api_model")?.value || "gemini-1.5-flash";
-    if (!geminiModel || geminiModel === "gemini-flash-latest" || geminiModel.includes("3.8") || geminiModel.includes("2.5")) {
-      geminiModel = "gemini-1.5-flash";
-    }
+    let geminiModel = settings?.find((d: any) => d.key === "gemini_api_model")?.value || "gemini-flash-latest";
 
     if (!geminiKey) {
       return new Response(JSON.stringify({ error: "Gemini API key is not configured" }), {
