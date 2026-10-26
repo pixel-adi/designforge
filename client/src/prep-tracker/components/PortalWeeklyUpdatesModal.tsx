@@ -30,23 +30,23 @@ export const PORTAL_RELEASES: WeeklyRelease[] = [
     items: [
       {
         type: 'feature',
-        title: 'AI Part B Subjective Evaluations (Gemini Vision)',
-        description: 'Instant multi-modal evaluation for design sketches, illustrations, and subjective answers. Automatically computes rubric scores across Critical Thinking, Ideation, Storytelling, Conceptualisation, and Representation, paired with a concise 20–25 word review.',
+        title: 'Custom Practice Drills from Question Bank',
+        description: 'You can now create personalized practice tests tailored to your weak areas directly from the question bank. Select curated presets like "GK Spree & Design Awareness", "Part A Speed Drill", or "Part B Creative Studio", or build your own custom combination.',
       },
       {
         type: 'feature',
-        title: 'Student Custom Practice Drills',
-        description: 'Students can now build personalized practice workouts from the question bank. Choose from presets like "GK Spree & Design Awareness", "Part A Speed Drill", or "Part B Creative Studio" with instant automated AI feedback on submissions.',
-      },
-      {
-        type: 'feature',
-        title: 'Bulk Exam Paper Upload with Rubric Matching',
-        description: 'Create complete exam papers in seconds by uploading a CSV alongside question diagrams and sketches. Automatically validates question counts and marks against the exam template rubric before importing.',
+        title: 'Dedicated "My Drills" Dashboard Workspace',
+        description: 'Track and access all your personalized practice tests in one place using the new "⚡ My Drills" filter on your student dashboard.',
       },
       {
         type: 'improvement',
-        title: 'Quota-Managed Student Practice Tests',
-        description: 'Practice drills are tracked in the backend database with tier-aware quota limits (up to 10 active drills for standard students, unlimited for Focus Batch) and self-service deletion.',
+        title: 'Drill Quota & Self-Service Management',
+        description: 'Keep up to 10 active practice tests at a time (unlimited for Focus Batch students). Delete completed drills anytime with a single tap to free up space for fresh workouts.',
+      },
+      {
+        type: 'improvement',
+        title: 'Instant Answer Autosave & Engine Performance',
+        description: 'Optimized test engine responsiveness ensures seamless background autosave of answers, sketches, and smoother question transitions during timed practice.',
       },
     ],
   },
