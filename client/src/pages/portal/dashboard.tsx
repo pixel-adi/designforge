@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy, BookOpen, Lightbulb, ClipboardList, Lock, CreditCard, ExternalLink, Download, Eye, EyeOff, Upload, AlertCircle, Star, Shield, Sparkles, ThumbsUp, Plus, HelpCircle, Send, Zap, Target, TrendingUp, Calendar, ChevronLeft } from "lucide-react";
+import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy, BookOpen, Lightbulb, ClipboardList, Lock, CreditCard, ExternalLink, Download, Eye, EyeOff, Upload, AlertCircle, Star, Shield, Sparkles, ThumbsUp, Plus, HelpCircle, Send, Zap, Target, TrendingUp, Calendar, ChevronLeft, Trash2 } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -15,6 +15,7 @@ import { PortalPrepTrackerSection } from "@/prep-tracker/components/PortalPrepTr
 import { PortalWeeklyUpdatesModal } from "@/prep-tracker/components/PortalWeeklyUpdatesModal";
 import { ExamCountdownTimer } from "@/prep-tracker/components/ExamCountdownTimer";
 import { sanitizeHtml } from "@/lib/sanitize";
+import CustomTestCreatorModal from "./CustomTestCreatorModal";
 const CustomScatterTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length && payload[0] && payload[0].payload) {
     const data = payload[0].payload;
@@ -105,6 +106,8 @@ export default function PortalDashboard() {
     return [];
   });
   const [testCategoryFilter, setTestCategoryFilter] = useState<'all' | 'full_length' | 'short'>('all');
+  const [showCustomTestModal, setShowCustomTestModal] = useState(false);
+  const [customPracticeFilter, setCustomPracticeFilter] = useState<'all' | 'official' | 'custom'>('all');
   const [candidateAttemptsMap, setCandidateAttemptsMap] = useState<Record<string, any[]>>({});
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -584,7 +587,7 @@ export default function PortalDashboard() {
       const [testsRes, attemptsRes] = await Promise.allSettled([
         supabase
           .from('exam_tests')
-          .select(`id, title, category, is_focus_batch, access_tier, program_format, expires_at, created_at, exam_test_sections(part, duration_minutes)`)
+          .select(`id, title, category, is_focus_batch, access_tier, program_format, expires_at, created_at, is_custom_practice, created_by_candidate_id, practice_category, exam_test_sections(part, duration_minutes)`)
           .eq('status', 'published')
           .order('created_at', { ascending: false }),
         supabase.from('exam_attempts').select('id, test_id, status, attempt_number').eq('candidate_id', candidateId).order('attempt_number', { ascending: true })
@@ -610,6 +613,11 @@ export default function PortalDashboard() {
       setCandidateAttemptsMap(attemptMap);
 
       const filteredTests = (tests || []).filter(test => {
+        // Custom practice tests: strictly only visible to the creator
+        if (test.is_custom_practice) {
+          return test.created_by_candidate_id === candidateId;
+        }
+
         // Focus batch tests are always included so Focus Batch section can display them
         if (test.is_focus_batch || test.access_tier === 'focus_batch') return true;
 
@@ -639,6 +647,27 @@ export default function PortalDashboard() {
       } catch (e) {}
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleDeleteCustomTest = async (testId: string) => {
+    if (!candidate?.id) return;
+    try {
+      const { error: rpcErr } = await supabase.rpc('delete_student_custom_test', {
+        p_candidate_id: candidate.id,
+        p_test_id: testId
+      });
+
+      if (rpcErr) {
+        await supabase.from('exam_tests').delete().eq('id', testId).eq('created_by_candidate_id', candidate.id);
+      }
+
+      toast({ title: "Custom Drill Deleted", description: "Practice drill removed and quota slot freed." });
+      if (candidate?.id) {
+        fetchDashboardData(candidate.program_ids || [], candidate.education_level, candidate.id);
+      }
+    } catch (err: any) {
+      toast({ title: "Could Not Delete Test", description: err.message, variant: "destructive" });
     }
   };
 
@@ -2482,26 +2511,52 @@ export default function PortalDashboard() {
                   })()}
 
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                    <h2 className="text-lg font-semibold text-[#262626]">Active Mock & Practice Tests</h2>
-                    <div className="flex items-center gap-1.5 bg-black/5 p-1 rounded-xl text-xs font-semibold self-start sm:self-auto">
-                      <button
-                        onClick={() => setTestCategoryFilter('all')}
-                        className={`px-3 py-1.5 rounded-lg transition-all ${testCategoryFilter === 'all' ? 'bg-white text-black shadow-xs font-bold' : 'text-foreground/60 hover:text-black'}`}
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-lg font-semibold text-[#262626]">Active Mock & Practice Tests</h2>
+                      {candidate && (
+                        <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-primary/10 text-primary border border-primary/20">
+                          {candidate?.access_level === 'focus_batch' 
+                            ? 'Focus Batch (Unlimited Drills)' 
+                            : `${activeTests.filter((t: any) => t.is_custom_practice).length} / 10 Custom Drills`}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 bg-black/5 p-1 rounded-xl text-xs font-semibold self-start sm:self-auto">
+                        <button
+                          onClick={() => setTestCategoryFilter('all')}
+                          className={`px-3 py-1.5 rounded-lg transition-all ${testCategoryFilter === 'all' ? 'bg-white text-black shadow-xs font-bold' : 'text-foreground/60 hover:text-black'}`}
+                        >
+                          All Tests
+                        </button>
+                        <button
+                          onClick={() => setTestCategoryFilter('full_length')}
+                          className={`px-3 py-1.5 rounded-lg transition-all ${testCategoryFilter === 'full_length' ? 'bg-white text-black shadow-xs font-bold' : 'text-foreground/60 hover:text-black'}`}
+                        >
+                          Full Mocks
+                        </button>
+                        <button
+                          onClick={() => setTestCategoryFilter('short')}
+                          className={`px-3 py-1.5 rounded-lg transition-all ${testCategoryFilter === 'short' ? 'bg-purple-600 text-white shadow-xs font-bold' : 'text-purple-700 hover:bg-purple-50'}`}
+                        >
+                          ⚡ Short Tests
+                        </button>
+                        <button
+                          onClick={() => setTestCategoryFilter('custom' as any)}
+                          className={`px-3 py-1.5 rounded-lg transition-all ${testCategoryFilter === ('custom' as any) ? 'bg-orange-600 text-white shadow-xs font-bold' : 'text-orange-700 hover:bg-orange-50'}`}
+                        >
+                          🎯 Custom ({activeTests.filter((t: any) => t.is_custom_practice).length})
+                        </button>
+                      </div>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => setShowCustomTestModal(true)}
+                        className="h-8 gap-1.5 text-xs font-bold bg-gradient-to-r from-primary to-orange-600 hover:from-primary/90 hover:to-orange-700 text-white rounded-xl shadow-xs"
                       >
-                        All Tests
-                      </button>
-                      <button
-                        onClick={() => setTestCategoryFilter('full_length')}
-                        className={`px-3 py-1.5 rounded-lg transition-all ${testCategoryFilter === 'full_length' ? 'bg-white text-black shadow-xs font-bold' : 'text-foreground/60 hover:text-black'}`}
-                      >
-                        Full Length Mocks
-                      </button>
-                      <button
-                        onClick={() => setTestCategoryFilter('short')}
-                        className={`px-3 py-1.5 rounded-lg transition-all ${testCategoryFilter === 'short' ? 'bg-purple-600 text-white shadow-xs font-bold' : 'text-purple-700 hover:bg-purple-50'}`}
-                      >
-                        ⚡ Short Tests
-                      </button>
+                        <Zap className="w-3.5 h-3.5" /> + Build Custom Drill
+                      </Button>
                     </div>
                   </div>
 
@@ -2509,9 +2564,10 @@ export default function PortalDashboard() {
                     {(() => {
                       const generalTests = activeTests.filter((t: any) => !t.is_focus_batch && t.access_tier !== 'focus_batch');
                       const displayTests = generalTests.filter((test: any) => {
+                        if (testCategoryFilter === ('custom' as any)) return test.is_custom_practice === true;
                         if (testCategoryFilter === 'all') return true;
-                        if (testCategoryFilter === 'full_length') return test.category === 'full_length' || !test.category;
-                        if (testCategoryFilter === 'short') return test.category === 'half_length' || test.category === 'custom_short' || test.category === 'short';
+                        if (testCategoryFilter === 'full_length') return (test.category === 'full_length' || !test.category) && !test.is_custom_practice;
+                        if (testCategoryFilter === 'short') return (test.category === 'half_length' || test.category === 'custom_short' || test.category === 'short') && !test.is_custom_practice;
                         return true;
                       });
 
@@ -2549,10 +2605,15 @@ export default function PortalDashboard() {
                         <div key={test.id} className={`bg-white border border-black/5 p-6 rounded-2xl shadow-sm transition-shadow group flex flex-col justify-between ${isExpired && !hasCompletedAttempt ? 'opacity-70' : 'hover:shadow-md'}`}>
                           <div>
                             <div className="flex justify-between items-start mb-4 flex-wrap gap-2">
-                              <div className={`w-10 h-10 ${isHalfLength ? 'bg-purple-100 text-purple-700' : isShortTest ? 'bg-indigo-100 text-indigo-700' : 'bg-primary/10 text-primary'} rounded-xl flex items-center justify-center`}>
-                                {isShortTest ? <Zap className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+                              <div className={`w-10 h-10 ${test.is_custom_practice ? 'bg-amber-100 text-amber-700' : isHalfLength ? 'bg-purple-100 text-purple-700' : isShortTest ? 'bg-indigo-100 text-indigo-700' : 'bg-primary/10 text-primary'} rounded-xl flex items-center justify-center`}>
+                                {test.is_custom_practice ? <Zap className="w-5 h-5 text-amber-600" /> : isShortTest ? <Zap className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
                               </div>
                               <div className="flex gap-2 flex-wrap items-center">
+                                {test.is_custom_practice && (
+                                  <span className="bg-amber-100 text-amber-800 text-[10px] uppercase tracking-wider font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1">
+                                    <Zap className="w-3 h-3 text-amber-600" /> Custom Drill
+                                  </span>
+                                )}
                                 {isHalfLength ? (
                                   <span className="bg-purple-100 text-purple-700 text-[10px] uppercase tracking-wider font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1">
                                     <Zap className="w-3 h-3" /> Half Length
@@ -2572,8 +2633,21 @@ export default function PortalDashboard() {
                                     {expiryText}
                                   </span>
                                 )}
-                                {!test.expires_at && !hasCompletedAttempt && !isShortTest && (
+                                {!test.expires_at && !hasCompletedAttempt && !isShortTest && !test.is_custom_practice && (
                                   <span className="bg-green-100 text-green-700 text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full">New</span>
+                                )}
+                                {test.is_custom_practice && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteCustomTest(test.id);
+                                    }}
+                                    title="Delete custom practice drill"
+                                    className="p-1.5 text-foreground/40 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-1 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
                                 )}
                               </div>
                             </div>
@@ -4696,6 +4770,20 @@ export default function PortalDashboard() {
       <PortalWeeklyUpdatesModal
         open={showUniversalUpdatesModal}
         onOpenChange={setShowUniversalUpdatesModal}
+      />
+
+      {/* Student Custom Test Creator Modal */}
+      <CustomTestCreatorModal
+        isOpen={showCustomTestModal}
+        onClose={() => setShowCustomTestModal(false)}
+        candidate={candidate}
+        activeTestCount={activeTests.filter((t: any) => t.is_custom_practice).length}
+        onTestCreated={(testId) => {
+          if (candidate?.id) {
+            fetchDashboardData(candidate.program_ids || [], candidate.education_level, candidate.id);
+          }
+          setLocation('/portal/test/' + testId);
+        }}
       />
     </div>
   );

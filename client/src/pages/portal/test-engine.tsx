@@ -917,6 +917,20 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         }).eq('id', currentAttemptId);
 
         if (updateError) throw updateError;
+
+        // If this is a custom practice test and Part B was answered, trigger background AI evaluation
+        if (engineData?.test?.is_custom_practice && partBAnswered > 0 && currentAttemptId) {
+          try {
+            supabase.functions.invoke('evaluate-part-b', {
+              body: { attemptId: currentAttemptId }
+            }).then(({ data, error }) => {
+              if (error) console.warn('Background AI evaluation error:', error);
+              else console.log('Background AI evaluation completed:', data);
+            }).catch(e => console.warn('Background AI evaluation failed to trigger:', e));
+          } catch (invokeErr) {
+            console.warn('Could not trigger AI eval invocation:', invokeErr);
+          }
+        }
       }
 
     } catch (err) {

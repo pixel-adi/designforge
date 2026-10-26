@@ -8,6 +8,7 @@ import { ClipboardList, PlusCircle, CheckCircle2, Search, ArrowLeft, Loader2, Fi
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { sanitizeHtml } from "@/lib/sanitize";
+import BulkExamUploadModal from "./BulkExamUploadModal";
 
 const TEMPLATES = [
   // Full Length Mocks
@@ -133,6 +134,9 @@ export default function AdminExamTests() {
   const [quickGenDiff, setQuickGenDiff] = useState("Medium");
   const [quickGenSource, setQuickGenSource] = useState<"all" | "pyq_only">("all");
   const [quickGenExamTag, setQuickGenExamTag] = useState<string>("ALL");
+
+  // Bulk Upload Exam Paper Modal State
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
 
   // Quick Extend Expiry Modal State (Admin list quick action)
   const [extendModalOpen, setExtendModalOpen] = useState(false);
@@ -1623,13 +1627,32 @@ export default function AdminExamTests() {
     );
   };
 
+  const handleQuestionsImportedFromBulk = (importedQuestions: any[], mode: 'replace' | 'append') => {
+    if (mode === 'replace') {
+      setSelectedQuestions(importedQuestions);
+    } else {
+      setSelectedQuestions(prev => [...prev, ...importedQuestions]);
+    }
+  };
+
   const renderBuilder = () => (
     <div className="space-y-8 animate-in fade-in duration-300 pb-12">
-      <div className="flex items-center gap-4 border-b border-black/5 pb-4">
-        <Button variant="ghost" size="sm" onClick={() => setCurrentStep('LIST')} className="text-foreground/50"><ArrowLeft className="w-4 h-4 mr-2" /> Back</Button>
-        <div>
-          <h2 className="text-xl font-semibold text-[#262626]">Build {selectedTemplate.name} Test</h2>
-          <p className="text-xs text-foreground/50">{selectedTemplate.description}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/5 pb-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => setCurrentStep('LIST')} className="text-foreground/50"><ArrowLeft className="w-4 h-4 mr-2" /> Back</Button>
+          <div>
+            <h2 className="text-xl font-semibold text-[#262626]">Build {selectedTemplate.name} Test</h2>
+            <p className="text-xs text-foreground/50">{selectedTemplate.description}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            onClick={() => setBulkUploadOpen(true)}
+            className="gap-2 bg-gradient-to-r from-primary to-orange-600 hover:from-primary/95 hover:to-orange-700 text-white font-bold text-xs h-9 rounded-xl shadow-md shadow-primary/20"
+          >
+            <Upload className="w-4 h-4" /> Bulk Upload Exam Paper
+          </Button>
         </div>
       </div>
 
@@ -2541,6 +2564,16 @@ export default function AdminExamTests() {
           {renderCreateQuestionModal()}
         </>
       )}
+
+      {/* Bulk Exam Paper Uploader */}
+      <BulkExamUploadModal
+        isOpen={bulkUploadOpen}
+        onClose={() => setBulkUploadOpen(false)}
+        testSections={testSections}
+        testCategory={testCategory}
+        selectedTemplate={selectedTemplate}
+        onQuestionsImported={handleQuestionsImportedFromBulk}
+      />
     </>
   );
 }

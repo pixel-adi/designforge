@@ -23,10 +23,38 @@ export interface WeeklyRelease {
 
 export const PORTAL_RELEASES: WeeklyRelease[] = [
   {
+    version: 'v2.6.0',
+    weekLabel: 'Week 6 Update',
+    releaseDate: 'Mon 26 Oct 2026',
+    isLatest: true,
+    items: [
+      {
+        type: 'feature',
+        title: 'AI Part B Subjective Evaluations (Gemini Vision)',
+        description: 'Instant multi-modal evaluation for design sketches, illustrations, and subjective answers. Automatically computes rubric scores across Critical Thinking, Ideation, Storytelling, Conceptualisation, and Representation, paired with a concise 20–25 word review.',
+      },
+      {
+        type: 'feature',
+        title: 'Student Custom Practice Drills',
+        description: 'Students can now build personalized practice workouts from the question bank. Choose from presets like "GK Spree & Design Awareness", "Part A Speed Drill", or "Part B Creative Studio" with instant automated AI feedback on submissions.',
+      },
+      {
+        type: 'feature',
+        title: 'Bulk Exam Paper Upload with Rubric Matching',
+        description: 'Create complete exam papers in seconds by uploading a CSV alongside question diagrams and sketches. Automatically validates question counts and marks against the exam template rubric before importing.',
+      },
+      {
+        type: 'improvement',
+        title: 'Quota-Managed Student Practice Tests',
+        description: 'Practice drills are tracked in the backend database with tier-aware quota limits (up to 10 active drills for standard students, unlimited for Focus Batch) and self-service deletion.',
+      },
+    ],
+  },
+  {
     version: 'v2.5.0',
     weekLabel: 'Week 5 Update',
     releaseDate: 'Mon 19 Oct 2026',
-    isLatest: true,
+    isLatest: false,
     items: [
       {
         type: 'feature',

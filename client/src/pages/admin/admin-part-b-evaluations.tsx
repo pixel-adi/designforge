@@ -11,6 +11,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { Sparkles, Bot } from "lucide-react";
+import { evaluatePartBWithGemini, countWords } from "@/lib/geminiEvaluation";
 
 const PAGE_SIZE = 100;
 
@@ -155,6 +157,10 @@ export default function AdminPartBEvaluations() {
   const [resolvedUrlOverride, setResolvedUrlOverride] = useState<string | null>(null);
   const [retryingSignedUrl, setRetryingSignedUrl] = useState(false);
   const [adminUploading, setAdminUploading] = useState(false);
+  const [aiEvaluatingSingle, setAiEvaluatingSingle] = useState(false);
+  const [aiEvaluatingBatch, setAiEvaluatingBatch] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentQuestion: "" });
+  const [showBatchModal, setShowBatchModal] = useState(false);
 
   useEffect(() => {
     setZoom(1);
@@ -500,6 +506,160 @@ export default function AdminPartBEvaluations() {
     }
   };
 
+  const getQuestionMaxMarks = (q: any) => {
+    if (q?.marks && typeof q.marks === 'number' && q.marks > 0) return q.marks;
+    const testTitleLower = (evaluatingAttempt?.exam_tests?.title || '').toLowerCase();
+    const programNameLower = (evaluatingAttempt?.exam_tests?.exam_programs?.name || '').toLowerCase();
+    const programFormatLower = (evaluatingAttempt?.exam_tests?.program_format || '').toLowerCase();
+
+    const isUceed = testTitleLower.includes('uceed') || programNameLower.includes('uceed') || testTitleLower.includes('b.des') || testTitleLower.includes('bdes') || programFormatLower === 'bachelors';
+    const isCeed = testTitleLower.includes('ceed') || programNameLower.includes('ceed') || testTitleLower.includes('m.des') || testTitleLower.includes('mdes') || programFormatLower === 'masters';
+
+    if (isCeed && !testTitleLower.includes('uceed') && !programNameLower.includes('uceed')) {
+      return 20;
+    } else if (isUceed) {
+      return 50;
+    } else if (questions.length > 0) {
+      return 100 / questions.length;
+    }
+    return 50;
+  };
+
+  const handleSingleAiEvaluate = async () => {
+    const currentResp = responses[currentQIndex];
+    const currentQ = questions.find(q => q.id === currentResp?.question_id);
+    if (!currentResp || !currentQ) return;
+
+    setAiEvaluatingSingle(true);
+    try {
+      toast({ title: "Gemini AI Evaluating...", description: "Analyzing submission and formulating 20-25 word review." });
+
+      const fileUrls = parseFileUrls(currentResp.file_url);
+      const activeFileUrl = fileUrls.length > 0 ? normalizeSubmissionUrl(fileUrls[0]).url : null;
+      const qMaxMarks = getQuestionMaxMarks(currentQ);
+
+      const result = await evaluatePartBWithGemini({
+        questionText: currentQ.content_text || "",
+        questionMediaUrl: currentQ.media_url ? resolveQuestionMediaUrl(currentQ.media_url) : null,
+        candidateFileUrl: activeFileUrl,
+        candidateAnswerText: currentResp.answer_text,
+        maxMarks: qMaxMarks
+      });
+
+      setEvalForm(prev => ({
+        ...prev,
+        marks_awarded: result.marks_awarded.toString(),
+        rubric_marks: {
+          critical_thinking: String(result.rubric_marks.critical_thinking ?? ""),
+          ideation: String(result.rubric_marks.ideation ?? ""),
+          storytelling: String(result.rubric_marks.storytelling ?? ""),
+          conceptualisation: String(result.rubric_marks.conceptualisation ?? ""),
+          representation: String(result.rubric_marks.representation ?? "")
+        },
+        mentor_comments: result.mentor_comments,
+        mentor_improvements: result.mentor_improvements || prev.mentor_improvements
+      }));
+
+      // Update response in state
+      const updated = [...responses];
+      updated[currentQIndex] = {
+        ...currentResp,
+        marks_awarded: result.marks_awarded,
+        rubric_marks: result.rubric_marks,
+        mentor_comments: result.mentor_comments,
+        mentor_improvements: result.mentor_improvements || currentResp.mentor_improvements
+      };
+      setResponses(updated);
+
+      toast({ 
+        title: "AI Evaluation Ready!", 
+        description: `Scored ${result.marks_awarded}/${qMaxMarks} with ${result.word_count}-word review. Please review and save.` 
+      });
+    } catch (err: any) {
+      console.error("AI Evaluation failed:", err);
+      toast({ title: "AI Evaluation Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setAiEvaluatingSingle(false);
+    }
+  };
+
+  const handleBatchAiEvaluate = async () => {
+    if (!responses || responses.length === 0) return;
+    setAiEvaluatingBatch(true);
+    setShowBatchModal(true);
+    setBatchProgress({ current: 0, total: responses.length, currentQuestion: "" });
+
+    try {
+      const updatedResponses = [...responses];
+
+      for (let i = 0; i < responses.length; i++) {
+        const resp = responses[i];
+        const q = questions.find(item => item.id === resp.question_id);
+        if (!q) continue;
+
+        setBatchProgress({
+          current: i + 1,
+          total: responses.length,
+          currentQuestion: `Evaluating Question ${i + 1} of ${responses.length}...`
+        });
+
+        const fileUrls = parseFileUrls(resp.file_url);
+        const activeFileUrl = fileUrls.length > 0 ? normalizeSubmissionUrl(fileUrls[0]).url : null;
+        const qMaxMarks = getQuestionMaxMarks(q);
+
+        try {
+          const result = await evaluatePartBWithGemini({
+            questionText: q.content_text || "",
+            questionMediaUrl: q.media_url ? resolveQuestionMediaUrl(q.media_url) : null,
+            candidateFileUrl: activeFileUrl,
+            candidateAnswerText: resp.answer_text,
+            maxMarks: qMaxMarks
+          });
+
+          updatedResponses[i] = {
+            ...resp,
+            marks_awarded: result.marks_awarded,
+            rubric_marks: result.rubric_marks,
+            mentor_comments: result.mentor_comments,
+            mentor_improvements: result.mentor_improvements || resp.mentor_improvements
+          };
+
+          // Save to database
+          await supabase.from('exam_responses').update({
+            marks_awarded: result.marks_awarded,
+            rubric_marks: result.rubric_marks,
+            mentor_comments: result.mentor_comments,
+            mentor_improvements: result.mentor_improvements || null,
+            ai_evaluated: true
+          }).eq('id', resp.id);
+
+        } catch (qErr: any) {
+          console.error(`AI failed for question ${i + 1}:`, qErr);
+        }
+      }
+
+      setResponses(updatedResponses);
+      if (updatedResponses[currentQIndex]) {
+        populateForm(updatedResponses[currentQIndex]);
+      }
+
+      if (evaluatingAttempt.part_b_evaluation_status === 'pending') {
+        await supabase.from('exam_attempts').update({ part_b_evaluation_status: 'draft' }).eq('id', evaluatingAttempt.id);
+        setEvaluatingAttempt({ ...evaluatingAttempt, part_b_evaluation_status: 'draft' });
+      }
+
+      toast({ 
+        title: "Batch AI Evaluation Finished!", 
+        description: `All ${responses.length} Part B questions evaluated. Review responses and verify.` 
+      });
+    } catch (err: any) {
+      toast({ title: "Batch Evaluation Error", description: err.message, variant: "destructive" });
+    } finally {
+      setAiEvaluatingBatch(false);
+      setShowBatchModal(false);
+    }
+  };
+
   if (isLoadingAttempts && !evaluatingAttempt) {
     return <div className="flex items-center justify-center py-20 text-foreground/40"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   }
@@ -679,6 +839,15 @@ export default function AdminPartBEvaluations() {
           </h2>
         </div>
         <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            disabled={aiEvaluatingBatch || aiEvaluatingSingle}
+            onClick={handleBatchAiEvaluate}
+            className="font-bold border-purple-200 text-purple-700 bg-purple-50/60 hover:bg-purple-100/70 gap-1.5"
+          >
+            {aiEvaluatingBatch ? <Loader2 className="w-4 h-4 animate-spin text-purple-600" /> : <Sparkles className="w-4 h-4 text-purple-600" />}
+            Evaluate All with AI
+          </Button>
           <Button variant="outline" onClick={() => { saveCurrentQuestionDraft(); toast({ title: "Draft Saved" }); }} className="font-bold border-orange-200 text-orange-600 hover:bg-orange-50">
             Save Draft
           </Button>
@@ -1044,6 +1213,40 @@ export default function AdminPartBEvaluations() {
            <h3 className="text-lg font-bold text-[#262626] mb-5 flex items-center gap-2"><PenTool className="w-5 h-5 text-primary" /> Evaluation Form</h3>
            
            <div className="space-y-5 flex-1">
+             {/* Gemini AI Auto-Evaluation Action */}
+             <div className="p-3.5 bg-gradient-to-br from-purple-50 via-indigo-50/40 to-white border border-purple-200/80 rounded-xl shadow-xs space-y-2.5">
+               <div className="flex items-center justify-between">
+                 <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                   <Sparkles className="w-4 h-4 text-purple-600" /> AI Auto-Evaluation
+                 </span>
+                 <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100/70 border border-purple-200 px-2 py-0.5 rounded">
+                   Gemini Multimodal
+                 </span>
+               </div>
+               <p className="text-[11px] text-purple-900/70 leading-snug">
+                 Evaluates sketch against 5 design rubrics and crafts a 20–25 word critique.
+               </p>
+               <Button
+                 type="button"
+                 size="sm"
+                 disabled={aiEvaluatingSingle || aiEvaluatingBatch}
+                 onClick={handleSingleAiEvaluate}
+                 className="w-full h-8 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white gap-1.5 shadow-xs"
+               >
+                 {aiEvaluatingSingle ? (
+                   <>
+                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                     Evaluating Question...
+                   </>
+                 ) : (
+                   <>
+                     <Sparkles className="w-3.5 h-3.5" />
+                     Evaluate This Question with AI
+                   </>
+                 )}
+               </Button>
+             </div>
+
              {/* Marks Input via Rubric */}
              <div>
                <div className="flex items-center justify-between mb-3">
@@ -1096,7 +1299,26 @@ export default function AdminPartBEvaluations() {
              
              {/* Comments */}
              <div>
-               <label className="flex items-center gap-1.5 text-xs font-bold text-foreground/70 mb-1.5 uppercase tracking-wider"><MessageSquare className="w-3.5 h-3.5" /> Mentor Comments</label>
+               <div className="flex items-center justify-between mb-1.5">
+                 <label className="flex items-center gap-1.5 text-xs font-bold text-foreground/70 uppercase tracking-wider">
+                   <MessageSquare className="w-3.5 h-3.5" /> Mentor Comments
+                 </label>
+                 {(() => {
+                   const wc = countWords(evalForm.mentor_comments);
+                   const isExact = wc >= 20 && wc <= 25;
+                   return (
+                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors ${
+                       isExact 
+                         ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                         : wc > 0 
+                         ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                         : 'text-foreground/40'
+                     }`}>
+                       {wc} / 25 words {isExact ? '✓ Optimal' : '(Target: 20-25)'}
+                     </span>
+                   );
+                 })()}
+               </div>
                <textarea 
                  aria-label="Mentor Comments"
                  value={evalForm.mentor_comments}
@@ -1197,6 +1419,33 @@ export default function AdminPartBEvaluations() {
               alt="Candidate sketch fullscreen" 
               className="max-w-full max-h-[90vh] object-contain rounded shadow-2xl select-none" 
             />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch AI Evaluation Progress Modal */}
+      <Dialog open={showBatchModal} onOpenChange={() => {}}>
+        <DialogContent className="max-w-md rounded-2xl p-6" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Sparkles className="w-5 h-5 text-purple-600 animate-pulse" />
+              Evaluating Part B with Gemini AI
+            </DialogTitle>
+            <DialogDescription>
+              Evaluating candidate responses against the 5 design rubrics and drafting 20–25 word reviews...
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="w-full bg-black/5 rounded-full h-3 overflow-hidden">
+              <div 
+                className="bg-purple-600 h-full transition-all duration-300 rounded-full"
+                style={{ width: `${batchProgress.total > 0 ? (batchProgress.current / batchProgress.total) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="flex justify-between items-center text-xs text-foreground/60 font-semibold">
+              <span>{batchProgress.currentQuestion || 'Processing...'}</span>
+              <span>{batchProgress.current} / {batchProgress.total}</span>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
