@@ -1,11 +1,19 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert, WifiOff, Lock, ClipboardList, Camera, Clipboard, Image as ImageIcon, Sparkles, CheckCircle2, PauseCircle, Play, Bookmark } from "lucide-react";
+import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert, WifiOff, Lock, ClipboardList, Camera, Clipboard, Image as ImageIcon, Sparkles, CheckCircle2, PauseCircle, Play, Bookmark, ShieldCheck } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { sanitizeHtml } from "@/lib/sanitize";
+
+// Deployment Protection: Guard against Vite chunk hash invalidation during live production pushes
+if (typeof window !== "undefined") {
+  window.addEventListener("vite:preloadError", (event) => {
+    event.preventDefault();
+    console.warn("[Deploy Protection] Prevented chunk preload crash during active exam.");
+  });
+}
 
 export const parseFileUrls = (fileUrlString: string | undefined | null): string[] => {
   if (!fileUrlString) return [];
@@ -75,6 +83,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
   // Pause & Resume State (Max 2 resumes allowed)
   const [isPaused, setIsPaused] = useState(false);
+  const [isSystemRecovery, setIsSystemRecovery] = useState(false);
   const [resumesUsed, setResumesUsed] = useState(0); // 0, 1, or 2
   const [pausedAt, setPausedAt] = useState<number | null>(null);
   const [totalPausedSecs, setTotalPausedSecs] = useState(0);
@@ -297,6 +306,15 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       const remaining = Math.max(0, Math.round((testEndTimeRef.current - now) / 1000));
       setTimeLeft(remaining);
 
+      // Continuously persist remaining seconds to localStorage for 0ms crash/deploy recovery
+      if (attemptId && remaining > 0) {
+        try {
+          localStorage.setItem(`df_frozen_seconds_${attemptId}`, String(remaining));
+        } catch (e) {
+          // Ignore quota errors
+        }
+      }
+
       // Auto-submit when time has fully elapsed
       if (remaining <= 0) {
         if (!hasAutoSubmittedRef.current) {
@@ -352,6 +370,23 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       window.removeEventListener('focus', handleSync);
     };
   }, [timerRunning, engineData?.hasTimedPartALock, engineData?.hasPartB, engineData?.partA_TimeThreshold, engineData?.totalMins, testStep, activeQuestionIndex, attemptId]);
+
+  // Deployment & Reload Protection: Automatically freeze time and save latest responses on tab close or page reload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (attemptId && timeLeft > 0 && testStep === 'test') {
+        try {
+          localStorage.setItem(`df_frozen_seconds_${attemptId}`, String(timeLeft));
+          localStorage.setItem(`df_attempt_${attemptId}`, JSON.stringify(latestResponsesRef.current));
+        } catch (e) {
+          // Ignore quota errors
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [attemptId, timeLeft, testStep]);
 
   const fetchTestEngineData = async () => {
     setLoading(true);
@@ -486,22 +521,143 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         hasTimedPartALock,
         isNid
       });
-      setResponses(initialResponses);
+      // 0ms Zero-Loss Auto-Recovery: Detect active in-progress attempt for this student
+      let hasRestoredActiveAttempt = false;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: candidate } = await supabase
+            .from('exam_candidates')
+            .select('id')
+            .eq('auth_user_id', user.id)
+            .maybeSingle();
 
-      // Check cached session end time for instant reload/crash recovery
-      const cachedEndTimeStr = typeof window !== 'undefined' ? sessionStorage.getItem(`df_test_end_${id}`) : null;
-      if (cachedEndTimeStr) {
-        const cachedEnd = Number(cachedEndTimeStr);
-        if (cachedEnd > Date.now()) {
-          const rem = Math.max(0, Math.round((cachedEnd - Date.now()) / 1000));
-          testEndTimeRef.current = cachedEnd;
-          setTimeLeft(rem);
-        } else {
-          testEndTimeRef.current = null;
-          setTimeLeft(0);
+          if (candidate) {
+            const { data: activeAttempt } = await supabase
+              .from('exam_attempts')
+              .select('*')
+              .eq('candidate_id', candidate.id)
+              .eq('test_id', id)
+              .eq('status', 'in_progress')
+              .order('attempt_number', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (activeAttempt) {
+              hasRestoredActiveAttempt = true;
+              setAttemptId(activeAttempt.id);
+
+              // 1. Restore Responses: Merge DB responses + LocalStorage (for freshest inputs)
+              const recoveredResponses = { ...initialResponses };
+
+              const { data: dbResponses } = await supabase
+                .from('exam_responses')
+                .select('*')
+                .eq('attempt_id', activeAttempt.id);
+
+              if (dbResponses) {
+                dbResponses.forEach((r: any) => {
+                  if (recoveredResponses[r.question_id]) {
+                    recoveredResponses[r.question_id] = {
+                      status: r.status || 'visited',
+                      selectedOptions: r.selected_options || [],
+                      answerText: r.answer_text || '',
+                      fileUrl: r.file_url || '',
+                      timeSpent: r.time_spent || 0,
+                      answerChanges: r.answer_changes || 0,
+                      stateTransitions: r.state_transitions || []
+                    };
+                  }
+                });
+              }
+
+              // Layer localStorage cache on top for any unsynced offline edits
+              try {
+                const localCached = localStorage.getItem(`df_attempt_${activeAttempt.id}`);
+                if (localCached) {
+                  const parsedLocal = JSON.parse(localCached);
+                  Object.keys(parsedLocal).forEach(qId => {
+                    if (recoveredResponses[qId]) {
+                      const localItem = parsedLocal[qId];
+                      if (
+                        (localItem.selectedOptions && localItem.selectedOptions.length > 0) ||
+                        (localItem.answerText && localItem.answerText.trim()) ||
+                        localItem.fileUrl
+                      ) {
+                        recoveredResponses[qId] = {
+                          ...recoveredResponses[qId],
+                          ...localItem
+                        };
+                      }
+                    }
+                  });
+                }
+              } catch (e) {
+                console.warn("Could not parse local attempt cache:", e);
+              }
+
+              latestResponsesRef.current = recoveredResponses;
+              setResponses(recoveredResponses);
+
+              // 2. Recover Exact Remaining Seconds (Frozen Seconds)
+              let remainingSecs = totalMins * 60;
+              const frozenSecondsStr = typeof window !== 'undefined' ? localStorage.getItem(`df_frozen_seconds_${activeAttempt.id}`) : null;
+
+              if (frozenSecondsStr && Number(frozenSecondsStr) > 0) {
+                remainingSecs = Number(frozenSecondsStr);
+              } else if (activeAttempt.start_time) {
+                const elapsed = Math.max(0, Math.floor((Date.now() - new Date(activeAttempt.start_time).getTime()) / 1000));
+                const storedTotalPaused = activeAttempt.total_paused_seconds || 0;
+                remainingSecs = Math.max(0, (totalMins * 60) - Math.max(0, elapsed - storedTotalPaused));
+              }
+
+              // Restore pause metadata
+              const storedResumes = (activeAttempt as any).pause_count ?? (Number(sessionStorage.getItem(`df_resumes_used_${activeAttempt.id}`)) || 0);
+              const storedTotalPaused = (activeAttempt as any).total_paused_seconds ?? (Number(sessionStorage.getItem(`df_total_paused_${activeAttempt.id}`)) || 0);
+              setResumesUsed(storedResumes);
+              setTotalPausedSecs(storedTotalPaused);
+
+              // 3. Freeze Timer & Transition into Safe Auto-Paused State
+              testEndTimeRef.current = Date.now() + (remainingSecs * 1000);
+              sessionStorage.setItem(`df_test_end_${id}`, String(testEndTimeRef.current));
+              setTimeLeft(remainingSecs);
+
+              setIsPaused(true);
+              setIsSystemRecovery(true);
+              setPausedAt(Date.now());
+              setTimerRunning(true);
+              setTestStep('test');
+
+              toast({
+                title: "Exam Session Restored 🛡️",
+                description: `All your answers are safe. Your timer was automatically frozen at ${formatTime(remainingSecs)}. Click 'Resume Examination' to continue.`,
+                duration: 8000
+              });
+            }
+          }
         }
-      } else {
-        setTimeLeft(totalMins * 60);
+      } catch (recoveryErr) {
+        console.warn("Could not check active attempt for auto-recovery:", recoveryErr);
+      }
+
+      if (!hasRestoredActiveAttempt) {
+        setResponses(initialResponses);
+
+        // Check cached session end time for instant reload/crash recovery
+        const cachedEndTimeStr = typeof window !== 'undefined' ? sessionStorage.getItem(`df_test_end_${id}`) : null;
+        if (cachedEndTimeStr) {
+          const cachedEnd = Number(cachedEndTimeStr);
+          if (cachedEnd > Date.now()) {
+            const rem = Math.max(0, Math.round((cachedEnd - Date.now()) / 1000));
+            testEndTimeRef.current = cachedEnd;
+            setTimeLeft(rem);
+          } else {
+            testEndTimeRef.current = null;
+            setTimeLeft(0);
+          }
+        } else {
+          setTimeLeft(totalMins * 60);
+        }
       }
 
     } catch (err: any) {
@@ -690,8 +846,23 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
   const startTest = async () => {
     const newAttemptId = await createAttempt();
+    if (!newAttemptId) return;
     setAttemptId(newAttemptId);
     setTestStep('test');
+
+    // If resuming an existing attempt with saved answers, preserve them!
+    try {
+      const cached = localStorage.getItem(`df_attempt_${newAttemptId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Object.keys(parsed).length > 0) {
+          setResponses(parsed);
+          latestResponsesRef.current = parsed;
+          setTimerRunning(true);
+          return;
+        }
+      }
+    } catch (e) {}
 
     const totalSecs = (engineData?.totalMins || 180) * 60;
     if (!testEndTimeRef.current || testEndTimeRef.current <= Date.now()) {
@@ -1148,6 +1319,24 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
   const handleResumeExam = async () => {
     if (!isPaused) return;
+
+    if (isSystemRecovery) {
+      // Deployment & Reload Recovery: Does NOT consume student's 2 manual pause credits!
+      setIsSystemRecovery(false);
+      setIsPaused(false);
+      setPausedAt(null);
+      if (testEndTimeRef.current) {
+        testEndTimeRef.current = Date.now() + (timeLeft * 1000);
+        sessionStorage.setItem(`df_test_end_${id}`, String(testEndTimeRef.current));
+      }
+      setTimerRunning(true);
+      toast({
+        title: "Exam Resumed ▶",
+        description: `Welcome back! Timer resumed at ${formatTime(timeLeft)}.`,
+        duration: 4000
+      });
+      return;
+    }
 
     const now = Date.now();
     const pauseStart = pausedAt || now;
@@ -2037,33 +2226,53 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             {/* Pause Screen Overlay */}
             {isPaused && (
               <div className="absolute inset-0 z-50 bg-white/98 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center rounded-2xl border border-black/10 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-                <div className="w-20 h-20 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mb-6 shadow-sm">
-                  <PauseCircle className="w-10 h-10 text-amber-600" />
+                <div className={`w-20 h-20 rounded-full ${isSystemRecovery ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'} border flex items-center justify-center mb-6 shadow-sm`}>
+                  {isSystemRecovery ? (
+                    <ShieldCheck className="w-10 h-10 text-emerald-600" />
+                  ) : (
+                    <PauseCircle className="w-10 h-10 text-amber-600" />
+                  )}
                 </div>
-                <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 mb-3">
-                  Examination Temporarily Paused
+                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${isSystemRecovery ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-300'} border mb-3`}>
+                  {isSystemRecovery ? "Exam Session Restored 🛡️" : "Examination Temporarily Paused"}
                 </span>
-                <h2 className="text-2xl font-black text-[#262626] mb-2">Timer Frozen & Questions Hidden</h2>
+                <h2 className="text-2xl font-black text-[#262626] mb-2">
+                  {isSystemRecovery ? "Timer Protected & Questions Ready" : "Timer Frozen & Questions Hidden"}
+                </h2>
                 <p className="text-sm text-foreground/60 max-w-md mb-6 leading-relaxed">
-                  Your countdown timer is paused at <span className="font-mono font-bold text-[#262626]">{formatTime(timeLeft)}</span>. Anti-malpractice monitoring is suspended while paused.
+                  {isSystemRecovery
+                    ? `Your examination was safely protected during page reload or server updates. All your answers are intact, and your timer was frozen at ${formatTime(timeLeft)} with zero seconds lost.`
+                    : `Your countdown timer is paused at ${formatTime(timeLeft)}. Anti-malpractice monitoring is suspended while paused.`}
                 </p>
 
-                <div className="bg-[#f8fafc] border border-black/10 rounded-xl p-4 max-w-sm w-full mb-6 text-left space-y-2">
-                  <div className="flex justify-between items-center text-xs font-bold">
-                    <span className="text-foreground/60">Resumes Allowed:</span>
-                    <span className="text-[#262626]">Maximum 2</span>
+                {isSystemRecovery ? (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 max-w-sm w-full mb-6 text-left space-y-1">
+                    <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>Zero-Loss Auto-Recovery Active</span>
+                    </div>
+                    <p className="text-[11px] text-emerald-700 leading-normal">
+                      This recovery pause does not deduct from your 2 allowed manual resumes ({2 - resumesUsed} manual resumes still available).
+                    </p>
                   </div>
-                  <div className="flex justify-between items-center text-xs font-bold">
-                    <span className="text-foreground/60">Resumes Used:</span>
-                    <span className="text-amber-700">{resumesUsed} of 2</span>
+                ) : (
+                  <div className="bg-[#f8fafc] border border-black/10 rounded-xl p-4 max-w-sm w-full mb-6 text-left space-y-2">
+                    <div className="flex justify-between items-center text-xs font-bold">
+                      <span className="text-foreground/60">Resumes Allowed:</span>
+                      <span className="text-[#262626]">Maximum 2</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs font-bold">
+                      <span className="text-foreground/60">Resumes Used:</span>
+                      <span className="text-amber-700">{resumesUsed} of 2</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs font-extrabold border-t border-black/5 pt-2">
+                      <span className="text-foreground/70">Remaining Resumes:</span>
+                      <span className={`px-2 py-0.5 rounded text-[11px] ${2 - resumesUsed > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {2 - resumesUsed} Remaining
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center text-xs font-extrabold border-t border-black/5 pt-2">
-                    <span className="text-foreground/70">Remaining Resumes:</span>
-                    <span className={`px-2 py-0.5 rounded text-[11px] ${2 - resumesUsed > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {2 - resumesUsed} Remaining
-                    </span>
-                  </div>
-                </div>
+                )}
 
                 <Button
                   onClick={handleResumeExam}
