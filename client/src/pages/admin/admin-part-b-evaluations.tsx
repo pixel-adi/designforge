@@ -6,7 +6,7 @@ import {
   Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, ChevronLeft, 
   MessageSquare, Video, FileText, Maximize, X, Shield,
   ZoomIn, ZoomOut, RotateCw, RefreshCw, ExternalLink, AlertCircle, Download,
-  UploadCloud, Plus, Settings, Sparkles, Key
+  UploadCloud, Plus, Settings, Sparkles, Key, FileCheck2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
