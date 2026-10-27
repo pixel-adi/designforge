@@ -570,6 +570,26 @@ export default function PortalDashboard() {
     try {
       const normEd = (educationLevel || 'bachelors').toLowerCase().trim();
 
+      const matchesEducation = (test: any, targetEd: string) => {
+        const format = (test.program_format || '').toLowerCase().trim();
+        const testTitle = (test.title || '').toLowerCase();
+        const isBdes = testTitle.includes('b.des') || testTitle.includes('bdes') || testTitle.includes('uceed') || testTitle.includes('nid b') || format === 'bachelors';
+        const isMdes = testTitle.includes('m.des') || testTitle.includes('mdes') || (testTitle.includes('ceed') && !testTitle.includes('uceed')) || testTitle.includes('nid m') || format === 'masters';
+
+        if (targetEd === 'bachelors') {
+          // If explicitly marked masters or titled M.Des/CEED, strictly hide
+          if (isMdes && !isBdes) return false;
+          if (format === 'masters') return false;
+          return isBdes || format === 'bachelors' || format === 'both' || format === 'all' || (!isBdes && !isMdes);
+        } else {
+          // masters student
+          // If explicitly marked bachelors or titled B.Des/UCEED, strictly hide
+          if (isBdes && !isMdes) return false;
+          if (format === 'bachelors') return false;
+          return isMdes || format === 'masters' || format === 'both' || format === 'all' || (!isBdes && !isMdes);
+        }
+      };
+
       // 1. Instant localStorage & sessionStorage cache check for published tests
       try {
         const cachedTestsRaw = typeof window !== 'undefined'
@@ -579,16 +599,8 @@ export default function PortalDashboard() {
           const parsed = JSON.parse(cachedTestsRaw);
           if (parsed && Date.now() - parsed.ts < 3600000 && Array.isArray(parsed.tests) && parsed.tests.length > 0) {
             const filtered = parsed.tests.filter((test: any) => {
-              if (test.is_focus_batch || test.access_tier === 'focus_batch') return true;
-              const format = (test.program_format || '').toLowerCase().trim();
-              if (!format || format === 'both' || format === 'all' || format === 'general') return true;
-              if (format === normEd) return true;
-              const title = (test.title || '').toLowerCase();
-              const isBdes = title.includes('b.des') || title.includes('bdes') || title.includes('uceed') || title.includes('nid b');
-              const isMdes = title.includes('m.des') || title.includes('mdes') || (title.includes('ceed') && !title.includes('uceed')) || title.includes('nid m');
-              if (normEd === 'bachelors' && isBdes) return true;
-              if (normEd === 'masters' && isMdes) return true;
-              return !isBdes && !isMdes;
+              if (test.is_custom_practice) return test.created_by_candidate_id === candidateId;
+              return matchesEducation(test, normEd);
             });
             if (filtered.length > 0) setActiveTests(filtered);
           }
@@ -630,23 +642,10 @@ export default function PortalDashboard() {
           return test.created_by_candidate_id === candidateId;
         }
 
-        // Focus batch tests are always included so Focus Batch section can display them
-        if (test.is_focus_batch || test.access_tier === 'focus_batch') return true;
-
-        // Generic / regular tests: visible to all students
-        const format = (test.program_format || '').toLowerCase().trim();
-        if (!format || format === 'both' || format === 'all' || format === 'general') return true;
-        if (format === normEd) return true;
-
-        const testTitle = (test.title || '').toLowerCase();
-        const isBdesTest = testTitle.includes('b.des') || testTitle.includes('bdes') || testTitle.includes('uceed') || testTitle.includes('nid b');
-        const isMdesTest = testTitle.includes('m.des') || testTitle.includes('mdes') || (testTitle.includes('ceed') && !testTitle.includes('uceed')) || testTitle.includes('nid m');
-
-        if (normEd === 'bachelors' && isBdesTest) return true;
-        if (normEd === 'masters' && isMdesTest) return true;
-        if (!isBdesTest && !isMdesTest) return true;
-
-        return false;
+        // Both Focus Batch and Generic tests must adhere strictly to education program format:
+        // Bachelors candidates ONLY see B.Des / UCEED papers
+        // Masters candidates ONLY see M.Des / CEED papers
+        return matchesEducation(test, normEd);
       });
 
       setActiveTests(filteredTests);
