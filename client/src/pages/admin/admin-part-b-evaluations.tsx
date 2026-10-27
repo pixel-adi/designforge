@@ -1220,6 +1220,384 @@ export default function AdminPartBEvaluations() {
             </div>
           </div>
         )}
+
+        {/* AI Configuration Modal (List View) */}
+        <Dialog open={showAiSettingsModal} onOpenChange={setShowAiSettingsModal}>
+          <DialogContent className="max-w-lg rounded-2xl p-6">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+                Configure AI Evaluator
+              </DialogTitle>
+              <DialogDescription>
+                Choose between OpenAI (GPT-4o) or Google Gemini for evaluating sketches against NID rubrics.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-3">
+              <div>
+                <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2">
+                  Active Provider
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setActiveAiProvider('openai'); setTestAiResult(null); }}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      activeAiProvider === 'openai' 
+                        ? 'border-purple-600 bg-purple-50 text-purple-900 shadow-xs' 
+                        : 'border-black/10 bg-white hover:bg-black/5 text-foreground/70'
+                    }`}
+                  >
+                    <div className="font-bold text-xs flex items-center justify-between">
+                      <span>OpenAI</span>
+                      {activeAiProvider === 'openai' && <span className="text-[10px] bg-purple-600 text-white px-1.5 py-0.5 rounded">Active</span>}
+                    </div>
+                    <p className="text-[11px] text-foreground/50 mt-1">GPT-4o / GPT-4o-mini</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setActiveAiProvider('gemini'); setTestAiResult(null); }}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      activeAiProvider === 'gemini' 
+                        ? 'border-purple-600 bg-purple-50 text-purple-900 shadow-xs' 
+                        : 'border-black/10 bg-white hover:bg-black/5 text-foreground/70'
+                    }`}
+                  >
+                    <div className="font-bold text-xs flex items-center justify-between">
+                      <span>Google Gemini</span>
+                      {activeAiProvider === 'gemini' && <span className="text-[10px] bg-purple-600 text-white px-1.5 py-0.5 rounded">Active</span>}
+                    </div>
+                    <p className="text-[11px] text-foreground/50 mt-1">gemini-flash-latest</p>
+                  </button>
+                </div>
+              </div>
+
+              {activeAiProvider === 'openai' ? (
+                <div className="space-y-3 pt-2 border-t border-black/5">
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground/80 mb-1">
+                      OpenAI API Key
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="sk-proj-..."
+                      value={configOpenaiKey}
+                      onChange={(e) => setConfigOpenaiKey(e.target.value)}
+                      className="w-full text-xs p-2.5 rounded-lg border border-black/15 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground/80 mb-1">
+                      Model
+                    </label>
+                    <select
+                      value={configOpenaiModel}
+                      onChange={(e) => setConfigOpenaiModel(e.target.value)}
+                      className="w-full text-xs p-2.5 rounded-lg border border-black/15 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="gpt-4o-mini">gpt-4o-mini (Faster & cost-effective)</option>
+                      <option value="gpt-4o">gpt-4o (Highest reasoning & visual accuracy)</option>
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3 pt-2 border-t border-black/5">
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground/80 mb-1">
+                      Gemini API Key
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="AIzaSy..."
+                      value={configGeminiKey}
+                      onChange={(e) => setConfigGeminiKey(e.target.value)}
+                      className="w-full text-xs p-2.5 rounded-lg border border-black/15 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground/80 mb-1">
+                      Model
+                    </label>
+                    <select
+                      value={configGeminiModel}
+                      onChange={(e) => setConfigGeminiModel(e.target.value)}
+                      className="w-full text-xs p-2.5 rounded-lg border border-black/15 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="gemini-flash-latest">gemini-flash-latest (Recommended)</option>
+                      <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {testAiResult && (
+                <div className={`p-3 rounded-lg text-xs leading-relaxed ${
+                  testAiResult.startsWith("✅") 
+                    ? "bg-emerald-50 text-emerald-900 border border-emerald-200" 
+                    : testAiResult.startsWith("⚠️")
+                    ? "bg-amber-50 text-amber-900 border border-amber-200 font-medium"
+                    : "bg-red-50 text-red-900 border border-red-200"
+                }`}>
+                  {testAiResult}
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={testingAiKey}
+                onClick={handleTestAiKey}
+                className="text-xs font-semibold"
+              >
+                {testingAiKey ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                Test Connection
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={savingAiSettings}
+                onClick={handleSaveAiSettings}
+                className="text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                {savingAiSettings ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                Save Settings
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Admin Proxy Submission Modal (List View) */}
+        <Dialog open={showProxyModal} onOpenChange={setShowProxyModal}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl p-6">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-[#262626] flex items-center gap-2">
+                <Plus className="w-5 h-5 text-primary" />
+                <span>Submit on Behalf of Student</span>
+              </DialogTitle>
+              <DialogDescription className="text-xs text-foreground/60">
+                Create an exam submission for a student who could not complete their upload due to connectivity or technical issues.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 py-4">
+              {/* Step 1: Candidate Selection */}
+              <div>
+                <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2">
+                  1. Select Student (Focus Batch highlighted)
+                </label>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Search student by name or email…"
+                    value={proxyCandidateSearch}
+                    onChange={(e) => setProxyCandidateSearch(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-black/10 bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+
+                  {proxySelectedCandidate ? (
+                    <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-primary/20 text-primary font-bold text-xs flex items-center justify-center">
+                          {proxySelectedCandidate.name?.charAt(0) || 'S'}
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-[#262626] flex items-center gap-1.5">
+                            <span>{proxySelectedCandidate.name}</span>
+                            {(proxySelectedCandidate.access_level === 'focus_batch' || proxySelectedCandidate.has_focus_mocks_access) && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800">
+                                Focus Batch
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-foreground/50">{proxySelectedCandidate.email} • {proxySelectedCandidate.unique_id}</div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setProxySelectedCandidate(null)}
+                        className="text-xs h-7 text-foreground/50 hover:text-red-600"
+                      >
+                        Change
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto border border-black/10 rounded-xl divide-y divide-black/5 bg-white">
+                      {proxyCandidates.length === 0 ? (
+                        <div className="p-4 text-center text-xs text-foreground/40">No students found</div>
+                      ) : (
+                        proxyCandidates.map((cand: any) => {
+                          const isFocus = cand.access_level === 'focus_batch' || cand.has_focus_mocks_access;
+                          return (
+                            <div
+                              key={cand.id}
+                              onClick={() => setProxySelectedCandidate(cand)}
+                              className="p-2.5 hover:bg-black/5 cursor-pointer flex items-center justify-between transition-colors"
+                            >
+                              <div>
+                                <div className="text-xs font-semibold text-[#262626] flex items-center gap-1.5">
+                                  <span>{cand.name}</span>
+                                  {isFocus && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-green-100 text-green-800">
+                                      Focus
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-foreground/50">{cand.email} • {cand.unique_id}</div>
+                              </div>
+                              <Button size="sm" variant="outline" className="h-6 text-[10px] px-2">Select</Button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Step 2: Test Selection */}
+              <div>
+                <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2">
+                  2. Select Exam Test
+                </label>
+                <select
+                  value={proxySelectedTestId}
+                  onChange={(e) => handleSelectProxyTest(e.target.value)}
+                  className="w-full text-xs p-2.5 rounded-xl border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">-- Choose Test --</option>
+                  {proxyTests.map((t: any) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title} ({t.exam_programs?.name || t.program_format})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Step 3: Question-wise Solutions */}
+              {proxySelectedTestId && (
+                <div className="space-y-4 pt-2">
+                  <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider">
+                    3. Upload Solutions Question-Wise ({proxyTestQuestions.length} Part B questions)
+                  </label>
+
+                  {proxyTestQuestions.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-black/5 text-center text-xs text-foreground/50">
+                      This test has no Part B subjective questions.
+                    </div>
+                  ) : (
+                    proxyTestQuestions.map((q, idx) => {
+                      const resp = proxyResponses[q.id] || { fileUrls: [], answerText: '' };
+                      return (
+                        <div key={q.id} className="p-4 rounded-xl border border-black/10 bg-black/[0.01] space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-xs font-bold text-[#262626]">
+                              Q{idx + 1}. {q.title || `Question ${idx + 1}`} ({q.marks} Marks)
+                            </span>
+                          </div>
+
+                          {/* Sketches Uploaded */}
+                          <div>
+                            <label className="block text-[11px] font-semibold text-foreground/60 mb-1.5">
+                              Sketches / Photos ({resp.fileUrls.length} attached)
+                            </label>
+
+                            {resp.fileUrls.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mb-2">
+                                {resp.fileUrls.map((url, i) => (
+                                  <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-black/10">
+                                    <img src={url} alt="Thumbnail" className="w-full h-full object-cover" />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = resp.fileUrls.filter((_, idx2) => idx2 !== i);
+                                        setProxyResponses(p => ({
+                                          ...p,
+                                          [q.id]: { ...p[q.id], fileUrls: updated }
+                                        }));
+                                      }}
+                                      className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/70 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[9px]"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/15 bg-white hover:bg-black/5 text-xs font-semibold">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                className="hidden"
+                                disabled={proxyUploadingQId === q.id}
+                                onChange={(e) => handleProxyFileUpload(e.target.files, q.id)}
+                              />
+                              {proxyUploadingQId === q.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <UploadCloud className="w-3.5 h-3.5 text-primary" />
+                              )}
+                              <span>{proxyUploadingQId === q.id ? 'Compressing & uploading...' : 'Attach Image Files'}</span>
+                            </label>
+                          </div>
+
+                          {/* Concept notes */}
+                          <div>
+                            <label className="block text-[11px] font-semibold text-foreground/60 mb-1">
+                              Student Notes / Concept Text
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={resp.answerText}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setProxyResponses(p => ({
+                                  ...p,
+                                  [q.id]: { ...p[q.id], answerText: val }
+                                }));
+                              }}
+                              placeholder="Type student's written response or problem statement notes..."
+                              className="w-full text-xs p-2 rounded-lg border border-black/10 bg-white focus:outline-none focus:ring-1 focus:ring-primary/20 resize-y"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowProxyModal(false)}
+                className="text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={submittingProxy || !proxySelectedCandidate || !proxySelectedTestId}
+                onClick={handleSubmitProxy}
+                className="text-xs font-bold bg-primary hover:bg-primary/90 text-white gap-1.5"
+              >
+                {submittingProxy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileCheck2 className="w-3.5 h-3.5" />}
+                <span>Create Submission Entry</span>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
