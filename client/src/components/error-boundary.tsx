@@ -51,11 +51,14 @@ export class ErrorBoundary extends Component<Props, State> {
                 Refresh Page
               </button>
               <button 
-                onClick={() => window.location.href = "/"}
+                onClick={() => {
+                  const isPortal = typeof window !== 'undefined' && window.location.pathname.startsWith('/portal');
+                  window.location.href = isPortal ? "/portal/dashboard" : "/";
+                }}
                 className="w-full flex items-center justify-center gap-2 h-11 bg-black/5 text-foreground rounded-xl font-semibold hover:bg-black/10 transition-colors"
               >
                 <Home className="w-4 h-4" />
-                Go to Homepage
+                {typeof window !== 'undefined' && window.location.pathname.startsWith('/portal') ? "Return to Portal Dashboard" : "Go to Homepage"}
               </button>
             </div>
           </div>

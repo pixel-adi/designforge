@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert, WifiOff, Lock, ClipboardList, Camera, Clipboard, Image as ImageIcon, Sparkles, CheckCircle2, PauseCircle, Play, Bookmark, ShieldCheck } from "lucide-react";
+import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert, WifiOff, Lock, ClipboardList, Camera, Clipboard, Image as ImageIcon, Sparkles, CheckCircle2, PauseCircle, Play, Bookmark, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -675,22 +675,48 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               setResumesUsed(storedResumes);
               setTotalPausedSecs(storedTotalPaused);
 
-              // 3. Freeze Timer & Transition into Safe Auto-Paused State
-              testEndTimeRef.current = Date.now() + (remainingSecs * 1000);
-              sessionStorage.setItem(`df_test_end_${id}`, String(testEndTimeRef.current));
-              setTimeLeft(remainingSecs);
+              // 3. Check if upload buffer window is active or main exam timer expired
+              const bufferEndKey = `df_upload_buffer_end_${activeAttempt.id}`;
+              const storedBufferEnd = typeof window !== 'undefined' ? Number(localStorage.getItem(bufferEndKey)) : 0;
 
-              setIsPaused(true);
-              setIsSystemRecovery(true);
-              setPausedAt(Date.now());
-              setTimerRunning(true);
-              setTestStep('test');
+              if (hasPartB && storedBufferEnd && storedBufferEnd > Date.now()) {
+                uploadBufferEndTimeRef.current = storedBufferEnd;
+                hasStartedUploadBufferRef.current = true;
+                setUploadBufferTimeLeft(Math.max(0, Math.round((storedBufferEnd - Date.now()) / 1000)));
+                setTestStep('upload_buffer');
+                setIsPaused(false);
+                setTimerRunning(false);
+                toast({
+                  title: "Buffer Window Active ⏱️",
+                  description: "You are in the 10-minute solution upload window. Objective answers are locked.",
+                  duration: 6000
+                });
+              } else if (remainingSecs <= 0 && hasPartB && !storedBufferEnd) {
+                const bufferEnd = Date.now() + 600 * 1000;
+                uploadBufferEndTimeRef.current = bufferEnd;
+                if (typeof window !== 'undefined') localStorage.setItem(bufferEndKey, String(bufferEnd));
+                hasStartedUploadBufferRef.current = true;
+                setUploadBufferTimeLeft(600);
+                setTestStep('upload_buffer');
+                setIsPaused(false);
+                setTimerRunning(false);
+              } else {
+                testEndTimeRef.current = Date.now() + (remainingSecs * 1000);
+                sessionStorage.setItem(`df_test_end_${id}`, String(testEndTimeRef.current));
+                setTimeLeft(remainingSecs);
 
-              toast({
-                title: "Exam Session Restored 🛡️",
-                description: `All your answers are safe. Your timer was automatically frozen at ${formatTime(remainingSecs)}. Click 'Resume Examination' to continue.`,
-                duration: 8000
-              });
+                setIsPaused(true);
+                setIsSystemRecovery(true);
+                setPausedAt(Date.now());
+                setTimerRunning(true);
+                setTestStep('test');
+
+                toast({
+                  title: "Exam Session Restored 🛡️",
+                  description: `All your answers are safe. Your timer was automatically frozen at ${formatTime(remainingSecs)}. Click 'Resume Examination' to continue.`,
+                  duration: 8000
+                });
+              }
             }
           }
         }
