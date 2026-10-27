@@ -34,22 +34,7 @@ export async function getAISettings(): Promise<AISettings> {
   let geminiModel = "gemini-flash-latest";
   let provider: "openai" | "gemini" = "openai";
 
-  // Check localStorage first
-  try {
-    if (typeof window !== "undefined") {
-      const localOpenaiKey = localStorage.getItem("df_openai_api_key");
-      if (localOpenaiKey) openaiKey = localOpenaiKey;
-      const localOpenaiModel = localStorage.getItem("df_openai_api_model");
-      if (localOpenaiModel) openaiModel = localOpenaiModel;
-      const localGeminiKey = localStorage.getItem("df_gemini_api_key");
-      if (localGeminiKey) geminiKey = localGeminiKey;
-      const localGeminiModel = localStorage.getItem("df_gemini_api_model");
-      if (localGeminiModel) geminiModel = localGeminiModel;
-      const localProvider = localStorage.getItem("df_ai_provider") as "openai" | "gemini" | null;
-      if (localProvider) provider = localProvider;
-    }
-  } catch (e) {}
-
+  // 1. Fetch persistent system_settings from DB as baseline
   try {
     const { data } = await supabase
       .from("system_settings")
@@ -69,6 +54,22 @@ export async function getAISettings(): Promise<AISettings> {
   } catch (err) {
     console.warn("Could not read settings from DB, using cached/default settings:", err);
   }
+
+  // 2. Layer localStorage on top: Active admin session settings MUST take precedence over DB
+  try {
+    if (typeof window !== "undefined") {
+      const localProvider = localStorage.getItem("df_ai_provider") as "openai" | "gemini" | null;
+      if (localProvider) provider = localProvider;
+      const localOpenaiKey = localStorage.getItem("df_openai_api_key");
+      if (localOpenaiKey) openaiKey = localOpenaiKey;
+      const localOpenaiModel = localStorage.getItem("df_openai_api_model");
+      if (localOpenaiModel) openaiModel = localOpenaiModel;
+      const localGeminiKey = localStorage.getItem("df_gemini_api_key");
+      if (localGeminiKey) geminiKey = localGeminiKey;
+      const localGeminiModel = localStorage.getItem("df_gemini_api_model");
+      if (localGeminiModel) geminiModel = localGeminiModel;
+    }
+  } catch (e) {}
 
   if (geminiModel.startsWith("gemini-1.5") || geminiModel === "gemini-2.5-flash") {
     geminiModel = "gemini-flash-latest";
@@ -628,38 +629,41 @@ export async function evaluatePartBWithAI(params: {
   candidateFileUrl?: string | null;
   candidateAnswerText?: string | null;
   maxMarks: number;
+  provider?: "openai" | "gemini";
+  openaiKey?: string;
+  openaiModel?: string;
+  geminiKey?: string;
+  geminiModel?: string;
 }): Promise<EvaluationResult> {
   const settings = await getAISettings();
 
-  // Prefer OpenAI if configured or selected as provider
-  if (settings.provider === "openai" || (!settings.geminiKey && settings.openaiKey)) {
-    if (!settings.openaiKey) {
-      throw new Error("OpenAI API key is missing. Please add your ChatGPT/OpenAI API key in AI Settings.");
+  const provider = params.provider || settings.provider || "openai";
+  const openaiKey = (params.openaiKey?.trim() || settings.openaiKey || "").trim();
+  const openaiModel = params.openaiModel || settings.openaiModel || "gpt-4o-mini";
+  const geminiKey = (params.geminiKey?.trim() || settings.geminiKey || "").trim();
+  const geminiModel = params.geminiModel || settings.geminiModel || "gemini-flash-latest";
+
+  if (provider === "openai") {
+    if (!openaiKey) {
+      throw new Error("OpenAI (ChatGPT) is selected as the evaluator, but no OpenAI API key was found. Please configure your OpenAI API key in AI Settings.");
     }
     return evaluatePartBWithOpenAI({
       ...params,
-      apiKey: settings.openaiKey,
-      model: settings.openaiModel
+      apiKey: openaiKey,
+      model: openaiModel
     });
   }
 
-  // Fallback to Gemini if configured
-  if (settings.geminiKey) {
+  if (provider === "gemini") {
+    if (!geminiKey) {
+      throw new Error("Google Gemini is selected as the evaluator, but no Gemini API key was found. Please configure your Gemini API key in AI Settings.");
+    }
     return evaluatePartBWithGemini({
       ...params,
-      apiKey: settings.geminiKey,
-      model: settings.geminiModel
+      apiKey: geminiKey,
+      model: geminiModel
     });
   }
 
-  // If OpenAI key is present even if provider wasn't explicitly switched
-  if (settings.openaiKey) {
-    return evaluatePartBWithOpenAI({
-      ...params,
-      apiKey: settings.openaiKey,
-      model: settings.openaiModel
-    });
-  }
-
-  throw new Error("No AI API key found. Please configure OpenAI (ChatGPT) or Gemini in AI Settings.");
+  throw new Error(`Unsupported AI evaluation provider: ${provider}`);
 }

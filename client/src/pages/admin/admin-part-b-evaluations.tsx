@@ -955,7 +955,8 @@ export default function AdminPartBEvaluations() {
 
     setAiEvaluatingSingle(true);
     try {
-      toast({ title: "AI Evaluating Submission...", description: "Analyzing sketch and formulating 20-25 word review." });
+      const providerLabel = activeAiProvider === 'openai' ? `OpenAI (${configOpenaiModel})` : 'Google Gemini';
+      toast({ title: `AI Evaluating with ${providerLabel}...`, description: "Analyzing sketch and formulating 20-25 word review." });
 
       const fileUrls = parseFileUrls(currentResp.file_url);
       const activeFileUrl = fileUrls.length > 0 ? normalizeSubmissionUrl(fileUrls[0]).url : null;
@@ -966,7 +967,12 @@ export default function AdminPartBEvaluations() {
         questionMediaUrl: currentQ.media_url ? resolveQuestionMediaUrl(currentQ.media_url) : null,
         candidateFileUrl: activeFileUrl,
         candidateAnswerText: currentResp.answer_text,
-        maxMarks: qMaxMarks
+        maxMarks: qMaxMarks,
+        provider: activeAiProvider,
+        openaiKey: configOpenaiKey.trim() || undefined,
+        openaiModel: configOpenaiModel,
+        geminiKey: configGeminiKey.trim() || undefined,
+        geminiModel: configGeminiModel,
       });
 
       setEvalForm(prev => ({
@@ -995,8 +1001,8 @@ export default function AdminPartBEvaluations() {
       setResponses(updated);
 
       toast({ 
-        title: "AI Evaluation Ready!", 
-        description: `Scored ${result.marks_awarded}/${qMaxMarks} with ${result.word_count}-word review. Please review and save.` 
+        title: "AI Evaluation Ready", 
+        description: `Scored ${result.marks_awarded}/${qMaxMarks} via ${providerLabel}. Please review and save.` 
       });
     } catch (err: any) {
       console.error("AI Evaluation failed:", err);
@@ -1040,7 +1046,12 @@ export default function AdminPartBEvaluations() {
               questionMediaUrl: q.media_url ? resolveQuestionMediaUrl(q.media_url) : null,
               candidateFileUrl: activeFileUrl,
               candidateAnswerText: resp.answer_text,
-              maxMarks: qMaxMarks
+              maxMarks: qMaxMarks,
+              provider: activeAiProvider,
+              openaiKey: configOpenaiKey.trim() || undefined,
+              openaiModel: configOpenaiModel,
+              geminiKey: configGeminiKey.trim() || undefined,
+              geminiModel: configGeminiModel,
             });
 
             updatedResponses[i] = {
@@ -1288,7 +1299,11 @@ export default function AdminPartBEvaluations() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => { setActiveAiProvider('openai'); setTestAiResult(null); }}
+                    onClick={() => { 
+                      setActiveAiProvider('openai'); 
+                      setTestAiResult(null); 
+                      try { localStorage.setItem("df_ai_provider", "openai"); } catch (e) {}
+                    }}
                     className={`p-3 rounded-xl border text-left transition-all ${
                       activeAiProvider === 'openai' 
                         ? 'border-purple-600 bg-purple-50 text-purple-900 shadow-xs' 
@@ -1304,7 +1319,11 @@ export default function AdminPartBEvaluations() {
 
                   <button
                     type="button"
-                    onClick={() => { setActiveAiProvider('gemini'); setTestAiResult(null); }}
+                    onClick={() => { 
+                      setActiveAiProvider('gemini'); 
+                      setTestAiResult(null); 
+                      try { localStorage.setItem("df_ai_provider", "gemini"); } catch (e) {}
+                    }}
                     className={`p-3 rounded-xl border text-left transition-all ${
                       activeAiProvider === 'gemini' 
                         ? 'border-purple-600 bg-purple-50 text-purple-900 shadow-xs' 
@@ -1802,7 +1821,7 @@ export default function AdminPartBEvaluations() {
             className="font-bold border-purple-200 text-purple-700 bg-purple-50/60 hover:bg-purple-100/70 gap-1.5"
           >
             {aiEvaluatingBatch ? <Loader2 className="w-4 h-4 animate-spin text-purple-600" /> : <Sparkles className="w-4 h-4 text-purple-600" />}
-            Evaluate All with AI
+            Evaluate All with {activeAiProvider === 'openai' ? 'OpenAI' : 'Gemini'}
           </Button>
           <Button variant="outline" onClick={() => { saveCurrentQuestionDraft(); toast({ title: "Draft Saved" }); }} className="font-bold border-orange-200 text-orange-600 hover:bg-orange-50">
             Save Draft
@@ -2202,12 +2221,12 @@ export default function AdminPartBEvaluations() {
                  {aiEvaluatingSingle ? (
                    <>
                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                     Evaluating Question...
+                     Evaluating with {activeAiProvider === 'openai' ? 'OpenAI' : 'Gemini'}...
                    </>
                  ) : (
                    <>
                      <Sparkles className="w-3.5 h-3.5" />
-                     Evaluate This Question with AI
+                     Evaluate with {activeAiProvider === 'openai' ? `OpenAI (${configOpenaiModel})` : 'Gemini'}
                    </>
                  )}
                </Button>
@@ -2423,7 +2442,11 @@ export default function AdminPartBEvaluations() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => { setActiveAiProvider("openai"); setTestAiResult(null); }}
+                  onClick={() => { 
+                    setActiveAiProvider("openai"); 
+                    setTestAiResult(null); 
+                    try { localStorage.setItem("df_ai_provider", "openai"); } catch (e) {}
+                  }}
                   className={`p-3 rounded-xl border text-left font-bold text-xs transition-all ${
                     activeAiProvider === "openai" 
                       ? "border-purple-600 bg-purple-50/60 text-purple-950 shadow-xs ring-1 ring-purple-600" 
@@ -2439,7 +2462,11 @@ export default function AdminPartBEvaluations() {
 
                 <button
                   type="button"
-                  onClick={() => { setActiveAiProvider("gemini"); setTestAiResult(null); }}
+                  onClick={() => { 
+                    setActiveAiProvider("gemini"); 
+                    setTestAiResult(null); 
+                    try { localStorage.setItem("df_ai_provider", "gemini"); } catch (e) {}
+                  }}
                   className={`p-3 rounded-xl border text-left font-bold text-xs transition-all ${
                     activeAiProvider === "gemini" 
                       ? "border-purple-600 bg-purple-50/60 text-purple-950 shadow-xs ring-1 ring-purple-600" 
@@ -2554,7 +2581,7 @@ export default function AdminPartBEvaluations() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
               <Sparkles className="w-5 h-5 text-purple-600 animate-pulse" />
-              Evaluating Part B with Gemini AI
+              Evaluating Part B with {activeAiProvider === 'openai' ? `OpenAI (${configOpenaiModel})` : 'Google Gemini'}
             </DialogTitle>
             <DialogDescription>
               Evaluating candidate responses against the 5 design rubrics and drafting 20–25 word reviews...
