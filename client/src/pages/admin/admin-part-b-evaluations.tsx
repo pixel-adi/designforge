@@ -174,9 +174,11 @@ export default function AdminPartBEvaluations() {
 
   // Admin Proxy Submission (Create on behalf of student) state
   const [showProxyModal, setShowProxyModal] = useState(false);
+  const [proxyCandidateFilter, setProxyCandidateFilter] = useState<'focus_batch' | 'materials_only' | 'generic' | 'all'>('focus_batch');
   const [proxyCandidateSearch, setProxyCandidateSearch] = useState('');
   const [proxySelectedCandidate, setProxySelectedCandidate] = useState<any>(null);
   const [proxySelectedTestId, setProxySelectedTestId] = useState('');
+  const [proxyLoadingQuestions, setProxyLoadingQuestions] = useState(false);
   const [proxyTestQuestions, setProxyTestQuestions] = useState<any[]>([]);
   const [proxyResponses, setProxyResponses] = useState<Record<string, { fileUrls: string[]; answerText: string }>>({});
   const [proxyUploadingQId, setProxyUploadingQId] = useState<string | null>(null);
@@ -284,22 +286,34 @@ export default function AdminPartBEvaluations() {
     }
   };
 
-  // Query candidates for proxy submission modal (prioritize Focus Batch)
+  // Query candidates for proxy submission modal (filtered by tier with Focus Batch default)
   const { data: proxyCandidates = [] } = useQuery({
-    queryKey: ['proxy-candidates', proxyCandidateSearch],
+    queryKey: ['proxy-candidates', proxyCandidateFilter, proxyCandidateSearch],
     enabled: showProxyModal,
     queryFn: async () => {
       let q = supabase
         .from('exam_candidates')
-        .select('id, name, email, unique_id, access_level, has_focus_mocks_access')
-        .order('created_at', { ascending: false })
-        .limit(40);
+        .select('id, name, email, unique_id, access_level, education_level, has_focus_mocks_access')
+        .order('created_at', { ascending: false });
+
+      if (proxyCandidateFilter === 'focus_batch') {
+        q = q.or('access_level.eq.focus_batch,has_focus_mocks_access.eq.true');
+      } else if (proxyCandidateFilter === 'materials_only') {
+        q = q.eq('access_level', 'materials_only');
+      } else if (proxyCandidateFilter === 'generic') {
+        q = q.eq('access_level', 'generic').eq('has_focus_mocks_access', false);
+      }
 
       if (proxyCandidateSearch.trim()) {
-        q = q.or(`name.ilike.%${proxyCandidateSearch}%,email.ilike.%${proxyCandidateSearch}%`);
+        q = q.or(`name.ilike.%${proxyCandidateSearch}%,email.ilike.%${proxyCandidateSearch}%,unique_id.ilike.%${proxyCandidateSearch}%`);
       }
-      const { data, error } = await q;
-      if (error) throw error;
+
+      const { data, error } = await q.limit(60);
+      if (error) {
+        console.error("Error fetching proxy candidates:", error);
+        throw error;
+      }
+
       // Sort Focus Batch to top
       return (data || []).sort((a, b) => {
         const aIsFocus = a.access_level === 'focus_batch' || a.has_focus_mocks_access;
@@ -311,17 +325,20 @@ export default function AdminPartBEvaluations() {
     }
   });
 
-  // Query tests with Part B questions
-  const { data: proxyTests = [] } = useQuery({
+  // Query tests for proxy submission modal
+  const { data: proxyTests = [], isLoading: isLoadingProxyTests } = useQuery({
     queryKey: ['proxy-tests'],
     enabled: showProxyModal,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('exam_tests')
-        .select('id, title, program_format, total_time_mins, exam_programs(name)')
-        .order('created_at', { ascending: false })
-        .limit(60);
-      if (error) throw error;
+        .select('id, title, program_format, is_focus_batch, access_tier, status, category, exam_programs(name)')
+        .eq('status', 'published')
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.error("Error fetching proxy tests:", error);
+        throw error;
+      }
       return data || [];
     }
   });
@@ -333,23 +350,51 @@ export default function AdminPartBEvaluations() {
     setProxyResponses({});
     if (!testId) return;
 
+    setProxyLoadingQuestions(true);
     try {
-      const { data, error } = await supabase
-        .from('exam_questions')
-        .select('id, title, content_text, marks, part, question_type, media_url')
-        .eq('test_id', testId)
-        .eq('part', 'B')
-        .order('order_seq', { ascending: true });
+      // 1. Fetch questions linked to this test via exam_test_questions
+      const { data: tqData, error: tqErr } = await supabase
+        .from('exam_test_questions')
+        .select('question_id, marks')
+        .eq('test_id', testId);
 
-      if (error) throw error;
-      setProxyTestQuestions(data || []);
+      if (tqErr) {
+        console.warn("Could not fetch exam_test_questions:", tqErr);
+      }
+
+      const qIds = (tqData || []).map((t: any) => t.question_id);
+      let questions: any[] = [];
+
+      if (qIds.length > 0) {
+        const { data: qs, error: qsErr } = await supabase
+          .from('exam_questions')
+          .select('*')
+          .in('id', qIds);
+
+        if (qsErr) throw qsErr;
+
+        const marksMap = new Map((tqData || []).map((t: any) => [t.question_id, t.marks]));
+        const allQuestions = (qs || []).map((q: any) => ({
+          ...q,
+          marks: marksMap.get(q.id) != null ? Number(marksMap.get(q.id)) : (q.marks || 10)
+        }));
+
+        // Filter Part B subjective questions, fallback to all if none tagged Part B
+        const partB = allQuestions.filter((q: any) => q.part === 'B');
+        questions = partB.length > 0 ? partB : allQuestions;
+      }
+
+      setProxyTestQuestions(questions);
       const initResp: Record<string, { fileUrls: string[]; answerText: string }> = {};
-      (data || []).forEach(q => {
+      questions.forEach((q: any) => {
         initResp[q.id] = { fileUrls: [], answerText: '' };
       });
       setProxyResponses(initResp);
     } catch (err: any) {
+      console.error("Error loading test questions for proxy:", err);
       toast({ title: "Failed to load questions", description: err.message, variant: "destructive" });
+    } finally {
+      setProxyLoadingQuestions(false);
     }
   };
 
@@ -1098,6 +1143,7 @@ export default function AdminPartBEvaluations() {
             <Button
               onClick={() => {
                 setProxySelectedCandidate(null);
+                setProxyCandidateFilter('focus_batch');
                 setProxyCandidateSearch('');
                 setProxySelectedTestId('');
                 setProxyTestQuestions([]);
@@ -1387,13 +1433,67 @@ export default function AdminPartBEvaluations() {
             <div className="space-y-6 py-4">
               {/* Step 1: Candidate Selection */}
               <div>
-                <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2">
-                  1. Select Student (Focus Batch highlighted)
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider">
+                    1. Select Student
+                  </label>
+                  {proxySelectedCandidate && (
+                    <span className="text-[11px] font-medium text-emerald-600">Student selected</span>
+                  )}
+                </div>
+
+                {/* Filter Tabs: Focus Batch (default) / Material / Generic / All */}
+                <div className="flex flex-wrap items-center gap-1.5 p-1 bg-black/5 rounded-xl border border-black/5 w-fit mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setProxyCandidateFilter('focus_batch')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      proxyCandidateFilter === 'focus_batch'
+                        ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                        : 'text-foreground/70 hover:text-foreground hover:bg-black/5'
+                    }`}
+                  >
+                    Focus Batch
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProxyCandidateFilter('materials_only')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      proxyCandidateFilter === 'materials_only'
+                        ? 'bg-blue-600 text-white shadow-xs font-bold'
+                        : 'text-foreground/70 hover:text-foreground hover:bg-black/5'
+                    }`}
+                  >
+                    Material
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProxyCandidateFilter('generic')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      proxyCandidateFilter === 'generic'
+                        ? 'bg-zinc-800 text-white shadow-xs font-bold'
+                        : 'text-foreground/70 hover:text-foreground hover:bg-black/5'
+                    }`}
+                  >
+                    Generic
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProxyCandidateFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      proxyCandidateFilter === 'all'
+                        ? 'bg-zinc-800 text-white shadow-xs font-bold'
+                        : 'text-foreground/70 hover:text-foreground hover:bg-black/5'
+                    }`}
+                  >
+                    All Students
+                  </button>
+                </div>
+
                 <div className="space-y-2">
                   <input
                     type="text"
-                    placeholder="Search student by name or email…"
+                    placeholder="Search student by name, email, or DF ID…"
                     value={proxyCandidateSearch}
                     onChange={(e) => setProxyCandidateSearch(e.target.value)}
                     className="w-full text-xs p-2.5 rounded-xl border border-black/10 bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -1409,8 +1509,18 @@ export default function AdminPartBEvaluations() {
                           <div className="text-xs font-bold text-[#262626] flex items-center gap-1.5">
                             <span>{proxySelectedCandidate.name}</span>
                             {(proxySelectedCandidate.access_level === 'focus_batch' || proxySelectedCandidate.has_focus_mocks_access) && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800 border border-green-200">
                                 Focus Batch
+                              </span>
+                            )}
+                            {proxySelectedCandidate.access_level === 'materials_only' && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                Material
+                              </span>
+                            )}
+                            {proxySelectedCandidate.education_level && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-black/5 text-foreground/60">
+                                {proxySelectedCandidate.education_level === 'bachelors' ? 'B.Des' : proxySelectedCandidate.education_level === 'masters' ? 'M.Des' : proxySelectedCandidate.education_level}
                               </span>
                             )}
                           </div>
@@ -1429,10 +1539,13 @@ export default function AdminPartBEvaluations() {
                   ) : (
                     <div className="max-h-48 overflow-y-auto border border-black/10 rounded-xl divide-y divide-black/5 bg-white">
                       {proxyCandidates.length === 0 ? (
-                        <div className="p-4 text-center text-xs text-foreground/40">No students found</div>
+                        <div className="p-4 text-center text-xs text-foreground/40">
+                          No students found in {proxyCandidateFilter.replace('_', ' ')}
+                        </div>
                       ) : (
                         proxyCandidates.map((cand: any) => {
                           const isFocus = cand.access_level === 'focus_batch' || cand.has_focus_mocks_access;
+                          const isMaterial = cand.access_level === 'materials_only';
                           return (
                             <div
                               key={cand.id}
@@ -1443,8 +1556,23 @@ export default function AdminPartBEvaluations() {
                                 <div className="text-xs font-semibold text-[#262626] flex items-center gap-1.5">
                                   <span>{cand.name}</span>
                                   {isFocus && (
-                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-green-100 text-green-800">
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 text-green-800 border border-green-200">
                                       Focus
+                                    </span>
+                                  )}
+                                  {isMaterial && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                      Material
+                                    </span>
+                                  )}
+                                  {!isFocus && !isMaterial && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/5 text-foreground/60">
+                                      Generic
+                                    </span>
+                                  )}
+                                  {cand.education_level && (
+                                    <span className="text-[10px] text-foreground/40">
+                                      ({cand.education_level === 'bachelors' ? 'B.Des' : cand.education_level === 'masters' ? 'M.Des' : cand.education_level})
                                     </span>
                                   )}
                                 </div>
@@ -1470,35 +1598,50 @@ export default function AdminPartBEvaluations() {
                   onChange={(e) => handleSelectProxyTest(e.target.value)}
                   className="w-full text-xs p-2.5 rounded-xl border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
                 >
-                  <option value="">-- Choose Test --</option>
-                  {proxyTests.map((t: any) => (
-                    <option key={t.id} value={t.id}>
-                      {t.title} ({t.exam_programs?.name || t.program_format})
-                    </option>
-                  ))}
+                  <option value="">{isLoadingProxyTests ? "Loading tests..." : "-- Choose Test --"}</option>
+                  {proxyTests.map((t: any) => {
+                    const isFocus = t.is_focus_batch;
+                    const prog = t.exam_programs?.name || (t.program_format === 'bachelors' ? 'B.Des' : t.program_format === 'masters' ? 'M.Des' : 'All');
+                    return (
+                      <option key={t.id} value={t.id}>
+                        {t.title} • {isFocus ? 'Focus Batch' : 'Generic'} ({prog})
+                      </option>
+                    );
+                  })}
                 </select>
+                {proxyLoadingQuestions && (
+                  <div className="flex items-center gap-2 mt-2 text-xs text-foreground/60">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                    <span>Loading questions for selected exam...</span>
+                  </div>
+                )}
               </div>
 
               {/* Step 3: Question-wise Solutions */}
               {proxySelectedTestId && (
                 <div className="space-y-4 pt-2">
                   <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider">
-                    3. Upload Solutions Question-Wise ({proxyTestQuestions.length} Part B questions)
+                    3. Upload Solutions Question-Wise ({proxyTestQuestions.length} Questions)
                   </label>
 
                   {proxyTestQuestions.length === 0 ? (
                     <div className="p-4 rounded-xl bg-black/5 text-center text-xs text-foreground/50">
-                      This test has no Part B subjective questions.
+                      {proxyLoadingQuestions ? "Loading questions..." : "This test has no Part B questions configured."}
                     </div>
                   ) : (
                     proxyTestQuestions.map((q, idx) => {
                       const resp = proxyResponses[q.id] || { fileUrls: [], answerText: '' };
                       return (
                         <div key={q.id} className="p-4 rounded-xl border border-black/10 bg-black/[0.01] space-y-3">
-                          <div className="flex items-start justify-between gap-2">
+                          <div className="flex flex-col gap-1">
                             <span className="text-xs font-bold text-[#262626]">
-                              Q{idx + 1}. {q.title || `Question ${idx + 1}`} ({q.marks} Marks)
+                              Q{idx + 1}. {q.pyq_tag || (q.content_text ? (q.content_text.length > 80 ? q.content_text.substring(0, 80) + '...' : q.content_text) : `Question ${idx + 1}`)} ({q.marks || 10} Marks)
                             </span>
+                            {q.content_text && q.content_text.length > 80 && (
+                              <p className="text-[11px] text-foreground/70 italic bg-black/5 p-2 rounded-lg line-clamp-3">
+                                {q.content_text}
+                              </p>
+                            )}
                           </div>
 
                           {/* Sketches Uploaded */}
@@ -2448,13 +2591,67 @@ export default function AdminPartBEvaluations() {
           <div className="space-y-6 py-4">
             {/* Step 1: Candidate Selection */}
             <div>
-              <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2">
-                1. Select Student (Focus Batch highlighted)
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider">
+                  1. Select Student
+                </label>
+                {proxySelectedCandidate && (
+                  <span className="text-[11px] font-medium text-emerald-600">Student selected</span>
+                )}
+              </div>
+
+              {/* Filter Tabs: Focus Batch (default) / Material / Generic / All */}
+              <div className="flex flex-wrap items-center gap-1.5 p-1 bg-black/5 rounded-xl border border-black/5 w-fit mb-3">
+                <button
+                  type="button"
+                  onClick={() => setProxyCandidateFilter('focus_batch')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    proxyCandidateFilter === 'focus_batch'
+                      ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                      : 'text-foreground/70 hover:text-foreground hover:bg-black/5'
+                  }`}
+                >
+                  Focus Batch
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProxyCandidateFilter('materials_only')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    proxyCandidateFilter === 'materials_only'
+                      ? 'bg-blue-600 text-white shadow-xs font-bold'
+                      : 'text-foreground/70 hover:text-foreground hover:bg-black/5'
+                  }`}
+                >
+                  Material
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProxyCandidateFilter('generic')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    proxyCandidateFilter === 'generic'
+                      ? 'bg-zinc-800 text-white shadow-xs font-bold'
+                      : 'text-foreground/70 hover:text-foreground hover:bg-black/5'
+                  }`}
+                >
+                  Generic
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProxyCandidateFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    proxyCandidateFilter === 'all'
+                      ? 'bg-zinc-800 text-white shadow-xs font-bold'
+                      : 'text-foreground/70 hover:text-foreground hover:bg-black/5'
+                  }`}
+                >
+                  All Students
+                </button>
+              </div>
+
               <div className="space-y-2">
                 <input
                   type="text"
-                  placeholder="Search student by name or email…"
+                  placeholder="Search student by name, email, or DF ID…"
                   value={proxyCandidateSearch}
                   onChange={(e) => setProxyCandidateSearch(e.target.value)}
                   className="w-full text-xs p-2.5 rounded-xl border border-black/10 bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -2470,8 +2667,18 @@ export default function AdminPartBEvaluations() {
                         <div className="text-xs font-bold text-[#262626] flex items-center gap-1.5">
                           <span>{proxySelectedCandidate.name}</span>
                           {(proxySelectedCandidate.access_level === 'focus_batch' || proxySelectedCandidate.has_focus_mocks_access) && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800 border border-green-200">
                               Focus Batch
+                            </span>
+                          )}
+                          {proxySelectedCandidate.access_level === 'materials_only' && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                              Material
+                            </span>
+                          )}
+                          {proxySelectedCandidate.education_level && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-black/5 text-foreground/60">
+                              {proxySelectedCandidate.education_level === 'bachelors' ? 'B.Des' : proxySelectedCandidate.education_level === 'masters' ? 'M.Des' : proxySelectedCandidate.education_level}
                             </span>
                           )}
                         </div>
@@ -2490,10 +2697,13 @@ export default function AdminPartBEvaluations() {
                 ) : (
                   <div className="max-h-48 overflow-y-auto border border-black/10 rounded-xl divide-y divide-black/5 bg-white">
                     {proxyCandidates.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-foreground/40">No students found</div>
+                      <div className="p-4 text-center text-xs text-foreground/40">
+                        No students found in {proxyCandidateFilter.replace('_', ' ')}
+                      </div>
                     ) : (
                       proxyCandidates.map((cand: any) => {
                         const isFocus = cand.access_level === 'focus_batch' || cand.has_focus_mocks_access;
+                        const isMaterial = cand.access_level === 'materials_only';
                         return (
                           <div
                             key={cand.id}
@@ -2504,8 +2714,23 @@ export default function AdminPartBEvaluations() {
                               <div className="text-xs font-semibold text-[#262626] flex items-center gap-1.5">
                                 <span>{cand.name}</span>
                                 {isFocus && (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-green-100 text-green-800">
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 text-green-800 border border-green-200">
                                     Focus
+                                  </span>
+                                )}
+                                {isMaterial && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                    Material
+                                  </span>
+                                )}
+                                {!isFocus && !isMaterial && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/5 text-foreground/60">
+                                    Generic
+                                  </span>
+                                )}
+                                {cand.education_level && (
+                                  <span className="text-[10px] text-foreground/40">
+                                    ({cand.education_level === 'bachelors' ? 'B.Des' : cand.education_level === 'masters' ? 'M.Des' : cand.education_level})
                                   </span>
                                 )}
                               </div>
@@ -2531,35 +2756,50 @@ export default function AdminPartBEvaluations() {
                 onChange={(e) => handleSelectProxyTest(e.target.value)}
                 className="w-full text-xs p-2.5 rounded-xl border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
-                <option value="">-- Choose Test --</option>
-                {proxyTests.map((t: any) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title} ({t.exam_programs?.name || t.program_format})
-                  </option>
-                ))}
+                <option value="">{isLoadingProxyTests ? "Loading tests..." : "-- Choose Test --"}</option>
+                {proxyTests.map((t: any) => {
+                  const isFocus = t.is_focus_batch;
+                  const prog = t.exam_programs?.name || (t.program_format === 'bachelors' ? 'B.Des' : t.program_format === 'masters' ? 'M.Des' : 'All');
+                  return (
+                    <option key={t.id} value={t.id}>
+                      {t.title} • {isFocus ? 'Focus Batch' : 'Generic'} ({prog})
+                    </option>
+                  );
+                })}
               </select>
+              {proxyLoadingQuestions && (
+                <div className="flex items-center gap-2 mt-2 text-xs text-foreground/60">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                  <span>Loading questions for selected exam...</span>
+                </div>
+              )}
             </div>
 
             {/* Step 3: Question-wise Solutions */}
             {proxySelectedTestId && (
               <div className="space-y-4 pt-2">
                 <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider">
-                  3. Upload Solutions Question-Wise ({proxyTestQuestions.length} Part B questions)
+                  3. Upload Solutions Question-Wise ({proxyTestQuestions.length} Questions)
                 </label>
 
                 {proxyTestQuestions.length === 0 ? (
                   <div className="p-4 rounded-xl bg-black/5 text-center text-xs text-foreground/50">
-                    This test has no Part B subjective questions.
+                    {proxyLoadingQuestions ? "Loading questions..." : "This test has no Part B questions configured."}
                   </div>
                 ) : (
                   proxyTestQuestions.map((q, idx) => {
                     const resp = proxyResponses[q.id] || { fileUrls: [], answerText: '' };
                     return (
                       <div key={q.id} className="p-4 rounded-xl border border-black/10 bg-black/[0.01] space-y-3">
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-col gap-1">
                           <span className="text-xs font-bold text-[#262626]">
-                            Q{idx + 1}. {q.title || `Question ${idx + 1}`} ({q.marks} Marks)
+                            Q{idx + 1}. {q.pyq_tag || (q.content_text ? (q.content_text.length > 80 ? q.content_text.substring(0, 80) + '...' : q.content_text) : `Question ${idx + 1}`)} ({q.marks || 10} Marks)
                           </span>
+                          {q.content_text && q.content_text.length > 80 && (
+                            <p className="text-[11px] text-foreground/70 italic bg-black/5 p-2 rounded-lg line-clamp-3">
+                              {q.content_text}
+                            </p>
+                          )}
                         </div>
 
                         {/* Sketches Uploaded */}
