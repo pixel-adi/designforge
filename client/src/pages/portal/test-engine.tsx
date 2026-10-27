@@ -43,7 +43,7 @@ interface EngineState {
   isNid: boolean;
 }
 
-type TestStep = 'instructions' | 'test' | 'part-b-instructions' | 'submitted' | 'review';
+type TestStep = 'instructions' | 'test' | 'part-b-instructions' | 'upload_buffer' | 'submitted' | 'review';
 type QuestionStatus = 'unseen' | 'visited' | 'answered' | 'marked';
 
 interface ResponseData {
@@ -80,6 +80,11 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   const testEndTimeRef = useRef<number | null>(null);
   const hasAutoSubmittedRef = useRef(false);
   const hasTransitionedPartBRef = useRef(false);
+
+  // 10-Minute Post-Exam Solution Upload Buffer State
+  const [uploadBufferTimeLeft, setUploadBufferTimeLeft] = useState(600); // 10 minutes in seconds
+  const uploadBufferEndTimeRef = useRef<number | null>(null);
+  const hasStartedUploadBufferRef = useRef(false);
 
   // Pause & Resume State (Max 2 resumes allowed)
   const [isPaused, setIsPaused] = useState(false);
@@ -315,9 +320,28 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         }
       }
 
-      // Auto-submit when time has fully elapsed
+      // Auto-submit or transition to 10-minute Post-Exam Solution Upload Buffer when time has fully elapsed
       if (remaining <= 0) {
         if (!hasAutoSubmittedRef.current) {
+          // If test has Part B (subjective sketching questions), activate dedicated 10-min upload buffer
+          if (engineData?.hasPartB && !hasStartedUploadBufferRef.current) {
+            hasStartedUploadBufferRef.current = true;
+            const bufferEnd = Date.now() + 600 * 1000;
+            uploadBufferEndTimeRef.current = bufferEnd;
+            if (attemptId) {
+              localStorage.setItem(`df_upload_buffer_end_${attemptId}`, String(bufferEnd));
+            }
+            setUploadBufferTimeLeft(600);
+            setTimerRunning(false);
+            setTestStep('upload_buffer');
+            toast({
+              title: "Exam Finished ⏱️ Upload Buffer Active",
+              description: "You have 10 minutes to upload your question sketches. Objective questions are now locked.",
+              duration: 9000
+            });
+            return;
+          }
+
           hasAutoSubmittedRef.current = true;
           setTimerRunning(false);
           handleAutoSubmit("Time's up! Your test has been automatically submitted.");
@@ -370,6 +394,40 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       window.removeEventListener('focus', handleSync);
     };
   }, [timerRunning, engineData?.hasTimedPartALock, engineData?.hasPartB, engineData?.partA_TimeThreshold, engineData?.totalMins, testStep, activeQuestionIndex, attemptId]);
+
+  // 10-Minute Post-Exam Solution Upload Buffer Countdown Effect
+  useEffect(() => {
+    if (testStep !== 'upload_buffer') return;
+
+    if (!uploadBufferEndTimeRef.current) {
+      const stored = attemptId ? Number(localStorage.getItem(`df_upload_buffer_end_${attemptId}`)) : null;
+      if (stored && stored > Date.now()) {
+        uploadBufferEndTimeRef.current = stored;
+      } else {
+        const newEnd = Date.now() + 600 * 1000;
+        uploadBufferEndTimeRef.current = newEnd;
+        if (attemptId) localStorage.setItem(`df_upload_buffer_end_${attemptId}`, String(newEnd));
+      }
+    }
+
+    const checkBufferTick = () => {
+      if (!uploadBufferEndTimeRef.current) return;
+      const rem = Math.max(0, Math.round((uploadBufferEndTimeRef.current - Date.now()) / 1000));
+      setUploadBufferTimeLeft(rem);
+
+      if (rem <= 0) {
+        if (attemptId) {
+          localStorage.removeItem(`df_upload_buffer_end_${attemptId}`);
+        }
+        handleAutoSubmit("Upload buffer ended. Your test and solutions have been submitted.");
+      }
+    };
+
+    checkBufferTick();
+    const interval = setInterval(checkBufferTick, 500);
+
+    return () => clearInterval(interval);
+  }, [testStep, attemptId]);
 
   // Deployment & Reload Protection: Automatically freeze time and save latest responses on tab close or page reload
   useEffect(() => {
@@ -751,7 +809,27 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         }
 
         if (remaining <= 0 && !isCurrentlyPaused) {
-          handleAutoSubmit("Your attempt duration has expired. Test submitted.");
+          // Check if test has Part B and upload buffer window is still valid
+          const bufferEndKey = `df_upload_buffer_end_${inProgress.id}`;
+          const storedBufferEnd = Number(localStorage.getItem(bufferEndKey));
+          const hasPartB = engineData?.hasPartB ?? true;
+          
+          if (hasPartB && storedBufferEnd && storedBufferEnd > Date.now()) {
+            uploadBufferEndTimeRef.current = storedBufferEnd;
+            hasStartedUploadBufferRef.current = true;
+            setUploadBufferTimeLeft(Math.max(0, Math.round((storedBufferEnd - Date.now()) / 1000)));
+            setTestStep('upload_buffer');
+          } else if (hasPartB && !storedBufferEnd) {
+            // Main exam just expired, initiate the 10-minute solution upload buffer
+            const bufferEnd = Date.now() + 600 * 1000;
+            uploadBufferEndTimeRef.current = bufferEnd;
+            localStorage.setItem(bufferEndKey, String(bufferEnd));
+            hasStartedUploadBufferRef.current = true;
+            setUploadBufferTimeLeft(600);
+            setTestStep('upload_buffer');
+          } else {
+            handleAutoSubmit("Your attempt duration has expired. Test submitted.");
+          }
         }
         return inProgress.id;
       }
@@ -1520,7 +1598,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          const MAX_DIM = 2200;
+          const MAX_DIM = 1400;
           let width = img.width;
           let height = img.height;
 
@@ -1547,10 +1625,11 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           ctx.fillRect(0, 0, width, height);
           ctx.drawImage(img, 0, 0, width, height);
 
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          // Fast mobile canvas compression: 1400px @ 0.75 quality produces 150-250KB sketches
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
           canvas.toBlob((blob) => {
             resolve({ blob: blob || file, dataUrl, ext: 'jpg' });
-          }, 'image/jpeg', 0.85);
+          }, 'image/jpeg', 0.75);
         };
         img.onerror = () => {
           resolve({ blob: file, dataUrl: (e.target?.result as string) || '', ext: file.name.split('.').pop() || 'jpg' });
@@ -1690,9 +1769,22 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   const captureSnapshot = async (qId: string) => {
     if (!videoRef.current) return;
     const video = videoRef.current;
+    
+    // Scale live camera snapshot down to max 1400px dimension
+    const MAX_DIM = 1400;
+    let width = video.videoWidth || 1280;
+    let height = video.videoHeight || 720;
+    if (width > height && width > MAX_DIM) {
+      height = Math.round((height * MAX_DIM) / width);
+      width = MAX_DIM;
+    } else if (height > MAX_DIM) {
+      width = Math.round((width * MAX_DIM) / height);
+      height = MAX_DIM;
+    }
+
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -1703,7 +1795,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       if (!blob) return;
       const snapshotFile = new File([blob], `sketch_camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
       await uploadFiles([snapshotFile], qId);
-    }, 'image/jpeg', 0.92);
+    }, 'image/jpeg', 0.75);
   };
 
   const handleClipboardButton = async (qId: string) => {
@@ -2052,6 +2144,216 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                 Start Part B Now
               </Button>
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 10-MINUTE POST-EXAM SOLUTION UPLOAD BUFFER SCREEN
+  // -------------------------------------------------------------
+  if (testStep === 'upload_buffer') {
+    const partBQuestions = (engineData?.questions || []).filter(q => q.part === 'B');
+
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex flex-col">
+        {/* Sticky Header with 10-minute Countdown Banner */}
+        <div className="bg-white border-b border-black/10 px-6 py-4 sticky top-0 z-20 shadow-xs flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 shrink-0">
+              <UploadCloud className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                  Buffer Window
+                </span>
+                <span className="text-xs text-foreground/50">• Part A Locked</span>
+              </div>
+              <h1 className="text-lg font-bold text-[#262626]">Upload Sketches & Solutions</h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-mono font-bold text-sm ${
+              uploadBufferTimeLeft < 120 
+                ? 'bg-red-50 border-red-200 text-red-600 animate-pulse' 
+                : 'bg-amber-50 border-amber-200 text-amber-900'
+            }`}>
+              <Clock className="w-4 h-4" />
+              <span>{formatTime(uploadBufferTimeLeft)} remaining</span>
+            </div>
+
+            <Button
+              onClick={() => confirmSubmit()}
+              disabled={loading}
+              className="bg-primary hover:bg-primary/90 text-white font-bold text-sm h-10 px-5 rounded-xl shadow-xs gap-1.5"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck2 className="w-4 h-4" />}
+              <span>Finalize & Submit All</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Informational Guidance Notice */}
+        <div className="max-w-5xl w-full mx-auto px-6 pt-6">
+          <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 flex items-start gap-3.5">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-xs sm:text-sm text-amber-900 leading-relaxed">
+              <strong>Main exam duration has concluded.</strong> All objective answers (Part A) are saved and locked. Use this 10-minute window to take photos or upload your design sketches and written concepts question-wise below. Photos are automatically compressed for high-speed transmission.
+            </div>
+          </div>
+        </div>
+
+        {/* Question-Wise Upload Cards */}
+        <div className="max-w-5xl w-full mx-auto px-6 py-6 space-y-6 flex-1">
+          {partBQuestions.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-black/10 p-12 text-center">
+              <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+              <h3 className="text-base font-bold text-[#262626]">No subjective questions to upload</h3>
+              <p className="text-xs text-foreground/50 mt-1 max-w-md mx-auto mb-6">
+                All questions in this test were objective and have been submitted. You can finalize your attempt.
+              </p>
+              <Button onClick={() => confirmSubmit()} className="bg-primary text-white font-bold px-6">
+                Complete Attempt
+              </Button>
+            </div>
+          ) : (
+            partBQuestions.map((q, qIndex) => {
+              const currentResp = responses[q.id];
+              const fileList = parseFileUrls(currentResp?.fileUrl);
+
+              return (
+                <div key={q.id} className="bg-white rounded-2xl border border-black/10 p-6 shadow-xs space-y-4">
+                  <div className="flex items-start justify-between gap-4 border-b border-black/5 pb-3">
+                    <div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-0.5 rounded-md">
+                        Part B • Question {qIndex + 1}
+                      </span>
+                      <h3 className="text-sm sm:text-base font-bold text-[#262626] mt-2">
+                        {q.title || `Subjective Task ${qIndex + 1}`}
+                      </h3>
+                    </div>
+                    <span className="text-xs font-black text-foreground/50 shrink-0">
+                      {q.marks || 15} Marks
+                    </span>
+                  </div>
+
+                  {/* Question Prompt */}
+                  <div 
+                    className="prose prose-sm max-w-none text-[#262626]/80 text-xs sm:text-sm leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(q.content_text || '') }}
+                  />
+
+                  {/* Upload Controls */}
+                  <div className="pt-2">
+                    <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2">
+                      Attach Sketches / Solution Sheets ({fileList.length} attached)
+                    </label>
+
+                    {/* Previews Grid */}
+                    {fileList.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                        {fileList.map((url, imgIdx) => (
+                          <div key={imgIdx} className="relative aspect-square rounded-xl overflow-hidden border border-black/10 bg-black/5 group">
+                            <img src={url} alt={`Sketch ${imgIdx + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = fileList.filter((_, i) => i !== imgIdx);
+                                updateResponse(q.id, { fileUrl: JSON.stringify(updated) });
+                              }}
+                              className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-red-600 text-white flex items-center justify-center transition-colors shadow-xs"
+                              title="Remove image"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          disabled={isUploadingFile}
+                          onChange={(e) => handleFileUpload(e, q.id)}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isUploadingFile}
+                          asChild
+                          className="h-9 text-xs font-semibold gap-1.5 border-black/15 hover:bg-black/5"
+                        >
+                          <span>
+                            {isUploadingFile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5 text-primary" />}
+                            <span>Select Images</span>
+                          </span>
+                        </Button>
+                      </label>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isUploadingFile}
+                        onClick={() => {
+                          setActiveQuestionIndex(engineData!.questions.findIndex(item => item.id === q.id));
+                          startCamera();
+                        }}
+                        className="h-9 text-xs font-semibold gap-1.5 border-black/15 hover:bg-black/5"
+                      >
+                        <Camera className="w-3.5 h-3.5 text-primary" />
+                        <span>Take Photo</span>
+                      </Button>
+
+                      {isUploadingFile && uploadProgressText && (
+                        <span className="text-xs text-foreground/50 animate-pulse">
+                          {uploadProgressText}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Written Explanation / Notes */}
+                  <div className="pt-2">
+                    <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider mb-1.5">
+                      Design Notes & Concept Explanation (Optional)
+                    </label>
+                    <textarea
+                      value={currentResp?.answerText || ''}
+                      onChange={(e) => updateResponse(q.id, { answerText: e.target.value })}
+                      placeholder="Explain your design thinking, user persona, problem breakdown, or material choices..."
+                      rows={3}
+                      className="w-full text-xs sm:text-sm p-3 rounded-xl border border-black/10 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-background/50 resize-y"
+                    />
+                  </div>
+                </div>
+              );
+            })
+          )}
+
+          {/* Bottom Complete Bar */}
+          <div className="flex items-center justify-between bg-white rounded-2xl border border-black/10 p-5 shadow-xs">
+            <div>
+              <p className="text-xs font-bold text-[#262626]">Finished uploading your solutions?</p>
+              <p className="text-[11px] text-foreground/50">You can submit early or let the timer finalize automatically.</p>
+            </div>
+            <Button
+              onClick={() => confirmSubmit()}
+              disabled={loading}
+              className="bg-primary hover:bg-primary/90 text-white font-bold text-sm h-10 px-6 rounded-xl shadow-xs"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Submit All Solutions"}
+            </Button>
           </div>
         </div>
       </div>

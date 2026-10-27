@@ -94,6 +94,16 @@ Deno.serve(async (req) => {
     
     if (access_level !== undefined) {
       updateData.access_level = access_level;
+      // Guarantee has_focus_mocks_access is synchronized whenever access_level changes
+      if (access_level === "focus_batch") {
+        updateData.has_focus_mocks_access = true;
+      } else if (body.has_focus_mocks_access === false) {
+        updateData.has_focus_mocks_access = false;
+      }
+    }
+
+    if (body.has_focus_mocks_access !== undefined) {
+      updateData.has_focus_mocks_access = Boolean(body.has_focus_mocks_access);
     }
 
     if (access_level === "generic") {
@@ -112,12 +122,31 @@ Deno.serve(async (req) => {
       .from("exam_candidates")
       .update(updateData)
       .eq("id", candidate_id)
-      .select("id, access_level, access_expires_at")
+      .select("id, access_level, access_expires_at, has_focus_mocks_access")
       .single();
 
     if (updateError) {
       console.error("Update error:", updateError);
       return jsonOk(req, { error: `Database error: ${updateError.message}` }, 500);
+    }
+
+    // If the candidate has an email, also synchronize any duplicate account rows created with that email
+    // (e.g. email pre-registration vs Google OAuth login) to prevent account locking discrepancies
+    try {
+      const { data: candidateInfo } = await supabase
+        .from("exam_candidates")
+        .select("email")
+        .eq("id", candidate_id)
+        .single();
+
+      if (candidateInfo?.email) {
+        await supabase
+          .from("exam_candidates")
+          .update(updateData)
+          .ilike("email", candidateInfo.email.trim().toLowerCase());
+      }
+    } catch (syncErr) {
+      console.warn("Non-fatal email sync notice:", syncErr);
     }
 
     console.log(`Admin ${callerEmail} updated candidate ${candidate_id}: ${JSON.stringify(updateData)}`);

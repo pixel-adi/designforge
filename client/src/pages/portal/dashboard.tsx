@@ -151,7 +151,10 @@ export default function PortalDashboard() {
   const [focusMocksError, setFocusMocksError] = useState<string | null>(null);
 
   const hasFocusMocksAccess = useMemo(() => {
-    return candidate?.access_level === 'focus_batch' || Boolean(candidate?.has_focus_mocks_access);
+    const rawLevel = (candidate?.access_level || '').trim().toLowerCase();
+    const isExpired = candidate?.access_expires_at && new Date(candidate.access_expires_at).getTime() < Date.now();
+    const isFocusBatchLevel = (rawLevel === 'focus_batch' || rawLevel === 'focus batch') && !isExpired;
+    return isFocusBatchLevel || Boolean(candidate?.has_focus_mocks_access);
   }, [candidate]);
 
   // Question Bank state
@@ -297,13 +300,22 @@ export default function PortalDashboard() {
 
         const { data, error } = await supabase
           .from('exam_candidates')
-          .select('access_level, access_expires_at')
+          .select('access_level, access_expires_at, has_focus_mocks_access')
           .eq('id', candidate.id)
           .maybeSingle();
 
         if (!error && data) {
-          if (data.access_level !== candidate.access_level) {
-            setCandidate((prev: any) => prev ? { ...prev, access_level: data.access_level, access_expires_at: data.access_expires_at } : prev);
+          const levelChanged = data.access_level !== candidate.access_level;
+          const focusMocksChanged = Boolean(data.has_focus_mocks_access) !== Boolean(candidate.has_focus_mocks_access);
+          const expiryChanged = data.access_expires_at !== candidate.access_expires_at;
+
+          if (levelChanged || focusMocksChanged || expiryChanged) {
+            setCandidate((prev: any) => prev ? { 
+              ...prev, 
+              access_level: data.access_level, 
+              access_expires_at: data.access_expires_at,
+              has_focus_mocks_access: data.has_focus_mocks_access
+            } : prev);
           }
         }
       } catch (err) {
@@ -319,7 +331,7 @@ export default function PortalDashboard() {
       clearInterval(revalidate);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [candidate?.id, candidate?.access_level]);
+  }, [candidate?.id, candidate?.access_level, candidate?.has_focus_mocks_access]);
 
   // Robust Auth & Candidate Profile Initialization (Prevents Logout on Refresh / Google OAuth)
   useEffect(() => {

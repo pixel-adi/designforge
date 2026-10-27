@@ -172,6 +172,16 @@ export default function AdminPartBEvaluations() {
   const [testAiResult, setTestAiResult] = useState<string | null>(null);
   const [savingAiSettings, setSavingAiSettings] = useState(false);
 
+  // Admin Proxy Submission (Create on behalf of student) state
+  const [showProxyModal, setShowProxyModal] = useState(false);
+  const [proxyCandidateSearch, setProxyCandidateSearch] = useState('');
+  const [proxySelectedCandidate, setProxySelectedCandidate] = useState<any>(null);
+  const [proxySelectedTestId, setProxySelectedTestId] = useState('');
+  const [proxyTestQuestions, setProxyTestQuestions] = useState<any[]>([]);
+  const [proxyResponses, setProxyResponses] = useState<Record<string, { fileUrls: string[]; answerText: string }>>({});
+  const [proxyUploadingQId, setProxyUploadingQId] = useState<string | null>(null);
+  const [submittingProxy, setSubmittingProxy] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
@@ -271,6 +281,257 @@ export default function AdminPartBEvaluations() {
       setTestAiResult(`❌ Connection Failed: ${err.message}`);
     } finally {
       setTestingAiKey(false);
+    }
+  };
+
+  // Query candidates for proxy submission modal (prioritize Focus Batch)
+  const { data: proxyCandidates = [] } = useQuery({
+    queryKey: ['proxy-candidates', proxyCandidateSearch],
+    enabled: showProxyModal,
+    queryFn: async () => {
+      let q = supabase
+        .from('exam_candidates')
+        .select('id, name, email, unique_id, access_level, has_focus_mocks_access')
+        .order('created_at', { ascending: false })
+        .limit(40);
+
+      if (proxyCandidateSearch.trim()) {
+        q = q.or(`name.ilike.%${proxyCandidateSearch}%,email.ilike.%${proxyCandidateSearch}%`);
+      }
+      const { data, error } = await q;
+      if (error) throw error;
+      // Sort Focus Batch to top
+      return (data || []).sort((a, b) => {
+        const aIsFocus = a.access_level === 'focus_batch' || a.has_focus_mocks_access;
+        const bIsFocus = b.access_level === 'focus_batch' || b.has_focus_mocks_access;
+        if (aIsFocus && !bIsFocus) return -1;
+        if (!aIsFocus && bIsFocus) return 1;
+        return 0;
+      });
+    }
+  });
+
+  // Query tests with Part B questions
+  const { data: proxyTests = [] } = useQuery({
+    queryKey: ['proxy-tests'],
+    enabled: showProxyModal,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('exam_tests')
+        .select('id, title, program_format, total_time_mins, exam_programs(name)')
+        .order('created_at', { ascending: false })
+        .limit(60);
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  // Fetch questions for selected test in proxy modal
+  const handleSelectProxyTest = async (testId: string) => {
+    setProxySelectedTestId(testId);
+    setProxyTestQuestions([]);
+    setProxyResponses({});
+    if (!testId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('exam_questions')
+        .select('id, title, content_text, marks, part, question_type, media_url')
+        .eq('test_id', testId)
+        .eq('part', 'B')
+        .order('order_seq', { ascending: true });
+
+      if (error) throw error;
+      setProxyTestQuestions(data || []);
+      const initResp: Record<string, { fileUrls: string[]; answerText: string }> = {};
+      (data || []).forEach(q => {
+        initResp[q.id] = { fileUrls: [], answerText: '' };
+      });
+      setProxyResponses(initResp);
+    } catch (err: any) {
+      toast({ title: "Failed to load questions", description: err.message, variant: "destructive" });
+    }
+  };
+
+  // Compress image helper with 1400px & 0.75 quality
+  const compressImageForProxy = (file: File): Promise<{ blob: Blob; ext: string }> => {
+    return new Promise((resolve) => {
+      if (!file.type.startsWith('image/')) {
+        resolve({ blob: file, ext: file.name.split('.').pop() || 'dat' });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX_DIM = 1400;
+          let width = img.width;
+          let height = img.height;
+          if (width > height && width > MAX_DIM) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else if (height > MAX_DIM) {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve({ blob: file, ext: 'jpg' });
+            return;
+          }
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            resolve({ blob: blob || file, ext: 'jpg' });
+          }, 'image/jpeg', 0.75);
+        };
+        img.onerror = () => resolve({ blob: file, ext: 'jpg' });
+        img.src = (e.target?.result as string) || '';
+      };
+      reader.onerror = () => resolve({ blob: file, ext: 'jpg' });
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Handle uploading sketches in proxy modal
+  const handleProxyFileUpload = async (files: FileList | null, qId: string) => {
+    if (!files || files.length === 0) return;
+    setProxyUploadingQId(qId);
+    try {
+      const currentList = proxyResponses[qId]?.fileUrls || [];
+      const newUrls = [...currentList];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const { blob, ext } = await compressImageForProxy(file);
+        const fileName = `proxy_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+        const filePath = `submissions/proxy_${proxySelectedCandidate?.id || 'admin'}/${qId}_${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('candidate-submissions')
+          .upload(filePath, blob, {
+            contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+            upsert: true
+          });
+
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('candidate-submissions')
+            .getPublicUrl(filePath);
+          newUrls.push(publicUrl);
+        } else {
+          // Fallback to base64 if storage fails
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((res) => {
+            reader.onload = () => res(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          newUrls.push(base64);
+        }
+      }
+
+      setProxyResponses(prev => ({
+        ...prev,
+        [qId]: { ...prev[qId], fileUrls: newUrls }
+      }));
+      toast({ title: "Sketches uploaded", description: `${files.length} file(s) attached.` });
+    } catch (err: any) {
+      toast({ title: "Upload error", description: err.message, variant: "destructive" });
+    } finally {
+      setProxyUploadingQId(null);
+    }
+  };
+
+  // Submit on behalf of student
+  const handleSubmitProxy = async () => {
+    if (!proxySelectedCandidate) {
+      toast({ title: "Select a Candidate", description: "Please pick a student account.", variant: "destructive" });
+      return;
+    }
+    if (!proxySelectedTestId) {
+      toast({ title: "Select a Test", description: "Please choose an exam to submit.", variant: "destructive" });
+      return;
+    }
+
+    setSubmittingProxy(true);
+    try {
+      // 1. Determine next attempt number
+      const { data: prevAttempts } = await supabase
+        .from('exam_attempts')
+        .select('attempt_number')
+        .eq('candidate_id', proxySelectedCandidate.id)
+        .eq('test_id', proxySelectedTestId);
+
+      const nextAttemptNumber = prevAttempts && prevAttempts.length > 0
+        ? Math.max(...prevAttempts.map(a => a.attempt_number || 1)) + 1
+        : 1;
+
+      // Count answered Part B questions
+      let answeredCount = 0;
+      Object.values(proxyResponses).forEach(r => {
+        if (r.fileUrls.length > 0 || r.answerText.trim()) answeredCount++;
+      });
+
+      // 2. Create completed exam_attempt
+      const { data: newAttempt, error: attemptError } = await supabase
+        .from('exam_attempts')
+        .insert({
+          candidate_id: proxySelectedCandidate.id,
+          test_id: proxySelectedTestId,
+          start_time: new Date(Date.now() - 3600000).toISOString(),
+          completed_at: new Date().toISOString(),
+          status: 'completed',
+          attempt_number: nextAttemptNumber,
+          part_b_answered: answeredCount,
+          part_b_evaluation_status: 'pending'
+        })
+        .select('id')
+        .single();
+
+      if (attemptError || !newAttempt) throw attemptError || new Error("Could not create attempt");
+
+      // 3. Insert exam_responses for all Part B questions
+      const responsesToInsert: any[] = [];
+      proxyTestQuestions.forEach(q => {
+        const resp = proxyResponses[q.id] || { fileUrls: [], answerText: '' };
+        responsesToInsert.push({
+          attempt_id: newAttempt.id,
+          question_id: q.id,
+          status: resp.fileUrls.length > 0 || resp.answerText.trim() ? 'answered' : 'unseen',
+          selected_options: [],
+          answer_text: resp.answerText.trim() || null,
+          file_url: resp.fileUrls.length > 0 ? JSON.stringify(resp.fileUrls) : null,
+          time_spent: 300,
+          answer_changes: 1,
+          state_transitions: [{ action: 'admin_proxy_submission', timestamp: new Date().toISOString() }]
+        });
+      });
+
+      if (responsesToInsert.length > 0) {
+        const { error: respError } = await supabase
+          .from('exam_responses')
+          .insert(responsesToInsert);
+
+        if (respError) throw respError;
+      }
+
+      toast({
+        title: "Submission Created Successfully",
+        description: `Submission on behalf of ${proxySelectedCandidate.name} recorded. It is now listed under Pending evaluations.`
+      });
+
+      // Refresh list & reset modal
+      queryClient.invalidateQueries({ queryKey: ['admin-part-b-attempts'] });
+      setShowProxyModal(false);
+      setActiveTab('pending');
+    } catch (err: any) {
+      toast({ title: "Submission failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmittingProxy(false);
     }
   };
 
@@ -819,9 +1080,37 @@ export default function AdminPartBEvaluations() {
 
     return (
       <div className="space-y-8 pb-12 animate-in fade-in duration-300">
-        <div>
-          <h1 className="text-2xl font-semibold text-[#262626]">Part B Evaluations</h1>
-          <p className="text-sm text-[#262626]/50 mt-1">Review and grade subjective candidate submissions.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-[#262626]">Part B Evaluations</h1>
+            <p className="text-sm text-[#262626]/50 mt-1">Review and grade subjective candidate submissions.</p>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <Button
+              onClick={() => setShowAiSettingsModal(true)}
+              variant="outline"
+              size="sm"
+              className="h-9 px-3.5 text-xs font-semibold gap-1.5 border-black/15 hover:bg-black/5"
+            >
+              <Settings className="w-3.5 h-3.5 text-purple-600" />
+              <span>AI Evaluator</span>
+            </Button>
+            <Button
+              onClick={() => {
+                setProxySelectedCandidate(null);
+                setProxyCandidateSearch('');
+                setProxySelectedTestId('');
+                setProxyTestQuestions([]);
+                setProxyResponses({});
+                setShowProxyModal(true);
+              }}
+              size="sm"
+              className="h-9 px-4 text-xs font-bold gap-1.5 bg-primary hover:bg-primary/90 text-white shadow-xs"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Submit on Behalf of Student</span>
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -1762,6 +2051,234 @@ export default function AdminPartBEvaluations() {
               <span>{batchProgress.current} / {batchProgress.total}</span>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin Proxy Submission Modal (Create On Behalf Of Student) */}
+      <Dialog open={showProxyModal} onOpenChange={setShowProxyModal}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-[#262626] flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" />
+              <span>Submit on Behalf of Student</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-foreground/60">
+              Create an exam submission for a student who could not complete their upload due to connectivity or technical issues.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Step 1: Candidate Selection */}
+            <div>
+              <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2">
+                1. Select Student (Focus Batch highlighted)
+              </label>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="Search student by name or email…"
+                  value={proxyCandidateSearch}
+                  onChange={(e) => setProxyCandidateSearch(e.target.value)}
+                  className="w-full text-xs p-2.5 rounded-xl border border-black/10 bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+
+                {proxySelectedCandidate ? (
+                  <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-primary/20 text-primary font-bold text-xs flex items-center justify-center">
+                        {proxySelectedCandidate.name?.charAt(0) || 'S'}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[#262626] flex items-center gap-1.5">
+                          <span>{proxySelectedCandidate.name}</span>
+                          {(proxySelectedCandidate.access_level === 'focus_batch' || proxySelectedCandidate.has_focus_mocks_access) && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800">
+                              Focus Batch
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-foreground/50">{proxySelectedCandidate.email} • {proxySelectedCandidate.unique_id}</div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setProxySelectedCandidate(null)}
+                      className="text-xs h-7 text-foreground/50 hover:text-red-600"
+                    >
+                      Change
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto border border-black/10 rounded-xl divide-y divide-black/5 bg-white">
+                    {proxyCandidates.length === 0 ? (
+                      <div className="p-4 text-center text-xs text-foreground/40">No students found</div>
+                    ) : (
+                      proxyCandidates.map((cand: any) => {
+                        const isFocus = cand.access_level === 'focus_batch' || cand.has_focus_mocks_access;
+                        return (
+                          <div
+                            key={cand.id}
+                            onClick={() => setProxySelectedCandidate(cand)}
+                            className="p-2.5 hover:bg-black/5 cursor-pointer flex items-center justify-between transition-colors"
+                          >
+                            <div>
+                              <div className="text-xs font-semibold text-[#262626] flex items-center gap-1.5">
+                                <span>{cand.name}</span>
+                                {isFocus && (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-green-100 text-green-800">
+                                    Focus
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-foreground/50">{cand.email} • {cand.unique_id}</div>
+                            </div>
+                            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2">Select</Button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Step 2: Test Selection */}
+            <div>
+              <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2">
+                2. Select Exam Test
+              </label>
+              <select
+                value={proxySelectedTestId}
+                onChange={(e) => handleSelectProxyTest(e.target.value)}
+                className="w-full text-xs p-2.5 rounded-xl border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="">-- Choose Test --</option>
+                {proxyTests.map((t: any) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title} ({t.exam_programs?.name || t.program_format})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Step 3: Question-wise Solutions */}
+            {proxySelectedTestId && (
+              <div className="space-y-4 pt-2">
+                <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider">
+                  3. Upload Solutions Question-Wise ({proxyTestQuestions.length} Part B questions)
+                </label>
+
+                {proxyTestQuestions.length === 0 ? (
+                  <div className="p-4 rounded-xl bg-black/5 text-center text-xs text-foreground/50">
+                    This test has no Part B subjective questions.
+                  </div>
+                ) : (
+                  proxyTestQuestions.map((q, idx) => {
+                    const resp = proxyResponses[q.id] || { fileUrls: [], answerText: '' };
+                    return (
+                      <div key={q.id} className="p-4 rounded-xl border border-black/10 bg-black/[0.01] space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-xs font-bold text-[#262626]">
+                            Q{idx + 1}. {q.title || `Question ${idx + 1}`} ({q.marks} Marks)
+                          </span>
+                        </div>
+
+                        {/* Sketches Uploaded */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-foreground/60 mb-1.5">
+                            Sketches / Photos ({resp.fileUrls.length} attached)
+                          </label>
+
+                          {resp.fileUrls.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {resp.fileUrls.map((url, i) => (
+                                <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-black/10">
+                                  <img src={url} alt="Thumbnail" className="w-full h-full object-cover" />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = resp.fileUrls.filter((_, idx2) => idx2 !== i);
+                                      setProxyResponses(p => ({
+                                        ...p,
+                                        [q.id]: { ...p[q.id], fileUrls: updated }
+                                      }));
+                                    }}
+                                    className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/70 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[9px]"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/15 bg-white hover:bg-black/5 text-xs font-semibold">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              disabled={proxyUploadingQId === q.id}
+                              onChange={(e) => handleProxyFileUpload(e.target.files, q.id)}
+                            />
+                            {proxyUploadingQId === q.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <UploadCloud className="w-3.5 h-3.5 text-primary" />
+                            )}
+                            <span>{proxyUploadingQId === q.id ? 'Compressing & uploading...' : 'Attach Image Files'}</span>
+                          </label>
+                        </div>
+
+                        {/* Concept notes */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-foreground/60 mb-1">
+                            Student Notes / Concept Text
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={resp.answerText}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setProxyResponses(p => ({
+                                ...p,
+                                [q.id]: { ...p[q.id], answerText: val }
+                              }));
+                            }}
+                            placeholder="Type student's written response or problem statement notes..."
+                            className="w-full text-xs p-2 rounded-lg border border-black/10 bg-white focus:outline-none focus:ring-1 focus:ring-primary/20 resize-y"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowProxyModal(false)}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={submittingProxy || !proxySelectedCandidate || !proxySelectedTestId}
+              onClick={handleSubmitProxy}
+              className="text-xs font-bold bg-primary hover:bg-primary/90 text-white gap-1.5"
+            >
+              {submittingProxy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileCheck2 className="w-3.5 h-3.5" />}
+              <span>Create Submission Entry</span>
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

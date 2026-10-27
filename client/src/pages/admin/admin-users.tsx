@@ -149,6 +149,7 @@ export default function AdminUsers() {
           candidate_id: editingId,
           access_level: accessLevel,
           access_expires_at: accessExpiresAt,
+          has_focus_mocks_access: accessLevel === 'focus_batch' ? true : undefined,
         }),
       });
 
