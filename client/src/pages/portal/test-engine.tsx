@@ -52,6 +52,7 @@ interface ResponseData {
   answerText: string;
   fileUrl: string;
   marksAwarded?: number;
+  rubricMarks?: Record<string, any>;
   mentorComments?: string;
   mentorImprovements?: string;
   mentorLoomLink?: string;
@@ -204,7 +205,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             selectedOptions: r.selected_options || [],
             answerText: r.answer_text || '',
             fileUrl: r.file_url || '',
-            marksAwarded: r.marks_awarded,
+            marksAwarded: r.marks_awarded !== null && r.marks_awarded !== undefined ? Number(r.marks_awarded) : undefined,
+            rubricMarks: r.rubric_marks || undefined,
             mentorComments: r.mentor_comments,
             mentorImprovements: r.mentor_improvements,
             mentorLoomLink: r.mentor_loom_link,
@@ -216,7 +218,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       }
 
       setResponses(loadedResponses);
-      setTestStep('submitted');
+      setTestStep('review');
+      setActiveQuestionIndex(0);
 
       await finalizeAttempt(loadedResponses, attemptIdFromUrl, true);
     } catch (err) {
@@ -1021,6 +1024,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
       let scorePartA = 0;
       let totalPartA = 0;
+      let qScores: Record<string, number> = {};
+      let qCorrectness: Record<string, 'correct' | 'incorrect' | 'unattempted'> = {};
 
       if (partAQuestionIds.length > 0) {
         const { data: correctOpts } = await supabase
@@ -1066,8 +1071,6 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         let mcqWrong = isCeed ? -0.5 : -0.71;
 
         let breakdown: Record<string, number> = { NAT: 0, MSQ: 0, MCQ: 0, NAT_A: 0, MSQ_A: 0, MCQ_A: 0, NAT_T: 0, MSQ_T: 0, MCQ_T: 0 };
-        let qScores: Record<string, number> = {};
-        let qCorrectness: Record<string, 'correct' | 'incorrect' | 'unattempted'> = {};
 
         // Score each Part A question
         partAQuestionIds.forEach(qId => {
@@ -1149,10 +1152,21 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         breakdown.MCQ = Math.round(breakdown.MCQ * 100) / 100;
 
         setScoreBreakdown(breakdown);
-        setQuestionScores(qScores);
-        setQuestionCorrectness(qCorrectness);
         setCorrectAnswersMap(correctMap);
       }
+
+      // Also populate scores and correctness for Part B questions if evaluated
+      (engineData.questions || []).filter(q => q.part === 'B').forEach(q => {
+        const resp = responsesToScore[q.id];
+        if (resp?.marksAwarded !== undefined && resp?.marksAwarded !== null) {
+          const awarded = Number(resp.marksAwarded);
+          qScores[q.id] = awarded;
+          qCorrectness[q.id] = awarded > 0 ? 'correct' : 'incorrect';
+        }
+      });
+
+      setQuestionScores(qScores);
+      setQuestionCorrectness(qCorrectness);
 
       const partBAnswered = (engineData?.questions || [])
         .filter(q => q.part === 'B')
@@ -1923,13 +1937,24 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             if (isPartALocked) {
               bgClass = "bg-gray-100 border-gray-200 text-gray-400 opacity-60 cursor-not-allowed";
             } else if (testStep === 'review') {
-              const qState = questionCorrectness[q.id];
-              if (qState === 'correct') {
-                bgClass = "bg-green-100 border-green-300 text-green-700 font-bold";
-              } else if (qState === 'incorrect') {
-                bgClass = "bg-red-100 border-red-300 text-red-700 font-bold";
+              if (q.part === 'B') {
+                const awarded = responses[q.id]?.marksAwarded;
+                if (awarded !== undefined && awarded !== null) {
+                  bgClass = "bg-emerald-100 border-emerald-400 text-emerald-800 font-bold";
+                } else if (hasAnswer) {
+                  bgClass = "bg-amber-100 border-amber-300 text-amber-800 font-medium";
+                } else {
+                  bgClass = "bg-gray-100 border-gray-300 text-gray-500";
+                }
               } else {
-                bgClass = "bg-gray-100 border-gray-300 text-gray-500";
+                const qState = questionCorrectness[q.id];
+                if (qState === 'correct') {
+                  bgClass = "bg-green-100 border-green-300 text-green-700 font-bold";
+                } else if (qState === 'incorrect') {
+                  bgClass = "bg-red-100 border-red-300 text-red-700 font-bold";
+                } else {
+                  bgClass = "bg-gray-100 border-gray-300 text-gray-500";
+                }
               }
             } else {
               if (status === 'visited') bgClass = "bg-red-50 border-red-200 text-red-600";
@@ -1953,7 +1978,13 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                   isPartALocked 
                     ? "Part A is locked" 
                     : testStep === 'review'
-                    ? `Question ${idx + 1}: ${questionCorrectness[q.id] === 'correct' ? 'Correct (+' + (questionScores[q.id] || 0) + ' Marks)' : questionCorrectness[q.id] === 'incorrect' ? 'Incorrect (' + (questionScores[q.id] || 0) + ' Marks)' : 'Unattempted (0 Marks)'}`
+                    ? q.part === 'B'
+                      ? responses[q.id]?.marksAwarded !== undefined && responses[q.id]?.marksAwarded !== null
+                        ? `Question ${idx + 1} (Part B): Allotted ${responses[q.id].marksAwarded}/${q.marks || '-'} Marks`
+                        : hasAnswer
+                        ? `Question ${idx + 1} (Part B): Submitted (Evaluation in Progress)`
+                        : `Question ${idx + 1} (Part B): Unattempted (0 Marks)`
+                      : `Question ${idx + 1}: ${questionCorrectness[q.id] === 'correct' ? 'Correct (+' + (questionScores[q.id] || 0) + ' Marks)' : questionCorrectness[q.id] === 'incorrect' ? 'Incorrect (' + (questionScores[q.id] || 0) + ' Marks)' : 'Unattempted (0 Marks)'}`
                     : isMarked && hasAnswer
                     ? `Question ${idx + 1}: Answered & Marked for Review`
                     : isMarked
@@ -1967,7 +1998,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                 ) : (
                   <>
                     <span>{idx + 1}</span>
-                    {isMarked && hasAnswer && (
+                    {testStep === 'review' && q.part === 'B' && responses[q.id]?.marksAwarded !== undefined && responses[q.id]?.marksAwarded !== null && (
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white shadow-2xs" title={`Allotted: ${responses[q.id].marksAwarded} Marks`} />
+                    )}
+                    {testStep !== 'review' && isMarked && hasAnswer && (
                       <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white shadow-2xs" title="Answered & Marked for Review" />
                     )}
                   </>
@@ -2426,7 +2460,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             </div>
           )}
 
-          {attemptDetails?.part_b_evaluation_status === 'completed' ? (
+          {(attemptDetails?.part_b_evaluation_status === 'completed' || (attemptDetails?.score_part_b !== null && attemptDetails?.score_part_b !== undefined)) ? (
             <div className="bg-green-50 border border-green-200 p-6 rounded-xl mb-8 flex flex-col items-center justify-center gap-3">
                <h3 className="text-xl font-bold text-green-800">
                  {engineData.isNid ? "Subjective Evaluation Complete" : "Part B Evaluation Complete"}
@@ -2458,7 +2492,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
           <div className="flex gap-4 max-w-lg mx-auto">
             <Button variant="outline" onClick={() => { setActiveQuestionIndex(0); setTestStep('review'); }} className="w-full font-bold border-primary text-primary hover:bg-primary/5 h-12 shadow-sm">
-              Review Marked Answers
+              Review Questions & Allotted Marks
             </Button>
             <Button onClick={() => setLocation('/portal/dashboard')} className="w-full h-12 font-bold shadow-sm">
               Return to Dashboard
@@ -2639,6 +2673,37 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                     <span className="font-extrabold">
                       ({questionScores[currentQ.id] > 0 ? '+' : ''}{questionScores[currentQ.id]} Marks)
                     </span>
+                  </div>
+                )}
+                {testStep === 'review' && currentQ.part === 'B' && (
+                  <div className={`text-xs font-bold border px-3.5 py-1.5 rounded-lg shadow-sm flex items-center gap-2 ${
+                    currentResponse?.marksAwarded !== undefined && currentResponse?.marksAwarded !== null
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                      : (currentResponse?.fileUrl || currentResponse?.answerText?.trim())
+                      ? 'bg-amber-50 text-amber-800 border-amber-300'
+                      : 'bg-black/5 text-foreground/70 border-black/10'
+                  }`}>
+                    {currentResponse?.marksAwarded !== undefined && currentResponse?.marksAwarded !== null ? (
+                      <>
+                        <span className="flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Allotted Marks:</span>
+                        </span>
+                        <span className="font-extrabold text-sm text-emerald-700 bg-white/90 px-2 py-0.5 rounded border border-emerald-200">
+                          {currentResponse.marksAwarded} / {currentQ.marks || '-'}
+                        </span>
+                      </>
+                    ) : (currentResponse?.fileUrl || currentResponse?.answerText?.trim()) ? (
+                      <>
+                        <span>⏳ Evaluation Pending</span>
+                        <span className="font-medium opacity-75">(Max: {currentQ.marks || '-'} Marks)</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>⚪ Unattempted</span>
+                        <span className="font-medium opacity-75">(0 / {currentQ.marks || '-'} Marks)</span>
+                      </>
+                    )}
                   </div>
                 )}
                 <div className="text-sm font-bold text-foreground/50">
@@ -2855,36 +2920,120 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                       </div>
                     )}
 
-                    {testStep === 'review' && attemptDetails?.part_b_evaluation_status === 'completed' && (currentResponse.mentorComments || currentResponse.marksAwarded !== undefined) && (
-                      <div className="mt-6 p-6 bg-orange-50 border border-orange-200 rounded-xl shadow-sm">
-                        <div className="flex items-center justify-between mb-4 border-b border-orange-200 pb-4">
-                          <h4 className="font-bold text-orange-800 text-lg">Mentor Evaluation</h4>
-                          <div className="bg-white border border-orange-200 px-3 py-1 rounded-lg text-orange-600 font-bold">
-                            {currentResponse.marksAwarded} Marks
+                    {testStep === 'review' && currentQ.part === 'B' && (
+                      <div className="mt-6 p-6 bg-gradient-to-br from-white via-emerald-50/20 to-emerald-50/50 border border-emerald-200/90 rounded-2xl shadow-sm space-y-5">
+                        {/* Header with Allotted Marks */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-200/80 pb-4">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="w-5 h-5 text-emerald-600" />
+                              <h4 className="font-bold text-[#262626] text-base">
+                                Part B Subjective Evaluation
+                              </h4>
+                            </div>
+                            <p className="text-xs text-foreground/60 mt-0.5">
+                              Scored against official NID design rubrics and mentor review criteria.
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <div className={`px-4 py-1.5 rounded-xl font-black text-sm shadow-xs flex items-center gap-2 ${
+                              currentResponse?.marksAwarded !== undefined && currentResponse?.marksAwarded !== null
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-amber-500 text-white'
+                            }`}>
+                              <span>Allotted Marks:</span>
+                              <span className="text-base font-extrabold">
+                                {currentResponse?.marksAwarded !== undefined && currentResponse?.marksAwarded !== null
+                                  ? `${currentResponse.marksAwarded} / ${currentQ.marks || '-'}`
+                                  : `Pending / ${currentQ.marks || '-'}`}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        <div className="space-y-4 text-sm text-orange-900">
-                          {currentResponse.mentorComments && (
-                            <div>
-                              <span className="font-bold opacity-70 uppercase tracking-wider text-[10px] block mb-1">Feedback & Comments</span>
-                              <p>{currentResponse.mentorComments}</p>
+
+                        {/* Rubric Criteria Breakdown */}
+                        {currentResponse?.rubricMarks && typeof currentResponse.rubricMarks === 'object' && Object.keys(currentResponse.rubricMarks).length > 0 && (
+                          <div>
+                            <span className="font-bold uppercase tracking-wider text-[11px] text-foreground/60 block mb-2.5">
+                              5-Axis Rubric Breakdown
+                            </span>
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                              {[
+                                { key: 'critical_thinking', label: 'Critical Thinking' },
+                                { key: 'ideation', label: 'Ideation' },
+                                { key: 'storytelling', label: 'Storytelling' },
+                                { key: 'conceptualisation', label: 'Conceptualisation' },
+                                { key: 'representation', label: 'Representation' },
+                              ].map(criterion => {
+                                const score = currentResponse.rubricMarks?.[criterion.key];
+                                const maxPerCrit = currentQ.marks ? (Number(currentQ.marks) / 5).toFixed(1).replace(/\.0$/, '') : null;
+                                return (
+                                  <div key={criterion.key} className="bg-white border border-emerald-200/80 p-3 rounded-xl text-center shadow-2xs">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/60 mb-1 truncate" title={criterion.label}>
+                                      {criterion.label}
+                                    </p>
+                                    <p className="text-base font-black text-emerald-700">
+                                      {score !== undefined && score !== null && score !== '' ? score : '-'}
+                                      {maxPerCrit && <span className="text-[10px] font-normal text-foreground/50 ml-0.5">/{maxPerCrit}</span>}
+                                    </p>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          )}
-                          {currentResponse.mentorImprovements && (
+                          </div>
+                        )}
+
+                        {/* Mentor Feedback & Qualitative Comments */}
+                        {currentResponse?.mentorComments && (
+                          <div className="bg-white border border-emerald-200/80 p-4 rounded-xl shadow-2xs">
+                            <span className="font-bold text-[11px] uppercase tracking-wider text-emerald-900/80 block mb-1">
+                              Mentor Feedback & Critique
+                            </span>
+                            <p className="text-sm text-[#262626] leading-relaxed">
+                              {currentResponse.mentorComments}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Practical Studio Improvement Drills */}
+                        {currentResponse?.mentorImprovements && (
+                          <div className="bg-amber-50/80 border border-amber-200/80 p-4 rounded-xl shadow-2xs">
+                            <span className="font-bold text-[11px] uppercase tracking-wider text-amber-900/80 block mb-1">
+                              Recommended Studio Drill & Improvements
+                            </span>
+                            <p className="text-sm text-amber-950 leading-relaxed">
+                              {currentResponse.mentorImprovements}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Video Review Link */}
+                        {currentResponse?.mentorLoomLink && (
+                          <div className="bg-white border border-emerald-200/80 p-3.5 rounded-xl flex items-center justify-between shadow-2xs">
                             <div>
-                              <span className="font-bold opacity-70 uppercase tracking-wider text-[10px] block mb-1">Areas for Improvement</span>
-                              <p>{currentResponse.mentorImprovements}</p>
+                              <span className="font-bold text-[11px] uppercase tracking-wider text-foreground/60 block">Video Review</span>
+                              <p className="text-xs text-foreground/70">Watch mentor walkthrough and sketch breakdown.</p>
                             </div>
-                          )}
-                          {currentResponse.mentorLoomLink && (
-                            <div>
-                              <span className="font-bold opacity-70 uppercase tracking-wider text-[10px] block mb-1">Video Review</span>
-                              <a href={currentResponse.mentorLoomLink} target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold inline-flex items-center gap-1">
-                                Watch Loom Recording ↗
-                              </a>
-                            </div>
-                          )}
-                        </div>
+                            <a
+                              href={currentResponse.mentorLoomLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary hover:underline font-bold text-xs inline-flex items-center gap-1.5 bg-primary/10 px-3 py-1.5 rounded-lg"
+                            >
+                              Watch Recording ↗
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Pending notice if not evaluated yet */}
+                        {(currentResponse?.marksAwarded === undefined || currentResponse?.marksAwarded === null) && !currentResponse?.mentorComments && (
+                          <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-xl text-center">
+                            <p className="text-xs font-bold text-amber-900">
+                              Your sketch submission for this question is currently under review by our design mentors. Allotted marks and qualitative feedback will appear here as soon as evaluation is completed!
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -3004,13 +3153,23 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           </div>
 
           <div className="mt-auto pt-4 border-t border-black/5 shrink-0">
-            <div className="grid grid-cols-2 gap-x-2 gap-y-2.5">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-green-100 border border-green-300 text-green-700">✓</div> Answered</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-red-50 border border-red-200 text-red-600">✕</div> Not Answered</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-purple-50 border border-purple-200 text-purple-700">★</div> Marked</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="relative w-4 h-4 rounded flex items-center justify-center bg-purple-100 border border-purple-400 text-purple-800 font-bold">★<span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full" /></div> Ans & Marked</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70 col-span-2"><div className="w-4 h-4 rounded flex items-center justify-center border border-black/20 bg-white">○</div> Not Visited</div>
-            </div>
+            {testStep === 'review' ? (
+              <div className="grid grid-cols-2 gap-x-2 gap-y-2.5">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-green-100 border border-green-300 text-green-700">✓</div> Correct (+Marks)</div>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-red-100 border border-red-300 text-red-700">✕</div> Incorrect</div>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="relative w-4 h-4 rounded flex items-center justify-center bg-emerald-100 border border-emerald-400 text-emerald-800 font-bold">B<span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full" /></div> Part B Evaluated</div>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-amber-100 border border-amber-300 text-amber-800">⏳</div> Part B Pending</div>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70 col-span-2"><div className="w-4 h-4 rounded flex items-center justify-center bg-gray-100 border border-gray-300 text-gray-500">○</div> Unattempted</div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-x-2 gap-y-2.5">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-green-100 border border-green-300 text-green-700">✓</div> Answered</div>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-red-50 border border-red-200 text-red-600">✕</div> Not Answered</div>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="w-4 h-4 rounded flex items-center justify-center bg-purple-50 border border-purple-200 text-purple-700">★</div> Marked</div>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70"><div className="relative w-4 h-4 rounded flex items-center justify-center bg-purple-100 border border-purple-400 text-purple-800 font-bold">★<span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full" /></div> Ans & Marked</div>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/70 col-span-2"><div className="w-4 h-4 rounded flex items-center justify-center border border-black/20 bg-white">○</div> Not Visited</div>
+              </div>
+            )}
           </div>
         </div>
       </div>

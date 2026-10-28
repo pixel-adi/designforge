@@ -23,10 +23,38 @@ export interface WeeklyRelease {
 
 export const PORTAL_RELEASES: WeeklyRelease[] = [
   {
+    version: 'v2.7.0',
+    weekLabel: 'Week 7 Update',
+    releaseDate: 'Wed 28 Oct 2026',
+    isLatest: true,
+    items: [
+      {
+        type: 'feature',
+        title: 'Part B Allotted Marks & Rubric Breakdown in Review Mode',
+        description: 'Students can now review their question-by-question allotted marks for subjective Part B drawing questions directly inside test review mode. Detailed scorecards display mentor marks, five-axis rubric grading (Critical Thinking, Ideation, Storytelling, Conceptualisation, Representation), qualitative critique, and improvement pointers right alongside candidate sketch submissions.',
+      },
+      {
+        type: 'improvement',
+        title: 'Calibrated Mock Test Segregation (B.Des vs M.Des)',
+        description: 'Automated candidate-level filtering ensures M.Des aspirants exclusively view specialized M.Des papers while B.Des candidates access undergraduate design aptitude simulations without cross-program clutter.',
+      },
+      {
+        type: 'fix',
+        title: 'Resilient 10-Minute Sketch Upload Buffer & Auto-Recovery',
+        description: 'The post-exam 10-minute sketch upload window is now persisted across browser reloads, connection blips, and page refreshes, ensuring candidate sketch submissions and buffer countdowns are never lost.',
+      },
+      {
+        type: 'improvement',
+        title: 'Enhanced Question Palette in Review Mode',
+        description: 'The question navigation palette now features dedicated visual status indicators for evaluated Part B questions, pending reviews, and color-coded Part A scoring for instant exam walkthroughs.',
+      },
+    ],
+  },
+  {
     version: 'v2.6.0',
     weekLabel: 'Week 6 Update',
     releaseDate: 'Mon 26 Oct 2026',
-    isLatest: true,
+    isLatest: false,
     items: [
       {
         type: 'feature',
