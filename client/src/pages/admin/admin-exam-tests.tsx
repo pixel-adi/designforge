@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ClipboardList, PlusCircle, CheckCircle2, Search, ArrowLeft, Loader2, FileText, Clock, Trash2, Filter, Settings, Wand2, RefreshCw, FileDown, Zap, Plus, Sparkles, Upload, Image as ImageIcon, AlertCircle, Check, CalendarPlus, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { sanitizeHtml } from "@/lib/sanitize";
+import { sanitizeHtml, cleanPlainText } from "@/lib/sanitize";
 import BulkExamUploadModal from "./BulkExamUploadModal";
 
 const TEMPLATES = [
@@ -113,6 +113,8 @@ export default function AdminExamTests() {
   const [currentStep, setCurrentStep] = useState<'LIST' | 'BUILDER' | 'PREVIEW'>('LIST');
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [testTitle, setTestTitle] = useState("");
+  const [testCode, setTestCode] = useState("");
+  const [testSearch, setTestSearch] = useState("");
   const [programFormat, setProgramFormat] = useState("bachelors");
   const [testCategory, setTestCategory] = useState<string>("full_length");
   const [templateCategoryFilter, setTemplateCategoryFilter] = useState<string>("ALL");
@@ -853,6 +855,7 @@ export default function AdminExamTests() {
       
       setSelectedTemplate(template);
       setTestTitle(testData.title);
+      setTestCode(testData.test_code || "");
       setProgramFormat(testData.program_format || template.programFormat || "bachelors");
       setTestCategory(testData.category || template.category || "full_length");
       setExpiresAt(testData.expires_at ? new Date(testData.expires_at).toISOString().slice(0, 16) : "");
@@ -937,6 +940,7 @@ export default function AdminExamTests() {
 
       const testPayload: any = {
         title: testTitle, 
+        test_code: testCode.trim() || null,
         program_id: programId, 
         status: publish ? 'published' : 'draft', 
         program_format: programFormat, 
@@ -948,7 +952,8 @@ export default function AdminExamTests() {
 
       if (editingTestId) {
         let { error: testErr } = await supabase.from('exam_tests').update(testPayload).eq('id', editingTestId);
-        if (testErr && (testErr.message?.includes('category') || testErr.message?.includes('is_focus_batch') || testErr.message?.includes('access_tier'))) {
+        if (testErr && (testErr.message?.includes('test_code') || testErr.message?.includes('category') || testErr.message?.includes('is_focus_batch') || testErr.message?.includes('access_tier'))) {
+          if (testErr.message?.includes('test_code')) delete testPayload.test_code;
           delete testPayload.is_focus_batch;
           delete testPayload.access_tier;
           delete testPayload.category;
@@ -1027,6 +1032,12 @@ export default function AdminExamTests() {
       if (testListCategoryFilter !== "ALL" && (t.category || "full_length") !== testListCategoryFilter) return false;
       if (testListFocusFilter === "FOCUS" && !t.is_focus_batch && t.access_tier !== 'focus_batch') return false;
       if (testListFocusFilter === "GENERAL" && (t.is_focus_batch || t.access_tier === 'focus_batch')) return false;
+      if (testSearch.trim()) {
+        const s = testSearch.trim().toLowerCase();
+        const matchTitle = (t.title || '').toLowerCase().includes(s);
+        const matchCode = (t.test_code || '').toLowerCase().includes(s);
+        if (!matchTitle && !matchCode) return false;
+      }
       return true;
     });
 
@@ -1238,6 +1249,18 @@ export default function AdminExamTests() {
           <h3 className="text-lg font-medium text-[#262626]">Created Tests ({filteredTests.length})</h3>
           
           <div className="flex flex-wrap items-center gap-2">
+            {/* Live Search by Title or Code */}
+            <div className="relative w-full sm:w-56">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/40" />
+              <Input
+                type="text"
+                placeholder="Search tests or code..."
+                value={testSearch}
+                onChange={(e) => setTestSearch(e.target.value)}
+                className="h-8 pl-8 text-xs bg-white border-black/10 rounded-lg"
+              />
+            </div>
+
             {/* Focus Batch vs General Filter */}
             <div className="flex items-center gap-1 bg-black/5 p-1 rounded-lg text-xs font-semibold">
               <button 
@@ -1302,6 +1325,11 @@ export default function AdminExamTests() {
             {filteredTests.map(test => (
               <div key={test.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center hover:bg-background/30 transition-colors text-sm">
                 <div className="col-span-4 font-semibold text-[#262626] flex items-center gap-2 flex-wrap">
+                  {test.test_code && (
+                    <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-xs font-mono font-bold shrink-0">
+                      {test.test_code}
+                    </span>
+                  )}
                   <span className="truncate">{test.title}</span>
                   {Boolean(test.is_focus_batch || test.access_tier === 'focus_batch') && (
                     <span className="bg-orange-100 text-orange-800 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full shrink-0 border border-orange-200">
@@ -1657,10 +1685,38 @@ export default function AdminExamTests() {
       </div>
 
       <div className="bg-white p-6 rounded-xl border border-black/10 shadow-sm space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="md:col-span-2">
             <Label className="text-sm font-semibold">Test Title</Label>
             <Input value={testTitle} onChange={(e) => setTestTitle(e.target.value)} placeholder={`e.g. ${selectedTemplate.name} Mock Test 1`} className="mt-1 h-10" />
+          </div>
+          <div>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">Paper Code</Label>
+              <button 
+                type="button" 
+                onClick={() => {
+                  const batch = isFocusBatch ? 'FB' : 'GEN';
+                  const nameLower = (selectedTemplate?.name || testTitle || '').toLowerCase();
+                  let prog = 'NID';
+                  if (nameLower.includes('uceed')) prog = 'UCEED';
+                  else if (nameLower.includes('ceed')) prog = 'CEED';
+                  else if (programFormat === 'masters') prog = 'NID-PG';
+                  const half = testCategory === 'half_length' ? 'H' : '';
+                  const nextNum = String(tests.length + 1).padStart(2, '0');
+                  setTestCode(`${batch}-${prog}-${half}${nextNum}`);
+                }}
+                className="text-[11px] text-primary hover:underline font-bold"
+              >
+                Auto-fill
+              </button>
+            </div>
+            <Input 
+              value={testCode} 
+              onChange={(e) => setTestCode(e.target.value.toUpperCase())} 
+              placeholder="e.g. FB-NID-01" 
+              className="mt-1 h-10 font-mono text-xs uppercase" 
+            />
           </div>
           <div>
             <Label className="text-sm font-semibold">Test Category</Label>
@@ -1669,12 +1725,12 @@ export default function AdminExamTests() {
               value={testCategory}
               onChange={e => setTestCategory(e.target.value)}
             >
-              <option value="full_length">Full Length Mock (Standard 180 Min)</option>
-              <option value="half_length">⚡ Half Length Test (90 Min practice)</option>
-              <option value="custom_short">⚡ Custom Short Practice Test (15-90 Min drill)</option>
+              <option value="full_length">Full Length Mock (180 Min)</option>
+              <option value="half_length">⚡ Half Length (90 Min)</option>
+              <option value="custom_short">⚡ Custom Short (15-90 Min)</option>
             </select>
           </div>
-          <div>
+          <div className="md:col-span-2">
             <Label className="text-sm font-semibold">Target Program Format</Label>
             <select 
               className="w-full h-10 mt-1 border border-black/10 rounded-md px-3 bg-white text-sm"
@@ -2222,7 +2278,7 @@ export default function AdminExamTests() {
                             <span className="bg-black/5 text-[#262626] border border-black/10 px-2 py-1 rounded text-[10px] font-bold tracking-wide">{q.type}</span>
                           </td>
                           <td className="p-4 font-medium text-foreground/80 line-clamp-2">
-                            {q.content_text}
+                            {cleanPlainText(q.content_text)}
                           </td>
                           <td className="p-4">
                             <span className={`text-[10px] px-3 py-1 rounded-full font-bold tracking-wide ${q.difficulty === 'High' ? 'bg-red-50 text-red-700 border border-red-200' : q.difficulty === 'Medium' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>

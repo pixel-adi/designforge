@@ -5,7 +5,8 @@ import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, 
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { sanitizeHtml } from "@/lib/sanitize";
+import { sanitizeHtml, cleanPlainText } from "@/lib/sanitize";
+import { resolvePartBMaxMarks, formatScore } from "@/lib/utils";
 
 // Deployment Protection: Guard against Vite chunk hash invalidation during live production pushes
 if (typeof window !== "undefined") {
@@ -492,10 +493,20 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         ]);
 
         const tqMarksMap = new Map((tqRes.data || []).map((t: any) => [t.question_id, t.marks]));
-        questionsData = (qRes.data || []).map((q: any) => ({
-          ...q,
-          marks: tqMarksMap.get(q.id) != null ? Number(tqMarksMap.get(q.id)) : q.marks
-        }));
+        questionsData = (qRes.data || []).map((q: any) => {
+          const explicitMarks = tqMarksMap.get(q.id) != null && Number(tqMarksMap.get(q.id)) > 0
+            ? Number(tqMarksMap.get(q.id))
+            : (q.marks != null && Number(q.marks) > 0 ? Number(q.marks) : null);
+
+          const finalMarks = explicitMarks != null
+            ? explicitMarks
+            : (q.part === 'B' ? resolvePartBMaxMarks(q, testData) : q.marks);
+
+          return {
+            ...q,
+            marks: finalMarks
+          };
+        });
         const optData = optRes.data || [];
         optData.forEach(opt => {
           if (!optionsMap[opt.question_id]) optionsMap[opt.question_id] = [];
@@ -1980,7 +1991,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                     : testStep === 'review'
                     ? q.part === 'B'
                       ? responses[q.id]?.marksAwarded !== undefined && responses[q.id]?.marksAwarded !== null
-                        ? `Question ${idx + 1} (Part B): Allotted ${responses[q.id].marksAwarded}/${q.marks || '-'} Marks`
+                        ? `Question ${idx + 1} (Part B): Allotted ${formatScore(responses[q.id].marksAwarded)}/${resolvePartBMaxMarks(q, engineData?.test)} Marks`
                         : hasAnswer
                         ? `Question ${idx + 1} (Part B): Submitted (Evaluation in Progress)`
                         : `Question ${idx + 1} (Part B): Unattempted (0 Marks)`
@@ -2526,7 +2537,15 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="h-6 w-px bg-black/10 mx-2" />
-          <h1 className="font-bold text-[#262626]">{engineData.test.title} {testStep === 'review' && <span className="text-primary ml-2 border border-primary/20 bg-primary/5 px-2 py-1 rounded text-sm">Review Mode</span>}</h1>
+          <h1 className="font-bold text-[#262626] flex items-center gap-2">
+            {engineData.test.test_code && (
+              <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-xs font-mono font-bold tracking-wide">
+                {engineData.test.test_code}
+              </span>
+            )}
+            <span>{engineData.test.title}</span>
+            {testStep === 'review' && <span className="text-primary ml-2 border border-primary/20 bg-primary/5 px-2 py-1 rounded text-sm">Review Mode</span>}
+          </h1>
         </div>
         {testStep !== 'review' ? (
           <div className="flex items-center gap-4 md:gap-6">
@@ -2690,18 +2709,18 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                           <span>Allotted Marks:</span>
                         </span>
                         <span className="font-extrabold text-sm text-emerald-700 bg-white/90 px-2 py-0.5 rounded border border-emerald-200">
-                          {currentResponse.marksAwarded} / {currentQ.marks || '-'}
+                          {formatScore(currentResponse.marksAwarded)} / {resolvePartBMaxMarks(currentQ, engineData?.test)}
                         </span>
                       </>
                     ) : (currentResponse?.fileUrl || currentResponse?.answerText?.trim()) ? (
                       <>
                         <span>⏳ Evaluation Pending</span>
-                        <span className="font-medium opacity-75">(Max: {currentQ.marks || '-'} Marks)</span>
+                        <span className="font-medium opacity-75">(Max: {resolvePartBMaxMarks(currentQ, engineData?.test)} Marks)</span>
                       </>
                     ) : (
                       <>
                         <span>⚪ Unattempted</span>
-                        <span className="font-medium opacity-75">(0 / {currentQ.marks || '-'} Marks)</span>
+                        <span className="font-medium opacity-75">(0 / {resolvePartBMaxMarks(currentQ, engineData?.test)} Marks)</span>
                       </>
                     )}
                   </div>
@@ -2753,7 +2772,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                           </span>
                         </div>
                         <div className="text-green-700 font-extrabold mt-0.5">
-                          Correct Answer: {correctAnswersMap[currentQ.id][0]?.content_text}
+                          Correct Answer: {cleanPlainText(correctAnswersMap[currentQ.id][0]?.content_text)}
                         </div>
                       </div>
                     )}
@@ -2945,8 +2964,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                               <span>Allotted Marks:</span>
                               <span className="text-base font-extrabold">
                                 {currentResponse?.marksAwarded !== undefined && currentResponse?.marksAwarded !== null
-                                  ? `${currentResponse.marksAwarded} / ${currentQ.marks || '-'}`
-                                  : `Pending / ${currentQ.marks || '-'}`}
+                                  ? `${formatScore(currentResponse.marksAwarded)} / ${resolvePartBMaxMarks(currentQ, engineData?.test)}`
+                                  : `Pending / ${resolvePartBMaxMarks(currentQ, engineData?.test)}`}
                               </span>
                             </div>
                           </div>
@@ -2967,7 +2986,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                                 { key: 'representation', label: 'Representation' },
                               ].map(criterion => {
                                 const score = currentResponse.rubricMarks?.[criterion.key];
-                                const maxPerCrit = currentQ.marks ? (Number(currentQ.marks) / 5).toFixed(1).replace(/\.0$/, '') : null;
+                                const partBMax = resolvePartBMaxMarks(currentQ, engineData?.test);
+                                const maxPerCrit = (partBMax / 5).toFixed(1).replace(/\.0$/, '');
                                 return (
                                   <div key={criterion.key} className="bg-white border border-emerald-200/80 p-3 rounded-xl text-center shadow-2xs">
                                     <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/60 mb-1 truncate" title={criterion.label}>
@@ -3080,7 +3100,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                           <div className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold shrink-0 ${letterClass}`}>
                             {String.fromCharCode(65 + idx)}
                           </div>
-                          <span className={`text-sm font-semibold ${testStep === 'review' && (isCorrectAnswer || isSelectedButWrong) ? 'text-[#262626]' : (isSelected ? 'font-bold text-primary' : 'text-[#262626]')}`}>{opt.content_text}</span>
+                          <span className={`text-sm font-semibold ${testStep === 'review' && (isCorrectAnswer || isSelectedButWrong) ? 'text-[#262626]' : (isSelected ? 'font-bold text-primary' : 'text-[#262626]')}`}>{cleanPlainText(opt.content_text)}</span>
                           {testStep === 'review' && (
                             <>
                               {isCorrectAnswer && isSelected && (

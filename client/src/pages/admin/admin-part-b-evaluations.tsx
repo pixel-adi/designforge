@@ -1,16 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   Loader2, ArrowLeft, PenTool, CheckCircle2, ChevronRight, ChevronLeft, 
   MessageSquare, Video, FileText, Maximize, X, Shield,
   ZoomIn, ZoomOut, RotateCw, RefreshCw, ExternalLink, AlertCircle, Download,
-  UploadCloud, Plus, Settings, Sparkles, Key, FileCheck2
+  UploadCloud, Plus, Settings, Sparkles, Key, FileCheck2, Search, Layers,
+  Users, ChevronDown, ChevronUp, ImagePlus, Calendar
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { sanitizeHtml } from "@/lib/sanitize";
+import { sanitizeHtml, cleanPlainText } from "@/lib/sanitize";
+import { roundScore, formatScore, resolvePartBMaxMarks } from "@/lib/utils";
 import { evaluatePartBWithAI, evaluatePartBWithGemini, getAISettings, countWords } from "@/lib/geminiEvaluation";
 
 const PAGE_SIZE = 100;
@@ -73,6 +76,20 @@ const resolveQuestionMediaUrl = (rawUrl: string | null | undefined): string => {
   return `${supabaseUrl}/storage/v1/object/public/question-media/${cleanPath}`;
 };
 
+const parseQuestionMediaUrls = (rawUrl: string | null | undefined): string[] => {
+  if (!rawUrl) return [];
+  const trimmed = rawUrl.trim();
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.map(u => resolveQuestionMediaUrl(String(u))).filter(Boolean);
+      }
+    } catch {}
+  }
+  return [resolveQuestionMediaUrl(trimmed)].filter(Boolean);
+};
+
 export default function AdminPartBEvaluations() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -90,9 +107,9 @@ export default function AdminPartBEvaluations() {
         .select(`
           *,
           exam_candidates(name, unique_id, email, access_level),
-          exam_tests(title, program_format, exam_programs(name))
+          exam_tests(id, title, test_code, is_focus_batch, program_format, exam_programs(name))
         `, { count: 'exact' })
-        .gt('part_b_answered', 0)
+        .or('part_b_answered.gt.0,part_b_evaluation_status.not.is.null')
         .order('completed_at', { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
         
@@ -122,6 +139,12 @@ export default function AdminPartBEvaluations() {
   const attempts = attemptsData?.attempts || [];
   const totalPages = Math.ceil((attemptsData?.total || 0) / PAGE_SIZE);
   const [evaluatingAttempt, setEvaluatingAttempt] = useState<any>(null);
+
+  // Segregation & Live Search State
+  const [viewMode, setViewMode] = useState<'paper' | 'student' | 'flat'>('paper');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedPapers, setExpandedPapers] = useState<Record<string, boolean>>({});
+  const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({});
   
   // Evaluation Details State
   const [questions, setQuestions] = useState<any[]>([]);
@@ -147,6 +170,8 @@ export default function AdminPartBEvaluations() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
+  const [selectedQuestionMediaIndex, setSelectedQuestionMediaIndex] = useState(0);
+  const [uploadingQuestionMedia, setUploadingQuestionMedia] = useState(false);
 
   // Zoom, rotation, and progressive image loading states
   const [zoom, setZoom] = useState(1);
@@ -586,59 +611,162 @@ export default function AdminPartBEvaluations() {
     setImageLoading(true);
     setImageError(false);
     setResolvedUrlOverride(null);
+    setSelectedQuestionMediaIndex(0);
   }, [currentQIndex, selectedFileIndex, evaluatingAttempt?.id]);
 
-  const handleAdminManualUpload = async (file: File) => {
+  const handleAdminManualUpload = async (fileOrFiles: File | FileList | File[]) => {
     if (!evaluatingAttempt) return;
     const currentResp = responses[currentQIndex];
     if (!currentResp) return;
 
+    const fileList: File[] = fileOrFiles instanceof File 
+      ? [fileOrFiles] 
+      : Array.from(fileOrFiles as any);
+
+    if (fileList.length === 0) return;
+
     setAdminUploading(true);
     try {
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const uniqueId = crypto.randomUUID().slice(0, 8);
-      const filePath = `submissions/${evaluatingAttempt.id}/${currentResp.question_id}_manual_${uniqueId}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('candidate-submissions')
-        .upload(filePath, file, {
-          contentType: file.type || 'image/jpeg',
-          upsert: true
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('candidate-submissions')
-        .getPublicUrl(filePath);
-
-      // Clean existing filenames from array if any, keeping valid URLs
       const currentUrls = parseFileUrls(currentResp.file_url);
       const validUrls = currentUrls.filter(u => !normalizeSubmissionUrl(u).isFilenameOnly);
-      const newUrls = [...validUrls, publicUrl];
+      const newUrls = [...validUrls];
 
-      const { error: dbError } = await supabase
-        .from('exam_responses')
-        .update({ file_url: JSON.stringify(newUrls) })
-        .eq('id', currentResp.id);
+      for (const file of fileList) {
+        const fileExt = file.name.split('.').pop() || 'jpg';
+        const uniqueId = crypto.randomUUID().slice(0, 8);
+        const filePath = `submissions/${evaluatingAttempt.id}/${currentResp.question_id}_manual_${uniqueId}.${fileExt}`;
 
-      if (dbError) throw dbError;
+        const { error: uploadError } = await supabase.storage
+          .from('candidate-submissions')
+          .upload(filePath, file, {
+            contentType: file.type || 'image/jpeg',
+            upsert: true
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('candidate-submissions')
+          .getPublicUrl(filePath);
+
+        newUrls.push(publicUrl);
+      }
+
+      // Upsert into exam_responses if not already recorded
+      let responseId = currentResp.id;
+      if (!responseId) {
+        const { data: newResp, error: insErr } = await supabase
+          .from('exam_responses')
+          .insert({
+            attempt_id: evaluatingAttempt.id,
+            question_id: currentResp.question_id,
+            status: 'answered',
+            file_url: JSON.stringify(newUrls),
+            selected_options: [],
+            answer_text: null
+          })
+          .select('id')
+          .single();
+        if (insErr) throw insErr;
+        responseId = newResp.id;
+      } else {
+        const { error: dbError } = await supabase
+          .from('exam_responses')
+          .update({ file_url: JSON.stringify(newUrls), status: 'answered' })
+          .eq('id', responseId);
+
+        if (dbError) throw dbError;
+      }
 
       // Update in-memory responses state
       const updated = [...responses];
-      updated[currentQIndex] = { ...currentResp, file_url: JSON.stringify(newUrls) };
+      updated[currentQIndex] = { ...currentResp, id: responseId, file_url: JSON.stringify(newUrls), status: 'answered' };
       setResponses(updated);
       setSelectedFileIndex(newUrls.length - 1);
-      setResolvedUrlOverride(publicUrl);
+      setResolvedUrlOverride(newUrls[newUrls.length - 1]);
       setImageError(false);
       setImageLoading(false);
 
-      toast({ title: "Image Attached!", description: "Candidate submission sketch updated and saved." });
+      toast({ 
+        title: "Sketches Uploaded! 🎉", 
+        description: `${fileList.length} page(s) attached and saved. You can now score or evaluate with AI.` 
+      });
     } catch (err: any) {
       console.error("Admin upload failed:", err);
       toast({ title: "Upload Failed", description: err.message || "Could not attach image", variant: "destructive" });
     } finally {
       setAdminUploading(false);
+    }
+  };
+
+  const handleUploadQuestionMedia = async (fileOrFiles: File | FileList | File[]) => {
+    const currentResp = responses[currentQIndex];
+    const currentQ = questions.find(q => q.id === currentResp?.question_id);
+    if (!currentQ) {
+      toast({ title: "No Question Selected", description: "Could not find current question", variant: "destructive" });
+      return;
+    }
+
+    const fileList: File[] = fileOrFiles instanceof File 
+      ? [fileOrFiles] 
+      : Array.from(fileOrFiles as any);
+
+    if (fileList.length === 0) return;
+
+    setUploadingQuestionMedia(true);
+    try {
+      const existingUrls = parseQuestionMediaUrls(currentQ.media_url);
+      const newUrls = [...existingUrls];
+
+      for (const file of fileList) {
+        const fileExt = file.name.split('.').pop() || 'jpg';
+        const uniqueId = crypto.randomUUID().slice(0, 8);
+        const filePath = `questions/${currentQ.id}_${uniqueId}.${fileExt}`;
+
+        let uploadRes = await supabase.storage
+          .from('question-media')
+          .upload(filePath, file, { contentType: file.type || 'image/jpeg', upsert: true });
+
+        let publicUrl = '';
+        if (!uploadRes.error) {
+          publicUrl = supabase.storage.from('question-media').getPublicUrl(filePath).data.publicUrl;
+        } else {
+          // Fallback to candidate-submissions bucket
+          const fallbackRes = await supabase.storage
+            .from('candidate-submissions')
+            .upload(filePath, file, { contentType: file.type || 'image/jpeg', upsert: true });
+          if (fallbackRes.error) throw fallbackRes.error;
+          publicUrl = supabase.storage.from('candidate-submissions').getPublicUrl(filePath).data.publicUrl;
+        }
+
+        newUrls.push(publicUrl);
+      }
+
+      const finalMediaUrl = newUrls.length === 1 ? newUrls[0] : JSON.stringify(newUrls);
+
+      const { error: dbErr } = await supabase
+        .from('exam_questions')
+        .update({ media_url: finalMediaUrl })
+        .eq('id', currentQ.id);
+
+      if (dbErr) throw dbErr;
+
+      setQuestions(prev => prev.map(q => q.id === currentQ.id ? { ...q, media_url: finalMediaUrl } : q));
+      setSelectedQuestionMediaIndex(newUrls.length - 1);
+
+      toast({
+        title: "Question Reference Attached! 🎉",
+        description: `${fileList.length} question reference image(s) saved permanently.`
+      });
+    } catch (err: any) {
+      console.error("Upload question media failed:", err);
+      toast({
+        title: "Question Upload Failed",
+        description: err.message || "Could not attach question image",
+        variant: "destructive"
+      });
+    } finally {
+      setUploadingQuestionMedia(false);
     }
   };
 
@@ -760,7 +888,9 @@ export default function AdminPartBEvaluations() {
       const marksMap = new Map((tqData || []).map(t => [t.question_id, t.marks]));
       const partBQs = (qData || []).map((q: any) => ({
         ...q,
-        marks: marksMap.get(q.id) != null ? Number(marksMap.get(q.id)) : q.marks
+        marks: marksMap.get(q.id) != null && Number(marksMap.get(q.id)) > 0 
+          ? Number(marksMap.get(q.id)) 
+          : (q.marks != null && Number(q.marks) > 0 ? Number(q.marks) : resolvePartBMaxMarks(q, attempt.exam_tests))
       }));
       
       // Sort questions so it's consistent
@@ -770,15 +900,29 @@ export default function AdminPartBEvaluations() {
       // Get responses
       const { data: rData } = await supabase.from('exam_responses').select('*').eq('attempt_id', attempt.id).in('question_id', partBQs.map(q => q.id));
       
-      // We only care about questions they actually answered
-      const answeredResponses = (rData || []).filter(r => r.fileUrl !== null || r.answer_text !== null || r.file_url !== null);
+      // Map ALL Part B questions to response objects so unuploaded questions can be evaluated on-the-fly
+      const mappedResponses = partBQs.map(q => {
+        const existing = (rData || []).find((r: any) => r.question_id === q.id);
+        return existing || {
+          attempt_id: attempt.id,
+          question_id: q.id,
+          file_url: null,
+          answer_text: null,
+          marks_awarded: null,
+          rubric_marks: null,
+          mentor_comments: null,
+          mentor_improvements: null,
+          mentor_loom_link: null,
+          status: 'unseen'
+        };
+      });
       
       // Map to state
-      setResponses(answeredResponses);
+      setResponses(mappedResponses);
       setCurrentQIndex(0);
       
-      if (answeredResponses.length > 0) {
-        populateForm(answeredResponses[0]);
+      if (mappedResponses.length > 0) {
+        populateForm(mappedResponses[0]);
       }
       
     } catch (err: any) {
@@ -830,13 +974,31 @@ export default function AdminPartBEvaluations() {
     
     // Save to DB
     try {
-      await supabase.from('exam_responses').update({
-        marks_awarded: roundedMarks,
-        rubric_marks: evalForm.rubric_marks,
-        mentor_comments: evalForm.mentor_comments || null,
-        mentor_improvements: evalForm.mentor_improvements || null,
-        mentor_loom_link: evalForm.mentor_loom_link || null
-      }).eq('id', currentResponse.id);
+      let responseId = currentResponse.id;
+      if (!responseId) {
+        const { data: newResp, error: insErr } = await supabase.from('exam_responses').insert({
+          attempt_id: evaluatingAttempt.id,
+          question_id: currentResponse.question_id,
+          marks_awarded: roundedMarks,
+          rubric_marks: evalForm.rubric_marks,
+          mentor_comments: evalForm.mentor_comments || null,
+          mentor_improvements: evalForm.mentor_improvements || null,
+          mentor_loom_link: evalForm.mentor_loom_link || null,
+          status: 'answered'
+        }).select('id').single();
+        if (insErr) throw insErr;
+        responseId = newResp.id;
+        updatedResponses[currentQIndex].id = responseId;
+        setResponses(updatedResponses);
+      } else {
+        await supabase.from('exam_responses').update({
+          marks_awarded: roundedMarks,
+          rubric_marks: evalForm.rubric_marks,
+          mentor_comments: evalForm.mentor_comments || null,
+          mentor_improvements: evalForm.mentor_improvements || null,
+          mentor_loom_link: evalForm.mentor_loom_link || null
+        }).eq('id', responseId);
+      }
       
       // Update attempt status to draft if it was pending
       if (evaluatingAttempt.part_b_evaluation_status === 'pending') {
@@ -1131,11 +1293,58 @@ export default function AdminPartBEvaluations() {
   // LIST VIEW
   // -------------------------------------------------------------
   if (!evaluatingAttempt) {
-    // Data is already filtered server-side per activeTab
-    const filteredAttempts = attempts;
+    // Filter attempts by search query (Candidate name, DF ID, email, test title, test code)
+    const filteredAttempts = useMemo(() => {
+      if (!searchQuery.trim()) return attempts;
+      const q = searchQuery.toLowerCase().trim();
+      return attempts.filter((a: any) => {
+        const name = (a.exam_candidates?.name || '').toLowerCase();
+        const email = (a.exam_candidates?.email || '').toLowerCase();
+        const uid = (a.exam_candidates?.unique_id || '').toLowerCase();
+        const title = (a.exam_tests?.title || '').toLowerCase();
+        const code = (a.exam_tests?.test_code || '').toLowerCase();
+        return name.includes(q) || email.includes(q) || uid.includes(q) || title.includes(q) || code.includes(q);
+      });
+    }, [attempts, searchQuery]);
+
+    // Paper-wise grouping (Segregate attempts by Exam Paper)
+    const paperGroups = useMemo(() => {
+      const map = new Map<string, { test: any; attempts: any[] }>();
+      filteredAttempts.forEach((a: any) => {
+        const key = a.test_id || a.exam_tests?.id || 'unknown';
+        if (!map.has(key)) {
+          map.set(key, { test: a.exam_tests, attempts: [] });
+        }
+        map.get(key)!.attempts.push(a);
+      });
+      return Array.from(map.values()).sort((a, b) => {
+        const aFB = a.test?.is_focus_batch ? 0 : 1;
+        const bFB = b.test?.is_focus_batch ? 0 : 1;
+        if (aFB !== bFB) return aFB - bFB;
+        return (a.test?.title || '').localeCompare(b.test?.title || '');
+      });
+    }, [filteredAttempts]);
+
+    // Student-wise grouping (Segregate attempts by Candidate Name)
+    const studentGroups = useMemo(() => {
+      const map = new Map<string, { candidate: any; attempts: any[] }>();
+      filteredAttempts.forEach((a: any) => {
+        const key = a.candidate_id || a.exam_candidates?.id || 'unknown';
+        if (!map.has(key)) {
+          map.set(key, { candidate: a.exam_candidates, attempts: [] });
+        }
+        map.get(key)!.attempts.push(a);
+      });
+      return Array.from(map.values()).sort((a, b) => {
+        const aFB = a.candidate?.access_level === 'focus_batch' ? 0 : 1;
+        const bFB = b.candidate?.access_level === 'focus_batch' ? 0 : 1;
+        if (aFB !== bFB) return aFB - bFB;
+        return (a.candidate?.name || '').localeCompare(b.candidate?.name || '');
+      });
+    }, [filteredAttempts]);
 
     return (
-      <div className="space-y-8 pb-12 animate-in fade-in duration-300">
+      <div className="space-y-6 pb-12 animate-in fade-in duration-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-[#262626]">Part B Evaluations</h1>
@@ -1170,96 +1379,444 @@ export default function AdminPartBEvaluations() {
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-2 p-1 bg-black/5 rounded-xl w-fit">
-          <button 
-            onClick={() => { setActiveTab('pending'); setPage(0); }}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'pending' ? 'bg-white shadow-sm text-primary' : 'text-foreground/60 hover:text-foreground'}`}
-          >
-            Pending {activeTab === 'pending' && attemptsData?.total !== undefined && <span className="ml-1 text-xs opacity-60">({attemptsData.total})</span>}
-          </button>
-          <button 
-            onClick={() => { setActiveTab('draft'); setPage(0); }}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'draft' ? 'bg-white shadow-sm text-orange-600' : 'text-foreground/60 hover:text-foreground'}`}
-          >
-            Drafts {activeTab === 'draft' && attemptsData?.total !== undefined && <span className="ml-1 text-xs opacity-60">({attemptsData.total})</span>}
-          </button>
-          <button 
-            onClick={() => { setActiveTab('completed'); setPage(0); }}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'completed' ? 'bg-white shadow-sm text-green-600' : 'text-foreground/60 hover:text-foreground'}`}
-          >
-            Evaluated {activeTab === 'completed' && attemptsData?.total !== undefined && <span className="ml-1 text-xs opacity-60">({attemptsData.total})</span>}
-          </button>
+        {/* Search & View Mode Switcher Toolbar */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3 bg-white rounded-2xl border border-black/5 shadow-2xs">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Live Search Input */}
+            <div className="relative w-full sm:w-72">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
+              <Input
+                type="text"
+                placeholder="Search student, DF ID, test code or title..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-9 pl-9 pr-3 text-xs bg-black/[0.02] border-black/10 rounded-xl"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Segregation View Modes */}
+            <div className="flex items-center gap-1 bg-black/5 p-1 rounded-xl text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setViewMode('paper')}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  viewMode === 'paper' ? 'bg-white shadow-xs text-primary font-bold' : 'text-foreground/60 hover:text-foreground'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>By Paper ({paperGroups.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('student')}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  viewMode === 'student' ? 'bg-white shadow-xs text-primary font-bold' : 'text-foreground/60 hover:text-foreground'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>By Student ({studentGroups.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('flat')}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  viewMode === 'flat' ? 'bg-white shadow-xs text-primary font-bold' : 'text-foreground/60 hover:text-foreground'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>All Attempts ({filteredAttempts.length})</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Status Filter Tabs */}
+          <div className="flex gap-1.5 p-1 bg-black/5 rounded-xl text-xs font-semibold self-start lg:self-auto">
+            <button 
+              onClick={() => { setActiveTab('pending'); setPage(0); }}
+              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === 'pending' ? 'bg-white shadow-xs text-primary font-bold' : 'text-foreground/60 hover:text-foreground'}`}
+            >
+              Pending {activeTab === 'pending' && attemptsData?.total !== undefined && <span className="ml-1 opacity-70 font-mono">({attemptsData.total})</span>}
+            </button>
+            <button 
+              onClick={() => { setActiveTab('draft'); setPage(0); }}
+              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === 'draft' ? 'bg-white shadow-xs text-orange-600 font-bold' : 'text-foreground/60 hover:text-foreground'}`}
+            >
+              Drafts {activeTab === 'draft' && attemptsData?.total !== undefined && <span className="ml-1 opacity-70 font-mono">({attemptsData.total})</span>}
+            </button>
+            <button 
+              onClick={() => { setActiveTab('completed'); setPage(0); }}
+              className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === 'completed' ? 'bg-white shadow-xs text-green-600 font-bold' : 'text-foreground/60 hover:text-foreground'}`}
+            >
+              Evaluated {activeTab === 'completed' && attemptsData?.total !== undefined && <span className="ml-1 opacity-70 font-mono">({attemptsData.total})</span>}
+            </button>
+          </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-black/5 overflow-hidden shadow-sm">
-          <div className="grid grid-cols-12 gap-4 border-b border-black/5 p-4 bg-background/50 text-xs font-semibold text-foreground/50 uppercase tracking-widest hidden md:grid">
-            <div className="col-span-3">Candidate</div>
-            <div className="col-span-3">Test</div>
-            <div className="col-span-2">Date</div>
-            <div className="col-span-2">Scores</div>
-            <div className="col-span-2 text-right">Action</div>
-          </div>
-          <div className="divide-y divide-black/5">
-            {filteredAttempts.map(attempt => (
-              <div key={attempt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-3 px-4 items-center hover:bg-background/30 transition-colors text-sm">
-                <div className="col-span-3 flex flex-col justify-center">
-                  <p className="font-bold text-[#262626] leading-tight">
-                    {attempt.exam_candidates?.name}
-                    {attempt.exam_candidates?.access_level === 'focus_batch' && (
-                      <span className="ml-2 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 align-middle">
-                        <Shield className="w-2.5 h-2.5" /> FB
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-[11px] text-foreground/50 mt-0.5">{attempt.exam_candidates?.unique_id}</p>
-                </div>
-                <div className="col-span-3 text-foreground/70 font-semibold truncate text-xs" title={attempt.exam_tests?.title}>
-                  {attempt.exam_tests?.title}
-                </div>
-                <div className="col-span-2 text-foreground/60 text-xs font-medium">
-                  {new Date(attempt.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </div>
-                <div className="col-span-2 flex flex-wrap gap-1.5 items-center">
-                  {attempt.total_part_a > 0 && (
-                    <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-bold border border-green-200">
-                      A: {attempt.score_part_a}/{attempt.total_part_a}
-                    </span>
-                  )}
-                  {attempt.score_part_b !== null && (
-                    <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold border border-orange-200">
-                      B: {attempt.score_part_b}
-                    </span>
-                  )}
-                  {attempt.total_score !== null && (
-                    <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-black border border-primary/20">
-                      Total: {attempt.total_score}
-                    </span>
-                  )}
-                  {attempt.total_part_a === 0 && attempt.score_part_b === null && (
-                    <span className="text-[11px] font-medium text-foreground/40 italic">Pending</span>
-                  )}
-                </div>
-                <div className="col-span-2 flex justify-end">
-                  <Button 
-                    onClick={() => loadEvaluation(attempt)} 
-                    variant={activeTab === 'completed' ? "outline" : "default"}
-                    size="sm"
-                    className={`h-7 px-3 font-bold text-xs rounded-md ${activeTab === 'completed' ? '' : 'bg-primary text-white hover:bg-primary/90 shadow-sm'}`}
+        {/* ------------------------------------------------------------- */}
+        {/* VIEW 1: SEGREGATE BY EXAM PAPER (Recommended)                 */}
+        {/* ------------------------------------------------------------- */}
+        {viewMode === 'paper' && (
+          <div className="space-y-4">
+            {paperGroups.map(({ test, attempts: pAttempts }) => {
+              const testKey = test?.id || 'unknown';
+              const isExpanded = expandedPapers[testKey] !== false; // Default expanded
+              const pendingCount = pAttempts.filter((a: any) => a.part_b_evaluation_status === 'pending' || !a.part_b_evaluation_status).length;
+              const completedCount = pAttempts.filter((a: any) => a.part_b_evaluation_status === 'completed').length;
+
+              return (
+                <div key={testKey} className="bg-white rounded-2xl border border-black/5 overflow-hidden shadow-2xs">
+                  {/* Paper Header */}
+                  <div 
+                    onClick={() => setExpandedPapers(prev => ({ ...prev, [testKey]: !isExpanded }))}
+                    className="p-4 sm:px-6 flex items-center justify-between cursor-pointer hover:bg-neutral-50/80 transition-colors border-b border-black/5"
                   >
-                    {activeTab === 'completed' ? 'Edit' : activeTab === 'draft' ? 'Resume' : 'Evaluate'}
-                  </Button>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {test?.test_code && (
+                        <span className="bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-lg text-xs font-mono font-bold tracking-wide">
+                          {test.test_code}
+                        </span>
+                      )}
+                      <div>
+                        <h3 className="font-bold text-sm text-[#262626] flex items-center gap-2">
+                          <span>{test?.title || 'Unknown Exam Test'}</span>
+                          {test?.is_focus_batch && (
+                            <span className="bg-orange-100 text-orange-800 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border border-orange-200">
+                              Focus Batch
+                            </span>
+                          )}
+                        </h3>
+                        <p className="text-[11px] text-foreground/50 mt-0.5">
+                          {test?.exam_programs?.name || (test?.program_format === 'masters' ? 'M.Des' : 'B.Des')} • {pAttempts.length} Total Submissions
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold">
+                        {pendingCount > 0 && (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[11px]">
+                            {pendingCount} Pending
+                          </span>
+                        )}
+                        {completedCount > 0 && (
+                          <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200 text-[11px]">
+                            {completedCount} Evaluated
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-7 h-7 rounded-lg bg-black/5 flex items-center justify-center text-foreground/60">
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Attendees List Under This Paper */}
+                  {isExpanded && (
+                    <div className="divide-y divide-black/5 bg-neutral-50/30">
+                      <div className="grid grid-cols-12 gap-4 px-6 py-2.5 bg-black/[0.02] text-[11px] font-bold text-foreground/50 uppercase tracking-wider hidden md:grid">
+                        <div className="col-span-4">Student Attendee</div>
+                        <div className="col-span-2">Submitted Date</div>
+                        <div className="col-span-3">Scores (Part A / B / Total)</div>
+                        <div className="col-span-1">Status</div>
+                        <div className="col-span-2 text-right">Action</div>
+                      </div>
+
+                      {pAttempts.map((attempt: any) => (
+                        <div key={attempt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-3 px-6 items-center hover:bg-white transition-colors text-xs">
+                          <div className="col-span-4 flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center shrink-0">
+                              {attempt.exam_candidates?.name?.charAt(0) || 'S'}
+                            </div>
+                            <div>
+                              <p className="font-bold text-[#262626]">
+                                {attempt.exam_candidates?.name}
+                                {attempt.exam_candidates?.access_level === 'focus_batch' && (
+                                  <span className="ml-1.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-green-100 text-green-800 border border-green-200">
+                                    FB
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-[10px] text-foreground/50 font-mono">{attempt.exam_candidates?.unique_id}</p>
+                            </div>
+                          </div>
+
+                          <div className="col-span-2 text-foreground/60 font-medium">
+                            {new Date(attempt.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </div>
+
+                          <div className="col-span-3 flex flex-wrap gap-1.5 items-center">
+                            {attempt.total_part_a > 0 && (
+                              <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-bold border border-green-200">
+                                A: {formatScore(attempt.score_part_a)}/{attempt.total_part_a}
+                              </span>
+                            )}
+                            {attempt.score_part_b !== null && (
+                              <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold border border-orange-200">
+                                B: {formatScore(attempt.score_part_b)}
+                              </span>
+                            )}
+                            {attempt.total_score !== null && (
+                              <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-black border border-primary/20">
+                                Total: {formatScore(attempt.total_score)}
+                              </span>
+                            )}
+                            {attempt.total_part_a === 0 && attempt.score_part_b === null && (
+                              <span className="text-[11px] font-medium text-foreground/40 italic">Pending</span>
+                            )}
+                          </div>
+
+                          <div className="col-span-1">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
+                              attempt.part_b_evaluation_status === 'completed' 
+                                ? 'bg-green-100 text-green-800' 
+                                : attempt.part_b_evaluation_status === 'draft' 
+                                ? 'bg-amber-100 text-amber-800' 
+                                : 'bg-orange-100 text-orange-800'
+                            }`}>
+                              {attempt.part_b_evaluation_status || 'Pending'}
+                            </span>
+                          </div>
+
+                          <div className="col-span-2 flex justify-end">
+                            <Button 
+                              onClick={() => loadEvaluation(attempt)} 
+                              size="sm"
+                              className={`h-7 px-3 font-bold text-xs rounded-md ${
+                                attempt.part_b_evaluation_status === 'completed' 
+                                  ? 'border border-black/10 bg-white hover:bg-black/5 text-[#262626]' 
+                                  : 'bg-primary text-white hover:bg-primary/90 shadow-2xs'
+                              }`}
+                            >
+                              {attempt.part_b_evaluation_status === 'completed' ? 'Edit Evaluation' : attempt.part_b_evaluation_status === 'draft' ? 'Resume' : 'Evaluate'}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
-            {filteredAttempts.length === 0 && (
-              <div className="p-12 text-center text-foreground/40">
-                <PenTool className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p>No attempts found in this category.</p>
+              );
+            })}
+
+            {paperGroups.length === 0 && (
+              <div className="bg-white rounded-2xl border border-black/5 p-12 text-center text-foreground/40">
+                <Layers className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="font-semibold text-sm">No test papers found matching your filters.</p>
               </div>
             )}
           </div>
-        </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* VIEW 2: SEGREGATE BY STUDENT CANDIDATE                        */}
+        {/* ------------------------------------------------------------- */}
+        {viewMode === 'student' && (
+          <div className="space-y-4">
+            {studentGroups.map(({ candidate, attempts: sAttempts }) => {
+              const candKey = candidate?.id || 'unknown';
+              const isExpanded = expandedStudents[candKey] !== false; // Default expanded
+              const isFB = candidate?.access_level === 'focus_batch';
+
+              return (
+                <div key={candKey} className="bg-white rounded-2xl border border-black/5 overflow-hidden shadow-2xs">
+                  {/* Student Header */}
+                  <div 
+                    onClick={() => setExpandedStudents(prev => ({ ...prev, [candKey]: !isExpanded }))}
+                    className="p-4 sm:px-6 flex items-center justify-between cursor-pointer hover:bg-neutral-50/80 transition-colors border-b border-black/5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary font-bold text-sm flex items-center justify-center shrink-0">
+                        {candidate?.name?.charAt(0) || 'S'}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-sm text-[#262626] flex items-center gap-2">
+                          <span>{candidate?.name || 'Unknown Candidate'}</span>
+                          {isFB && (
+                            <span className="bg-green-100 text-green-800 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border border-green-200">
+                              Focus Batch
+                            </span>
+                          )}
+                        </h3>
+                        <p className="text-[11px] text-foreground/50 font-mono mt-0.5">
+                          {candidate?.unique_id} • {candidate?.email}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="px-2.5 py-1 rounded-lg bg-black/5 text-foreground/70 text-xs font-semibold">
+                        {sAttempts.length} Paper Attempt{sAttempts.length === 1 ? '' : 's'}
+                      </span>
+                      <div className="w-7 h-7 rounded-lg bg-black/5 flex items-center justify-center text-foreground/60">
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Test Submissions by this student */}
+                  {isExpanded && (
+                    <div className="divide-y divide-black/5 bg-neutral-50/30">
+                      <div className="grid grid-cols-12 gap-4 px-6 py-2.5 bg-black/[0.02] text-[11px] font-bold text-foreground/50 uppercase tracking-wider hidden md:grid">
+                        <div className="col-span-5">Paper Attempted</div>
+                        <div className="col-span-2">Date Submitted</div>
+                        <div className="col-span-3">Scores</div>
+                        <div className="col-span-2 text-right">Action</div>
+                      </div>
+
+                      {sAttempts.map((attempt: any) => (
+                        <div key={attempt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-3 px-6 items-center hover:bg-white transition-colors text-xs">
+                          <div className="col-span-5">
+                            <div className="flex items-center gap-2">
+                              {attempt.exam_tests?.test_code && (
+                                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-mono font-bold shrink-0">
+                                  {attempt.exam_tests.test_code}
+                                </span>
+                              )}
+                              <span className="font-bold text-[#262626] truncate">{attempt.exam_tests?.title || 'Exam'}</span>
+                            </div>
+                            <span className="text-[10px] text-foreground/50 capitalize">
+                              Format: {attempt.exam_tests?.program_format || 'Standard'}
+                            </span>
+                          </div>
+
+                          <div className="col-span-2 text-foreground/60 font-medium">
+                            {new Date(attempt.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </div>
+
+                          <div className="col-span-3 flex flex-wrap gap-1.5 items-center">
+                            {attempt.total_part_a > 0 && (
+                              <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-bold border border-green-200">
+                                A: {formatScore(attempt.score_part_a)}/{attempt.total_part_a}
+                              </span>
+                            )}
+                            {attempt.score_part_b !== null && (
+                              <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold border border-orange-200">
+                                B: {formatScore(attempt.score_part_b)}
+                              </span>
+                            )}
+                            {attempt.total_score !== null && (
+                              <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-black border border-primary/20">
+                                Total: {formatScore(attempt.total_score)}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="col-span-2 flex justify-end">
+                            <Button 
+                              onClick={() => loadEvaluation(attempt)} 
+                              size="sm"
+                              className={`h-7 px-3 font-bold text-xs rounded-md ${
+                                attempt.part_b_evaluation_status === 'completed' 
+                                  ? 'border border-black/10 bg-white hover:bg-black/5 text-[#262626]' 
+                                  : 'bg-primary text-white hover:bg-primary/90 shadow-2xs'
+                              }`}
+                            >
+                              {attempt.part_b_evaluation_status === 'completed' ? 'Edit' : attempt.part_b_evaluation_status === 'draft' ? 'Resume' : 'Evaluate'}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {studentGroups.length === 0 && (
+              <div className="bg-white rounded-2xl border border-black/5 p-12 text-center text-foreground/40">
+                <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="font-semibold text-sm">No students found matching your filters.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* VIEW 3: FLAT TIMELINE FEED (All Attempts)                     */}
+        {/* ------------------------------------------------------------- */}
+        {viewMode === 'flat' && (
+          <div className="bg-white rounded-2xl border border-black/5 overflow-hidden shadow-2xs">
+            <div className="grid grid-cols-12 gap-4 border-b border-black/5 p-4 bg-background/50 text-xs font-semibold text-foreground/50 uppercase tracking-widest hidden md:grid">
+              <div className="col-span-3">Candidate</div>
+              <div className="col-span-3">Test</div>
+              <div className="col-span-2">Date</div>
+              <div className="col-span-2">Scores</div>
+              <div className="col-span-2 text-right">Action</div>
+            </div>
+            <div className="divide-y divide-black/5">
+              {filteredAttempts.map(attempt => (
+                <div key={attempt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-3 px-4 items-center hover:bg-background/30 transition-colors text-sm">
+                  <div className="col-span-3 flex flex-col justify-center">
+                    <p className="font-bold text-[#262626] leading-tight flex items-center gap-1.5">
+                      <span>{attempt.exam_candidates?.name}</span>
+                      {attempt.exam_candidates?.access_level === 'focus_batch' && (
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">
+                          FB
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[11px] text-foreground/50 mt-0.5 font-mono">{attempt.exam_candidates?.unique_id}</p>
+                  </div>
+                  <div className="col-span-3 text-foreground/70 font-semibold truncate text-xs flex items-center gap-1.5" title={attempt.exam_tests?.title}>
+                    {attempt.exam_tests?.test_code && (
+                      <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-mono font-bold shrink-0">
+                        {attempt.exam_tests.test_code}
+                      </span>
+                    )}
+                    <span className="truncate">{attempt.exam_tests?.title}</span>
+                  </div>
+                  <div className="col-span-2 text-foreground/60 text-xs font-medium">
+                    {new Date(attempt.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </div>
+                  <div className="col-span-2 flex flex-wrap gap-1.5 items-center">
+                    {attempt.total_part_a > 0 && (
+                      <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-bold border border-green-200">
+                        A: {formatScore(attempt.score_part_a)}/{attempt.total_part_a}
+                      </span>
+                    )}
+                    {attempt.score_part_b !== null && (
+                      <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold border border-orange-200">
+                        B: {formatScore(attempt.score_part_b)}
+                      </span>
+                    )}
+                    {attempt.total_score !== null && (
+                      <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-black border border-primary/20">
+                        Total: {formatScore(attempt.total_score)}
+                      </span>
+                    )}
+                    {attempt.total_part_a === 0 && attempt.score_part_b === null && (
+                      <span className="text-[11px] font-medium text-foreground/40 italic">Pending</span>
+                    )}
+                  </div>
+                  <div className="col-span-2 flex justify-end">
+                    <Button 
+                      onClick={() => loadEvaluation(attempt)} 
+                      variant={activeTab === 'completed' ? "outline" : "default"}
+                      size="sm"
+                      className={`h-7 px-3 font-bold text-xs rounded-md ${activeTab === 'completed' ? '' : 'bg-primary text-white hover:bg-primary/90 shadow-2xs'}`}
+                    >
+                      {activeTab === 'completed' ? 'Edit' : activeTab === 'draft' ? 'Resume' : 'Evaluate'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {filteredAttempts.length === 0 && (
+                <div className="p-12 text-center text-foreground/40">
+                  <PenTool className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>No attempts found in this category.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Pagination */}
         {totalPages > 1 && (
@@ -1438,8 +1995,8 @@ export default function AdminPartBEvaluations() {
 
         {/* Admin Proxy Submission Modal (List View) */}
         <Dialog open={showProxyModal} onOpenChange={setShowProxyModal}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl p-6">
-            <DialogHeader>
+          <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col p-0 overflow-hidden rounded-2xl">
+            <DialogHeader className="p-6 pb-4 border-b shrink-0">
               <DialogTitle className="text-xl font-bold text-[#262626] flex items-center gap-2">
                 <Plus className="w-5 h-5 text-primary" />
                 <span>Submit on Behalf of Student</span>
@@ -1449,7 +2006,7 @@ export default function AdminPartBEvaluations() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-6 py-4">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
               {/* Step 1: Candidate Selection */}
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -1652,14 +2209,19 @@ export default function AdminPartBEvaluations() {
                       const resp = proxyResponses[q.id] || { fileUrls: [], answerText: '' };
                       return (
                         <div key={q.id} className="p-4 rounded-xl border border-black/10 bg-black/[0.01] space-y-3">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs font-bold text-[#262626]">
-                              Q{idx + 1}. {q.pyq_tag || (q.content_text ? (q.content_text.length > 80 ? q.content_text.substring(0, 80) + '...' : q.content_text) : `Question ${idx + 1}`)} ({q.marks || 10} Marks)
-                            </span>
-                            {q.content_text && q.content_text.length > 80 && (
-                              <p className="text-[11px] text-foreground/70 italic bg-black/5 p-2 rounded-lg line-clamp-3">
-                                {q.content_text}
-                              </p>
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-bold text-[#262626]">
+                                Q{idx + 1}. {q.pyq_tag ? cleanPlainText(q.pyq_tag) : `Question ${idx + 1}`}
+                              </span>
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 shrink-0">
+                                {q.marks || 10} Marks
+                              </span>
+                            </div>
+                            {q.content_text && (
+                              <div className="text-xs text-foreground/80 bg-black/[0.03] p-3 rounded-lg border border-black/5 whitespace-pre-line leading-relaxed font-normal">
+                                {cleanPlainText(q.content_text)}
+                              </div>
                             )}
                           </div>
 
@@ -1737,7 +2299,7 @@ export default function AdminPartBEvaluations() {
               )}
             </div>
 
-            <DialogFooter className="gap-2">
+            <DialogFooter className="p-4 border-t bg-muted/20 shrink-0 gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -1846,16 +2408,70 @@ export default function AdminPartBEvaluations() {
                 className="text-sm text-[#262626] leading-relaxed max-w-full prose prose-sm prose-p:my-1 prose-img:max-h-[500px] prose-img:w-auto prose-img:rounded-xl prose-img:shadow-sm prose-img:my-2" 
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml((currentQ.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ')) }} 
               />
-              {currentQ.media_url && (
-                <div className="pt-3 border-t border-black/5">
-                  <div className="text-xs font-bold text-foreground/50 mb-2 uppercase tracking-wider">
-                    Question Reference Image
+              {parseQuestionMediaUrls(currentQ.media_url).length > 0 ? (
+                <div className="pt-3 border-t border-black/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-foreground/60 uppercase tracking-wider">
+                        Question Reference Image ({parseQuestionMediaUrls(currentQ.media_url).length} page{parseQuestionMediaUrls(currentQ.media_url).length > 1 ? 's' : ''})
+                      </span>
+                      {parseQuestionMediaUrls(currentQ.media_url).length > 1 && (
+                        <div className="flex items-center gap-1 bg-black/5 p-0.5 rounded-md">
+                          {parseQuestionMediaUrls(currentQ.media_url).map((_, qmIdx) => (
+                            <button
+                              key={qmIdx}
+                              onClick={() => setSelectedQuestionMediaIndex(qmIdx)}
+                              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${selectedQuestionMediaIndex === qmIdx ? 'bg-primary text-white shadow-xs' : 'text-foreground/70 hover:bg-black/10'}`}
+                            >
+                              Page {qmIdx + 1}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          disabled={uploadingQuestionMedia}
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files.length > 0) {
+                              handleUploadQuestionMedia(e.target.files);
+                            }
+                          }}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          asChild
+                          className="h-7 px-2 text-xs text-primary font-medium hover:bg-primary/5"
+                        >
+                          <span>
+                            {uploadingQuestionMedia ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Plus className="w-3.5 h-3.5 mr-1" />}
+                            Add Page / Image
+                          </span>
+                        </Button>
+                      </label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setFullscreenImage(parseQuestionMediaUrls(currentQ.media_url)[selectedQuestionMediaIndex] || parseQuestionMediaUrls(currentQ.media_url)[0])}
+                        className="h-7 px-2 text-xs"
+                      >
+                        <Maximize className="w-3.5 h-3.5 mr-1" /> Full Screen
+                      </Button>
+                    </div>
                   </div>
-                  <div className="rounded-xl border border-black/10 overflow-hidden bg-neutral-50/50 p-2 max-w-2xl">
+
+                  <div className="rounded-xl border border-black/10 overflow-hidden bg-neutral-50/50 p-2 max-w-2xl relative group">
                     <img
-                      src={resolveQuestionMediaUrl(currentQ.media_url)}
+                      src={parseQuestionMediaUrls(currentQ.media_url)[selectedQuestionMediaIndex] || parseQuestionMediaUrls(currentQ.media_url)[0]}
                       alt="Question Reference"
-                      className="max-h-[450px] w-auto max-w-full rounded-lg object-contain mx-auto"
+                      className="max-h-[450px] w-auto max-w-full rounded-lg object-contain mx-auto cursor-pointer"
+                      onClick={() => setFullscreenImage(parseQuestionMediaUrls(currentQ.media_url)[selectedQuestionMediaIndex] || parseQuestionMediaUrls(currentQ.media_url)[0])}
                       onError={(e) => {
                         const target = e.currentTarget;
                         if (!target.src.includes('candidate-submissions')) {
@@ -1863,6 +2479,45 @@ export default function AdminPartBEvaluations() {
                         }
                       }}
                     />
+                  </div>
+                </div>
+              ) : (
+                <div className="pt-3 border-t border-black/5">
+                  <div className="flex flex-col sm:flex-row items-center justify-between p-3.5 rounded-xl border border-dashed border-amber-300 bg-amber-50/40 gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
+                        <AlertCircle className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-amber-900">No Question Image Attached</div>
+                        <div className="text-[11px] text-amber-800/80">Upload question reference or diagram while evaluating to guide marking.</div>
+                      </div>
+                    </div>
+                    <label className="cursor-pointer shrink-0">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        disabled={uploadingQuestionMedia}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files.length > 0) {
+                            handleUploadQuestionMedia(e.target.files);
+                          }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        disabled={uploadingQuestionMedia}
+                        asChild
+                        className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold gap-1.5 shadow-xs"
+                      >
+                        <span>
+                          {uploadingQuestionMedia ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
+                          Upload Question Image / Add Page
+                        </span>
+                      </Button>
+                    </label>
                   </div>
                 </div>
               )}
@@ -2175,9 +2830,57 @@ export default function AdminPartBEvaluations() {
                  {currentResponse.answer_text}
                </div>
              ) : (
-               <div className="text-foreground/40 flex flex-col items-center">
-                 <FileText className="w-12 h-12 mb-2 opacity-50" />
-                 <p className="font-medium text-lg">No file uploaded for this question.</p>
+               <div 
+                 className="flex flex-col items-center justify-center p-8 bg-neutral-50/80 rounded-2xl border-2 border-dashed border-black/15 text-center max-w-md my-auto transition-all hover:border-primary/50 hover:bg-primary/[0.02]"
+                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                 onDrop={(e) => {
+                   e.preventDefault();
+                   e.stopPropagation();
+                   const droppedFiles = e.dataTransfer.files;
+                   if (droppedFiles && droppedFiles.length > 0) {
+                     handleAdminManualUpload(droppedFiles);
+                   }
+                 }}
+               >
+                 <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-3 shadow-xs">
+                   <UploadCloud className="w-7 h-7" />
+                 </div>
+                 <h4 className="font-bold text-base text-[#262626] mb-1">No Candidate Sketch Uploaded</h4>
+                 <p className="text-xs text-foreground/60 leading-relaxed mb-4 max-w-xs">
+                   The student has not uploaded an image for this question. Attach their sketch sheet or pages here to evaluate against rubrics or run AI evaluation.
+                 </p>
+
+                 <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
+                   <label className="cursor-pointer">
+                     <input
+                       type="file"
+                       accept="image/*"
+                       multiple
+                       className="hidden"
+                       disabled={adminUploading}
+                       onChange={(e) => {
+                         if (e.target.files && e.target.files.length > 0) {
+                           handleAdminManualUpload(e.target.files);
+                         }
+                       }}
+                     />
+                     <Button
+                       size="sm"
+                       disabled={adminUploading}
+                       asChild
+                       className="text-xs gap-1.5 bg-primary hover:bg-primary/90 text-white font-bold h-9 px-4 shadow-xs"
+                     >
+                       <span>
+                         {adminUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
+                         Upload Question Sketch / Add Page
+                       </span>
+                     </Button>
+                   </label>
+                 </div>
+
+                 <span className="text-[11px] text-foreground/50">
+                   Drag & drop images here or paste directly (<kbd className="font-mono bg-white px-1.5 py-0.5 rounded border border-black/10 text-[10px]">Ctrl+V</kbd>)
+                 </span>
                </div>
              )}
           </div>
@@ -2604,8 +3307,8 @@ export default function AdminPartBEvaluations() {
 
       {/* Admin Proxy Submission Modal (Create On Behalf Of Student) */}
       <Dialog open={showProxyModal} onOpenChange={setShowProxyModal}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl p-6">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col p-0 overflow-hidden rounded-2xl">
+          <DialogHeader className="p-6 pb-4 border-b shrink-0">
             <DialogTitle className="text-xl font-bold text-[#262626] flex items-center gap-2">
               <Plus className="w-5 h-5 text-primary" />
               <span>Submit on Behalf of Student</span>
@@ -2615,7 +3318,7 @@ export default function AdminPartBEvaluations() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
             {/* Step 1: Candidate Selection */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -2818,14 +3521,19 @@ export default function AdminPartBEvaluations() {
                     const resp = proxyResponses[q.id] || { fileUrls: [], answerText: '' };
                     return (
                       <div key={q.id} className="p-4 rounded-xl border border-black/10 bg-black/[0.01] space-y-3">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-bold text-[#262626]">
-                            Q{idx + 1}. {q.pyq_tag || (q.content_text ? (q.content_text.length > 80 ? q.content_text.substring(0, 80) + '...' : q.content_text) : `Question ${idx + 1}`)} ({q.marks || 10} Marks)
-                          </span>
-                          {q.content_text && q.content_text.length > 80 && (
-                            <p className="text-[11px] text-foreground/70 italic bg-black/5 p-2 rounded-lg line-clamp-3">
-                              {q.content_text}
-                            </p>
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-[#262626]">
+                              Question {idx + 1} {q.pyq_tag ? `(${q.pyq_tag})` : ''}
+                            </span>
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                              {q.marks || 10} Marks
+                            </span>
+                          </div>
+                          {q.content_text && (
+                            <div className="text-xs text-foreground/80 bg-black/[0.03] p-3 rounded-lg border border-black/5 whitespace-pre-line leading-relaxed font-normal">
+                              {cleanPlainText(q.content_text)}
+                            </div>
                           )}
                         </div>
 
@@ -2903,7 +3611,7 @@ export default function AdminPartBEvaluations() {
             )}
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="p-4 border-t bg-muted/20 shrink-0 gap-2">
             <Button
               type="button"
               variant="outline"

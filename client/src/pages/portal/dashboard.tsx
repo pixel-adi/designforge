@@ -15,6 +15,7 @@ import { PortalPrepTrackerSection } from "@/prep-tracker/components/PortalPrepTr
 import { PortalWeeklyUpdatesModal } from "@/prep-tracker/components/PortalWeeklyUpdatesModal";
 import { ExamCountdownTimer } from "@/prep-tracker/components/ExamCountdownTimer";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { formatScore, resolvePartBMaxMarks } from "@/lib/utils";
 import CustomTestCreatorModal from "./CustomTestCreatorModal";
 const CustomScatterTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length && payload[0] && payload[0].payload) {
@@ -3333,7 +3334,7 @@ export default function PortalDashboard() {
                                     {responses.filter((r: any) => r.exam_questions?.part === 'B').map((r: any, i: number) => (
                                       <div key={r.id} className="border-b border-black/5 pb-3 last:border-0 last:pb-0">
                                         <p className="text-xs font-bold text-primary mb-1">Question {i + 1} ({r.exam_questions?.topics?.[0] || 'Subjective Sketching'})</p>
-                                        <p className="text-xs font-semibold text-[#262626]">Marks: <span className="text-green-600">{r.marks_awarded || '—'} / 20</span></p>
+                                        <p className="text-xs font-semibold text-[#262626]">Marks: <span className="text-green-600">{r.marks_awarded != null ? formatScore(r.marks_awarded) : '—'} / {resolvePartBMaxMarks(r.exam_questions, activeReport?.exam_tests)}</span></p>
                                         
                                         {r.mentor_comments && (
                                           <div className="bg-black/5 p-2 rounded-lg text-xs mt-2 font-medium text-foreground/70">
