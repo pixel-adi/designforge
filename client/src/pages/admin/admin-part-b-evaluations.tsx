@@ -368,6 +368,56 @@ export default function AdminPartBEvaluations() {
     }
   });
 
+  // Filter attempts by search query (Candidate name, DF ID, email, test title, test code)
+  const filteredAttempts = useMemo(() => {
+    if (!searchQuery.trim()) return attempts;
+    const q = searchQuery.toLowerCase().trim();
+    return attempts.filter((a: any) => {
+      const name = (a.exam_candidates?.name || '').toLowerCase();
+      const email = (a.exam_candidates?.email || '').toLowerCase();
+      const uid = (a.exam_candidates?.unique_id || '').toLowerCase();
+      const title = (a.exam_tests?.title || '').toLowerCase();
+      const code = (a.exam_tests?.test_code || '').toLowerCase();
+      return name.includes(q) || email.includes(q) || uid.includes(q) || title.includes(q) || code.includes(q);
+    });
+  }, [attempts, searchQuery]);
+
+  // Paper-wise grouping (Segregate attempts by Exam Paper)
+  const paperGroups = useMemo(() => {
+    const map = new Map<string, { test: any; attempts: any[] }>();
+    filteredAttempts.forEach((a: any) => {
+      const key = a.test_id || a.exam_tests?.id || 'unknown';
+      if (!map.has(key)) {
+        map.set(key, { test: a.exam_tests, attempts: [] });
+      }
+      map.get(key)!.attempts.push(a);
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const aFB = a.test?.is_focus_batch ? 0 : 1;
+      const bFB = b.test?.is_focus_batch ? 0 : 1;
+      if (aFB !== bFB) return aFB - bFB;
+      return (a.test?.title || '').localeCompare(b.test?.title || '');
+    });
+  }, [filteredAttempts]);
+
+  // Student-wise grouping (Segregate attempts by Candidate Name)
+  const studentGroups = useMemo(() => {
+    const map = new Map<string, { candidate: any; attempts: any[] }>();
+    filteredAttempts.forEach((a: any) => {
+      const key = a.candidate_id || a.exam_candidates?.id || 'unknown';
+      if (!map.has(key)) {
+        map.set(key, { candidate: a.exam_candidates, attempts: [] });
+      }
+      map.get(key)!.attempts.push(a);
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const aFB = a.candidate?.access_level === 'focus_batch' ? 0 : 1;
+      const bFB = b.candidate?.access_level === 'focus_batch' ? 0 : 1;
+      if (aFB !== bFB) return aFB - bFB;
+      return (a.candidate?.name || '').localeCompare(b.candidate?.name || '');
+    });
+  }, [filteredAttempts]);
+
   // Fetch questions for selected test in proxy modal
   const handleSelectProxyTest = async (testId: string) => {
     setProxySelectedTestId(testId);
@@ -1293,56 +1343,6 @@ export default function AdminPartBEvaluations() {
   // LIST VIEW
   // -------------------------------------------------------------
   if (!evaluatingAttempt) {
-    // Filter attempts by search query (Candidate name, DF ID, email, test title, test code)
-    const filteredAttempts = useMemo(() => {
-      if (!searchQuery.trim()) return attempts;
-      const q = searchQuery.toLowerCase().trim();
-      return attempts.filter((a: any) => {
-        const name = (a.exam_candidates?.name || '').toLowerCase();
-        const email = (a.exam_candidates?.email || '').toLowerCase();
-        const uid = (a.exam_candidates?.unique_id || '').toLowerCase();
-        const title = (a.exam_tests?.title || '').toLowerCase();
-        const code = (a.exam_tests?.test_code || '').toLowerCase();
-        return name.includes(q) || email.includes(q) || uid.includes(q) || title.includes(q) || code.includes(q);
-      });
-    }, [attempts, searchQuery]);
-
-    // Paper-wise grouping (Segregate attempts by Exam Paper)
-    const paperGroups = useMemo(() => {
-      const map = new Map<string, { test: any; attempts: any[] }>();
-      filteredAttempts.forEach((a: any) => {
-        const key = a.test_id || a.exam_tests?.id || 'unknown';
-        if (!map.has(key)) {
-          map.set(key, { test: a.exam_tests, attempts: [] });
-        }
-        map.get(key)!.attempts.push(a);
-      });
-      return Array.from(map.values()).sort((a, b) => {
-        const aFB = a.test?.is_focus_batch ? 0 : 1;
-        const bFB = b.test?.is_focus_batch ? 0 : 1;
-        if (aFB !== bFB) return aFB - bFB;
-        return (a.test?.title || '').localeCompare(b.test?.title || '');
-      });
-    }, [filteredAttempts]);
-
-    // Student-wise grouping (Segregate attempts by Candidate Name)
-    const studentGroups = useMemo(() => {
-      const map = new Map<string, { candidate: any; attempts: any[] }>();
-      filteredAttempts.forEach((a: any) => {
-        const key = a.candidate_id || a.exam_candidates?.id || 'unknown';
-        if (!map.has(key)) {
-          map.set(key, { candidate: a.exam_candidates, attempts: [] });
-        }
-        map.get(key)!.attempts.push(a);
-      });
-      return Array.from(map.values()).sort((a, b) => {
-        const aFB = a.candidate?.access_level === 'focus_batch' ? 0 : 1;
-        const bFB = b.candidate?.access_level === 'focus_batch' ? 0 : 1;
-        if (aFB !== bFB) return aFB - bFB;
-        return (a.candidate?.name || '').localeCompare(b.candidate?.name || '');
-      });
-    }, [filteredAttempts]);
-
     return (
       <div className="space-y-6 pb-12 animate-in fade-in duration-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
