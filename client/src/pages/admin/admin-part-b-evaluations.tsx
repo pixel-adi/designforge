@@ -665,6 +665,12 @@ export default function AdminPartBEvaluations() {
     setImageError(false);
     setResolvedUrlOverride(null);
     setSelectedQuestionMediaIndex(0);
+
+    // Safety timeout: never leave candidate sketch stuck in loading state
+    const timer = setTimeout(() => {
+      setImageLoading(false);
+    }, 2500);
+    return () => clearTimeout(timer);
   }, [currentQIndex, selectedFileIndex, evaluatingAttempt?.id]);
 
   const handleAdminManualUpload = async (fileOrFiles: File | FileList | File[]) => {
@@ -2069,7 +2075,7 @@ export default function AdminPartBEvaluations() {
   });
 
   return (
-    <div className="absolute inset-0 z-20 bg-[#F8F9FA] flex flex-col animate-in fade-in duration-300">
+    <div className="fixed inset-0 lg:left-64 z-30 bg-[#F8F9FA] flex flex-col animate-in fade-in duration-300">
       {/* Top Nav */}
       <div className="h-16 bg-white border-b border-black/5 flex items-center justify-between px-6 shrink-0 z-10 shadow-sm">
         <div className="flex items-center gap-4">
@@ -2422,12 +2428,17 @@ export default function AdminPartBEvaluations() {
                              </div>
                            ) : (
                              <div className="w-full h-full flex items-center justify-center p-2 overflow-auto">
-                               <img
-                                 src={displayUrl}
-                                 alt={`Candidate Submission Page ${selectedFileIndex + 1}`}
-                                 loading="lazy"
-                                 decoding="async"
-                                 onLoad={() => setImageLoading(false)}
+                                <img
+                                  key={`${evaluatingAttempt?.id}-${currentQIndex}-${selectedFileIndex}-${displayUrl}`}
+                                  ref={(img) => {
+                                    if (img && img.complete && img.naturalWidth > 0) {
+                                      setImageLoading(false);
+                                    }
+                                  }}
+                                  src={displayUrl}
+                                  alt={`Candidate Submission Page ${selectedFileIndex + 1}`}
+                                  loading="eager"
+                                  onLoad={() => setImageLoading(false)}
                                  onError={() => {
                                    setImageLoading(false);
                                    if (!resolvedUrlOverride && displayUrl.includes('candidate-submissions')) {

@@ -23,10 +23,38 @@ export interface WeeklyRelease {
 
 export const PORTAL_RELEASES: WeeklyRelease[] = [
   {
+    version: 'v2.8.0',
+    weekLabel: 'Week 8 Update',
+    releaseDate: 'Fri 30 Oct 2026',
+    isLatest: true,
+    items: [
+      {
+        type: 'improvement',
+        title: 'High-resolution diagram options in test engine',
+        description: 'Visual diagrams and sketches in MCQ and MSQ options now render in full clarity (up to 400×400 px) in an expanded layout, so fine lines, perspective details, and annotations are easy to inspect during timed exams and review.',
+      },
+      {
+        type: 'improvement',
+        title: 'Simplified test codes across portal',
+        description: 'All mock test papers now feature streamlined reference codes (like FB-NID-01 and GEN-UCEED-02) across your dashboard cards and test engine header, making papers quick to identify and reference.',
+      },
+      {
+        type: 'fix',
+        title: 'Exact Part B marks alignment in review mode',
+        description: 'Question allotted marks and maximum scores for Part B creative design questions now strictly reflect paper blueprints, with clean two-decimal score rounding across test reviews and performance metrics.',
+      },
+      {
+        type: 'fix',
+        title: 'Clean plain-text question readability',
+        description: 'Sanitized question statements and options to remove raw formatting tags, providing clean, distraction-free reading across all practice papers.',
+      },
+    ],
+  },
+  {
     version: 'v2.7.0',
     weekLabel: 'Week 7 Update',
     releaseDate: 'Wed 28 Oct 2026',
-    isLatest: true,
+    isLatest: false,
     items: [
       {
         type: 'feature',

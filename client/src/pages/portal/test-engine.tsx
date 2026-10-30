@@ -3080,6 +3080,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                         }
                       }
 
+                      const hasMedia = Boolean(opt.media_url);
+
                       return (
                         <div
                           key={opt.id}
@@ -3095,33 +3097,45 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                               updateResponse(currentQ.id, { selectedOptions: newOpts });
                             }
                           }}
-                          className={`flex items-center gap-4 p-3 border rounded-xl cursor-pointer transition-all ${containerClass}`}
+                          className={`p-3.5 border rounded-xl cursor-pointer transition-all ${containerClass} ${hasMedia ? 'flex flex-col gap-2.5' : 'flex items-center gap-4'}`}
                         >
-                          <div className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold shrink-0 ${letterClass}`}>
-                            {String.fromCharCode(65 + idx)}
+                          <div className="flex items-center gap-3 w-full">
+                            <div className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold shrink-0 ${letterClass}`}>
+                              {String.fromCharCode(65 + idx)}
+                            </div>
+                            {opt.content_text && (
+                              <span className={`text-sm font-semibold flex-1 ${testStep === 'review' && (isCorrectAnswer || isSelectedButWrong) ? 'text-[#262626]' : (isSelected ? 'font-bold text-primary' : 'text-[#262626]')}`}>
+                                {cleanPlainText(opt.content_text)}
+                              </span>
+                            )}
+                            {testStep === 'review' && (
+                              <>
+                                {isCorrectAnswer && isSelected && (
+                                  <span className="ml-auto text-xs font-bold text-green-700 bg-green-100 border border-green-200 px-2 py-0.5 rounded shrink-0">
+                                    ✓ Your Choice (Correct)
+                                  </span>
+                                )}
+                                {isCorrectAnswer && !isSelected && (
+                                  <span className="ml-auto text-xs font-bold text-green-700 bg-green-100 border border-green-200 px-2 py-0.5 rounded shrink-0">
+                                    ✓ Correct Option
+                                  </span>
+                                )}
+                                {isSelectedButWrong && (
+                                  <span className="ml-auto text-xs font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded shrink-0">
+                                    ✗ Your Choice (Incorrect)
+                                  </span>
+                                )}
+                              </>
+                            )}
                           </div>
-                          <span className={`text-sm font-semibold ${testStep === 'review' && (isCorrectAnswer || isSelectedButWrong) ? 'text-[#262626]' : (isSelected ? 'font-bold text-primary' : 'text-[#262626]')}`}>{cleanPlainText(opt.content_text)}</span>
-                          {testStep === 'review' && (
-                            <>
-                              {isCorrectAnswer && isSelected && (
-                                <span className="ml-auto text-xs font-bold text-green-700 bg-green-100 border border-green-200 px-2 py-0.5 rounded shrink-0">
-                                  ✓ Your Choice (Correct)
-                                </span>
-                              )}
-                              {isCorrectAnswer && !isSelected && (
-                                <span className="ml-auto text-xs font-bold text-green-700 bg-green-100 border border-green-200 px-2 py-0.5 rounded shrink-0">
-                                  ✓ Correct Option
-                                </span>
-                              )}
-                              {isSelectedButWrong && (
-                                <span className="ml-auto text-xs font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded shrink-0">
-                                  ✗ Your Choice (Incorrect)
-                                </span>
-                              )}
-                            </>
-                          )}
                           {opt.media_url && (
-                            <img src={opt.media_url} alt="Option Media" className="max-h-20 rounded border border-black/5 ml-auto" />
+                            <div className="w-full flex items-center justify-center p-2.5 bg-neutral-50/70 rounded-xl border border-black/5 overflow-hidden">
+                              <img
+                                src={opt.media_url}
+                                alt={`Option ${String.fromCharCode(65 + idx)}`}
+                                className="max-h-[380px] max-w-[420px] w-auto h-auto object-contain rounded-lg shadow-2xs"
+                              />
+                            </div>
                           )}
                         </div>
                       );

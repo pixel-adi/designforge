@@ -4107,11 +4107,13 @@ export default function PortalDashboard() {
                                               )}
                                             </div>
                                             {opt.media_url && (
-                                              <img
-                                                src={opt.media_url}
-                                                alt={`Option ${String.fromCharCode(65 + optIdx)}`}
-                                                className="rounded-lg border border-black/10 max-h-32 object-contain ml-8"
-                                              />
+                                              <div className="w-full flex items-center justify-center p-2 bg-neutral-50/70 rounded-xl border border-black/5 mt-2 overflow-hidden">
+                                                <img
+                                                  src={opt.media_url}
+                                                  alt={`Option ${String.fromCharCode(65 + optIdx)}`}
+                                                  className="rounded-lg max-h-[380px] max-w-[420px] w-auto h-auto object-contain shadow-2xs"
+                                                />
+                                              </div>
                                             )}
                                           </button>
                                         );
