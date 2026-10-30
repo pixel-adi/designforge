@@ -118,7 +118,7 @@ export default function AdminPartBEvaluations() {
         `, { count: 'exact' })
         .not('completed_at', 'is', null)
         .in('status', ['completed', 'submitted'])
-        .or('part_b_answered.gt.0,part_b_evaluation_status.not.is.null')
+        .gt('part_b_answered', 0)
         .order('completed_at', { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
         
@@ -149,11 +149,9 @@ export default function AdminPartBEvaluations() {
   const totalPages = Math.ceil((attemptsData?.total || 0) / PAGE_SIZE);
   const [evaluatingAttempt, setEvaluatingAttempt] = useState<any>(null);
 
-  // Segregation & Live Search State
-  const [viewMode, setViewMode] = useState<'paper' | 'student' | 'flat'>('paper');
+  // Filter State
+  const [selectedTestFilter, setSelectedTestFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedPapers, setExpandedPapers] = useState<Record<string, boolean>>({});
-  const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({});
   
   // Evaluation Details State
   const [questions, setQuestions] = useState<any[]>([]);
@@ -377,12 +375,43 @@ export default function AdminPartBEvaluations() {
     }
   });
 
-  // Filter attempts by search query (Candidate name, DF ID, email, test title, test code)
+  // Unique tests represented in current attempts batch for dropdown
+  const availableTests = useMemo(() => {
+    const map = new Map<string, { id: string; title: string; test_code: string | null; count: number }>();
+    attempts.forEach((a: any) => {
+      if (!a.completed_at || a.status === 'in_progress' || Number(a.part_b_answered || 0) <= 0) return;
+      const tid = a.test_id || a.exam_tests?.id || 'unknown';
+      if (!map.has(tid)) {
+        map.set(tid, {
+          id: tid,
+          title: a.exam_tests?.title || 'Unknown Test',
+          test_code: a.exam_tests?.test_code || null,
+          count: 0
+        });
+      }
+      map.get(tid)!.count++;
+    });
+    return Array.from(map.values()).sort((a, b) => a.title.localeCompare(b.title));
+  }, [attempts]);
+
+  // Filter attempts strictly by completed status, Part B answered > 0, test dropdown, and search query
   const filteredAttempts = useMemo(() => {
-    const validAttempts = attempts.filter((a: any) => Boolean(a.completed_at) && a.status !== 'in_progress');
-    if (!searchQuery.trim()) return validAttempts;
+    const validAttempts = attempts.filter((a: any) => 
+      Boolean(a.completed_at) && 
+      a.completed_at !== '1970-01-01T00:00:00.000Z' &&
+      new Date(a.completed_at).getFullYear() > 1970 &&
+      a.status !== 'in_progress' && 
+      Number(a.part_b_answered || 0) > 0
+    );
+
+    let list = validAttempts;
+    if (selectedTestFilter !== 'all') {
+      list = list.filter((a: any) => (a.test_id === selectedTestFilter || a.exam_tests?.id === selectedTestFilter));
+    }
+
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
-    return validAttempts.filter((a: any) => {
+    return list.filter((a: any) => {
       const name = (a.exam_candidates?.name || '').toLowerCase();
       const email = (a.exam_candidates?.email || '').toLowerCase();
       const uid = (a.exam_candidates?.unique_id || '').toLowerCase();
@@ -390,43 +419,7 @@ export default function AdminPartBEvaluations() {
       const code = (a.exam_tests?.test_code || '').toLowerCase();
       return name.includes(q) || email.includes(q) || uid.includes(q) || title.includes(q) || code.includes(q);
     });
-  }, [attempts, searchQuery]);
-
-  // Paper-wise grouping (Segregate attempts by Exam Paper)
-  const paperGroups = useMemo(() => {
-    const map = new Map<string, { test: any; attempts: any[] }>();
-    filteredAttempts.forEach((a: any) => {
-      const key = a.test_id || a.exam_tests?.id || 'unknown';
-      if (!map.has(key)) {
-        map.set(key, { test: a.exam_tests, attempts: [] });
-      }
-      map.get(key)!.attempts.push(a);
-    });
-    return Array.from(map.values()).sort((a, b) => {
-      const aFB = a.test?.is_focus_batch ? 0 : 1;
-      const bFB = b.test?.is_focus_batch ? 0 : 1;
-      if (aFB !== bFB) return aFB - bFB;
-      return (a.test?.title || '').localeCompare(b.test?.title || '');
-    });
-  }, [filteredAttempts]);
-
-  // Student-wise grouping (Segregate attempts by Candidate Name)
-  const studentGroups = useMemo(() => {
-    const map = new Map<string, { candidate: any; attempts: any[] }>();
-    filteredAttempts.forEach((a: any) => {
-      const key = a.candidate_id || a.exam_candidates?.id || 'unknown';
-      if (!map.has(key)) {
-        map.set(key, { candidate: a.exam_candidates, attempts: [] });
-      }
-      map.get(key)!.attempts.push(a);
-    });
-    return Array.from(map.values()).sort((a, b) => {
-      const aFB = a.candidate?.access_level === 'focus_batch' ? 0 : 1;
-      const bFB = b.candidate?.access_level === 'focus_batch' ? 0 : 1;
-      if (aFB !== bFB) return aFB - bFB;
-      return (a.candidate?.name || '').localeCompare(b.candidate?.name || '');
-    });
-  }, [filteredAttempts]);
+  }, [attempts, searchQuery, selectedTestFilter]);
 
   // Fetch questions for selected test in proxy modal
   const handleSelectProxyTest = async (testId: string) => {
@@ -1412,38 +1405,21 @@ export default function AdminPartBEvaluations() {
               )}
             </div>
 
-            {/* Segregation View Modes */}
-            <div className="flex items-center gap-1 bg-black/5 p-1 rounded-xl text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setViewMode('paper')}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                  viewMode === 'paper' ? 'bg-white shadow-xs text-primary font-bold' : 'text-foreground/60 hover:text-foreground'
-                }`}
+            {/* Test Paper Dropdown Filter */}
+            <div className="flex items-center gap-1.5 bg-black/[0.03] border border-black/10 rounded-xl px-2.5 py-1">
+              <Layers className="w-3.5 h-3.5 text-foreground/50 shrink-0" />
+              <select
+                value={selectedTestFilter}
+                onChange={(e) => setSelectedTestFilter(e.target.value)}
+                className="h-7 text-xs bg-transparent border-0 focus:outline-none text-[#262626] font-medium max-w-[260px] truncate cursor-pointer"
               >
-                <Layers className="w-3.5 h-3.5" />
-                <span>By Paper ({paperGroups.length})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('student')}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                  viewMode === 'student' ? 'bg-white shadow-xs text-primary font-bold' : 'text-foreground/60 hover:text-foreground'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>By Student ({studentGroups.length})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('flat')}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                  viewMode === 'flat' ? 'bg-white shadow-xs text-primary font-bold' : 'text-foreground/60 hover:text-foreground'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>All Attempts ({filteredAttempts.length})</span>
-              </button>
+                <option value="all">All Test Papers ({availableTests.reduce((sum, t) => sum + t.count, 0)})</option>
+                {availableTests.map((t: any) => (
+                  <option key={t.id} value={t.id}>
+                    {t.test_code ? `[${t.test_code}] ` : ''}{t.title} ({t.count})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -1470,363 +1446,81 @@ export default function AdminPartBEvaluations() {
           </div>
         </div>
 
-        {/* ------------------------------------------------------------- */}
-        {/* VIEW 1: SEGREGATE BY EXAM PAPER (Recommended)                 */}
-        {/* ------------------------------------------------------------- */}
-        {viewMode === 'paper' && (
-          <div className="space-y-4">
-            {paperGroups.map(({ test, attempts: pAttempts }) => {
-              const testKey = test?.id || 'unknown';
-              const isExpanded = expandedPapers[testKey] !== false; // Default expanded
-              const pendingCount = pAttempts.filter((a: any) => a.part_b_evaluation_status === 'pending' || !a.part_b_evaluation_status).length;
-              const completedCount = pAttempts.filter((a: any) => a.part_b_evaluation_status === 'completed').length;
-
-              return (
-                <div key={testKey} className="bg-white rounded-2xl border border-black/5 overflow-hidden shadow-2xs">
-                  {/* Paper Header */}
-                  <div 
-                    onClick={() => setExpandedPapers(prev => ({ ...prev, [testKey]: !isExpanded }))}
-                    className="p-4 sm:px-6 flex items-center justify-between cursor-pointer hover:bg-neutral-50/80 transition-colors border-b border-black/5"
-                  >
-                    <div className="flex items-center gap-3 flex-wrap">
-                      {test?.test_code && (
-                        <span className="bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-lg text-xs font-mono font-bold tracking-wide">
-                          {test.test_code}
-                        </span>
-                      )}
-                      <div>
-                        <h3 className="font-bold text-sm text-[#262626] flex items-center gap-2">
-                          <span>{test?.title || 'Unknown Exam Test'}</span>
-                          {test?.is_focus_batch && (
-                            <span className="bg-orange-100 text-orange-800 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border border-orange-200">
-                              Focus Batch
-                            </span>
-                          )}
-                        </h3>
-                        <p className="text-[11px] text-foreground/50 mt-0.5">
-                          {test?.exam_programs?.name || (test?.program_format === 'masters' ? 'M.Des' : 'B.Des')} • {pAttempts.length} Total Submissions
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold">
-                        {pendingCount > 0 && (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[11px]">
-                            {pendingCount} Pending
-                          </span>
-                        )}
-                        {completedCount > 0 && (
-                          <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200 text-[11px]">
-                            {completedCount} Evaluated
-                          </span>
-                        )}
-                      </div>
-                      <div className="w-7 h-7 rounded-lg bg-black/5 flex items-center justify-center text-foreground/60">
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Attendees List Under This Paper */}
-                  {isExpanded && (
-                    <div className="divide-y divide-black/5 bg-neutral-50/30">
-                      <div className="grid grid-cols-12 gap-4 px-6 py-2.5 bg-black/[0.02] text-[11px] font-bold text-foreground/50 uppercase tracking-wider hidden md:grid">
-                        <div className="col-span-4">Student Attendee</div>
-                        <div className="col-span-2">Submitted Date</div>
-                        <div className="col-span-3">Scores (Part A / B / Total)</div>
-                        <div className="col-span-1">Status</div>
-                        <div className="col-span-2 text-right">Action</div>
-                      </div>
-
-                      {pAttempts.map((attempt: any) => (
-                        <div key={attempt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-3 px-6 items-center hover:bg-white transition-colors text-xs">
-                          <div className="col-span-4 flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center shrink-0">
-                              {attempt.exam_candidates?.name?.charAt(0) || 'S'}
-                            </div>
-                            <div>
-                              <p className="font-bold text-[#262626]">
-                                {attempt.exam_candidates?.name}
-                                {attempt.exam_candidates?.access_level === 'focus_batch' && (
-                                  <span className="ml-1.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-green-100 text-green-800 border border-green-200">
-                                    FB
-                                  </span>
-                                )}
-                              </p>
-                              <p className="text-[10px] text-foreground/50 font-mono">{attempt.exam_candidates?.unique_id}</p>
-                            </div>
-                          </div>
-
-                          <div className="col-span-2 text-foreground/60 font-medium">
-                            {formatSubmissionDate(attempt.completed_at)}
-                          </div>
-
-                          <div className="col-span-3 flex flex-wrap gap-1.5 items-center">
-                            {attempt.total_part_a > 0 && (
-                              <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-bold border border-green-200">
-                                A: {formatScore(attempt.score_part_a)}/{attempt.total_part_a}
-                              </span>
-                            )}
-                            {attempt.score_part_b !== null && (
-                              <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold border border-orange-200">
-                                B: {formatScore(attempt.score_part_b)}
-                              </span>
-                            )}
-                            {attempt.total_score !== null && (
-                              <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-black border border-primary/20">
-                                Total: {formatScore(attempt.total_score)}
-                              </span>
-                            )}
-                            {attempt.total_part_a === 0 && attempt.score_part_b === null && (
-                              <span className="text-[11px] font-medium text-foreground/40 italic">Pending</span>
-                            )}
-                          </div>
-
-                          <div className="col-span-1">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
-                              attempt.part_b_evaluation_status === 'completed' 
-                                ? 'bg-green-100 text-green-800' 
-                                : attempt.part_b_evaluation_status === 'draft' 
-                                ? 'bg-amber-100 text-amber-800' 
-                                : 'bg-orange-100 text-orange-800'
-                            }`}>
-                              {attempt.part_b_evaluation_status || 'Pending'}
-                            </span>
-                          </div>
-
-                          <div className="col-span-2 flex justify-end">
-                            <Button 
-                              onClick={() => loadEvaluation(attempt)} 
-                              size="sm"
-                              className={`h-7 px-3 font-bold text-xs rounded-md ${
-                                attempt.part_b_evaluation_status === 'completed' 
-                                  ? 'border border-black/10 bg-white hover:bg-black/5 text-[#262626]' 
-                                  : 'bg-primary text-white hover:bg-primary/90 shadow-2xs'
-                              }`}
-                            >
-                              {attempt.part_b_evaluation_status === 'completed' ? 'Edit Evaluation' : attempt.part_b_evaluation_status === 'draft' ? 'Resume' : 'Evaluate'}
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+        {/* Evaluations Table */}
+        <div className="bg-white rounded-2xl border border-black/5 overflow-hidden shadow-2xs">
+          <div className="grid grid-cols-12 gap-4 border-b border-black/5 p-4 bg-background/50 text-xs font-semibold text-foreground/50 uppercase tracking-widest hidden md:grid">
+            <div className="col-span-3">Candidate</div>
+            <div className="col-span-3">Test Paper</div>
+            <div className="col-span-2">Submitted Date</div>
+            <div className="col-span-2">Scores</div>
+            <div className="col-span-2 text-right">Action</div>
+          </div>
+          <div className="divide-y divide-black/5">
+            {filteredAttempts.map(attempt => (
+              <div key={attempt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-3.5 px-4 items-center hover:bg-background/30 transition-colors text-sm">
+                <div className="col-span-3 flex flex-col justify-center">
+                  <p className="font-bold text-[#262626] leading-tight flex items-center gap-1.5">
+                    <span>{attempt.exam_candidates?.name}</span>
+                    {attempt.exam_candidates?.access_level === 'focus_batch' && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">
+                        FB
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-foreground/50 mt-0.5 font-mono">{attempt.exam_candidates?.unique_id}</p>
+                </div>
+                <div className="col-span-3 text-foreground/70 font-semibold truncate text-xs flex items-center gap-1.5" title={attempt.exam_tests?.title}>
+                  {attempt.exam_tests?.test_code && (
+                    <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-mono font-bold shrink-0">
+                      {attempt.exam_tests.test_code}
+                    </span>
+                  )}
+                  <span className="truncate">{attempt.exam_tests?.title || 'Unknown Test'}</span>
+                </div>
+                <div className="col-span-2 text-foreground/60 text-xs font-medium">
+                  {formatSubmissionDate(attempt.completed_at)}
+                </div>
+                <div className="col-span-2 flex flex-wrap gap-1.5 items-center">
+                  {attempt.total_part_a > 0 && (
+                    <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-bold border border-green-200">
+                      A: {formatScore(attempt.score_part_a)}/{attempt.total_part_a}
+                    </span>
+                  )}
+                  {attempt.score_part_b !== null && (
+                    <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold border border-orange-200">
+                      B: {formatScore(attempt.score_part_b)}
+                    </span>
+                  )}
+                  {attempt.total_score !== null && (
+                    <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-black border border-primary/20">
+                      Total: {formatScore(attempt.total_score)}
+                    </span>
+                  )}
+                  {attempt.total_part_a === 0 && attempt.score_part_b === null && (
+                    <span className="text-[11px] font-medium text-foreground/40 italic">Pending</span>
                   )}
                 </div>
-              );
-            })}
-
-            {paperGroups.length === 0 && (
-              <div className="bg-white rounded-2xl border border-black/5 p-12 text-center text-foreground/40">
-                <Layers className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="font-semibold text-sm">No test papers found matching your filters.</p>
+                <div className="col-span-2 flex justify-end">
+                  <Button 
+                    onClick={() => loadEvaluation(attempt)} 
+                    variant={activeTab === 'completed' ? "outline" : "default"}
+                    size="sm"
+                    className={`h-7 px-3 font-bold text-xs rounded-md ${activeTab === 'completed' ? '' : 'bg-primary text-white hover:bg-primary/90 shadow-2xs'}`}
+                  >
+                    {activeTab === 'completed' ? 'Edit' : activeTab === 'draft' ? 'Resume' : 'Evaluate'}
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {filteredAttempts.length === 0 && (
+              <div className="p-12 text-center text-foreground/40">
+                <PenTool className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>No evaluations found in this category.</p>
               </div>
             )}
           </div>
-        )}
+        </div>
 
-        {/* ------------------------------------------------------------- */}
-        {/* VIEW 2: SEGREGATE BY STUDENT CANDIDATE                        */}
-        {/* ------------------------------------------------------------- */}
-        {viewMode === 'student' && (
-          <div className="space-y-4">
-            {studentGroups.map(({ candidate, attempts: sAttempts }) => {
-              const candKey = candidate?.id || 'unknown';
-              const isExpanded = expandedStudents[candKey] !== false; // Default expanded
-              const isFB = candidate?.access_level === 'focus_batch';
-
-              return (
-                <div key={candKey} className="bg-white rounded-2xl border border-black/5 overflow-hidden shadow-2xs">
-                  {/* Student Header */}
-                  <div 
-                    onClick={() => setExpandedStudents(prev => ({ ...prev, [candKey]: !isExpanded }))}
-                    className="p-4 sm:px-6 flex items-center justify-between cursor-pointer hover:bg-neutral-50/80 transition-colors border-b border-black/5"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary font-bold text-sm flex items-center justify-center shrink-0">
-                        {candidate?.name?.charAt(0) || 'S'}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-sm text-[#262626] flex items-center gap-2">
-                          <span>{candidate?.name || 'Unknown Candidate'}</span>
-                          {isFB && (
-                            <span className="bg-green-100 text-green-800 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border border-green-200">
-                              Focus Batch
-                            </span>
-                          )}
-                        </h3>
-                        <p className="text-[11px] text-foreground/50 font-mono mt-0.5">
-                          {candidate?.unique_id} • {candidate?.email}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <span className="px-2.5 py-1 rounded-lg bg-black/5 text-foreground/70 text-xs font-semibold">
-                        {sAttempts.length} Paper Attempt{sAttempts.length === 1 ? '' : 's'}
-                      </span>
-                      <div className="w-7 h-7 rounded-lg bg-black/5 flex items-center justify-center text-foreground/60">
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Test Submissions by this student */}
-                  {isExpanded && (
-                    <div className="divide-y divide-black/5 bg-neutral-50/30">
-                      <div className="grid grid-cols-12 gap-4 px-6 py-2.5 bg-black/[0.02] text-[11px] font-bold text-foreground/50 uppercase tracking-wider hidden md:grid">
-                        <div className="col-span-5">Paper Attempted</div>
-                        <div className="col-span-2">Date Submitted</div>
-                        <div className="col-span-3">Scores</div>
-                        <div className="col-span-2 text-right">Action</div>
-                      </div>
-
-                      {sAttempts.map((attempt: any) => (
-                        <div key={attempt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-3 px-6 items-center hover:bg-white transition-colors text-xs">
-                          <div className="col-span-5">
-                            <div className="flex items-center gap-2">
-                              {attempt.exam_tests?.test_code && (
-                                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-mono font-bold shrink-0">
-                                  {attempt.exam_tests.test_code}
-                                </span>
-                              )}
-                              <span className="font-bold text-[#262626] truncate">{attempt.exam_tests?.title || 'Exam'}</span>
-                            </div>
-                            <span className="text-[10px] text-foreground/50 capitalize">
-                              Format: {attempt.exam_tests?.program_format || 'Standard'}
-                            </span>
-                          </div>
-
-                          <div className="col-span-2 text-foreground/60 font-medium">
-                            {formatSubmissionDate(attempt.completed_at)}
-                          </div>
-
-                          <div className="col-span-3 flex flex-wrap gap-1.5 items-center">
-                            {attempt.total_part_a > 0 && (
-                              <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-bold border border-green-200">
-                                A: {formatScore(attempt.score_part_a)}/{attempt.total_part_a}
-                              </span>
-                            )}
-                            {attempt.score_part_b !== null && (
-                              <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold border border-orange-200">
-                                B: {formatScore(attempt.score_part_b)}
-                              </span>
-                            )}
-                            {attempt.total_score !== null && (
-                              <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-black border border-primary/20">
-                                Total: {formatScore(attempt.total_score)}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="col-span-2 flex justify-end">
-                            <Button 
-                              onClick={() => loadEvaluation(attempt)} 
-                              size="sm"
-                              className={`h-7 px-3 font-bold text-xs rounded-md ${
-                                attempt.part_b_evaluation_status === 'completed' 
-                                  ? 'border border-black/10 bg-white hover:bg-black/5 text-[#262626]' 
-                                  : 'bg-primary text-white hover:bg-primary/90 shadow-2xs'
-                              }`}
-                            >
-                              {attempt.part_b_evaluation_status === 'completed' ? 'Edit' : attempt.part_b_evaluation_status === 'draft' ? 'Resume' : 'Evaluate'}
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {studentGroups.length === 0 && (
-              <div className="bg-white rounded-2xl border border-black/5 p-12 text-center text-foreground/40">
-                <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="font-semibold text-sm">No students found matching your filters.</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ------------------------------------------------------------- */}
-        {/* VIEW 3: FLAT TIMELINE FEED (All Attempts)                     */}
-        {/* ------------------------------------------------------------- */}
-        {viewMode === 'flat' && (
-          <div className="bg-white rounded-2xl border border-black/5 overflow-hidden shadow-2xs">
-            <div className="grid grid-cols-12 gap-4 border-b border-black/5 p-4 bg-background/50 text-xs font-semibold text-foreground/50 uppercase tracking-widest hidden md:grid">
-              <div className="col-span-3">Candidate</div>
-              <div className="col-span-3">Test</div>
-              <div className="col-span-2">Date</div>
-              <div className="col-span-2">Scores</div>
-              <div className="col-span-2 text-right">Action</div>
-            </div>
-            <div className="divide-y divide-black/5">
-              {filteredAttempts.map(attempt => (
-                <div key={attempt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-3 px-4 items-center hover:bg-background/30 transition-colors text-sm">
-                  <div className="col-span-3 flex flex-col justify-center">
-                    <p className="font-bold text-[#262626] leading-tight flex items-center gap-1.5">
-                      <span>{attempt.exam_candidates?.name}</span>
-                      {attempt.exam_candidates?.access_level === 'focus_batch' && (
-                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">
-                          FB
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-[11px] text-foreground/50 mt-0.5 font-mono">{attempt.exam_candidates?.unique_id}</p>
-                  </div>
-                  <div className="col-span-3 text-foreground/70 font-semibold truncate text-xs flex items-center gap-1.5" title={attempt.exam_tests?.title}>
-                    {attempt.exam_tests?.test_code && (
-                      <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-mono font-bold shrink-0">
-                        {attempt.exam_tests.test_code}
-                      </span>
-                    )}
-                    <span className="truncate">{attempt.exam_tests?.title}</span>
-                  </div>
-                  <div className="col-span-2 text-foreground/60 text-xs font-medium">
-                    {formatSubmissionDate(attempt.completed_at)}
-                  </div>
-                  <div className="col-span-2 flex flex-wrap gap-1.5 items-center">
-                    {attempt.total_part_a > 0 && (
-                      <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-bold border border-green-200">
-                        A: {formatScore(attempt.score_part_a)}/{attempt.total_part_a}
-                      </span>
-                    )}
-                    {attempt.score_part_b !== null && (
-                      <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold border border-orange-200">
-                        B: {formatScore(attempt.score_part_b)}
-                      </span>
-                    )}
-                    {attempt.total_score !== null && (
-                      <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-black border border-primary/20">
-                        Total: {formatScore(attempt.total_score)}
-                      </span>
-                    )}
-                    {attempt.total_part_a === 0 && attempt.score_part_b === null && (
-                      <span className="text-[11px] font-medium text-foreground/40 italic">Pending</span>
-                    )}
-                  </div>
-                  <div className="col-span-2 flex justify-end">
-                    <Button 
-                      onClick={() => loadEvaluation(attempt)} 
-                      variant={activeTab === 'completed' ? "outline" : "default"}
-                      size="sm"
-                      className={`h-7 px-3 font-bold text-xs rounded-md ${activeTab === 'completed' ? '' : 'bg-primary text-white hover:bg-primary/90 shadow-2xs'}`}
-                    >
-                      {activeTab === 'completed' ? 'Edit' : activeTab === 'draft' ? 'Resume' : 'Evaluate'}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              {filteredAttempts.length === 0 && (
-                <div className="p-12 text-center text-foreground/40">
-                  <PenTool className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p>No attempts found in this category.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* Pagination */}
         {totalPages > 1 && (
@@ -2418,7 +2112,7 @@ export default function AdminPartBEvaluations() {
                 className="text-sm text-[#262626] leading-relaxed max-w-full prose prose-sm prose-p:my-1 prose-img:max-h-[500px] prose-img:w-auto prose-img:rounded-xl prose-img:shadow-sm prose-img:my-2" 
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml((currentQ.content_text || '').replace(/(?:&nbsp;|\u00A0)/g, ' ')) }} 
               />
-              {parseQuestionMediaUrls(currentQ.media_url).length > 0 ? (
+              {parseQuestionMediaUrls(currentQ.media_url).length > 0 && (
                 <div className="pt-3 border-t border-black/5 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -2440,31 +2134,6 @@ export default function AdminPartBEvaluations() {
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <label className="cursor-pointer">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          disabled={uploadingQuestionMedia}
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files.length > 0) {
-                              handleUploadQuestionMedia(e.target.files);
-                            }
-                          }}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          asChild
-                          className="h-7 px-2 text-xs text-primary font-medium hover:bg-primary/5"
-                        >
-                          <span>
-                            {uploadingQuestionMedia ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Plus className="w-3.5 h-3.5 mr-1" />}
-                            Add Page / Image
-                          </span>
-                        </Button>
-                      </label>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -2489,45 +2158,6 @@ export default function AdminPartBEvaluations() {
                         }
                       }}
                     />
-                  </div>
-                </div>
-              ) : (
-                <div className="pt-3 border-t border-black/5">
-                  <div className="flex flex-col sm:flex-row items-center justify-between p-3.5 rounded-xl border border-dashed border-amber-300 bg-amber-50/40 gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
-                        <AlertCircle className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-amber-900">No Question Image Attached</div>
-                        <div className="text-[11px] text-amber-800/80">Upload question reference or diagram while evaluating to guide marking.</div>
-                      </div>
-                    </div>
-                    <label className="cursor-pointer shrink-0">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        disabled={uploadingQuestionMedia}
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files.length > 0) {
-                            handleUploadQuestionMedia(e.target.files);
-                          }
-                        }}
-                      />
-                      <Button
-                        size="sm"
-                        disabled={uploadingQuestionMedia}
-                        asChild
-                        className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold gap-1.5 shadow-xs"
-                      >
-                        <span>
-                          {uploadingQuestionMedia ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
-                          Upload Question Image / Add Page
-                        </span>
-                      </Button>
-                    </label>
                   </div>
                 </div>
               )}

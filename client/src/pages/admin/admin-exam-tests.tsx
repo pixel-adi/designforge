@@ -1314,79 +1314,64 @@ export default function AdminExamTests() {
         </div>
 
         <div className="bg-white rounded-xl border border-black/5 overflow-hidden shadow-sm">
-          <div className="grid grid-cols-12 gap-4 border-b border-black/5 p-4 bg-background/50 text-xs font-semibold text-foreground/50 uppercase tracking-widest hidden md:grid">
-            <div className="col-span-4">Test Title</div>
-            <div className="col-span-2">Category</div>
-            <div className="col-span-3">Program Format</div>
-            <div className="col-span-1">Status</div>
-            <div className="col-span-2 text-right">Actions</div>
+          {/* Header */}
+          <div className="grid grid-cols-[minmax(0,1fr)_80px_100px_72px_120px] gap-2 border-b border-black/5 px-4 py-2.5 bg-neutral-50/80 text-[10px] font-semibold text-foreground/50 uppercase tracking-widest hidden md:grid">
+            <div>Test</div>
+            <div>Type</div>
+            <div>Program</div>
+            <div>Status</div>
+            <div className="text-right">Actions</div>
           </div>
-          <div className="divide-y divide-black/5">
+          <div className="divide-y divide-black/[0.04]">
             {filteredTests.map(test => (
-              <div key={test.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center hover:bg-background/30 transition-colors text-sm">
-                <div className="col-span-4 font-semibold text-[#262626] flex items-center gap-2 flex-wrap">
+              <div key={test.id} className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_80px_100px_72px_120px] gap-2 px-4 py-2 items-center hover:bg-neutral-50/60 transition-colors">
+                {/* Test: code + title + indicators inline */}
+                <div className="flex items-center gap-2 min-w-0">
                   {test.test_code && (
-                    <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-xs font-mono font-bold shrink-0">
+                    <span className="bg-primary/8 text-primary px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 leading-none">
                       {test.test_code}
                     </span>
                   )}
-                  <span className="truncate">{test.title}</span>
+                  <span className="text-sm font-medium text-[#262626] truncate">{test.title}</span>
                   {Boolean(test.is_focus_batch || test.access_tier === 'focus_batch') && (
-                    <span className="bg-orange-100 text-orange-800 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full shrink-0 border border-orange-200">
-                      🎯 Focus Batch (1-Wk)
-                    </span>
+                    <span className="text-orange-600 shrink-0" title="Focus Batch">🎯</span>
                   )}
                   {test.expires_at && (
-                    <span className="bg-amber-50 text-amber-800 text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 border border-amber-200 inline-flex items-center gap-1">
-                      <Calendar className="w-2.5 h-2.5" />
-                      Exp: {new Date(test.expires_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    <span className="text-[10px] text-foreground/40 shrink-0 whitespace-nowrap">
+                      exp {new Date(test.expires_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                     </span>
                   )}
                 </div>
-                <div className="col-span-2">
-                  {test.category === 'half_length' ? (
-                    <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                      <Zap className="w-3 h-3" /> Half Length
-                    </span>
-                  ) : test.category === 'custom_short' ? (
-                    <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                      <Zap className="w-3 h-3" /> Custom Short
-                    </span>
-                  ) : (
-                    <span className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">
-                      Full Length
-                    </span>
-                  )}
+                {/* Type */}
+                <div className="text-xs text-foreground/60">
+                  {test.category === 'half_length' ? 'Half' : test.category === 'custom_short' ? 'Custom' : 'Full'}
                 </div>
-                <div className="col-span-3 text-foreground/60 font-medium bg-black/5 inline-block px-2 py-1 rounded w-fit text-xs">
-                  {test.program_format === 'both' ? 'Both' : test.program_format === 'masters' ? 'Masters (M.Des/CEED)' : test.program_format === 'bachelors' ? 'Bachelors (B.Des/UCEED)' : 'Unknown'}
+                {/* Program */}
+                <div className="text-xs text-foreground/60">
+                  {test.program_format === 'both' ? 'Both' : test.program_format === 'masters' ? 'M.Des/CEED' : 'B.Des/UCEED'}
                 </div>
-                <div className="col-span-1">
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${test.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                    {test.status.toUpperCase()}
+                {/* Status */}
+                <div>
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${test.status === 'published' ? 'text-green-600' : 'text-orange-600'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${test.status === 'published' ? 'bg-green-500' : 'bg-orange-500'}`} />
+                    {test.status === 'published' ? 'Live' : 'Draft'}
                   </span>
                 </div>
-                <div className="col-span-2 flex justify-end gap-1.5 flex-wrap">
+                {/* Actions */}
+                <div className="flex justify-end gap-1">
                   {test.status === 'published' && (
-                    <Button variant="outline" size="sm" onClick={() => downloadAnswerKey(test.id, testTitle || test.title)} className="h-8 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200" title="Download Answer Key">
-                      <FileDown className="w-4 h-4" />
+                    <Button variant="ghost" size="sm" onClick={() => downloadAnswerKey(test.id, testTitle || test.title)} className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50" title="Download Answer Key">
+                      <FileDown className="w-3.5 h-3.5" />
                     </Button>
                   )}
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => openExtendModal(test)} 
-                    className="h-8 text-amber-700 hover:text-amber-800 hover:bg-amber-50 border-amber-200 gap-1 text-xs px-2 font-medium" 
-                    title="Extend Test Expiry (+1 Week / Custom)"
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => openExtendModal(test)} className="h-7 w-7 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50" title="Extend Expiry">
                     <CalendarPlus className="w-3.5 h-3.5" />
-                    <span className="hidden xl:inline">+1 Wk</span>
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleEditTest(test.id)} className="h-8 text-primary hover:text-primary hover:bg-primary/5 border-primary/20">
-                    <Settings className="w-4 h-4" />
+                  <Button variant="ghost" size="sm" onClick={() => handleEditTest(test.id)} className="h-7 w-7 p-0 text-foreground/50 hover:text-primary hover:bg-primary/5" title="Settings">
+                    <Settings className="w-3.5 h-3.5" />
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => deleteTest(test.id)} className="h-8 text-red-500 hover:text-red-600 hover:bg-red-50 border-red-100">
-                    <Trash2 className="w-4 h-4" />
+                  <Button variant="ghost" size="sm" onClick={() => deleteTest(test.id)} className="h-7 w-7 p-0 text-foreground/30 hover:text-red-500 hover:bg-red-50" title="Delete">
+                    <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
               </div>
