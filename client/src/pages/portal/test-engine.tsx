@@ -327,8 +327,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       // Auto-submit or transition to 10-minute Post-Exam Solution Upload Buffer when time has fully elapsed
       if (remaining <= 0) {
         if (!hasAutoSubmittedRef.current) {
-          // If test has Part B (subjective sketching questions), activate dedicated 10-min upload buffer
-          if (engineData?.hasPartB && !hasStartedUploadBufferRef.current) {
+          // Buffer window ONLY activates if the student was actively taking the exam and duration just expired
+          if (engineData?.hasPartB && !hasStartedUploadBufferRef.current && testStep === 'test') {
             hasStartedUploadBufferRef.current = true;
             const bufferEnd = Date.now() + 600 * 1000;
             uploadBufferEndTimeRef.current = bufferEnd;
@@ -340,7 +340,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             setTestStep('upload_buffer');
             toast({
               title: "Exam Finished ⏱️ Upload Buffer Active",
-              description: "You have 10 minutes to upload your question sketches. Objective questions are now locked.",
+              description: engineData.isNid
+                ? "You have 10 minutes to photograph and upload your design sketches and solutions."
+                : "You have 10 minutes to upload your question sketches. Objective questions are now locked.",
               duration: 9000
             });
             return;
@@ -564,13 +566,19 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       const totalMins = sectionsData?.reduce((acc: number, sec: any) => acc + (sec.duration_minutes || 0), 0) || testData?.duration_minutes || 180;
 
       const titleUpper = (testData?.title || '').toUpperCase();
+      const codeUpper = (testData?.test_code || '').toUpperCase();
       const progNameUpper = (testData?.exam_programs?.name || '').toUpperCase();
-      const isNid = titleUpper.includes('NID') || progNameUpper.includes('NID');
+      const isNid = titleUpper.includes('NID') || codeUpper.includes('NID') || progNameUpper.includes('NID');
 
-      const hasPartA = questionsData.some(q => q.part === 'A');
-      const hasPartB = questionsData.some(q => q.part === 'B');
+      // For NID exams (B.Des and M.Des), there is strictly NO Part A. Candidates exclusively have Part B (Subjective Design & Drawing).
+      // Normalize all questions for NID so they are Part B.
+      const normalizedQuestions = isNid 
+        ? questionsData.map(q => ({ ...q, part: 'B' }))
+        : questionsData;
 
-      // For NID exams, there is NO Part A. Candidates have the entire duration for all questions.
+      const hasPartA = !isNid && normalizedQuestions.some(q => q.part === 'A');
+      const hasPartB = isNid || normalizedQuestions.some(q => q.part === 'B');
+
       // A timed Part A lockout is strictly for non-NID exams (like CEED/UCEED) that explicitly configure a separate Part A duration.
       let partAMins = 0;
       if (!isNid && hasPartA) {
@@ -583,7 +591,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       setEngineData({
         test: testData,
         sections: sectionsData || [],
-        questions: questionsData,
+        questions: normalizedQuestions,
         options: optionsMap,
         totalMins,
         partAMins,
@@ -702,18 +710,25 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                 setTimerRunning(false);
                 toast({
                   title: "Buffer Window Active ⏱️",
-                  description: "You are in the 10-minute solution upload window. Objective answers are locked.",
+                  description: isNid
+                    ? "You are in the 10-minute solution upload window."
+                    : "You are in the 10-minute solution upload window. Objective answers are locked.",
                   duration: 6000
                 });
-              } else if (remainingSecs <= 0 && hasPartB && !storedBufferEnd) {
-                const bufferEnd = Date.now() + 600 * 1000;
-                uploadBufferEndTimeRef.current = bufferEnd;
-                if (typeof window !== 'undefined') localStorage.setItem(bufferEndKey, String(bufferEnd));
-                hasStartedUploadBufferRef.current = true;
-                setUploadBufferTimeLeft(600);
-                setTestStep('upload_buffer');
-                setIsPaused(false);
-                setTimerRunning(false);
+              } else if (remainingSecs <= 0) {
+                // The attempt has already expired in the past and no active buffer window exists.
+                // Close this expired attempt so the candidate is NOT dropped into an artificial buffer window.
+                await supabase.from('exam_attempts').update({
+                  status: 'completed',
+                  completed_at: new Date().toISOString()
+                }).eq('id', activeAttempt.id);
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem(bufferEndKey);
+                  localStorage.removeItem(`df_frozen_seconds_${activeAttempt.id}`);
+                }
+                hasRestoredActiveAttempt = false;
+                setAttemptId(null);
+                setTestStep('instructions');
               } else {
                 testEndTimeRef.current = Date.now() + (remainingSecs * 1000);
                 sessionStorage.setItem(`df_test_end_${id}`, String(testEndTimeRef.current));
@@ -848,8 +863,8 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           setPausedAt(Date.now());
         }
 
-        if (remaining <= 0 && !isCurrentlyPaused) {
-          // Check if test has Part B and upload buffer window is still valid
+        if (remaining <= 0) {
+          // Check if test has Part B and upload buffer window is currently actively running
           const bufferEndKey = `df_upload_buffer_end_${inProgress.id}`;
           const storedBufferEnd = Number(localStorage.getItem(bufferEndKey));
           const hasPartB = engineData?.hasPartB ?? true;
@@ -859,19 +874,21 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             hasStartedUploadBufferRef.current = true;
             setUploadBufferTimeLeft(Math.max(0, Math.round((storedBufferEnd - Date.now()) / 1000)));
             setTestStep('upload_buffer');
-          } else if (hasPartB && !storedBufferEnd) {
-            // Main exam just expired, initiate the 10-minute solution upload buffer
-            const bufferEnd = Date.now() + 600 * 1000;
-            uploadBufferEndTimeRef.current = bufferEnd;
-            localStorage.setItem(bufferEndKey, String(bufferEnd));
-            hasStartedUploadBufferRef.current = true;
-            setUploadBufferTimeLeft(600);
-            setTestStep('upload_buffer');
+            return inProgress.id;
           } else {
-            handleAutoSubmit("Your attempt duration has expired. Test submitted.");
+            // Main exam duration expired and there is no active buffer.
+            // Mark the expired attempt completed so the student can create a fresh new attempt with full duration.
+            await supabase.from('exam_attempts').update({
+              status: 'completed',
+              completed_at: new Date().toISOString()
+            }).eq('id', inProgress.id);
+            localStorage.removeItem(bufferEndKey);
+            localStorage.removeItem(`df_frozen_seconds_${inProgress.id}`);
+            // Fall through to create fresh attempt below
           }
+        } else {
+          return inProgress.id;
         }
-        return inProgress.id;
       }
 
       // Check if max attempts reached
@@ -1053,10 +1070,11 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         });
 
         const titleUpper = (engineData!.test.title || '').toUpperCase();
+        const codeUpper = (engineData!.test.test_code || '').toUpperCase();
         const programNameUpper = (engineData!.test.exam_programs?.name || '').toUpperCase();
         const programFormatUpper = (engineData!.test.program_format || '').toUpperCase();
 
-        const isNid = engineData!.isNid || titleUpper.includes('NID') || programNameUpper.includes('NID');
+        const isNid = engineData!.isNid || titleUpper.includes('NID') || codeUpper.includes('NID') || programNameUpper.includes('NID');
 
         // Check UCEED first (excluding NID)
         const isUceed = !isNid && (
@@ -2073,8 +2091,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             {/* Structure & Marking Scheme Card */}
             {(() => {
               const titleUp = (engineData.test.title || '').toUpperCase();
+              const codeUp = (engineData.test.test_code || '').toUpperCase();
               const progUp = (engineData.test.exam_programs?.name || '').toUpperCase();
-              const isNid = engineData.isNid || titleUp.includes('NID') || progUp.includes('NID');
+              const isNid = engineData.isNid || titleUp.includes('NID') || codeUp.includes('NID') || progUp.includes('NID');
               const isUceed = !isNid && (titleUp.includes('UCEED') || progUp.includes('UCEED') || titleUp.includes('B.DES') || titleUp.includes('BDES'));
               const isCeed = !isNid && !isUceed && (titleUp.includes('CEED') || progUp.includes('CEED') || titleUp.includes('M.DES') || titleUp.includes('MDES'));
               
@@ -2240,7 +2259,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                 <span className="text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
                   Buffer Window
                 </span>
-                <span className="text-xs text-foreground/50">• Part A Locked</span>
+                <span className="text-xs text-foreground/50">
+                  {engineData?.isNid ? '• Solution Upload Window' : '• Part A Locked'}
+                </span>
               </div>
               <h1 className="text-lg font-bold text-[#262626]">Upload Sketches & Solutions</h1>
             </div>
@@ -2272,7 +2293,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 flex items-start gap-3.5">
             <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="text-xs sm:text-sm text-amber-900 leading-relaxed">
-              <strong>Main exam duration has concluded.</strong> All objective answers (Part A) are saved and locked. Use this 10-minute window to take photos or upload your design sketches and written concepts question-wise below. Photos are automatically compressed for high-speed transmission.
+              <strong>Main exam duration has concluded.</strong> {engineData?.isNid 
+                ? "Use this 10-minute window to take photos or upload your design sketches and written concepts question-wise below. Photos are automatically compressed for high-speed transmission."
+                : "All objective answers (Part A) are saved and locked. Use this 10-minute window to take photos or upload your design sketches and written concepts question-wise below. Photos are automatically compressed for high-speed transmission."}
             </div>
           </div>
         </div>
@@ -2300,7 +2323,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                   <div className="flex items-start justify-between gap-4 border-b border-black/5 pb-3">
                     <div>
                       <span className="text-[11px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-0.5 rounded-md">
-                        Part B • Question {qIndex + 1}
+                        {engineData?.isNid ? `Task ${qIndex + 1}` : `Part B • Question ${qIndex + 1}`}
                       </span>
                       <h3 className="text-sm sm:text-base font-bold text-[#262626] mt-2">
                         {q.title || `Subjective Task ${qIndex + 1}`}
