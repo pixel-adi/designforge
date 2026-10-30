@@ -175,6 +175,20 @@ export default function PortalDashboard() {
   const [topicFilter, setTopicFilter] = useState<'all' | 'strong' | 'weak'>('all');
   const [showUniversalUpdatesModal, setShowUniversalUpdatesModal] = useState(false);
 
+  // Safe duration calculator adhering to exam rules: Full = 180m (3h), Half = 90m (1.5h), Custom = Creator specified
+  const getTestDisplayDuration = (test: any): string => {
+    const cat = (test?.category || '').toLowerCase();
+    const titleUp = (test?.title || '').toUpperCase();
+    const isCustom = cat === 'custom_short' || cat === 'custom_practice' || Boolean(test?.is_custom_practice) || titleUp.includes('CUSTOM');
+    if (isCustom) {
+      const secSum = test?.exam_test_sections?.reduce((acc: number, curr: any) => acc + (curr.duration_minutes || 0), 0);
+      return secSum > 0 ? `${secSum} Mins` : '60 Mins';
+    }
+    const isHalf = cat === 'half_length' || titleUp.includes('HALF');
+    if (isHalf) return '1.5 Hours (90 Mins)';
+    return '3 Hours (180 Mins)';
+  };
+
   // Auto-prompt weekly updates modal once per new release session
   useEffect(() => {
     try {
@@ -2434,7 +2448,7 @@ export default function PortalDashboard() {
                                           <div className="flex items-center gap-4 text-xs font-medium text-neutral-300 mb-4">
                                             <div className="flex items-center gap-1.5">
                                               <Clock className="w-3.5 h-3.5 text-primary" />
-                                              {test.exam_test_sections?.reduce((acc: number, curr: any) => acc + curr.duration_minutes, 0) || 180} Mins
+                                              {getTestDisplayDuration(test)}
                                             </div>
                                             <div className="flex items-center gap-1.5">
                                               <LayoutDashboard className="w-3.5 h-3.5 text-primary" />
@@ -2718,7 +2732,7 @@ export default function PortalDashboard() {
                           <div className="flex items-center gap-4 text-xs font-medium text-foreground/50 mb-4">
                             <div className="flex items-center gap-1.5">
                               <Clock className="w-3.5 h-3.5" />
-                              {test.exam_test_sections?.reduce((acc: number, curr: any) => acc + curr.duration_minutes, 0)} Mins
+                              {getTestDisplayDuration(test)}
                             </div>
                             <div className="flex items-center gap-1.5">
                               <LayoutDashboard className="w-3.5 h-3.5" />

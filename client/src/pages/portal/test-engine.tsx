@@ -563,11 +563,27 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         });
       }
 
-      const totalMins = sectionsData?.reduce((acc: number, sec: any) => acc + (sec.duration_minutes || 0), 0) || testData?.duration_minutes || 180;
-
       const titleUpper = (testData?.title || '').toUpperCase();
       const codeUpper = (testData?.test_code || '').toUpperCase();
       const progNameUpper = (testData?.exam_programs?.name || '').toUpperCase();
+      const category = (testData?.category || '').toLowerCase();
+
+      // Rule: Full tests have 3 hours (180 min), Half tests have 1.5 hours (90 min),
+      // and Custom tests have whatever is defined while creation of the tests.
+      const isCustomTest = category === 'custom_short' || category === 'custom_practice' || Boolean(testData?.is_custom_practice) || titleUpper.includes('CUSTOM');
+      const isHalfTest = !isCustomTest && (category === 'half_length' || titleUpper.includes('HALF') || codeUpper.includes('-H'));
+      const isFullTest = !isCustomTest && !isHalfTest;
+
+      let totalMins = 180; // default 3 hours
+      if (isCustomTest) {
+        const secSum = sectionsData?.reduce((acc: number, sec: any) => acc + (sec.duration_minutes || 0), 0);
+        totalMins = (secSum && secSum > 0) ? secSum : (testData?.duration_minutes || 60);
+      } else if (isHalfTest) {
+        totalMins = 90; // strictly 1.5 hours
+      } else {
+        totalMins = 180; // strictly 3 hours
+      }
+
       const isNid = titleUpper.includes('NID') || codeUpper.includes('NID') || progNameUpper.includes('NID');
 
       // For NID exams (B.Des and M.Des), there is strictly NO Part A. Candidates exclusively have Part B (Subjective Design & Drawing).
@@ -582,7 +598,18 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       // A timed Part A lockout is strictly for non-NID exams (like CEED/UCEED) that explicitly configure a separate Part A duration.
       let partAMins = 0;
       if (!isNid && hasPartA) {
-        partAMins = sectionsData?.find((s: any) => s.part === 'A')?.duration_minutes || 0;
+        const foundPartA = sectionsData?.find((s: any) => s.part === 'A')?.duration_minutes;
+        if (foundPartA && foundPartA > 0 && foundPartA < totalMins) {
+          partAMins = foundPartA;
+        } else {
+          // Standard official defaults if sections were not populated or mismatched
+          if (titleUpper.includes('UCEED') || progNameUpper.includes('UCEED') || codeUpper.includes('UCEED')) {
+            partAMins = isHalfTest ? 60 : 120;
+          } else {
+            // CEED default
+            partAMins = isHalfTest ? 30 : 60;
+          }
+        }
       }
 
       const hasTimedPartALock = !isNid && hasPartA && hasPartB && partAMins > 0 && partAMins < totalMins;
@@ -2072,7 +2099,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             <h2 className="text-2xl font-bold mb-6">Please read carefully before starting</h2>
 
             <div className="prose max-w-none text-foreground/80 space-y-4 mb-10">
-              <p>1. Total duration of this examination is <strong>{formatTime(timeLeft)}</strong> hours.</p>
+              <p>1. Total duration of this examination is <strong>{engineData.totalMins === 180 ? '3 hours (180 Minutes)' : engineData.totalMins === 90 ? '1.5 hours (90 Minutes)' : `${engineData.totalMins} Minutes`}</strong>.</p>
               <p>2. The clock will be set at the server. The countdown timer at the top right of screen will display the remaining time available for you to complete the examination.</p>
               <p>3. {engineData.hasTimedPartALock 
                 ? "Do not switch tabs, minimize the browser, or open any other applications during Part A. Repeated tab switches (3) will automatically submit your exam. In Part B, tab switching is enabled for uploading your sketch files."

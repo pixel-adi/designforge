@@ -866,11 +866,16 @@ export default function AdminExamTests() {
         const tempSec = template.sections.find((ts: any) => ts.part === sec.part);
         return {
           ...sec,
+          duration: sec.duration || sec.duration_minutes || (tempSec?.duration ?? (testData.category === 'half_length' ? 90 : 180)),
           requirements: tempSec ? tempSec.requirements : {}
         };
       });
       
-      setTestSections(mergedSections);
+      const finalSections = mergedSections.length > 0 
+        ? mergedSections 
+        : JSON.parse(JSON.stringify(template.sections));
+      
+      setTestSections(finalSections);
       setSelectedQuestions(questionsData);
       setCurrentStep('BUILDER');
     } catch(err: any) {
@@ -983,7 +988,9 @@ export default function AdminExamTests() {
 
       for (const sec of testSections) {
         await supabase.from('exam_test_sections').insert({
-          test_id: testRecordId, part: sec.part, duration_minutes: sec.duration
+          test_id: testRecordId, 
+          part: sec.part, 
+          duration_minutes: sec.duration || sec.duration_minutes || (testCategory === 'half_length' ? (sec.part === 'A' ? 30 : 60) : (sec.part === 'A' ? 60 : 120))
         });
       }
 
@@ -1344,7 +1351,7 @@ export default function AdminExamTests() {
                 </div>
                 {/* Type */}
                 <div className="text-xs text-foreground/60">
-                  {test.category === 'half_length' ? 'Half' : test.category === 'custom_short' ? 'Custom' : 'Full'}
+                  {test.category === 'half_length' ? 'Half (1.5h)' : test.category === 'custom_short' ? 'Custom' : 'Full (3h)'}
                 </div>
                 {/* Program */}
                 <div className="text-xs text-foreground/60">
@@ -1708,7 +1715,21 @@ export default function AdminExamTests() {
             <select 
               className="w-full h-10 mt-1 border border-black/10 rounded-md px-3 bg-white text-sm font-medium"
               value={testCategory}
-              onChange={e => setTestCategory(e.target.value)}
+              onChange={e => {
+                const newCat = e.target.value;
+                setTestCategory(newCat);
+                if (newCat === 'full_length') {
+                  setTestSections(prev => prev.map(s => ({
+                    ...s,
+                    duration: s.part === 'B' ? (selectedTemplate?.id?.includes('UCEED') ? 60 : selectedTemplate?.id?.includes('CEED') ? 120 : 180) : (selectedTemplate?.id?.includes('UCEED') ? 120 : 60)
+                  })));
+                } else if (newCat === 'half_length') {
+                  setTestSections(prev => prev.map(s => ({
+                    ...s,
+                    duration: s.part === 'B' ? (selectedTemplate?.id?.includes('UCEED') ? 30 : selectedTemplate?.id?.includes('CEED') ? 60 : 90) : (selectedTemplate?.id?.includes('UCEED') ? 60 : 30)
+                  })));
+                }
+              }}
             >
               <option value="full_length">Full Length Mock (180 Min)</option>
               <option value="half_length">⚡ Half Length (90 Min)</option>
