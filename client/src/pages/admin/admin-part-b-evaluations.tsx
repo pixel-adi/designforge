@@ -90,6 +90,13 @@ const parseQuestionMediaUrls = (rawUrl: string | null | undefined): string[] => 
   return [resolveQuestionMediaUrl(trimmed)].filter(Boolean);
 };
 
+const formatSubmissionDate = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime()) || d.getFullYear() <= 1970) return '—';
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 export default function AdminPartBEvaluations() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -109,6 +116,8 @@ export default function AdminPartBEvaluations() {
           exam_candidates(name, unique_id, email, access_level),
           exam_tests(id, title, test_code, is_focus_batch, program_format, exam_programs(name))
         `, { count: 'exact' })
+        .not('completed_at', 'is', null)
+        .in('status', ['completed', 'submitted'])
         .or('part_b_answered.gt.0,part_b_evaluation_status.not.is.null')
         .order('completed_at', { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
@@ -370,9 +379,10 @@ export default function AdminPartBEvaluations() {
 
   // Filter attempts by search query (Candidate name, DF ID, email, test title, test code)
   const filteredAttempts = useMemo(() => {
-    if (!searchQuery.trim()) return attempts;
+    const validAttempts = attempts.filter((a: any) => Boolean(a.completed_at) && a.status !== 'in_progress');
+    if (!searchQuery.trim()) return validAttempts;
     const q = searchQuery.toLowerCase().trim();
-    return attempts.filter((a: any) => {
+    return validAttempts.filter((a: any) => {
       const name = (a.exam_candidates?.name || '').toLowerCase();
       const email = (a.exam_candidates?.email || '').toLowerCase();
       const uid = (a.exam_candidates?.unique_id || '').toLowerCase();
@@ -1549,7 +1559,7 @@ export default function AdminPartBEvaluations() {
                           </div>
 
                           <div className="col-span-2 text-foreground/60 font-medium">
-                            {new Date(attempt.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {formatSubmissionDate(attempt.completed_at)}
                           </div>
 
                           <div className="col-span-3 flex flex-wrap gap-1.5 items-center">
@@ -1688,7 +1698,7 @@ export default function AdminPartBEvaluations() {
                           </div>
 
                           <div className="col-span-2 text-foreground/60 font-medium">
-                            {new Date(attempt.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {formatSubmissionDate(attempt.completed_at)}
                           </div>
 
                           <div className="col-span-3 flex flex-wrap gap-1.5 items-center">
@@ -1774,7 +1784,7 @@ export default function AdminPartBEvaluations() {
                     <span className="truncate">{attempt.exam_tests?.title}</span>
                   </div>
                   <div className="col-span-2 text-foreground/60 text-xs font-medium">
-                    {new Date(attempt.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {formatSubmissionDate(attempt.completed_at)}
                   </div>
                   <div className="col-span-2 flex flex-wrap gap-1.5 items-center">
                     {attempt.total_part_a > 0 && (
