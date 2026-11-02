@@ -84,8 +84,8 @@ EVALUATION DIRECTIVES:
 2. PRECISE, GROUNDED, DIVERSE FEEDBACK:
    - Plain, direct, observant English. Zero filler or cliché compliments.
    - Reference at least 1 concrete visual element from the actual sketch (line hierarchy, hand grip, perspective angle, proportions).
-3. STRICT WORD LIMIT (CRITICAL):
-   - 'mentor_comments' MUST BE STRICTLY 15 TO 25 WORDS MAXIMUM. Never exceed 25 words.
+3. WORD GUIDELINE: 25–30 WORDS (CRITICAL):
+   - 'mentor_comments' MUST BE STRICTLY 25 TO 30 WORDS (Guideline: 25–30 words).
    - 'mentor_improvements': One actionable studio exercise (10 to 20 words).
 
 4. SCORING CRITERIA (0.0 to ${maxPerCriteria} each, evaluate independently without giving uniform scores):
@@ -178,11 +178,11 @@ EVALUATION DIRECTIVES:
             const re = Math.min(maxPerCriteria, Math.max(0, Number(evalResult.representation) || 0));
             const qScore = Math.max(0, Math.round((ct + id + st + co + re) * 100) / 100);
 
-            // Clean comment strictly limited to <= 25 words
+            // Clean comment strictly limited to Guideline: 25-30 words
             let comment = (evalResult.mentor_comments || "").trim();
             const words = comment.split(/\s+/).filter(Boolean);
-            if (words.length > 25) {
-              comment = words.slice(0, 25).join(" ").replace(/[,;:\-\s]+$/, "") + ".";
+            if (words.length > 30) {
+              comment = words.slice(0, 30).join(" ").replace(/[,;:\-\s]+$/, "") + ".";
             }
 
             await supabase.from("exam_responses").update({

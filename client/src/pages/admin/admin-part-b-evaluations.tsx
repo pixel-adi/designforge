@@ -1345,7 +1345,7 @@ export default function AdminPartBEvaluations() {
     setAiEvaluatingSingle(true);
     try {
       const providerLabel = activeAiProvider === 'openai' ? `OpenAI (${configOpenaiModel})` : 'Google Gemini';
-      toast({ title: `AI Evaluating with ${providerLabel}...`, description: "Analyzing sketch and formulating 20-25 word review." });
+      toast({ title: `AI Evaluating with ${providerLabel}...`, description: "Analyzing sketch and formulating 25-30 word review." });
 
       const fileUrls = parseFileUrls(currentResp.file_url);
       const activeFileUrl = fileUrls.length > 0 ? normalizeSubmissionUrl(fileUrls[0]).url : null;
@@ -2921,7 +2921,7 @@ export default function AdminPartBEvaluations() {
                   </div>
                </div>
                <p className="text-[11px] text-purple-900/70 leading-snug">
-                 Evaluates sketch against 5 design rubrics and crafts a 20–25 word critique.
+                 Evaluates sketch against 5 design rubrics and crafts a 25–30 word critique.
                </p>
                <Button
                  type="button"
@@ -3017,7 +3017,7 @@ export default function AdminPartBEvaluations() {
                  </label>
                  {(() => {
                    const wc = countWords(evalForm.mentor_comments);
-                   const isOptimal = wc >= 25 && wc <= 65;
+                   const isOptimal = wc >= 25 && wc <= 30;
                    return (
                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors ${
                        isOptimal 
@@ -3026,7 +3026,7 @@ export default function AdminPartBEvaluations() {
                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
                          : 'text-foreground/40'
                      }`}>
-                       {wc} words {isOptimal ? '✓ Studio Critique' : '(Guideline: 30–55 words)'}
+                       {wc} words {isOptimal ? '✓ Optimal (25–30)' : '(Guideline: 25–30 words)'}
                      </span>
                    );
                  })()}
@@ -3296,7 +3296,7 @@ export default function AdminPartBEvaluations() {
               Evaluating Part B with {activeAiProvider === 'openai' ? `OpenAI (${configOpenaiModel})` : 'Google Gemini'}
             </DialogTitle>
             <DialogDescription>
-              Evaluating candidate responses against the 5 design rubrics and drafting 20–25 word reviews...
+              Evaluating candidate responses against the 5 design rubrics and drafting 25–30 word reviews...
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">

@@ -216,7 +216,7 @@ export function countWords(text: string): number {
  * Ensures mentor comments have a clean, natural length without artificial fillers.
  * Replaces hardcoded repetitive phrases with genuine mentor observations.
  */
-export function adjustToWordLimit(text: string, minWords = 10, maxWords = 25): { text: string; wordCount: number } {
+export function adjustToWordLimit(text: string, minWords = 25, maxWords = 30): { text: string; wordCount: number } {
   if (!text) return { text: "", wordCount: 0 };
   const words = text.trim().split(/\s+/).filter(Boolean);
   const count = words.length;
@@ -225,7 +225,7 @@ export function adjustToWordLimit(text: string, minWords = 10, maxWords = 25): {
     return { text: words.join(" "), wordCount: count };
   }
 
-  // Truncate cleanly to <= 25 words
+  // Truncate cleanly to <= 30 words
   const truncated = words.slice(0, maxWords).join(" ");
   const cleanText = truncated.replace(/[,;:\-\s]+$/, "") + ".";
   return { text: cleanText, wordCount: countWords(cleanText) };
@@ -249,9 +249,9 @@ CORE EVALUATION DIRECTIVES:
    - Speak in simple, observant, conversational human English. Never be generic.
    - Absolutely NEVER use generic AI filler words ("delve", "testament", "tapestry", "blend of", "good effort", "nice attempt", "commendable", "it is imperative").
    - Explicitly cite 1 specific detail from their drawing (e.g. angle of perspective, hand grip, proportion, line weight hierarchy, explanatory note).
-3. STRICT WORD LIMIT (CRITICAL):
-   - 'mentor_comments' MUST BE STRICTLY NOT MORE THAN 25 WORDS (15 to 25 words maximum).
-   - Any comment over 25 words is strictly prohibited. Make every single word count.
+3. WORD GUIDELINE: 25–30 WORDS (CRITICAL):
+   - 'mentor_comments' MUST STRICTLY FOLLOW THE GUIDELINE: 25 TO 30 WORDS (25–30 words).
+   - Write insightful, precise feedback between 25 and 30 words. Do not write under 25 words or exceed 30 words.
    - 'mentor_improvements': One actionable studio exercise or technique tip (10 to 20 words).
 
 4. AUTHENTIC RUBRIC SCORING (Total: ${maxMarks}, Max ${maxPerCriteria} per criteria):
@@ -360,8 +360,8 @@ export async function evaluatePartBWithGemini(params: {
       storytelling: { type: "NUMBER", description: `Score between 0 and ${maxPerCriteria}` },
       conceptualisation: { type: "NUMBER", description: `Score between 0 and ${maxPerCriteria}` },
       representation: { type: "NUMBER", description: `Score between 0 and ${maxPerCriteria}` },
-      mentor_comments: { type: "STRING", description: "Direct, observant human mentor feedback referencing specific details in student submission (approx 30-55 words)" },
-      mentor_improvements: { type: "STRING", description: "Single practical studio exercise or sketch technique (15-25 words)" }
+      mentor_comments: { type: "STRING", description: "Direct, observant human mentor feedback referencing specific details in student submission (strictly 25-30 words)" },
+      mentor_improvements: { type: "STRING", description: "Single practical studio exercise or sketch technique (10-20 words)" }
     },
     required: [
       "critical_thinking",
@@ -433,8 +433,8 @@ export async function evaluatePartBWithGemini(params: {
 
   const totalSum = Math.max(0, Math.round((critical_thinking + ideation + storytelling + conceptualisation + representation) * 100) / 100);
 
-  // Ensure clean mentor comments length without artificial repetitive fillers
-  const { text: validatedComments, wordCount } = adjustToWordLimit(parsed.mentor_comments || "", 20, 75);
+  // Ensure clean mentor comments length adhering to the 25–30 words guideline
+  const { text: validatedComments, wordCount } = adjustToWordLimit(parsed.mentor_comments || "", 25, 30);
 
   return {
     rubric_marks: {
@@ -492,7 +492,7 @@ Return a strictly valid JSON object with EXACTLY these keys:
   "storytelling": number (0 to ${maxPerCriteria}),
   "conceptualisation": number (0 to ${maxPerCriteria}),
   "representation": number (0 to ${maxPerCriteria}),
-  "mentor_comments": string (observant, direct human mentor feedback directly addressing question ask, STRICTLY 15-25 words maximum, never exceed 25 words),
+  "mentor_comments": string (observant, direct human mentor feedback directly addressing question ask, STRICTLY 25-30 words, Guideline: 25–30 words),
   "mentor_improvements": string (one practical studio exercise or sketch technique, 10-20 words)
 }`;
 
@@ -601,7 +601,7 @@ Return a strictly valid JSON object with EXACTLY these keys:
 
   const totalSum = Math.max(0, Math.round((critical_thinking + ideation + storytelling + conceptualisation + representation) * 100) / 100);
 
-  const { text: validatedComments, wordCount } = adjustToWordLimit(parsed.mentor_comments || "", 20, 75);
+  const { text: validatedComments, wordCount } = adjustToWordLimit(parsed.mentor_comments || "", 25, 30);
 
   return {
     rubric_marks: {
