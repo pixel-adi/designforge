@@ -584,16 +584,25 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         totalMins = 180; // strictly 3 hours
       }
 
-      const isNid = titleUpper.includes('NID') || codeUpper.includes('NID') || progNameUpper.includes('NID');
+      // An official NID mock is a full or half length NID test (not a custom practice test)
+      const isNidMock = !isCustomTest && (titleUpper.includes('NID') || progNameUpper.includes('NID') || (codeUpper.includes('NID') && !titleUpper.includes('CEED') && !titleUpper.includes('CUSTOM')));
 
-      // For NID exams (B.Des and M.Des), there is strictly NO Part A. Candidates exclusively have Part B (Subjective Design & Drawing).
-      // Normalize all questions for NID so they are Part B.
-      const normalizedQuestions = isNid 
-        ? questionsData.map(q => ({ ...q, part: 'B' }))
-        : questionsData;
+      // In any test, questions of type MCQ, MSQ, NAT are strictly Part A (objective).
+      // Only SUBJECTIVE design & sketching tasks are Part B.
+      // For official NID full/half mocks, all questions are design tasks (Part B).
+      const normalizedQuestions = questionsData.map(q => {
+        if (q.type === 'MCQ' || q.type === 'MSQ' || q.type === 'NAT') {
+          return { ...q, part: 'A' };
+        }
+        if (q.type === 'SUBJECTIVE') {
+          return { ...q, part: 'B' };
+        }
+        return isNidMock ? { ...q, part: 'B' } : q;
+      });
 
-      const hasPartA = !isNid && normalizedQuestions.some(q => q.part === 'A');
-      const hasPartB = isNid || normalizedQuestions.some(q => q.part === 'B');
+      const hasPartA = normalizedQuestions.some(q => q.part === 'A');
+      const hasPartB = normalizedQuestions.some(q => q.part === 'B');
+      const isNid = isNidMock && !hasPartA;
 
       // A timed Part A lockout is strictly for non-NID exams (like CEED/UCEED) that explicitly configure a separate Part A duration.
       let partAMins = 0;
@@ -1074,7 +1083,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     try {
       // Fetch correct answers for all Part A questions in this test
       const partAQuestionIds = (engineData.questions || [])
-        .filter(q => q.part === 'A')
+        .filter(q => q.part === 'A' || q.type === 'MCQ' || q.type === 'MSQ' || q.type === 'NAT')
         .map(q => q.id);
 
       let scorePartA = 0;
@@ -1101,25 +1110,20 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         const programNameUpper = (engineData!.test.exam_programs?.name || '').toUpperCase();
         const programFormatUpper = (engineData!.test.program_format || '').toUpperCase();
 
-        const isNid = engineData!.isNid || titleUpper.includes('NID') || codeUpper.includes('NID') || programNameUpper.includes('NID');
+        const isNid = Boolean(engineData!.isNid);
 
-        // Check UCEED first (excluding NID)
-        const isUceed = !isNid && (
-          titleUpper.includes('UCEED') || 
-          programNameUpper.includes('UCEED') || 
-          titleUpper.includes('B.DES') || 
-          titleUpper.includes('BDES') || 
-          programFormatUpper === 'BACHELORS'
-        );
-
-        // CEED check (only if not UCEED and not NID)
-        const isCeed = !isNid && !isUceed && (
+        // Check CEED first
+        const isCeed = !isNid && (
           titleUpper.includes('CEED') || 
+          codeUpper.includes('CEED') ||
           programNameUpper.includes('CEED') || 
           titleUpper.includes('M.DES') || 
           titleUpper.includes('MDES') || 
           programFormatUpper === 'MASTERS'
         );
+
+        // UCEED is default for bachelors / general objective mocks
+        const isUceed = !isNid && !isCeed;
 
         let natCorrect = 4, natWrong = 0;
         let msCorrect = 4, msWrong = -1;
@@ -1299,7 +1303,46 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     toast({ title: "Test Auto-Submitted", description: reason, variant: "destructive", duration: 8000 });
   };
 
-  const confirmSubmit = async () => {
+  const confirmSubmit = async (force: boolean = false) => {
+    // If not forced (manual student submit), enforce that all subjective questions have at least 1 image/answer OR are marked noSolutionAttached
+    if (!force) {
+      const subjectiveQs = (engineData?.questions || []).filter(
+        q => q.type === 'SUBJECTIVE' || (q.part === 'B' && q.type !== 'MCQ' && q.type !== 'MSQ' && q.type !== 'NAT')
+      );
+
+      if (subjectiveQs.length > 0) {
+        const missingNumbers: number[] = [];
+        subjectiveQs.forEach((q, idx) => {
+          const resp = responses[q.id];
+          const hasFiles = parseFileUrls(resp?.fileUrl).length > 0;
+          const hasText = Boolean(resp?.answerText?.trim());
+          const isSkipped = Boolean(resp?.noSolutionAttached);
+
+          if (!hasFiles && !hasText && !isSkipped) {
+            missingNumbers.push(idx + 1);
+          }
+        });
+
+        if (missingNumbers.length > 0) {
+          setShowSubmitModal(false);
+          toast({
+            title: "Solution Upload Required",
+            description: `Please attach sketches or select "I don't want to attach a solution" for: Task ${missingNumbers.join(', ')}.`,
+            variant: "destructive",
+            duration: 9000
+          });
+          if (testStep === 'upload_buffer') {
+            const firstMissing = subjectiveQs[missingNumbers[0] - 1];
+            if (firstMissing) {
+              const el = document.getElementById(`upload-card-${firstMissing.id}`);
+              el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+          return;
+        }
+      }
+    }
+
     setLoading(true);
     testEndTimeRef.current = null;
     sessionStorage.removeItem(`df_test_end_${id}`);
@@ -2271,7 +2314,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   // 10-MINUTE POST-EXAM SOLUTION UPLOAD BUFFER SCREEN
   // -------------------------------------------------------------
   if (testStep === 'upload_buffer') {
-    const partBQuestions = (engineData?.questions || []).filter(q => q.part === 'B');
+    const partBQuestions = (engineData?.questions || []).filter(
+      q => q.type === 'SUBJECTIVE' || (q.part === 'B' && q.type !== 'MCQ' && q.type !== 'MSQ' && q.type !== 'NAT')
+    );
 
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex flex-col">
@@ -2346,7 +2391,15 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               const fileList = parseFileUrls(currentResp?.fileUrl);
 
               return (
-                <div key={q.id} className="bg-white rounded-2xl border border-black/10 p-6 shadow-xs space-y-4">
+                <div 
+                  key={q.id} 
+                  id={`upload-card-${q.id}`}
+                  className={`bg-white rounded-2xl border p-6 shadow-xs space-y-4 transition-all ${
+                    !fileList.length && !currentResp?.answerText?.trim() && !currentResp?.noSolutionAttached
+                      ? 'border-amber-300 ring-1 ring-amber-100'
+                      : 'border-black/10'
+                  }`}
+                >
                   <div className="flex items-start justify-between gap-4 border-b border-black/5 pb-3">
                     <div>
                       <span className="text-[11px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-0.5 rounded-md">
@@ -2357,7 +2410,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                       </h3>
                     </div>
                     <span className="text-xs font-black text-foreground/50 shrink-0">
-                      {q.marks || 15} Marks
+                      {q.marks ? `${q.marks} Marks` : '15 Marks'}
                     </span>
                   </div>
 
@@ -2369,9 +2422,16 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
                   {/* Upload Controls */}
                   <div className="pt-2">
-                    <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2">
-                      Attach Sketches / Solution Sheets ({fileList.length} attached)
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-bold text-foreground/70 uppercase tracking-wider">
+                        Attach Sketches / Solution Sheets ({fileList.length} attached)
+                      </label>
+                      {currentResp?.noSolutionAttached && (
+                        <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                          Skipped / No solution
+                        </span>
+                      )}
+                    </div>
 
                     {/* Previews Grid */}
                     {fileList.length > 0 && (
@@ -2404,7 +2464,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                           multiple
                           className="hidden"
                           disabled={isUploadingFile}
-                          onChange={(e) => handleFileUpload(e, q.id)}
+                          onChange={(e) => {
+                            if (currentResp?.noSolutionAttached) {
+                              updateResponse(q.id, { noSolutionAttached: false });
+                            }
+                            handleFileUpload(e, q.id);
+                          }}
                         />
                         <Button
                           type="button"
@@ -2427,6 +2492,9 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                         size="sm"
                         disabled={isUploadingFile}
                         onClick={() => {
+                          if (currentResp?.noSolutionAttached) {
+                            updateResponse(q.id, { noSolutionAttached: false });
+                          }
                           setActiveQuestionIndex(engineData!.questions.findIndex(item => item.id === q.id));
                           startCamera();
                         }}
@@ -2434,6 +2502,25 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                       >
                         <Camera className="w-3.5 h-3.5 text-primary" />
                         <span>Take Photo</span>
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant={currentResp?.noSolutionAttached ? "secondary" : "outline"}
+                        size="sm"
+                        disabled={isUploadingFile}
+                        onClick={() => {
+                          const newVal = !currentResp?.noSolutionAttached;
+                          updateResponse(q.id, { noSolutionAttached: newVal });
+                        }}
+                        className={`h-9 text-xs font-semibold gap-1.5 transition-all ${
+                          currentResp?.noSolutionAttached 
+                            ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200' 
+                            : 'border-black/15 text-foreground/70 hover:bg-black/5'
+                        }`}
+                      >
+                        <CheckCircle2 className={`w-3.5 h-3.5 ${currentResp?.noSolutionAttached ? 'text-amber-800' : 'text-foreground/40'}`} />
+                        <span>{currentResp?.noSolutionAttached ? "No Solution to Attach (Marked)" : "I don't want to attach a solution"}</span>
                       </Button>
 
                       {isUploadingFile && uploadProgressText && (
@@ -2906,7 +2993,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                         ) : (
                           <>
                             {/* Action Buttons Suite */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
                               {/* 1. Browse Files / Gallery */}
                               <label className="cursor-pointer">
                                 <input
@@ -2914,11 +3001,16 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                                   accept="image/*,.pdf"
                                   multiple
                                   className="hidden"
-                                  onChange={(e) => handleFileUpload(e, currentQ.id)}
+                                  onChange={(e) => {
+                                    if (currentResponse?.noSolutionAttached) {
+                                      updateResponse(currentQ.id, { noSolutionAttached: false });
+                                    }
+                                    handleFileUpload(e, currentQ.id);
+                                  }}
                                 />
                                 <div className="h-11 px-4 rounded-xl border border-primary/20 bg-white hover:bg-primary/5 hover:border-primary/40 text-primary font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all">
                                   <UploadCloud className="w-4 h-4" />
-                                  <span>📁 Browse Files / Gallery</span>
+                                  <span>📁 Browse Files</span>
                                 </div>
                               </label>
 
@@ -2926,24 +3018,65 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                               <Button
                                 type="button"
                                 variant="outline"
-                                onClick={startCamera}
+                                onClick={() => {
+                                  if (currentResponse?.noSolutionAttached) {
+                                    updateResponse(currentQ.id, { noSolutionAttached: false });
+                                  }
+                                  startCamera();
+                                }}
                                 className="h-11 rounded-xl border-primary/20 bg-white hover:bg-primary/5 hover:border-primary/40 text-primary font-bold text-xs gap-2 shadow-xs"
                               >
                                 <Camera className="w-4 h-4" />
-                                <span>📸 Snap with Camera</span>
+                                <span>📸 Camera</span>
                               </Button>
 
                               {/* 3. Paste from Clipboard */}
                               <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => handleClipboardButton(currentQ.id)}
+                                onClick={() => {
+                                  if (currentResponse?.noSolutionAttached) {
+                                    updateResponse(currentQ.id, { noSolutionAttached: false });
+                                  }
+                                  handleClipboardButton(currentQ.id);
+                                }}
                                 className="h-11 rounded-xl border-primary/20 bg-white hover:bg-primary/5 hover:border-primary/40 text-primary font-bold text-xs gap-2 shadow-xs"
                               >
                                 <Clipboard className="w-4 h-4" />
-                                <span>📋 Paste (Ctrl+V)</span>
+                                <span>📋 Paste</span>
+                              </Button>
+
+                              {/* 4. Skip Solution Option */}
+                              <Button
+                                type="button"
+                                variant={currentResponse?.noSolutionAttached ? "secondary" : "outline"}
+                                onClick={() => {
+                                  const newVal = !currentResponse?.noSolutionAttached;
+                                  updateResponse(currentQ.id, { noSolutionAttached: newVal });
+                                }}
+                                className={`h-11 rounded-xl font-bold text-xs gap-1.5 shadow-xs transition-all ${
+                                  currentResponse?.noSolutionAttached 
+                                    ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200' 
+                                    : 'border-black/15 text-foreground/70 hover:bg-black/5'
+                                }`}
+                              >
+                                <CheckCircle2 className={`w-3.5 h-3.5 ${currentResponse?.noSolutionAttached ? 'text-amber-800' : 'text-neutral-400'}`} />
+                                <span>{currentResponse?.noSolutionAttached ? "No Solution (Marked)" : "Skip Solution"}</span>
                               </Button>
                             </div>
+
+                            {currentResponse?.noSolutionAttached && (
+                              <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 flex items-center justify-between">
+                                <span>You marked this question: no solution sheet will be attached.</span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateResponse(currentQ.id, { noSolutionAttached: false })}
+                                  className="text-xs font-bold text-amber-800 underline hover:text-amber-950"
+                                >
+                                  Attach solution instead
+                                </button>
+                              </div>
+                            )}
 
                             {/* Dropzone Box */}
                             <div

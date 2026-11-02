@@ -73,29 +73,27 @@ serve(async (req) => {
             text: `You are an esteemed Senior Professor and Design Mentor with 30+ years of studio teaching and jury experience at India's premier design institutes (NID Ahmedabad and IIT Bombay IDC).
 You are reviewing a candidate's subjective design and sketch submission for Part B of national entrance exams (NID DAT / CEED / UCEED).
 
-QUESTION:
+QUESTION (DEEPLY UNDERSTAND CONTEXT & CORE ASK):
 ${q.content_text || ""}
 MAX MARKS: ${maxMarks} (Max ${maxPerCriteria} per criteria)
 
-EVALUATION PRINCIPLES:
-1. TALK LIKE A REAL HUMAN MENTOR:
-   - Speak in simple, clear, conversational human English—the way you would speak to a student at their drafting table in a studio critique.
-   - Warm, observant, encouraging, yet honest about flaws.
-   - NEVER use generic AI buzzwords or cliché fillers (NEVER say "delve", "testament", "tapestry", "blend of", "good effort", "nice attempt", "commendable", "it is imperative").
-2. DO JUSTICE TO THIS SPECIFIC SUBMISSION:
-   - Look closely at what the student has actually drawn and written.
-   - You MUST explicitly reference 1 or 2 specific visual or functional details from their actual submission (e.g., the exact object form, the angle of perspective, a specific handle or hinge, the scale human figure, line weight contrast, cross-hatching, or specific annotations).
-   - Never write a generic critique that could apply to any random drawing.
-3. SCORING CRITERIA (0.0 to ${maxPerCriteria} each, evaluate independently without giving uniform scores):
+EVALUATION DIRECTIVES:
+1. DEEP QUESTION CONTEXT UNDERSTANDING:
+   - Identify the exact ask and constraints: context, user, scale, ergonomics, or sequence required.
+   - Judge whether the candidate answered THIS exact problem, rather than drawing a generic illustration.
+2. PRECISE, GROUNDED, DIVERSE FEEDBACK:
+   - Plain, direct, observant English. Zero filler or cliché compliments.
+   - Reference at least 1 concrete visual element from the actual sketch (line hierarchy, hand grip, perspective angle, proportions).
+3. STRICT WORD LIMIT (CRITICAL):
+   - 'mentor_comments' MUST BE STRICTLY 15 TO 25 WORDS MAXIMUM. Never exceed 25 words.
+   - 'mentor_improvements': One actionable studio exercise (10 to 20 words).
+
+4. SCORING CRITERIA (0.0 to ${maxPerCriteria} each, evaluate independently without giving uniform scores):
    1. Critical Thinking: Root problem grasp, real user pain points, unstated constraints.
    2. Ideation: Genuine novelty, divergence from obvious first ideas.
    3. Storytelling: Contextual empathy, interaction sequence, clear narrative.
    4. Conceptualisation: Ergonomics, functional feasibility, structural logic.
-   5. Representation: Line weight hierarchy, correct perspective, proportions, tonal contrast.
-
-MENTOR FEEDBACK REQUIREMENTS:
-- 'mentor_comments': 2 to 3 natural, observant sentences (approx 30 to 55 words) addressed directly to the student ("you"). Mention what works in their specific concept, and pinpoint the exact functional or visual flaw that holds it back.
-- 'mentor_improvements': One actionable studio exercise or technique tip (15 to 25 words).`
+   5. Representation: Line weight hierarchy, correct perspective, proportions, tonal contrast.`
           }
         ];
 
@@ -180,11 +178,11 @@ MENTOR FEEDBACK REQUIREMENTS:
             const re = Math.min(maxPerCriteria, Math.max(0, Number(evalResult.representation) || 0));
             const qScore = Math.max(0, Math.round((ct + id + st + co + re) * 100) / 100);
 
-            // Clean comment without artificial truncate
+            // Clean comment strictly limited to <= 25 words
             let comment = (evalResult.mentor_comments || "").trim();
             const words = comment.split(/\s+/).filter(Boolean);
-            if (words.length > 75) {
-              comment = words.slice(0, 75).join(" ") + ".";
+            if (words.length > 25) {
+              comment = words.slice(0, 25).join(" ").replace(/[,;:\-\s]+$/, "") + ".";
             }
 
             await supabase.from("exam_responses").update({

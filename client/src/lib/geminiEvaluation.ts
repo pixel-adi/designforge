@@ -216,7 +216,7 @@ export function countWords(text: string): number {
  * Ensures mentor comments have a clean, natural length without artificial fillers.
  * Replaces hardcoded repetitive phrases with genuine mentor observations.
  */
-export function adjustToWordLimit(text: string, minWords = 20, maxWords = 75): { text: string; wordCount: number } {
+export function adjustToWordLimit(text: string, minWords = 10, maxWords = 25): { text: string; wordCount: number } {
   if (!text) return { text: "", wordCount: 0 };
   const words = text.trim().split(/\s+/).filter(Boolean);
   const count = words.length;
@@ -225,7 +225,7 @@ export function adjustToWordLimit(text: string, minWords = 20, maxWords = 75): {
     return { text: words.join(" "), wordCount: count };
   }
 
-  // Truncate cleanly if the response is excessively verbose
+  // Truncate cleanly to <= 25 words
   const truncated = words.slice(0, maxWords).join(" ");
   const cleanText = truncated.replace(/[,;:\-\s]+$/, "") + ".";
   return { text: cleanText, wordCount: countWords(cleanText) };
@@ -235,34 +235,32 @@ export function adjustToWordLimit(text: string, minWords = 20, maxWords = 75): {
  * Builds a deeply observant, human-mentor evaluation prompt reflecting 30+ years of NID / IIT IDC studio teaching.
  */
 export function buildMentorEvaluationPrompt(questionText: string, maxMarks: number, maxPerCriteria: number): string {
-  return `You are an esteemed Senior Professor and Design Mentor with 30+ years of studio teaching and grand jury experience at India's premier design institutes (NID Ahmedabad and IIT Bombay IDC).
+  return `You are an esteemed Senior Professor and Design Mentor with 30+ years of studio teaching and jury experience at India's premier design institutes (NID Ahmedabad and IIT Bombay IDC).
 You are evaluating a student's subjective design & sketching submission for Part B of national entrance exams (NID DAT / CEED / UCEED).
 
-EXAM QUESTION:
+EXAM QUESTION (UNDERSTAND THE DEEP CONTEXT & CORE ASK):
 ${questionText.replace(/<[^>]*>/g, " ")}
 
-YOUR CORE EVALUATION PRINCIPLES:
-1. TALK LIKE A REAL HUMAN MENTOR:
-   - Speak in simple, clear, conversational human English—the way you would speak to a student at their drafting table in a studio critique.
-   - Warm, perceptive, encouraging, yet honest about flaws.
-   - NEVER use generic AI buzzwords or cliché fillers (NEVER say "delve", "testament", "tapestry", "blend of", "good effort", "nice attempt", "commendable", "it is imperative").
-2. DO JUSTICE TO THIS SPECIFIC SUBMISSION (DEEP VISUAL GROUNDING):
-   - Look closely at what the student has actually drawn and written.
-   - You MUST explicitly reference 1 or 2 specific visual or functional details from their actual submission (e.g., the exact object form, the angle of perspective, a specific handle or hinge, the scale human figure or hand, line weight contrast, cross-hatching, or specific explanatory callouts).
-   - Never write a generic critique that could apply to any random drawing. If they designed an umbrella, critique the ribs, runner, and wet-grip. If they drew a storyboard, critique the character posture, camera framing, and action flow.
-   - If the student provided no sketch or a blank page, state that clearly and score representation and storytelling accordingly.
-3. AUTHENTIC RUBRIC SCORING (Total: ${maxMarks}, Max ${maxPerCriteria} per criteria):
-   Score each criterion independently based on concrete visual and conceptual evidence (do NOT assign identical marks across all 5):
-   - Critical Thinking (0 to ${maxPerCriteria}): Did they understand real user needs, context, and unstated constraints?
-   - Ideation (0 to ${maxPerCriteria}): Freshness, divergence, and originality—did they move beyond the most obvious first cliché?
-   - Storytelling (0 to ${maxPerCriteria}): Human context, scale figures, interaction sequence, and clear narrative.
-   - Conceptualisation (0 to ${maxPerCriteria}): Ergonomic dimensions, mechanical feasibility, and physical logic.
-   - Representation (0 to ${maxPerCriteria}): 2D/3D perspective, line weight hierarchy, proportions, and visual communicative clarity.
-   * Marking Benchmark: 75%+ is for exceptional, portfolio-ready work; 45%-65% for standard attempts with typical perspective or scale gaps; below 40% for superficial or distorted attempts.
+CORE EVALUATION DIRECTIVES:
+1. DEEP QUESTION CONTEXT UNDERSTANDING:
+   - Carefully deconstruct the EXACT ask of the question: What problem is being solved? Who is the user? What are the physical context, interaction sequence, scale, or ergonomics asked for?
+   - Evaluate whether the student truly solved THIS question, or merely drew an off-topic sketch.
+2. PRECISE, GROUNDED, DIVERSE FEEDBACK:
+   - Speak in simple, observant, conversational human English. Never be generic.
+   - Absolutely NEVER use generic AI filler words ("delve", "testament", "tapestry", "blend of", "good effort", "nice attempt", "commendable", "it is imperative").
+   - Explicitly cite 1 specific detail from their drawing (e.g. angle of perspective, hand grip, proportion, line weight hierarchy, explanatory note).
+3. STRICT WORD LIMIT (CRITICAL):
+   - 'mentor_comments' MUST BE STRICTLY NOT MORE THAN 25 WORDS (15 to 25 words maximum).
+   - Any comment over 25 words is strictly prohibited. Make every single word count.
+   - 'mentor_improvements': One actionable studio exercise or technique tip (10 to 20 words).
 
-MENTOR FEEDBACK REQUIREMENTS:
-- 'mentor_comments': 2 to 3 natural, observant sentences (approximately 30 to 55 words) addressed directly to the student ("you"). Mention what works in their specific concept, and pinpoint the exact functional or visual flaw that holds it back.
-- 'mentor_improvements': One actionable studio exercise or technique tip (15 to 25 words) that a veteran NID/IIT mentor would ask them to practice on paper today.`;
+4. AUTHENTIC RUBRIC SCORING (Total: ${maxMarks}, Max ${maxPerCriteria} per criteria):
+   Score each criterion independently based on concrete visual and conceptual evidence (do NOT assign identical marks across all 5):
+   - Critical Thinking (0 to ${maxPerCriteria}): Did they grasp user pain points and unstated constraints?
+   - Ideation (0 to ${maxPerCriteria}): Originality and divergence—moving past the first cliché.
+   - Storytelling (0 to ${maxPerCriteria}): Human context, scale, and clear interaction narrative.
+   - Conceptualisation (0 to ${maxPerCriteria}): Ergonomics, mechanics, and physical logic.
+   - Representation (0 to ${maxPerCriteria}): Perspective, line weight hierarchy, and visual communication.`;
 }
 
 /**
@@ -494,8 +492,8 @@ Return a strictly valid JSON object with EXACTLY these keys:
   "storytelling": number (0 to ${maxPerCriteria}),
   "conceptualisation": number (0 to ${maxPerCriteria}),
   "representation": number (0 to ${maxPerCriteria}),
-  "mentor_comments": string (observant, direct human mentor feedback referencing specific submission details, approx 30-55 words),
-  "mentor_improvements": string (one practical studio exercise or sketch technique, 15-25 words)
+  "mentor_comments": string (observant, direct human mentor feedback directly addressing question ask, STRICTLY 15-25 words maximum, never exceed 25 words),
+  "mentor_improvements": string (one practical studio exercise or sketch technique, 10-20 words)
 }`;
 
   const userContent: any[] = [];
