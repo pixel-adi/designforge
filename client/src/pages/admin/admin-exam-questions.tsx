@@ -1372,15 +1372,52 @@ export default function AdminExamQuestions() {
           const existingId = existingMap.get(norm);
           const isDuplicate = !!existingId;
 
+          const rawPartStr = (row['Part'] || 'A').toString().trim().toUpperCase();
+          const rawTypeStr = (row['Type'] || '').toString().trim().toUpperCase();
+
+          let resolvedPart: 'A' | 'B' = rawPartStr === 'B' ? 'B' : 'A';
+          let resolvedType: 'MCQ' | 'MSQ' | 'NAT' | 'SUBJECTIVE' = 'MCQ';
+
+          // Strictly resolve subjective questions vs objective
+          const isSubjective = 
+            rawTypeStr === 'SUBJECTIVE' || 
+            rawTypeStr === 'DESCRIPTIVE' || 
+            rawTypeStr === 'SKETCH' || 
+            rawTypeStr === 'DRAWING' ||
+            resolvedPart === 'B' ||
+            opts.length === 0;
+
+          if (isSubjective) {
+            if (rawTypeStr === 'NAT' && (row['Answer'] || row['Option 1'])) {
+              resolvedType = 'NAT';
+              resolvedPart = 'A';
+            } else {
+              resolvedType = 'SUBJECTIVE';
+              resolvedPart = 'B';
+            }
+          } else {
+            const correctCount = opts.filter((o: any) => o.is_correct).length;
+            if (rawTypeStr === 'MSQ' || correctCount > 1) {
+              resolvedType = 'MSQ';
+              resolvedPart = 'A';
+            } else if (rawTypeStr === 'NAT') {
+              resolvedType = 'NAT';
+              resolvedPart = 'A';
+            } else {
+              resolvedType = 'MCQ';
+              resolvedPart = 'A';
+            }
+          }
+
           return {
             _tempId: `bulk-${index}`,
-            part: row['Part'] || 'A',
-            type: row['Type'] || 'MCQ',
+            part: resolvedPart,
+            type: resolvedType,
             difficulty: finalDiff,
             content_text: content,
             topics: row['Topics (comma separated)'] ? row['Topics (comma separated)'].split(',').map((t:string) => t.trim()) : [],
             pyq_tag: row['PYQ Tag'] || '',
-            options: opts,
+            options: resolvedType === 'SUBJECTIVE' ? [] : opts,
             media_filename: "",
             media_exists: true,
             is_duplicate: isDuplicate,
@@ -1505,20 +1542,55 @@ export default function AdminExamQuestions() {
           const existingId = existingMap.get(norm);
           const isDuplicate = !!existingId;
 
-          const partVal = getValueIgnoreCase(row, ['Part']) || 'A';
-          const typeVal = getValueIgnoreCase(row, ['Type']) || 'MCQ';
+          const rawPartStr = (getValueIgnoreCase(row, ['Part', 'Section']) || 'A').toString().trim().toUpperCase();
+          const rawTypeStr = (getValueIgnoreCase(row, ['Type', 'Question Type', 'QuestionType']) || '').toString().trim().toUpperCase();
+
+          let resolvedPart: 'A' | 'B' = rawPartStr === 'B' ? 'B' : 'A';
+          let resolvedType: 'MCQ' | 'MSQ' | 'NAT' | 'SUBJECTIVE' = 'MCQ';
+
+          // Strictly resolve subjective questions vs objective
+          const isSubjective = 
+            rawTypeStr === 'SUBJECTIVE' || 
+            rawTypeStr === 'DESCRIPTIVE' || 
+            rawTypeStr === 'SKETCH' || 
+            rawTypeStr === 'DRAWING' ||
+            resolvedPart === 'B' ||
+            opts.length === 0;
+
+          if (isSubjective) {
+            if (rawTypeStr === 'NAT' && getValueIgnoreCase(row, ['Answer', 'Correct Answer', 'NAT Answer'])) {
+              resolvedType = 'NAT';
+              resolvedPart = 'A';
+            } else {
+              resolvedType = 'SUBJECTIVE';
+              resolvedPart = 'B';
+            }
+          } else {
+            const correctCount = opts.filter((o: any) => o.is_correct).length;
+            if (rawTypeStr === 'MSQ' || correctCount > 1) {
+              resolvedType = 'MSQ';
+              resolvedPart = 'A';
+            } else if (rawTypeStr === 'NAT') {
+              resolvedType = 'NAT';
+              resolvedPart = 'A';
+            } else {
+              resolvedType = 'MCQ';
+              resolvedPart = 'A';
+            }
+          }
+
           const topicsVal = getValueIgnoreCase(row, ['Topics (comma separated)', 'Topics', 'Topic']);
           const pyqVal = getValueIgnoreCase(row, ['PYQ Tag', 'PYQTag', 'Tag']) || '';
 
           return {
             _tempId: `bulk-${index}`,
-            part: partVal,
-            type: typeVal,
+            part: resolvedPart,
+            type: resolvedType,
             difficulty: finalDiff,
             content_text: content,
             topics: topicsVal ? topicsVal.split(',').map((t:string) => t.trim()) : [],
             pyq_tag: pyqVal,
-            options: opts,
+            options: resolvedType === 'SUBJECTIVE' ? [] : opts,
             media_filename: qImage.name,
             media_exists: qImage.exists,
             is_duplicate: isDuplicate,

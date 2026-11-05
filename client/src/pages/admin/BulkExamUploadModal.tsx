@@ -164,31 +164,54 @@ export default function BulkExamUploadModal({
   // -------------------------------------------------------------
   const parseRows = (rows: any[], imageFilesMap: Map<string, File> = new Map()) => {
     const parsed = rows.map((row: any, index: number) => {
-      const part = (row["Part"] || "A").trim().toUpperCase() === "B" ? "B" : "A";
-      const rawType = (row["Type"] || (part === "B" ? "SUBJECTIVE" : "MCQ")).trim().toUpperCase();
-      let type = "MCQ";
-      if (rawType === "NAT" || rawType === "MSQ" || rawType === "SUBJECTIVE") {
-        type = rawType;
-      }
+      const rawPart = (row["Part"] || "A").toString().trim().toUpperCase();
+      const rawType = (row["Type"] || "").toString().trim().toUpperCase();
 
       const opts: any[] = [];
-      if (type !== "NAT" && type !== "SUBJECTIVE") {
-        for (let i = 1; i <= 4; i++) {
-          const optText = row[`Option ${i}`];
-          if (optText !== undefined && optText !== null && String(optText).trim() !== "") {
-            opts.push({
-              content_text: String(optText).trim(),
-              is_correct: String(row[`Is Correct ${i}`] || "").trim().toUpperCase() === "TRUE"
-            });
-          }
-        }
-      } else if (type === "NAT") {
-        const natAns = row["Option 1"] || row["Answer"] || "";
-        if (natAns) {
+      for (let i = 1; i <= 4; i++) {
+        const optText = row[`Option ${i}`];
+        if (optText !== undefined && optText !== null && String(optText).trim() !== "") {
           opts.push({
-            content_text: String(natAns).trim(),
-            is_correct: true
+            content_text: String(optText).trim(),
+            is_correct: String(row[`Is Correct ${i}`] || "").trim().toUpperCase() === "TRUE"
           });
+        }
+      }
+
+      let part: "A" | "B" = rawPart === "B" ? "B" : "A";
+      let type: "MCQ" | "MSQ" | "NAT" | "SUBJECTIVE" = "MCQ";
+
+      const isSubjective = 
+        rawType === "SUBJECTIVE" || 
+        rawType === "DESCRIPTIVE" || 
+        rawType === "SKETCH" || 
+        rawType === "DRAWING" || 
+        part === "B" || 
+        opts.length === 0;
+
+      if (isSubjective) {
+        const natAns = row["Option 1"] || row["Answer"] || "";
+        if (rawType === "NAT" && natAns) {
+          type = "NAT";
+          part = "A";
+          opts.length = 0;
+          opts.push({ content_text: String(natAns).trim(), is_correct: true });
+        } else {
+          type = "SUBJECTIVE";
+          part = "B";
+          opts.length = 0; // Subjective design questions do not have objective options
+        }
+      } else {
+        const correctCount = opts.filter((o: any) => o.is_correct).length;
+        if (rawType === "MSQ" || correctCount > 1) {
+          type = "MSQ";
+          part = "A";
+        } else if (rawType === "NAT") {
+          type = "NAT";
+          part = "A";
+        } else {
+          type = "MCQ";
+          part = "A";
         }
       }
 
