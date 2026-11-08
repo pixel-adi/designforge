@@ -371,7 +371,7 @@ export default function AdminPartBEvaluations() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('exam_tests')
-        .select('id, title, program_format, is_focus_batch, access_tier, status, category, exam_programs(name)')
+        .select('id, title, test_code, program_format, is_focus_batch, access_tier, status, category, exam_programs(name)')
         .eq('status', 'published')
         .order('created_at', { ascending: false });
       if (error) {

@@ -60,6 +60,7 @@ interface ResponseData {
   timeSpent?: number;
   answerChanges?: number;
   stateTransitions?: Array<{ action: string; timestamp: string }>;
+  noSolutionAttached?: boolean;
 }
 
 export default function PortalTestEngine({ params }: { params?: { id: string } }) {
@@ -3429,7 +3430,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                 {resumesUsed < 2 ? `Pause & Resume Later (${2 - resumesUsed} left)` : 'Exit to Dashboard'}
               </Button>
             )}
-            <Button onClick={confirmSubmit} className="w-full font-bold bg-primary text-white hover:bg-primary/90">
+            <Button onClick={() => confirmSubmit()} className="w-full font-bold bg-primary text-white hover:bg-primary/90">
               {modalType === 'submit' ? 'Yes, Submit' : 'Submit & Exit'}
             </Button>
           </DialogFooter>

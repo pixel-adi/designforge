@@ -113,8 +113,18 @@ export default function PortalDashboard() {
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search);
-      if (p.get('tab') === 'tracker' || window.location.pathname.includes('prep-tracker')) {
+      const tabParam = p.get('tab');
+      if (tabParam === 'tracker' || window.location.pathname.includes('prep-tracker')) {
         return 'tracker';
+      }
+      if (tabParam === 'progress' || tabParam === 'analytics') {
+        return 'progress';
+      }
+      if (tabParam === 'leaderboard') {
+        return 'leaderboard';
+      }
+      if (tabParam && ['questions', 'materials', 'assignments', 'notes', 'features', 'profile'].includes(tabParam)) {
+        return tabParam;
       }
     }
     return 'overview';
@@ -702,7 +712,7 @@ export default function PortalDashboard() {
     try {
       const { data, error } = await supabase
         .from('exam_attempts')
-        .select(`*, exam_tests(title)`)
+        .select(`*, exam_tests(title, program_format)`)
         .eq('candidate_id', candidateId)
         .eq('status', 'completed')
         .order('completed_at', { ascending: false });
@@ -725,10 +735,12 @@ export default function PortalDashboard() {
   };
 
   useEffect(() => {
-    if (activeTab === 'progress' && candidate?.id && pastAttempts.length === 0) {
-      fetchAttempts(candidate.id);
+    if (activeTab === 'progress' && candidate?.id) {
+      if (pastAttempts.length === 0) {
+        fetchAttempts(candidate.id);
+      }
     }
-  }, [activeTab, candidate?.id, pastAttempts.length]);
+  }, [activeTab, candidate?.id]);
 
   useEffect(() => {
     if (selectedAttemptId && selectedAttemptId !== 'overall' && !attemptDetailsMap[selectedAttemptId] && activeTab === 'progress') {
@@ -1314,9 +1326,9 @@ export default function PortalDashboard() {
         const changes = r.answer_changes || 0;
         if (changes > 1) {
           if (r.isCorrect) {
-            marksGained += r.earnedMarks;
+            marksGained += Number(r.earnedMarks || 0);
           } else {
-            marksLost += Math.abs(r.earnedMarks);
+            marksLost += Math.abs(Number(r.earnedMarks || 0));
           }
         }
       }
@@ -1574,10 +1586,23 @@ export default function PortalDashboard() {
 
         // Filter by program format gracefully in JS
         const formatFiltered = data.filter((attempt: any) => {
+          if (leaderboardFilterTestId !== 'all') return true;
           if (!normEd) return true;
           const format = (attempt.exam_tests?.program_format || '').toLowerCase().trim();
-          if (!format || format === 'both' || format === 'all' || format === 'general') return true;
-          return format === normEd;
+          const testTitle = (attempt.exam_tests?.title || '').toLowerCase();
+          const isBdes = testTitle.includes('b.des') || testTitle.includes('bdes') || testTitle.includes('uceed') || testTitle.includes('nid b') || format === 'bachelors';
+          const isMdes = testTitle.includes('m.des') || testTitle.includes('mdes') || (testTitle.includes('ceed') && !testTitle.includes('uceed')) || testTitle.includes('nid m') || format === 'masters';
+          
+          if (normEd === 'bachelors') {
+            if (isMdes && !isBdes) return false;
+            if (format === 'masters') return false;
+            return true;
+          } else if (normEd === 'masters') {
+            if (isBdes && !isMdes) return false;
+            if (format === 'bachelors') return false;
+            return true;
+          }
+          return true;
         });
 
         // Sort by actual score descending: (total_score !== null ? total_score : score_part_a)
@@ -1595,9 +1620,12 @@ export default function PortalDashboard() {
           return true;
         }).slice(0, 10);
         setLeaderboard(uniqueTopAttempts);
+      } else {
+        setLeaderboard([]);
       }
     } catch (err) {
       console.error('Failed to fetch leaderboard:', err);
+      setLeaderboard([]);
     } finally {
       clearTimeout(safetyTimer);
       setLoadingLeaderboard(false);
@@ -3348,7 +3376,7 @@ export default function PortalDashboard() {
                                     {responses.filter((r: any) => r.exam_questions?.part === 'B').map((r: any, i: number) => (
                                       <div key={r.id} className="border-b border-black/5 pb-3 last:border-0 last:pb-0">
                                         <p className="text-xs font-bold text-primary mb-1">Question {i + 1} ({r.exam_questions?.topics?.[0] || 'Subjective Sketching'})</p>
-                                        <p className="text-xs font-semibold text-[#262626]">Marks: <span className="text-green-600">{r.marks_awarded != null ? formatScore(r.marks_awarded) : '—'} / {resolvePartBMaxMarks(r.exam_questions, activeReport?.exam_tests)}</span></p>
+                                        <p className="text-xs font-semibold text-[#262626]">Marks: <span className="text-green-600">{r.marks_awarded != null ? formatScore(r.marks_awarded) : '—'} / {resolvePartBMaxMarks(r.exam_questions, attemptObj?.exam_tests)}</span></p>
                                         
                                         {r.mentor_comments && (
                                           <div className="bg-black/5 p-2 rounded-lg text-xs mt-2 font-medium text-foreground/70">
