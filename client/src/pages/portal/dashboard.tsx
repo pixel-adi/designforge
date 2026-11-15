@@ -377,6 +377,35 @@ export default function PortalDashboard() {
         if (active) setLoading(false);
       }, 6000);
 
+      // Check for instant UI testing / preview mode (?preview=true or /portal/questions)
+      const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const isQuestionsRoute = typeof window !== 'undefined' && (
+        window.location.pathname.includes('/portal/questions') || 
+        window.location.pathname.includes('/portal/question-bank')
+      );
+      const isDemoMode = isQuestionsRoute || searchParams?.get('preview') === 'true' || searchParams?.get('demo') === 'true' || searchParams?.get('test') === 'true';
+
+      if (isDemoMode) {
+        clearTimeout(fallbackTimer);
+        const demoCandidate = {
+          id: 'demo-student-preview',
+          name: 'Design Aspirant (Preview Mode)',
+          email: 'preview@designforge.co.in',
+          access_level: 'focus_batch',
+          program_ids: ['bdes-nid'],
+          education_level: 'bachelors',
+        };
+        authUserRef.current = { id: 'demo-auth-user', email: 'preview@designforge.co.in' };
+        if (active) {
+          setAuthUser(authUserRef.current);
+          setCandidate(demoCandidate);
+          setLoading(false);
+          const requestedTab = searchParams?.get('tab') || 'questions';
+          setActiveTab(requestedTab);
+        }
+        return;
+      }
+
       try {
         let { data: { session } } = await supabase.auth.getSession();
 

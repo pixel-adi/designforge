@@ -88,6 +88,8 @@ function Router() {
         <Route path="/portal/login">{() => <PageWrapper><PortalLogin /></PageWrapper>}</Route>
         <Route path="/portal/dashboard">{() => <PageWrapper><PortalDashboard /></PageWrapper>}</Route>
         <Route path="/portal/prep-tracker">{() => <PageWrapper><PortalDashboard /></PageWrapper>}</Route>
+        <Route path="/portal/questions">{() => <PageWrapper><PortalDashboard /></PageWrapper>}</Route>
+        <Route path="/portal/question-bank">{() => <PageWrapper><PortalDashboard /></PageWrapper>}</Route>
         <Route path="/portal/test/:id">{() => <PageWrapper><PortalTestEngine /></PageWrapper>}</Route>
 
         {/* Admin Routes */}
