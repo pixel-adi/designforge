@@ -23,10 +23,48 @@ export interface WeeklyRelease {
 
 export const PORTAL_RELEASES: WeeklyRelease[] = [
   {
+    version: 'v2.10.0',
+    weekLabel: 'Question Bank & Search Overhaul',
+    releaseDate: 'Sun 15 Nov 2026',
+    isLatest: true,
+    items: [
+      {
+        type: 'feature',
+        title: 'Redesigned Question Bank Search & Instant Exam Switcher',
+        description: 'A completely redesigned search header featuring a fast dropdown exam picker (All Exams, CEED, UCEED, NID DAT) with real-time question counts, live debounced search, keyboard shortcuts (/ to search, Esc to dismiss), and dynamic placeholder feedback that reflects your active filter results in real time.',
+      },
+      {
+        type: 'feature',
+        title: 'Clean Search Chips & Quick Topic Selections',
+        description: 'Active filters now render as clean individual chips directly below the search bar with intuitive "+ Add filter" and "Clear all" actions. When browsing without filters, curated quick selections (Part B Studio, Drawing, Unattempted, Visual & Spatial) let you jump straight into focused study.',
+      },
+      {
+        type: 'improvement',
+        title: 'Domain Taxonomy Overhaul with Full Database Overlaps',
+        description: 'Upgraded topic filtering across Visual & Spatial, Design Sensitivity, Analytical & Logic, Color & Typography, and Materials & Ergonomics using exhaustive tag overlaps. All 465+ CEED visual reasoning questions and 5,000+ question bank items are now fully discoverable.',
+      },
+      {
+        type: 'improvement',
+        title: 'Isolated Practice Tracking for Part A and Part B',
+        description: 'Attempted and unattempted question counts are now strictly partitioned between Part A aptitude/objective questions and Part B creative sketch questions, ensuring your drawing practice records never mix with aptitude drills.',
+      },
+      {
+        type: 'fix',
+        title: 'Distraction-Free Question Cards & Sanitized Media',
+        description: 'Removed duplicate decorative images and redundant banners from question cards across the question bank. Cards now present a clean, high-clarity reading experience focused strictly on question text and relevant technical diagrams.',
+      },
+      {
+        type: 'improvement',
+        title: 'Zero-Lag Browsing with In-Memory Caching & Page Prefetching',
+        description: 'Integrated client-side query caching and intelligent background page prefetching. Toggling between pages, filters, and question types now responds in 0 milliseconds without re-fetching spinners.',
+      },
+    ],
+  },
+  {
     version: 'v2.9.0',
     weekLabel: 'Week 9 Update',
     releaseDate: 'Sun 15 Nov 2026',
-    isLatest: true,
+    isLatest: false,
     items: [
       {
         type: 'feature',
