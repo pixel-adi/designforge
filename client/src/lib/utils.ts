@@ -30,11 +30,19 @@ export function formatScore(value: number | string | null | undefined): string {
  */
 export function resolvePartBMaxMarks(q: any, test?: any): number {
   if (!q) return 15;
-  if (q.marks && !isNaN(Number(q.marks)) && Number(q.marks) > 0) {
-    return Number(q.marks);
-  }
-  if (q.test_question_marks && !isNaN(Number(q.test_question_marks)) && Number(q.test_question_marks) > 0) {
-    return Number(q.test_question_marks);
+
+  // Check all common locations where allotted marks might be attached on question or response
+  const candidateMarks = 
+    q.marks ?? 
+    q.test_question_marks ?? 
+    q.maxMarks ?? 
+    q.max_marks ??
+    q.exam_questions?.marks ?? 
+    q.exam_questions?.test_question_marks ?? 
+    q.exam_questions?.maxMarks;
+
+  if (candidateMarks != null && !isNaN(Number(candidateMarks)) && Number(candidateMarks) > 0) {
+    return Number(candidateMarks);
   }
   
   // Test format heuristics

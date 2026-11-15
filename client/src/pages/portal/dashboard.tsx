@@ -757,7 +757,7 @@ export default function PortalDashboard() {
     try {
       const { data, error } = await supabase
         .from('exam_attempts')
-        .select(`*, exam_tests(title, program_format)`)
+        .select(`*, exam_tests(id, title, program_format, category, exam_programs(name))`)
         .eq('candidate_id', candidateId)
         .eq('status', 'completed')
         .order('completed_at', { ascending: false });
@@ -796,9 +796,9 @@ export default function PortalDashboard() {
   const fetchAttemptDetails = async (attemptId: string) => {
     if (!attemptId || attemptId === 'overall' || attemptDetailsMap[attemptId]) return;
     
-    // Check sessionStorage cache for instant zero-latency loading
+    // Check sessionStorage cache for instant zero-latency loading (v3 cache to invalidate un-migrated marks cache)
     try {
-      const cached = sessionStorage.getItem(`df_telemetry_${attemptId}`);
+      const cached = sessionStorage.getItem(`df_telemetry_v3_${attemptId}`);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed && parsed.responses && parsed.responses.length > 0) {
@@ -822,7 +822,8 @@ export default function PortalDashboard() {
             difficulty,
             content_text,
             topics,
-            pyq_tag
+            pyq_tag,
+            marks
           )
         `)
         .eq('attempt_id', attemptId);
@@ -832,17 +833,44 @@ export default function PortalDashboard() {
         return;
       }
 
-      // Reuse test_id already loaded in pastAttempts (avoids redundant query)
-      const attemptObj = pastAttempts.find(a => a.id === attemptId);
-      const testId = attemptObj?.test_id;
+      // Reuse test_id already loaded in pastAttempts (or query attempt if missing)
+      let attemptObj = pastAttempts.find(a => a.id === attemptId);
+      let testId = attemptObj?.test_id;
+
+      if (!testId && isValidUuid(attemptId)) {
+        const { data: attData } = await supabase
+          .from('exam_attempts')
+          .select('id, test_id, attempt_number, score_part_a, total_part_a, score_part_b, total_score, part_b_evaluation_status, exam_tests(id, title, program_format, category, exam_programs(name))')
+          .eq('id', attemptId)
+          .single();
+        if (attData) {
+          testId = attData.test_id;
+          if (!attemptObj) {
+            attemptObj = attData;
+          }
+        }
+      }
 
       let tqQuestionIds: string[] = [];
-      if (testId) {
-        const { data: testQuestions } = await supabase
+      const tqMarksMap = new Map<string, number>();
+      if (testId && isValidUuid(testId)) {
+        let tqData: any[] = [];
+        const tqRes = await supabase
           .from('exam_test_questions')
-          .select('question_id')
+          .select('question_id, marks')
           .eq('test_id', testId);
-        tqQuestionIds = (testQuestions || []).map(tq => tq.question_id);
+        if (tqRes.error && (tqRes.error.message?.includes('marks') || tqRes.error.code === '42703')) {
+          const fallbackRes = await supabase.from('exam_test_questions').select('question_id').eq('test_id', testId);
+          tqData = fallbackRes.data || [];
+        } else {
+          tqData = tqRes.data || [];
+        }
+        tqQuestionIds = (tqData || []).map((tq: any) => tq.question_id);
+        (tqData || []).forEach((tq: any) => {
+          if (tq.marks != null && !isNaN(Number(tq.marks)) && Number(tq.marks) > 0) {
+            tqMarksMap.set(tq.question_id, Number(tq.marks));
+          }
+        });
       }
 
       const respQuestionIds = (responses || []).map(r => r.question_id).filter(Boolean);
@@ -863,7 +891,7 @@ export default function PortalDashboard() {
           missingQuestionIds.length > 0
             ? supabase
                 .from('exam_questions')
-                .select('id, type, part, difficulty, content_text, topics, pyq_tag')
+                .select('id, type, part, difficulty, content_text, topics, pyq_tag, marks')
                 .in('id', missingQuestionIds)
             : Promise.resolve({ data: [] })
         ]);
@@ -880,10 +908,22 @@ export default function PortalDashboard() {
 
       let allQuestionsMap: Record<string, any> = {};
       (responses || []).forEach(r => {
-        if (r.exam_questions) allQuestionsMap[r.exam_questions.id] = r.exam_questions;
+        if (r.exam_questions) {
+          const explicitMarks = tqMarksMap.get(r.exam_questions.id) ?? (r.exam_questions.marks != null && Number(r.exam_questions.marks) > 0 ? Number(r.exam_questions.marks) : undefined);
+          allQuestionsMap[r.exam_questions.id] = {
+            ...r.exam_questions,
+            marks: explicitMarks ?? resolvePartBMaxMarks(r.exam_questions, attemptObj?.exam_tests),
+            test_question_marks: explicitMarks
+          };
+        }
       });
       (missingQsData || []).forEach(q => {
-        allQuestionsMap[q.id] = q;
+        const explicitMarks = tqMarksMap.get(q.id) ?? (q.marks != null && Number(q.marks) > 0 ? Number(q.marks) : undefined);
+        allQuestionsMap[q.id] = {
+          ...q,
+          marks: explicitMarks ?? resolvePartBMaxMarks(q, attemptObj?.exam_tests),
+          test_question_marks: explicitMarks
+        };
       });
 
       const respMap: Record<string, any> = {};
@@ -905,10 +945,11 @@ export default function PortalDashboard() {
           state_transitions: []
         };
 
+        const allocatedMarks = tqMarksMap.get(q.id) ?? (q.marks != null && Number(q.marks) > 0 ? Number(q.marks) : undefined);
         const correctOptsArr = correctMap[q.id] || [];
         const selected = r.selected_options || [];
         let isCorrect = false;
-        let maxMarks = 1;
+        let maxMarks = allocatedMarks ?? (q.part === 'B' ? resolvePartBMaxMarks(q, attemptObj?.exam_tests) : 1);
         let earnedMarks = 0;
 
         const answeredText = r.answer_text?.trim();
@@ -922,26 +963,29 @@ export default function PortalDashboard() {
               ? parseFloat(answeredText) === parseFloat(correctText)
               : answeredText.toLowerCase() === correctText?.toLowerCase()
           ));
-          earnedMarks = isCorrect ? 4 : 0;
-          maxMarks = 4;
+          const qM = allocatedMarks ?? 4;
+          earnedMarks = isCorrect ? qM : 0;
+          maxMarks = qM;
         } else if (q.type === 'MCQ') {
           const selectedStr = selected.map((s: any) => String(s).toLowerCase());
           isCorrect = selectedStr.length === 1 && correctOptsArr.some(c => String(c.id).toLowerCase() === selectedStr[0]);
-          earnedMarks = isCorrect ? 3 : (isAttempted ? -0.5 : 0);
-          maxMarks = 3;
+          const qM = allocatedMarks ?? 3;
+          earnedMarks = isCorrect ? qM : (isAttempted ? -(qM > 3 ? 1 : 0.5) : 0);
+          maxMarks = qM;
         } else if (q.type === 'MSQ') {
           const correctIds = correctOptsArr.map(c => String(c.id).toLowerCase());
           const selectedIds = selected.map((s: any) => String(s).toLowerCase());
           const C = correctIds.length;
           const S = selectedIds.length;
           const W = selectedIds.filter((s: string) => !correctIds.includes(s)).length;
+          const qM = allocatedMarks ?? 4;
           if (isAttempted) {
             if (W > 0) {
               earnedMarks = -1;
               isCorrect = false;
             } else {
               if (S === C && C > 0) {
-                earnedMarks = 4;
+                earnedMarks = qM;
                 isCorrect = true;
               } else if (S > 0) {
                 earnedMarks = S;
@@ -949,10 +993,10 @@ export default function PortalDashboard() {
               }
             }
           }
-          maxMarks = 4;
+          maxMarks = qM;
         } else if (q.type === 'SUBJECTIVE') {
           earnedMarks = r.marks_awarded ? Number(r.marks_awarded) : 0;
-          maxMarks = 20;
+          maxMarks = allocatedMarks ?? resolvePartBMaxMarks(q, attemptObj?.exam_tests);
           isCorrect = earnedMarks >= (maxMarks * 0.5);
         }
 
@@ -963,13 +1007,21 @@ export default function PortalDashboard() {
           : q.type === 'SUBJECTIVE' ? 180 
           : 45;
 
+        const resolvedMax = q.part === 'B' 
+          ? (allocatedMarks ?? resolvePartBMaxMarks(q, attemptObj?.exam_tests))
+          : maxMarks;
+
         return {
           ...r,
-          exam_questions: q,
+          exam_questions: {
+            ...q,
+            marks: resolvedMax,
+            test_question_marks: allocatedMarks
+          },
           isCorrect,
           isAttempted,
           earnedMarks,
-          maxMarks,
+          maxMarks: resolvedMax,
           communityAvgTime: benchmarkSeconds
         };
       });
@@ -989,7 +1041,7 @@ export default function PortalDashboard() {
       };
 
       try {
-        sessionStorage.setItem(`df_telemetry_${attemptId}`, JSON.stringify(attemptResult));
+        sessionStorage.setItem(`df_telemetry_v3_${attemptId}`, JSON.stringify(attemptResult));
       } catch (e) {}
 
       setAttemptDetailsMap(prev => ({
@@ -3457,7 +3509,7 @@ export default function PortalDashboard() {
                                     {responses.filter((r: any) => r.exam_questions?.part === 'B').map((r: any, i: number) => (
                                       <div key={r.id} className="border-b border-black/5 pb-3 last:border-0 last:pb-0">
                                         <p className="text-xs font-bold text-primary mb-1">Question {i + 1} ({r.exam_questions?.topics?.[0] || 'Subjective Sketching'})</p>
-                                        <p className="text-xs font-semibold text-[#262626]">Marks: <span className="text-green-600">{r.marks_awarded != null ? formatScore(r.marks_awarded) : '—'} / {resolvePartBMaxMarks(r.exam_questions, attemptObj?.exam_tests)}</span></p>
+                                        <p className="text-xs font-semibold text-[#262626]">Marks: <span className="text-green-600">{r.marks_awarded != null ? formatScore(r.marks_awarded) : '—'} / {resolvePartBMaxMarks(r.exam_questions || r, attemptObj?.exam_tests)}</span></p>
                                         
                                         {r.mentor_comments && (
                                           <div className="bg-black/5 p-2 rounded-lg text-xs mt-2 font-medium text-foreground/70">

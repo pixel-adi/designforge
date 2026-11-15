@@ -2614,7 +2614,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                       </h3>
                     </div>
                     <span className="text-xs font-black text-foreground/50 shrink-0">
-                      {q.marks ? `${q.marks} Marks` : '15 Marks'}
+                      {q.marks ? `${q.marks} Marks` : `${resolvePartBMaxMarks(q, engineData?.test)} Marks`}
                     </span>
                   </div>
 

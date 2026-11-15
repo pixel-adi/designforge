@@ -54,6 +54,13 @@ serve(async (req) => {
 
     if (respErr || !responses) throw new Error("Responses not found");
 
+    // Fetch question marks configured by creator in test creation
+    const { data: tqData } = await supabase
+      .from("exam_test_questions")
+      .select("question_id, marks")
+      .eq("test_id", attempt.test_id);
+    const tqMarksMap = new Map((tqData || []).map((t: any) => [t.question_id, t.marks]));
+
     const partBResponses = responses.filter((r: any) => 
       r.exam_questions?.part === "B" || r.file_url !== null || r.answer_text !== null
     );
@@ -65,7 +72,10 @@ serve(async (req) => {
         const q = resp.exam_questions;
         if (!q) return 0;
 
-        const maxMarks = q.marks || 50;
+        const allocatedMarks = tqMarksMap.get(q.id) ?? q.marks;
+        const maxMarks = allocatedMarks && !isNaN(Number(allocatedMarks)) && Number(allocatedMarks) > 0
+          ? Number(allocatedMarks)
+          : 50;
         const maxPerCriteria = Math.round((maxMarks / 5) * 10) / 10;
 
         const contentParts: any[] = [

@@ -2191,7 +2191,7 @@ export default function AdminPartBEvaluations() {
                                 Q{idx + 1}. {q.pyq_tag ? cleanPlainText(q.pyq_tag) : `Question ${idx + 1}`}
                               </span>
                               <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 shrink-0">
-                                {q.marks || 10} Marks
+                                {resolvePartBMaxMarks(q, evaluatingAttempt?.exam_tests)} Marks
                               </span>
                             </div>
                             {q.content_text && (
