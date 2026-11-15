@@ -1926,12 +1926,6 @@ export default function PortalDashboard() {
 
   // Reactive auto-fetch hooks ensuring tabs never hang in loading state
   useEffect(() => {
-    if (activeTab === 'questions') {
-      fetchQuestions();
-    }
-  }, [activeTab, questionPartFilter, questionTypeFilter, questionDifficultyFilter]);
-
-  useEffect(() => {
     if (activeTab === 'materials') {
       fetchStudyMaterials();
     }
@@ -2285,7 +2279,7 @@ export default function PortalDashboard() {
           <p className="px-4 text-xs font-semibold uppercase tracking-wider text-foreground/40 mb-2 mt-6">Resources</p>
           <div className="space-y-1">
             <button
-              onClick={() => { setActiveTab('questions'); fetchQuestions(); }}
+              onClick={() => setActiveTab('questions')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'questions' ? 'bg-primary/10 text-primary' : 'text-foreground/70 hover:bg-black/5 hover:text-foreground'}`}
             >
               <BookOpen className="w-4 h-4" /> Question Bank

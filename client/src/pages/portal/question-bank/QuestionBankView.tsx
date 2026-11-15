@@ -49,6 +49,15 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
     return DEFAULT_FILTERS;
   });
 
+  // Debounced search query to eliminate network thrashing while keeping input silky smooth
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(filters.searchQuery);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(filters.searchQuery);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [filters.searchQuery]);
+
   const [questions, setQuestions] = useState<QuestionItem[]>([]);
   const [totalCount, setTotalCount] = useState<number>(5098);
   const [optionsMap, setOptionsMap] = useState<Record<string, QuestionOption[]>>({});
@@ -57,12 +66,21 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
   const [showAllAnswers, setShowAllAnswers] = useState(false);
   const fetchRequestIdRef = useRef<number>(0);
 
-  // Live Exam Counts across all questions
-  const [examCounts, setExamCounts] = useState<Record<string, number>>({
-    all: 5098,
-    ceed: 1290,
-    uceed: 721,
-    nid: 125,
+  // In-Memory Result & Page Cache for 0ms Instant Navigation
+  const queryCacheRef = useRef<Map<string, { items: QuestionItem[]; count: number; optionsMap: Record<string, QuestionOption[]> }>>(new Map());
+
+  // Live Exam Counts across all questions (cached in sessionStorage for 0ms startup)
+  const [examCounts, setExamCounts] = useState<Record<string, number>>(() => {
+    try {
+      const cached = sessionStorage.getItem('df_exam_counts_v1');
+      if (cached) return JSON.parse(cached);
+    } catch (e) {}
+    return {
+      all: 5098,
+      ceed: 1290,
+      uceed: 721,
+      nid: 125,
+    };
   });
 
   // Practiced and Bookmarked State
@@ -129,7 +147,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
     return () => { isMounted = false; };
   }, [candidate?.id, STORAGE_PRACTICED_KEY]);
 
-  // Load exact exam counts on mount
+  // Load exact exam counts in background and cache
   useEffect(() => {
     const fetchExamCounts = async () => {
       try {
@@ -145,12 +163,16 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
           supabase.from('exam_questions').select('*', { count: 'exact', head: true }).ilike('pyq_tag', '%NID%'),
         ]);
 
-        setExamCounts({
+        const counts = {
           all: allCount || 5098,
           ceed: ceedCount || 1290,
           uceed: uceedCount || 721,
           nid: nidCount || 125,
-        });
+        };
+        setExamCounts(counts);
+        try {
+          sessionStorage.setItem('df_exam_counts_v1', JSON.stringify(counts));
+        } catch (e) {}
       } catch (err) {
         console.warn('Could not load live exam counts:', err);
       }
@@ -158,8 +180,21 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
     fetchExamCounts();
   }, []);
 
-  // True Server-Side Query & Pagination (Handling all 5,098+ questions from admin question bank)
+  // Compute unique Cache Key
+  const cacheKey = `${filters.exam}_${filters.part}_${filters.type}_${filters.difficulty}_${filters.domain}_${filters.practiceStatus}_${debouncedSearchQuery}_${currentPage}`;
+
+  // True Server-Side Query with 0ms In-Memory Cache
   const fetchQuestions = useCallback(async () => {
+    // 1. Check in-memory cache for instant 0ms retrieval
+    const cached = queryCacheRef.current.get(cacheKey);
+    if (cached) {
+      setQuestions(cached.items);
+      setTotalCount(cached.count);
+      setOptionsMap(prev => ({ ...prev, ...cached.optionsMap }));
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     const requestId = ++fetchRequestIdRef.current;
     try {
@@ -201,9 +236,9 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         query = query.or('pyq_tag.ilike.%Focus%,pyq_tag.ilike.%Designforge%');
       }
 
-      // 5. Search query filter
-      if (filters.searchQuery.trim()) {
-        const term = filters.searchQuery.trim();
+      // 5. Debounced Search query filter
+      if (debouncedSearchQuery.trim()) {
+        const term = debouncedSearchQuery.trim();
         query = query.or(`content_text.ilike.%${term}%,pyq_tag.ilike.%${term}%`);
       }
 
@@ -230,7 +265,6 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         if (practicedArr.length > 0) {
           query = query.in('id', practicedArr);
         } else {
-          // No practiced questions yet
           setQuestions([]);
           setTotalCount(0);
           setLoading(false);
@@ -284,9 +318,19 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
             newOptsMap[q.id] = q.exam_options;
           }
         });
+
+        const effectiveCount = count ?? items.length;
+
+        // Store in cache for 0ms instant retrieval
+        queryCacheRef.current.set(cacheKey, {
+          items,
+          count: effectiveCount,
+          optionsMap: newOptsMap,
+        });
+
         setOptionsMap(prev => ({ ...prev, ...newOptsMap }));
         setQuestions(items);
-        setTotalCount(count ?? items.length);
+        setTotalCount(effectiveCount);
       }
     } catch (err) {
       console.error('Failed to load questions:', err);
@@ -296,14 +340,15 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
       }
     }
   }, [
+    cacheKey,
     currentPage, 
     filters.part, 
     filters.type, 
     filters.difficulty, 
     filters.exam, 
-    filters.searchQuery, 
     filters.domain, 
     filters.practiceStatus,
+    debouncedSearchQuery,
     practicedIds,
     bookmarkedIds
   ]);
@@ -311,6 +356,64 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
   useEffect(() => {
     fetchQuestions();
   }, [fetchQuestions]);
+
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(totalCount / QUESTIONS_PER_PAGE));
+  const startIndex = (currentPage - 1) * QUESTIONS_PER_PAGE;
+  const practicedCount = practicedIds.size;
+  const unattemptedCount = Math.max(0, totalCount - practicedCount);
+
+  // Background Pre-fetch of Next Page for 0ms Instant Page Transitions
+  useEffect(() => {
+    if (currentPage >= totalPages || loading) return;
+    const nextPage = currentPage + 1;
+    const nextCacheKey = `${filters.exam}_${filters.part}_${filters.type}_${filters.difficulty}_${filters.domain}_${filters.practiceStatus}_${debouncedSearchQuery}_${nextPage}`;
+    if (queryCacheRef.current.has(nextCacheKey)) return;
+
+    const idleTimer = setTimeout(async () => {
+      try {
+        const from = (nextPage - 1) * QUESTIONS_PER_PAGE;
+        const to = from + QUESTIONS_PER_PAGE - 1;
+        let nextQuery = supabase
+          .from('exam_questions')
+          .select('*, exam_options(id, question_id, is_correct, content_text, media_url)', { count: 'exact' })
+          .order('created_at', { ascending: false });
+
+        if (filters.part !== 'all') nextQuery = nextQuery.eq('part', filters.part);
+        if (filters.type !== 'all') nextQuery = nextQuery.eq('type', filters.type);
+        if (filters.difficulty !== 'all') nextQuery = nextQuery.eq('difficulty', filters.difficulty);
+        if (filters.exam === 'nid') nextQuery = nextQuery.ilike('pyq_tag', '%NID%');
+        else if (filters.exam === 'uceed') nextQuery = nextQuery.ilike('pyq_tag', '%UCEED%');
+        else if (filters.exam === 'ceed') nextQuery = nextQuery.ilike('pyq_tag', '%CEED%');
+        else if (filters.exam === 'nift') nextQuery = nextQuery.ilike('pyq_tag', '%NIFT%');
+        else if (filters.exam === 'pyq') nextQuery = nextQuery.not('pyq_tag', 'is', null);
+        else if (filters.exam === 'focus') nextQuery = nextQuery.or('pyq_tag.ilike.%Focus%,pyq_tag.ilike.%Designforge%');
+
+        if (debouncedSearchQuery.trim()) {
+          nextQuery = nextQuery.or(`content_text.ilike.%${debouncedSearchQuery.trim()}%,pyq_tag.ilike.%${debouncedSearchQuery.trim()}%`);
+        }
+
+        const { data: nData, count: nCount } = await nextQuery.range(from, to);
+        if (nData && nData.length > 0) {
+          const nextOptsMap: Record<string, QuestionOption[]> = {};
+          nData.forEach((q: any) => {
+            if (q.exam_options && q.exam_options.length > 0) {
+              nextOptsMap[q.id] = q.exam_options;
+            }
+          });
+          queryCacheRef.current.set(nextCacheKey, {
+            items: nData,
+            count: nCount ?? nData.length,
+            optionsMap: nextOptsMap,
+          });
+        }
+      } catch (e) {
+        // Silently ignore prefetch background error
+      }
+    }, 400);
+
+    return () => clearTimeout(idleTimer);
+  }, [currentPage, totalPages, loading, filters, debouncedSearchQuery]);
 
   // Toggle Practiced
   const handleTogglePracticed = useCallback((id: string) => {
@@ -343,12 +446,6 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
       return next;
     });
   }, [STORAGE_BOOKMARKED_KEY]);
-
-  // Pagination calculations
-  const totalPages = Math.max(1, Math.ceil(totalCount / QUESTIONS_PER_PAGE));
-  const startIndex = (currentPage - 1) * QUESTIONS_PER_PAGE;
-  const practicedCount = practicedIds.size;
-  const unattemptedCount = Math.max(0, totalCount - practicedCount);
 
   const handleFilterChange = (key: keyof QuestionBankFilters, value: any) => {
     setFilters(prev => {
@@ -435,7 +532,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
       />
 
       {/* 2. Questions Feed or Empty State */}
-      {loading ? (
+      {loading && questions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-black/10 space-y-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
           <p className="text-xs font-bold text-foreground/50">Loading question bank studio...</p>
