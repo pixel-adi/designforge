@@ -29,7 +29,7 @@ export function Footer() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12 mb-8 border-t border-white/20 pt-10">
-          <div className="md:col-span-6 lg:col-span-8">
+          <div className="md:col-span-6 lg:col-span-6">
             <div className="mb-4 bg-white p-3 rounded-xl border border-white/20 w-fit backdrop-blur-sm">
               <img src={logoImg} alt="Designforge Logo" className="h-8 object-contain" />
             </div>
@@ -38,14 +38,23 @@ export function Footer() {
             </p>
           </div>
           
-          <div className="md:col-span-3 lg:col-span-2">
+          <div className="md:col-span-2 lg:col-span-2">
             <h4 className="font-heading text-base mb-4 text-white">Explore</h4>
             <ul className="space-y-3 text-white/80 font-light text-sm">
               <li><Link href="/mentorship" className="hover:text-primary transition-colors cursor-pointer">Mentorship Tracks</Link></li>
+              <li><Link href="/focus-batch" className="hover:text-primary transition-colors cursor-pointer">Focus Batch</Link></li>
+            </ul>
+          </div>
+
+          <div className="md:col-span-2 lg:col-span-2">
+            <h4 className="font-heading text-base mb-4 text-white">Legal</h4>
+            <ul className="space-y-3 text-white/80 font-light text-sm">
+              <li><Link href="/privacy-policy" className="hover:text-primary transition-colors cursor-pointer">Privacy Policy</Link></li>
+              <li><Link href="/terms-of-service" className="hover:text-primary transition-colors cursor-pointer">Terms & Conditions</Link></li>
             </ul>
           </div>
           
-          <div className="md:col-span-3 lg:col-span-2">
+          <div className="md:col-span-2 lg:col-span-2">
             <h4 className="font-heading text-base mb-4 text-white">Connect</h4>
             <ul className="space-y-3 text-white/80 font-light text-sm">
               <li><a href="https://chat.whatsapp.com/FJGc9od7fbz7iRXsFnzYU0" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">WhatsApp</a></li>
@@ -58,7 +67,7 @@ export function Footer() {
           <p>© {new Date().getFullYear()} Designforge. All rights reserved.</p>
           <div className="flex gap-6 relative z-50">
             <Link href="/privacy-policy" className="hover:text-primary transition-colors cursor-pointer block pb-2 md:pb-0">Privacy Policy</Link>
-            <Link href="/terms-of-service" className="hover:text-primary transition-colors cursor-pointer block pb-2 md:pb-0">Terms of Service</Link>
+            <Link href="/terms-of-service" className="hover:text-primary transition-colors cursor-pointer block pb-2 md:pb-0">Terms & Conditions</Link>
           </div>
           <p>Designed with purpose.</p>
         </div>

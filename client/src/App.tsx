@@ -79,7 +79,10 @@ function Router() {
         <Route path="/apprenticeship">{() => <PageWrapper><ApprenticeshipPage /></PageWrapper>}</Route>
         <Route path="/courses/ai-native-ux">{() => <PageWrapper><AINativeUX /></PageWrapper>}</Route>
         <Route path="/privacy-policy">{() => <PageWrapper><PrivacyPolicy /></PageWrapper>}</Route>
+        <Route path="/privacy">{() => <PageWrapper><PrivacyPolicy /></PageWrapper>}</Route>
         <Route path="/terms-of-service">{() => <PageWrapper><TermsOfService /></PageWrapper>}</Route>
+        <Route path="/terms-and-conditions">{() => <PageWrapper><TermsOfService /></PageWrapper>}</Route>
+        <Route path="/terms">{() => <PageWrapper><TermsOfService /></PageWrapper>}</Route>
 
         {/* Candidate Portal */}
         <Route path="/portal/login">{() => <PageWrapper><PortalLogin /></PageWrapper>}</Route>
