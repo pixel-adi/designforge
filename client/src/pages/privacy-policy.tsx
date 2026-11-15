@@ -1,7 +1,31 @@
 import { Link } from "wouter";
-import { ArrowLeft, Shield, Mail, Phone, Globe, Calendar, Lock, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Shield, Mail, Phone, Globe, Calendar, Lock, CheckCircle2, ChevronRight, FileText } from "lucide-react";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
+
+const sections = [
+  { id: "section-1", title: "1. Introduction" },
+  { id: "section-2", title: "2. Scope of This Policy" },
+  { id: "section-3", title: "3. Information We Collect" },
+  { id: "section-4", title: "4. Purpose of Information Collection" },
+  { id: "section-5", title: "5. Consent and Lawful Processing" },
+  { id: "section-6", title: "6. Academic Data and Learning Analytics" },
+  { id: "section-7", title: "7. Student Submissions and Creative Work" },
+  { id: "section-8", title: "8. Information Sharing and Disclosure" },
+  { id: "section-9", title: "9. Third Party Platforms" },
+  { id: "section-10", title: "10. Cookies and Website Technologies" },
+  { id: "section-11", title: "11. Data Protection and Security" },
+  { id: "section-12", title: "12. Data Retention" },
+  { id: "section-13", title: "13. Privacy of Minors" },
+  { id: "section-14", title: "14. User Rights" },
+  { id: "section-15", title: "15. Marketing Communications" },
+  { id: "section-16", title: "16. External Website Links" },
+  { id: "section-17", title: "17. International Data Processing" },
+  { id: "section-18", title: "18. Data Breach Management" },
+  { id: "section-19", title: "19. Changes to This Privacy Policy" },
+  { id: "section-20", title: "20. Contact and Privacy Grievances" },
+  { id: "section-21", title: "21. Governing Law" },
+];
 
 export default function PrivacyPolicy() {
   return (
@@ -28,40 +52,55 @@ export default function PrivacyPolicy() {
             <h1 className="text-4xl md:text-5xl font-heading text-foreground mb-4 tracking-tight">
               Privacy Policy
             </h1>
-            <p className="text-lg text-foreground/80 font-medium mb-4">
-              Designforge (Formerly Whitespace Design Foundation)
+            <p className="text-xl text-foreground font-medium mb-3">
+              Designforge
             </p>
-            <div className="flex flex-wrap items-center gap-y-2 gap-x-6 text-sm text-foreground/60">
-              <span className="flex items-center gap-1.5">
-                <Globe className="w-4 h-4 text-primary" />
-                <a href="https://designforge.co.in" target="_blank" rel="noopener noreferrer" className="hover:underline">
+            <p className="text-sm text-foreground/60 mb-6">
+              Formerly known as Whitespace Design Foundation
+            </p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-black/5 text-sm text-foreground/70">
+              <div>
+                <span className="block text-xs uppercase font-semibold text-foreground/40 tracking-wider mb-1">Official Website</span>
+                <a href="https://designforge.co.in" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
                   https://designforge.co.in
                 </a>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-primary" />
-                Effective Date: 1 January 2025
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-primary" />
-                Last Updated: 1 May 2026
-              </span>
+              </div>
+              <div>
+                <span className="block text-xs uppercase font-semibold text-foreground/40 tracking-wider mb-1">Effective Date</span>
+                <span className="font-medium text-foreground">1 January 2025</span>
+              </div>
+              <div>
+                <span className="block text-xs uppercase font-semibold text-foreground/40 tracking-wider mb-1">Last Updated</span>
+                <span className="font-medium text-foreground">1 May 2026</span>
+              </div>
             </div>
-            <div className="w-20 h-1 bg-primary rounded-full mt-6"></div>
+
+            <div className="w-20 h-1 bg-primary rounded-full mt-8"></div>
           </div>
 
-          {/* Quick Intro Card */}
+          {/* Table of Contents Box */}
           <div className="p-6 md:p-8 rounded-2xl bg-white border border-black/5 shadow-sm mb-12">
-            <p className="text-lg md:text-xl font-heading text-foreground mb-2">
-              Our Privacy Commitment
-            </p>
-            <p className="text-foreground/80 leading-relaxed m-0">
-              Designforge, formerly known as Whitespace Design Foundation, is dedicated to making design education, creative learning, and professional guidance accessible. We handle your personal information responsibly, transparently, and in strict accordance with applicable Indian laws.
-            </p>
+            <h2 className="text-lg font-heading text-foreground mb-4 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              Table of Contents
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+              {sections.map((s) => (
+                <a
+                  key={s.id}
+                  href={`#${s.id}`}
+                  className="flex items-center gap-2 text-foreground/70 hover:text-primary transition-colors py-1 hover:translate-x-0.5"
+                >
+                  <ChevronRight className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="truncate">{s.title}</span>
+                </a>
+              ))}
+            </div>
           </div>
 
           {/* Policy Sections */}
-          <div className="space-y-12 text-foreground/85 leading-relaxed">
+          <div className="space-y-12 text-foreground/85 leading-relaxed text-base md:text-lg">
             
             {/* Section 1 */}
             <section id="section-1" className="scroll-mt-28">
@@ -108,44 +147,50 @@ export default function PrivacyPolicy() {
               </p>
 
               <div className="space-y-6">
-                <div className="p-5 rounded-xl bg-white/70 border border-black/5">
-                  <h3 className="text-lg font-heading text-foreground mb-2">3.1 Personal Information</h3>
-                  <p className="m-0 text-foreground/80">
+                <div>
+                  <h3 className="text-xl font-heading text-foreground mb-2">3.1 Personal Information</h3>
+                  <p className="m-0">
                     We may collect names, email addresses, mobile phone numbers, age or date of birth when necessary, educational qualifications, academic interests, examination preferences, and other information voluntarily provided during registration.
                   </p>
                 </div>
 
-                <div className="p-5 rounded-xl bg-white/70 border border-black/5">
-                  <h3 className="text-lg font-heading text-foreground mb-2">3.2 Account Information</h3>
-                  <p className="m-0 text-foreground/80">
-                    We may collect account identifiers, enrolment history, programme selections, authentication information, login activity, and preferences necessary for operating our learning platform. Passwords, where applicable, should be maintained through appropriate security mechanisms rather than stored in readable form.
+                <div>
+                  <h3 className="text-xl font-heading text-foreground mb-2">3.2 Account Information</h3>
+                  <p className="m-0">
+                    We may collect account identifiers, enrolment history, programme selections, authentication information, login activity, and preferences necessary for operating our learning platform.
+                  </p>
+                  <p className="mt-2 text-foreground/70 text-sm">
+                    Passwords, where applicable, should be maintained through appropriate security mechanisms rather than stored in readable form.
                   </p>
                 </div>
 
-                <div className="p-5 rounded-xl bg-white/70 border border-black/5">
-                  <h3 className="text-lg font-heading text-foreground mb-2">3.3 Educational Information</h3>
-                  <p className="m-0 text-foreground/80">
+                <div>
+                  <h3 className="text-xl font-heading text-foreground mb-2">3.3 Educational Information</h3>
+                  <p className="m-0">
                     We may collect assignments, portfolios, sketches, examination responses, evaluation scores, mock test results, performance analytics, attendance records, and feedback submitted during participation in our programmes.
                   </p>
                 </div>
 
-                <div className="p-5 rounded-xl bg-white/70 border border-black/5">
-                  <h3 className="text-lg font-heading text-foreground mb-2">3.4 Payment Information</h3>
-                  <p className="m-0 text-foreground/80">
-                    We may retain transaction identifiers, payment amounts, payment status, invoice details, and information necessary to manage purchases, refunds, and financial records. Payments may be processed through authorised external payment service providers. Designforge does not require access to complete payment card details for normal transaction processing.
+                <div>
+                  <h3 className="text-xl font-heading text-foreground mb-2">3.4 Payment Information</h3>
+                  <p className="m-0">
+                    We may retain transaction identifiers, payment amounts, payment status, invoice details, and information necessary to manage purchases, refunds, and financial records.
+                  </p>
+                  <p className="mt-2 text-foreground/70 text-sm">
+                    Payments may be processed through authorised external payment service providers. Designforge does not require access to complete payment card details for normal transaction processing.
                   </p>
                 </div>
 
-                <div className="p-5 rounded-xl bg-white/70 border border-black/5">
-                  <h3 className="text-lg font-heading text-foreground mb-2">3.5 Technical Information</h3>
-                  <p className="m-0 text-foreground/80">
+                <div>
+                  <h3 className="text-xl font-heading text-foreground mb-2">3.5 Technical Information</h3>
+                  <p className="m-0">
                     Our website and learning platform may process information such as browser type, device information, operating system, session information, cookies, and technical activity logs necessary for security, authentication, and platform functionality.
                   </p>
                 </div>
 
-                <div className="p-5 rounded-xl bg-white/70 border border-black/5">
-                  <h3 className="text-lg font-heading text-foreground mb-2">3.6 Communication Information</h3>
-                  <p className="m-0 text-foreground/80">
+                <div>
+                  <h3 className="text-xl font-heading text-foreground mb-2">3.6 Communication Information</h3>
+                  <p className="m-0">
                     We may retain enquiries, support requests, feedback, messages, and correspondence shared through official communication channels.
                   </p>
                 </div>
@@ -217,7 +262,7 @@ export default function PrivacyPolicy() {
               <p className="mb-4">
                 Students may submit drawings, portfolios, written responses, concepts, presentations, videos, and other original creative materials for evaluation.
               </p>
-              <p className="mb-4 font-medium text-foreground">
+              <p className="mb-4 font-semibold text-foreground">
                 Ownership of original student work remains with the respective student, subject to applicable third party intellectual property rights.
               </p>
               <p className="mb-4">
@@ -233,13 +278,9 @@ export default function PrivacyPolicy() {
               <h2 className="text-2xl md:text-3xl font-heading text-foreground mb-4">
                 8. Information Sharing and Disclosure
               </h2>
-              
-              <div className="my-6 p-6 rounded-2xl bg-primary/5 border border-primary/10">
-                <p className="text-lg font-heading text-primary m-0">
-                  Designforge does not sell personal information to advertisers or data brokers.
-                </p>
-              </div>
-
+              <p className="mb-4 font-semibold text-primary">
+                Designforge does not sell personal information to advertisers or data brokers.
+              </p>
               <p className="mb-4">
                 Personal information may be shared with authorised service providers where reasonably necessary for operating the services.
               </p>
@@ -478,7 +519,7 @@ export default function PrivacyPolicy() {
                   <div className="flex items-start gap-3">
                     <Mail className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-xs uppercase font-semibold text-foreground/50 tracking-wider">Official Privacy Email</p>
+                      <p className="text-xs uppercase font-semibold text-foreground/50 tracking-wider">Email</p>
                       <a href="mailto:designforge05@gmail.com" className="text-foreground hover:text-primary transition-colors font-medium">
                         designforge05@gmail.com
                       </a>
@@ -488,7 +529,7 @@ export default function PrivacyPolicy() {
                   <div className="flex items-start gap-3">
                     <Lock className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-xs uppercase font-semibold text-foreground/50 tracking-wider">Grievance Officer</p>
+                      <p className="text-xs uppercase font-semibold text-foreground/50 tracking-wider">Grievance Contact</p>
                       <p className="text-foreground font-medium m-0">
                         Designforge Grievance Redressal Officer
                       </p>

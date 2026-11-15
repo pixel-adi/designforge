@@ -1,7 +1,28 @@
 import { Link } from "wouter";
-import { ArrowLeft, FileText, Globe, Calendar, Mail, Phone, Lock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, FileText, Globe, Calendar, Mail, Phone, Lock, ChevronRight } from "lucide-react";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
+
+const sections = [
+  { id: "section-1", title: "1. Introduction and Acceptance of Terms" },
+  { id: "section-2", title: "2. Scope of Educational and Mentorship Services" },
+  { id: "section-3", title: "3. Eligibility, Registration and Account Security" },
+  { id: "section-4", title: "4. Academic Guidance Disclaimer & Outcome Neutrality" },
+  { id: "section-5", title: "5. Platform Code of Conduct & Academic Integrity" },
+  { id: "section-6", title: "6. Intellectual Property Rights" },
+  { id: "section-7", title: "7. Student Submissions and Creative Work" },
+  { id: "section-8", title: "8. Program Enrolment, Fees and Payments" },
+  { id: "section-9", title: "9. Cancellation and Refund Policy" },
+  { id: "section-10", title: "10. Mentorship Sessions and Community Spaces" },
+  { id: "section-11", title: "11. Third-Party Services and External Resources" },
+  { id: "section-12", title: "12. Disclaimers of Warranties" },
+  { id: "section-13", title: "13. Limitation of Liability" },
+  { id: "section-14", title: "14. Indemnification" },
+  { id: "section-15", title: "15. Account Suspension and Termination" },
+  { id: "section-16", title: "16. Modifications to Terms and Conditions" },
+  { id: "section-17", title: "17. Grievance Redressal and Contact Information" },
+  { id: "section-18", title: "18. Governing Law and Dispute Resolution" },
+];
 
 export default function TermsOfService() {
   return (
@@ -23,45 +44,60 @@ export default function TermsOfService() {
           <div className="mb-12 border-b border-black/10 pb-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary mb-4">
               <FileText className="w-3.5 h-3.5" />
-              <span>Terms & Conditions of Service</span>
+              <span>Terms of Service & Student Agreement</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-heading text-foreground mb-4 tracking-tight">
               Terms & Conditions
             </h1>
-            <p className="text-lg text-foreground/80 font-medium mb-4">
-              Designforge (Formerly Whitespace Design Foundation)
+            <p className="text-xl text-foreground font-medium mb-3">
+              Designforge
             </p>
-            <div className="flex flex-wrap items-center gap-y-2 gap-x-6 text-sm text-foreground/60">
-              <span className="flex items-center gap-1.5">
-                <Globe className="w-4 h-4 text-primary" />
-                <a href="https://designforge.co.in" target="_blank" rel="noopener noreferrer" className="hover:underline">
+            <p className="text-sm text-foreground/60 mb-6">
+              Formerly known as Whitespace Design Foundation
+            </p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-black/5 text-sm text-foreground/70">
+              <div>
+                <span className="block text-xs uppercase font-semibold text-foreground/40 tracking-wider mb-1">Official Website</span>
+                <a href="https://designforge.co.in" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
                   https://designforge.co.in
                 </a>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-primary" />
-                Effective Date: 1 January 2025
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-primary" />
-                Last Updated: 1 May 2026
-              </span>
+              </div>
+              <div>
+                <span className="block text-xs uppercase font-semibold text-foreground/40 tracking-wider mb-1">Effective Date</span>
+                <span className="font-medium text-foreground">1 January 2025</span>
+              </div>
+              <div>
+                <span className="block text-xs uppercase font-semibold text-foreground/40 tracking-wider mb-1">Last Updated</span>
+                <span className="font-medium text-foreground">1 May 2026</span>
+              </div>
             </div>
-            <div className="w-20 h-1 bg-primary rounded-full mt-6"></div>
+
+            <div className="w-20 h-1 bg-primary rounded-full mt-8"></div>
           </div>
 
-          {/* Quick Notice Card */}
+          {/* Table of Contents Box */}
           <div className="p-6 md:p-8 rounded-2xl bg-white border border-black/5 shadow-sm mb-12">
-            <p className="text-lg md:text-xl font-heading text-foreground mb-2">
-              Welcome to Designforge
-            </p>
-            <p className="text-foreground/80 leading-relaxed m-0">
-              Please read these Terms and Conditions carefully before accessing or using the Designforge website, learning portal, diagnostic tools, mentorship tracks, and mock examination engines. By accessing, enrolling, or participating in any Designforge offering, you agree to be legally bound by these terms.
-            </p>
+            <h2 className="text-lg font-heading text-foreground mb-4 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              Table of Contents
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+              {sections.map((s) => (
+                <a
+                  key={s.id}
+                  href={`#${s.id}`}
+                  className="flex items-center gap-2 text-foreground/70 hover:text-primary transition-colors py-1 hover:translate-x-0.5"
+                >
+                  <ChevronRight className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="truncate">{s.title}</span>
+                </a>
+              ))}
+            </div>
           </div>
 
           {/* Terms Sections */}
-          <div className="space-y-12 text-foreground/85 leading-relaxed">
+          <div className="space-y-12 text-foreground/85 leading-relaxed text-base md:text-lg">
 
             {/* Section 1 */}
             <section id="section-1" className="scroll-mt-28">
@@ -69,13 +105,13 @@ export default function TermsOfService() {
                 1. Introduction and Acceptance of Terms
               </h2>
               <p className="mb-4">
-                Designforge, formerly known as Whitespace Design Foundation ("Designforge", "we", "us", or "our"), operates the website <a href="https://designforge.co.in" className="text-primary hover:underline">https://designforge.co.in</a>, the student portal, preparatory trackers, and related educational services.
+                Designforge, formerly known as Whitespace Design Foundation ("Designforge", "we", "us", or "our"), is an educational and mentorship platform dedicated to making design education, creative learning, and professional guidance accessible. Designforge operates the website <a href="https://designforge.co.in" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">https://designforge.co.in</a>, the candidate assessment portal, preparatory curriculum, and associated digital services.
               </p>
               <p className="mb-4">
-                These Terms and Conditions ("Terms") govern your access to and use of our website, digital assessment portal, study materials, interactive question banks, live and recorded mentorship sessions, and offline or online workshops (collectively, the "Services").
+                These Terms and Conditions ("Terms") constitute a legally binding agreement between you ("User", "Student", "Candidate", or "You") and Designforge governing your access to and use of our website, learning portal, question banks, simulated mock examinations, diagnostic trackers, subjective evaluation rubrics, live sessions, workshops, and mentorship batches.
               </p>
               <p>
-                By creating an account, browsing our website, taking an assessment, or enrolling in any program, you confirm that you have read, understood, and agreed to these Terms, as well as our Privacy Policy. If you do not agree to these Terms, you must refrain from using the Services.
+                By accessing our website, creating an account, participating in workshops, or enrolling in any program, you acknowledge that you have read, understood, and agreed to be bound by these Terms and our Privacy Policy. Where parental or guardian consent is legally required, your parent or guardian accepts these Terms on your behalf.
               </p>
             </section>
 
@@ -85,13 +121,13 @@ export default function TermsOfService() {
                 2. Scope of Educational and Mentorship Services
               </h2>
               <p className="mb-4">
-                Designforge is an educational and mentorship platform specializing in design entrance preparation, creative thinking development, portfolio guidance, and academic assessment for competitive exams such as NID DAT, UCEED, CEED, and related design entrance examinations.
+                Designforge provides specialized pedagogical resources, curriculum frameworks, mock tests, and mentor guidance for students preparing for design competitive examinations, including the National Institute of Design Design Aptitude Test (NID DAT), Undergraduate Common Entrance Examination for Design (UCEED), Common Entrance Examination for Design (CEED), and allied creative entrance tests.
               </p>
               <p className="mb-4">
-                Our Services include digital test engines, objective and subjective paper evaluations, diagnostic trackers, personalized feedback, peer learning spaces, and structured batches such as the Focus Batch.
+                Our Services encompass digital test delivery, automated objective scoring, mentor-led subjective portfolio and drawing critiques, diagnostic analytics, peer community interaction, and intensive cohort programs such as the Focus Batch.
               </p>
               <p>
-                Designforge reserves the right to update, modify, expand, or deprecate any aspect of its learning tools, question banks, or curricula to preserve educational relevance and technical excellence.
+                Designforge reserves the right to modify, enhance, update, or discontinue any aspect of its learning tools, question banks, or curriculum to align with examination pattern evolutions and pedagogical standards.
               </p>
             </section>
 
@@ -101,24 +137,16 @@ export default function TermsOfService() {
                 3. Eligibility, Registration and Account Security
               </h2>
               <p className="mb-4">
-                To access the student portal and specific features, you must register for an account using authentic and accurate personal details, including your legal name, contact email, and phone number.
+                To access authenticated portal features, test series, and analytical reports, candidates must register by providing accurate, current, and complete personal information, including their real name, contact number, and email address.
               </p>
-              <div className="space-y-3 mb-6 bg-white/60 p-6 rounded-2xl border border-black/5">
-                <div className="flex items-start gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0"></span>
-                  <p className="m-0 text-foreground/80"><strong>Age & Parental Guidance:</strong> If you are under 18 years of age, you must use our Services under the supervision and with the explicit consent of a parent or legal guardian.</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0"></span>
-                  <p className="m-0 text-foreground/80"><strong>Single User License:</strong> Each account is strictly personal and non-transferable. You may not share, sell, or transfer your login credentials to any third party.</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0"></span>
-                  <p className="m-0 text-foreground/80"><strong>Account Safeguarding:</strong> You are solely responsible for maintaining the confidentiality of your login credentials and for all activities that occur under your account.</p>
-                </div>
-              </div>
+              <p className="mb-4">
+                <strong>Minors & Parental Supervision:</strong> If you are under 18 years of age, you represent that your parent or lawful guardian has reviewed and consented to your registration and participation in Designforge educational programs.
+              </p>
+              <p className="mb-4">
+                <strong>Account Confidentiality:</strong> Your account is personal, individual, and strictly non-transferable. You must not disclose, share, or transfer your login credentials to any other person. You are entirely responsible for maintaining the confidentiality of your credentials and for all activities carried out through your account.
+              </p>
               <p>
-                Designforge reserves the right to suspend or terminate accounts that provide fraudulent, misleading, or abusive registration details.
+                Designforge reserves the right to suspend or terminate accounts found to be using fraudulent details, shared access, or unauthorized automated logins.
               </p>
             </section>
 
@@ -127,18 +155,17 @@ export default function TermsOfService() {
               <h2 className="text-2xl md:text-3xl font-heading text-foreground mb-4">
                 4. Academic Guidance Disclaimer & Outcome Neutrality
               </h2>
-              
-              <div className="my-6 p-6 rounded-2xl bg-primary/5 border border-primary/10">
-                <p className="text-lg font-heading text-primary mb-2">
-                  No Guarantee of Selection, Ranks or Admissions
-                </p>
-                <p className="text-foreground/80 m-0 leading-relaxed">
-                  Designforge provides pedagogical guidance, diagnostic evaluations, practice materials, and mentorship to nurture design aptitude. We do not guarantee, promise, or warrant admission, selection, rank, or specific scores in any entrance examination, university, or academic institution, including the National Institute of Design (NID), IITs (UCEED/CEED), or other institutes. Examination outcomes depend on the student's independent diligence, personal aptitude, and exam day performance.
-                </p>
-              </div>
-
+              <p className="mb-4 font-semibold text-primary">
+                Designforge provides structured guidance, rigorous practice simulations, and diagnostic feedback; we do not guarantee exam results, ranks, marks, or admission.
+              </p>
               <p className="mb-4">
-                Mock tests and estimated scores provided by the platform represent practice simulations and should be treated as diagnostic aids rather than official institutional metrics.
+                Admission into prestigious institutions such as the National Institute of Design (NID), Indian Institutes of Technology (IITs), or any participating college depends solely upon the candidate's personal aptitude, dedication, consistent practice, and actual performance on examination day as evaluated by official examination authorities.
+              </p>
+              <p className="mb-4">
+                Designforge is an independent mentorship initiative. We are not affiliated with, endorsed by, or sponsored by the National Institute of Design, IIT Bombay, or any official government examination authority.
+              </p>
+              <p>
+                Estimated marks, percentile predictions, and leaderboard standings provided on our platform are diagnostic indicators intended to identify strengths and weaknesses; they must not be interpreted as official scorecards.
               </p>
             </section>
 
@@ -148,29 +175,18 @@ export default function TermsOfService() {
                 5. Platform Code of Conduct & Academic Integrity
               </h2>
               <p className="mb-4">
-                Learners, aspirants, and community members are expected to conduct themselves with integrity, professionalism, and mutual respect across all platform interactions, live sessions, and community channels.
+                Designforge fosters a community grounded in creativity, empathy, mutual respect, and academic honesty. By using the platform, you agree to adhere to the highest standards of integrity.
               </p>
-              <p className="mb-4 font-medium text-foreground">You agree not to:</p>
-              <ul className="space-y-3 mb-6 bg-white/60 p-6 rounded-2xl border border-black/5">
-                <li className="flex items-start gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0"></span>
-                  <span>Distribute, copy, screenshot, video-record, or extract proprietary questions, solution keys, evaluation rubrics, or video lectures without written permission.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0"></span>
-                  <span>Attempt to reverse engineer, decompile, scrape, or probe the portal, backend APIs, or test engine.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0"></span>
-                  <span>Engage in harassment, abusive language, discriminatory speech, or disrespectful behavior towards mentors, evaluators, or fellow learners.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0"></span>
-                  <span>Manipulate leaderboard rankings, scores, or diagnostic timers using automated bots or script injections.</span>
-                </li>
+              <p className="mb-4 font-semibold text-foreground">You expressly agree that you will not:</p>
+              <ul className="list-disc pl-6 space-y-3 mb-6">
+                <li>Copy, record, screenshot, download, rip, or redistribute test questions, subjective briefs, evaluation rubrics, or video lectures without prior written consent.</li>
+                <li>Attempt to probe, reverse engineer, decompile, scrape, or disrupt the student portal, API endpoints, or database structures.</li>
+                <li>Engage in harassment, abusive communication, defamatory remarks, or disruptive conduct toward mentors, evaluators, or fellow aspirants in live sessions or community groups.</li>
+                <li>Manipulate test timers, submit fraudulent or plagiarized artwork, or inject scripts to alter leaderboard rankings or scoring mechanisms.</li>
+                <li>Use automated bots, crawlers, or scrapers to access or extract content from the website or portal.</li>
               </ul>
               <p>
-                Violations of this code of conduct may result in immediate suspension or permanent revocation of portal access without refund.
+                Any breach of academic integrity or platform rules will lead to immediate account termination, forfeiture of fees, and potential legal action where intellectual property infringement has occurred.
               </p>
             </section>
 
@@ -180,13 +196,13 @@ export default function TermsOfService() {
                 6. Intellectual Property Rights
               </h2>
               <p className="mb-4">
-                All intellectual property rights in and to the Designforge platform—including without limitation logos, trademarks, website design, original question papers, test rubrics, proprietary evaluation methodologies, analytical dashboards, software code, and educational frameworks—are the exclusive property of Designforge or its licensors.
+                All contents, materials, software, and intellectual properties appearing on or made accessible through Designforge—including but not limited to curricula, question papers, diagnostic frameworks, error ledgers, test engines, user interface design, logos, brand elements, and written materials—are the exclusive intellectual property of Designforge or its licensors.
               </p>
               <p className="mb-4">
-                You are granted a limited, personal, revocable, non-exclusive, and non-transferable license to access and view study materials strictly for your individual educational preparation.
+                You are granted a revocable, limited, non-transferable, and non-exclusive personal license to view and utilize the materials solely for your own individual, non-commercial exam preparation.
               </p>
               <p>
-                Any commercial reproduction, redistribution, public exhibition, re-hosting, or monetization of Designforge content without explicit written consent is strictly prohibited and constitutes an infringement punishable under applicable laws.
+                Commercial reproduction, unauthorized re-publishing, distribution in Telegram/WhatsApp groups, or resale of Designforge materials constitutes copyright infringement and will be pursued under the Indian Copyright Act, 1957.
               </p>
             </section>
 
@@ -196,16 +212,16 @@ export default function TermsOfService() {
                 7. Student Submissions and Creative Work
               </h2>
               <p className="mb-4">
-                Students regularly submit design solutions, sketches, creative sheets, portfolio projects, and written essays for evaluation and feedback.
+                During test attempts, assignments, and portfolio sessions, students create original drawings, sketches, written essays, and design concepts.
+              </p>
+              <p className="mb-4 font-semibold text-foreground">
+                <strong>Student Ownership:</strong> You retain complete ownership and intellectual property rights in your original student submissions and creative portfolio works.
               </p>
               <p className="mb-4">
-                <strong>Student Ownership:</strong> You retain full intellectual property ownership of your original sketches, designs, and creative works submitted to the platform.
-              </p>
-              <p className="mb-4">
-                <strong>Evaluation License:</strong> By submitting academic work to Designforge, you grant us a non-exclusive, royalty-free license to store, review, annotate, evaluate, and display such work internally to our assigned mentors, educators, and administrators for evaluation purposes.
+                <strong>Evaluation License:</strong> By submitting academic work to Designforge, you grant Designforge a royalty-free, non-exclusive license to reproduce internally, inspect, annotate, and evaluate the submission for educational feedback and administrative purposes.
               </p>
               <p>
-                Designforge will not publish or display your identifiable creative work for marketing, testimonials, or promotional campaigns without your prior consent.
+                Designforge will not publicly display or publish your identifiable artwork for promotional campaigns, brochures, or social media testimonials without obtaining explicit consent from you or your legal guardian.
               </p>
             </section>
 
@@ -215,13 +231,13 @@ export default function TermsOfService() {
                 8. Program Enrolment, Fees and Payments
               </h2>
               <p className="mb-4">
-                Fees for paid batches, mock series, evaluations, and mentorship tracks are published on our website or communicated through official registration channels. All payments must be made in Indian Rupees (INR) unless explicitly stated otherwise.
+                Enrolment in paid batches (such as Focus Batch), test packs, subjective evaluation passes, and masterclasses is subject to timely payment of specified fees. All monetary amounts are quoted in Indian Rupees (INR) unless indicated otherwise.
               </p>
               <p className="mb-4">
-                Payments are processed via authorized third-party payment gateways. Designforge does not store your complete payment card or net banking credentials.
+                Payments are processed through secure external payment gateways. Designforge does not store debit/credit card numbers or CVVs. Enrolment is confirmed only once full payment has been received and verified.
               </p>
               <p>
-                Enrolment is confirmed only upon successful verification of payment. Designforge reserves the right to adjust pricing for future batches or offerings at its discretion.
+                Designforge reserves the right to revise pricing for future batches and offerings without retrospective application to existing paid enrolments.
               </p>
             </section>
 
@@ -231,22 +247,17 @@ export default function TermsOfService() {
                 9. Cancellation and Refund Policy
               </h2>
               <p className="mb-4">
-                Designforge provides high-quality educational content, instant digital access, and dedicated mentor hours. Due to the intellectual and customized nature of educational delivery:
+                Designforge provides high-touch mentorship, personalized evaluations, and instantaneous access to proprietary intellectual assets.
               </p>
-              <div className="space-y-3 mb-6 bg-white/60 p-6 rounded-2xl border border-black/5">
-                <div className="flex items-start gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0"></span>
-                  <p className="m-0 text-foreground/80"><strong>Digital Portal & Test Packs:</strong> Access to digital question banks, mock exams, and automated analytics is provisioned immediately upon purchase; hence, digital test packs and self-study modules are generally non-refundable once accessed.</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0"></span>
-                  <p className="m-0 text-foreground/80"><strong>Mentorship Batches:</strong> Refund requests submitted prior to batch commencement may be eligible for processing minus administrative and payment gateway processing fees. Once live batch sessions have begun or evaluated work has been returned, fees are non-refundable.</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 shrink-0"></span>
-                  <p className="m-0 text-foreground/80"><strong>Exceptional Circumstances:</strong> Genuine grievances or technical billing discrepancies will be reviewed on a case-by-case basis by the Designforge administrative committee.</p>
-                </div>
-              </div>
+              <p className="mb-4">
+                <strong>Digital Assessment & Test Packs:</strong> Access to digital question banks, test engines, and performance analytics is activated immediately upon purchase. Consequently, test packs and self-study subscriptions are non-refundable once activated.
+              </p>
+              <p className="mb-4">
+                <strong>Live Mentorship Cohorts:</strong> Cancellation requests submitted in writing prior to the formal commencement of a batch may be refunded subject to deduction of administrative and payment gateway processing charges. Once batch sessions have begun or evaluation sheets have been reviewed, fees are non-refundable.
+              </p>
+              <p>
+                In case of duplicate transactions or proven technical billing errors, the excess amount will be refunded upon verification.
+              </p>
             </section>
 
             {/* Section 10 */}
@@ -255,13 +266,13 @@ export default function TermsOfService() {
                 10. Mentorship Sessions and Community Spaces
               </h2>
               <p className="mb-4">
-                Mentorship cohorts, WhatsApp study groups, and interactive workshops are collaborative spaces designed to support preparation. Participants must preserve a safe, constructive, and supportive atmosphere.
+                Interactive mentorship calls, group critique rooms, and dedicated WhatsApp/Discord study cohorts are shared educational environments.
               </p>
               <p className="mb-4">
-                Spamming, commercial solicitation, sharing unsolicited marketing links, or harassing community members is strictly forbidden and will result in immediate removal from community channels without refund.
+                Participants must respect session schedules, mentor guidelines, and peer privacy. Sharing unsolicited commercial promotions, advertising third-party coaching, or circulating irrelevant content is prohibited.
               </p>
               <p>
-                Mentors provide guidance in their academic and advisory capacity; schedule modifications or mentor allocations may be adjusted when necessary to ensure optimal program delivery.
+                Designforge reserves the right to remove any participant from live sessions or community cohorts who behaves disrespectfully or violates community etiquette.
               </p>
             </section>
 
@@ -271,13 +282,13 @@ export default function TermsOfService() {
                 11. Third-Party Services and External Resources
               </h2>
               <p className="mb-4">
-                Our platform may integrate or interface with third-party software providers (such as cloud hosting, authentication systems, payment processors, video streaming platforms, or external messaging applications).
+                Our Services may integrate with or link to third-party services, including cloud hosting, authentication systems (e.g. Supabase, Google OAuth), video streaming, payment processors, and messaging platforms.
               </p>
               <p className="mb-4">
-                Designforge does not assume responsibility or liability for downtime, security policies, or independent disruptions caused by third-party providers beyond our reasonable control.
+                Designforge is not responsible for the performance, uptime, security practices, or availability of external third-party infrastructure beyond our reasonable control.
               </p>
               <p>
-                Links to external exam authority websites (e.g., admissions.nid.edu, uceed.iitb.ac.in) are provided for convenience only. We do not endorse or control official government or university portals.
+                Any reference or hyperlink to external exam portals (e.g. admissions.nid.edu or uceed.iitb.ac.in) is provided strictly for academic convenience.
               </p>
             </section>
 
@@ -287,10 +298,13 @@ export default function TermsOfService() {
                 12. Disclaimers of Warranties
               </h2>
               <p className="mb-4">
-                The Services are provided on an "as is" and "as available" basis. To the maximum extent permitted under applicable law, Designforge disclaims all warranties, express or implied, including fitness for a particular examination purpose, non-infringement, and uninterrupted system availability.
+                The Services are provided on an "as is" and "as available" basis without warranties of any kind, whether express or implied.
+              </p>
+              <p className="mb-4">
+                Designforge does not guarantee that access to the website or student portal will be completely uninterrupted, timely, or error-free at every moment, or that defects will be corrected immediately during scheduled maintenance windows.
               </p>
               <p>
-                While we strive for high uptime and rigorous test accuracy, we do not warrant that our servers, test timers, or software will operate completely error-free or uninterrupted during unexpected technical outages.
+                While our academic team exercises immense care in compiling questions and model solutions, we make no representation that practice test questions will appear verbatim in actual entrance exams.
               </p>
             </section>
 
@@ -300,10 +314,10 @@ export default function TermsOfService() {
                 13. Limitation of Liability
               </h2>
               <p className="mb-4">
-                To the fullest extent permitted under Indian law, Designforge, its directors, mentors, employees, and affiliates will not be liable for any indirect, consequential, punitive, incidental, or special damages arising out of your access to or inability to use the platform.
+                To the fullest extent permitted under applicable law, Designforge, its founders, mentors, evaluators, and staff shall not be liable for any indirect, incidental, punitive, or consequential damages arising from your use of or inability to use the platform.
               </p>
               <p>
-                In any circumstance, our aggregate cumulative liability towards you for any claim arising out of these Terms or the Services shall not exceed the actual amount paid by you to Designforge for the specific service in dispute.
+                Under all circumstances, Designforge's total aggregate liability arising out of or related to these Terms or the Services shall be limited strictly to the actual monetary amount paid by you to Designforge for the specific service or subscription in question.
               </p>
             </section>
 
@@ -313,7 +327,7 @@ export default function TermsOfService() {
                 14. Indemnification
               </h2>
               <p>
-                You agree to indemnify, defend, and hold harmless Designforge, its mentors, operators, and staff from and against any claims, damages, liabilities, losses, and expenses (including reasonable legal fees) resulting from your violation of these Terms, infringement of any intellectual property rights, or misuse of the platform.
+                You agree to defend, indemnify, and hold harmless Designforge, its directors, mentors, and affiliates from and against any claims, losses, liabilities, damages, and legal costs resulting from your breach of these Terms, unauthorized redistribution of course materials, or violation of any third-party intellectual property rights.
               </p>
             </section>
 
@@ -323,10 +337,10 @@ export default function TermsOfService() {
                 15. Account Suspension and Termination
               </h2>
               <p className="mb-4">
-                Designforge reserves the right, in its sole discretion, to suspend, disable, or terminate your account or revoke access to the Services at any time if we reasonably believe that you have breached these Terms, engaged in fraudulent conduct, infringed intellectual property rights, or disrupted platform security.
+                Designforge reserves the right, at its sole discretion, to suspend, deactivate, or permanently terminate your account without notice if we have reasonable grounds to believe that you have violated these Terms, engaged in piracy, or attempted to compromise the security of the platform.
               </p>
               <p>
-                Upon termination, your right to access the portal and educational materials immediately ceases.
+                Upon termination, your right to access the student portal and evaluation services will cease immediately.
               </p>
             </section>
 
@@ -336,10 +350,10 @@ export default function TermsOfService() {
                 16. Modifications to Terms and Conditions
               </h2>
               <p className="mb-4">
-                We reserve the right to revise or update these Terms periodically to reflect evolving pedagogical offerings, security standards, or regulatory updates.
+                Designforge reserves the right to amend these Terms periodically to reflect changes in our pedagogical offerings, operational practices, or applicable statutory laws.
               </p>
               <p>
-                The updated version will be published on our website along with the "Last Updated" date. Continued use of the website or Services following the posting of modifications constitutes your acceptance of the revised Terms.
+                Revised Terms will be published on this page with an updated "Last Updated" date. Continued access or use of our website or learning portal following such changes signifies your acceptance of the revised Terms.
               </p>
             </section>
 
@@ -349,7 +363,7 @@ export default function TermsOfService() {
                 17. Grievance Redressal and Contact Information
               </h2>
               <p className="mb-6">
-                For questions, clarifications, legal notices, or grievances concerning these Terms and Conditions, please contact us through our official channels:
+                For questions, clarifications, legal inquiries, or grievance redressal concerning these Terms, please contact:
               </p>
 
               <div className="p-6 md:p-8 rounded-2xl bg-white border border-black/5 shadow-sm space-y-4">
@@ -408,10 +422,10 @@ export default function TermsOfService() {
                 18. Governing Law and Dispute Resolution
               </h2>
               <p className="mb-4">
-                These Terms and Conditions shall be governed by and construed in accordance with the laws of India, without regard to conflict of law principles.
+                These Terms and Conditions shall be governed by, interpreted, and construed in accordance with the substantive laws of India, without regard to principles of conflicts of law.
               </p>
               <p>
-                In the event of any controversy, claim, or dispute arising out of or relating to these Terms or your use of the Services, the parties shall endeavor to resolve the matter through mutual good-faith consultation. If unresolved, any legal proceedings shall be subject to the exclusive jurisdiction of the competent courts in India.
+                Any dispute, claim, or controversy arising out of or relating to these Terms or the breach, termination, or invalidity thereof shall first be addressed through good-faith amicable discussion. In the event that a resolution cannot be reached, the dispute shall be subject to the exclusive jurisdiction of the competent courts in India.
               </p>
             </section>
 
