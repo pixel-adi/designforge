@@ -76,7 +76,8 @@ CREATE OR REPLACE FUNCTION public.create_student_custom_test(
 )
 RETURNS JSONB
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_access_level TEXT;
@@ -87,6 +88,18 @@ DECLARE
   v_q_part TEXT;
   v_q_marks NUMERIC;
 BEGIN
+  -- 0. Authorization check: Ensure caller is authenticated and matches p_candidate_id (or is staff)
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Authentication required.';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.exam_candidates 
+    WHERE id = p_candidate_id AND auth_user_id = auth.uid()
+  ) AND coalesce(auth.jwt()->>'email', '') NOT LIKE '%@designforge.co.in' THEN
+    RAISE EXCEPTION 'Unauthorized: You may only create practice tests for your own account.';
+  END IF;
+
   -- 1. Validate candidate & check quota
   SELECT access_level INTO v_access_level
   FROM public.exam_candidates
@@ -202,11 +215,24 @@ CREATE OR REPLACE FUNCTION public.delete_student_custom_test(
 )
 RETURNS BOOLEAN
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_deleted_count INT;
 BEGIN
+  -- 0. Authorization check: Ensure caller is authenticated and matches p_candidate_id (or is staff)
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Authentication required.';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.exam_candidates 
+    WHERE id = p_candidate_id AND auth_user_id = auth.uid()
+  ) AND coalesce(auth.jwt()->>'email', '') NOT LIKE '%@designforge.co.in' THEN
+    RAISE EXCEPTION 'Unauthorized: You may only delete practice tests for your own account.';
+  END IF;
+
   DELETE FROM public.exam_tests
   WHERE id = p_test_id
     AND created_by_candidate_id = p_candidate_id
@@ -216,6 +242,13 @@ BEGIN
   RETURN v_deleted_count > 0;
 END;
 $$;
+
+-- Permissions Lockdown: Revoke from public & anon; Grant to authenticated & service_role
+REVOKE EXECUTE ON FUNCTION public.create_student_custom_test(UUID, TEXT, TEXT, INT, UUID[], BOOLEAN, INT) FROM public, anon;
+REVOKE EXECUTE ON FUNCTION public.delete_student_custom_test(UUID, UUID) FROM public, anon;
+
+GRANT EXECUTE ON FUNCTION public.create_student_custom_test(UUID, TEXT, TEXT, INT, UUID[], BOOLEAN, INT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.delete_student_custom_test(UUID, UUID) TO authenticated, service_role;
 
 -- 7. RLS policy update for candidates to view own custom tests
 DROP POLICY IF EXISTS "Candidates can view own custom tests" ON public.exam_tests;
