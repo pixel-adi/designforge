@@ -23,10 +23,43 @@ export interface WeeklyRelease {
 
 export const PORTAL_RELEASES: WeeklyRelease[] = [
   {
+    version: 'v2.9.0',
+    weekLabel: 'Week 9 Update',
+    releaseDate: 'Sun 15 Nov 2026',
+    isLatest: true,
+    items: [
+      {
+        type: 'feature',
+        title: 'Instant Performance Analytics & Deep Telemetry',
+        description: 'Performance Analytics now loads instantly with zero spinner delays. Your high-level scores and mock attempt summaries appear in milliseconds, with smooth animated skeleton loading and cached session storage. Deep cognitive stamina charts, pacing breakdowns, and section telemetry are now available on demand with dedicated "View Telemetry" controls.',
+      },
+      {
+        type: 'fix',
+        title: 'Evaluated Papers & Cohort Leaderboard Access Restored',
+        description: 'Resolved the student evaluations viewing error. Candidates can now smoothly inspect all evaluated Part B mock papers, five-axis rubric scorecards (Critical Thinking, Ideation, Storytelling, Conceptualisation, Representation), mentor qualitative remarks, and cohort percentile ranks without interruption.',
+      },
+      {
+        type: 'improvement',
+        title: 'Strict Subjective Classification for Part B Questions',
+        description: 'Streamlined the question bank and custom drill builder so that Part B creative and drawing prompts strictly fall into Subjective drawing upload mode, ensuring visual sketch prompts never get miscategorized as objective multiple choice.',
+      },
+      {
+        type: 'improvement',
+        title: 'Optimized Custom Practice Test Engine & Quotas',
+        description: 'Custom practice tests now feature instant self-service quota tracking (up to 10 active drills for standard students, unlimited for Focus Batch) with instant cascade deletion of older attempts when clearing workspace space.',
+      },
+      {
+        type: 'improvement',
+        title: 'Sub-50ms Portal Responsiveness & Concurrency Hardening',
+        description: 'Under-the-hood database optimization with cached authentication plans cuts latency by over 70% across all exam response saves, auto-saving, and prep tracker daily task check-offs during high-traffic mock testing hours.',
+      },
+    ],
+  },
+  {
     version: 'v2.8.0',
     weekLabel: 'Week 8 Update',
     releaseDate: 'Fri 30 Oct 2026',
-    isLatest: true,
+    isLatest: false,
     items: [
       {
         type: 'improvement',
