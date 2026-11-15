@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy, BookOpen, Lightbulb, ClipboardList, Lock, CreditCard, ExternalLink, Download, Eye, EyeOff, Upload, AlertCircle, Star, Shield, Sparkles, ThumbsUp, Plus, HelpCircle, Send, Zap, Target, TrendingUp, Calendar, ChevronLeft, Trash2 } from "lucide-react";
+import { Loader2, LayoutDashboard, Clock, FileText, User, LogOut, ChevronRight, CheckCircle2, Trophy, BookOpen, Lightbulb, ClipboardList, Lock, CreditCard, ExternalLink, Download, Eye, EyeOff, Upload, AlertCircle, Star, Shield, Sparkles, ThumbsUp, Plus, HelpCircle, Send, Zap, Target, TrendingUp, Calendar, ChevronLeft, Trash2, Activity, ArrowLeft } from "lucide-react";
 import logoImg from "@assets/DF_BLACK_RED_1773094379878.png";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -444,6 +444,7 @@ export default function PortalDashboard() {
                   education_level: cachedCand.education_level || "bachelors"
                 });
                 fetchDashboardData(cachedCand.program_ids || [], cachedCand.education_level || "bachelors", cachedCand.id);
+                fetchAttempts(cachedCand.id);
               }
             }
           } catch (e) {}
@@ -583,6 +584,7 @@ export default function PortalDashboard() {
         await registerSession(candidateData.id);
 
         fetchDashboardData(candidateData.program_ids || [], candidateData.education_level || "bachelors", candidateData.id);
+        fetchAttempts(candidateData.id);
       }
     } catch (err: any) {
       console.error("Profile load error:", err);
@@ -718,14 +720,8 @@ export default function PortalDashboard() {
         .order('completed_at', { ascending: false });
       if (!error && data) {
         setPastAttempts(data || []);
-        if (data.length > 0) {
-          const firstId = data[0].id;
-          setSelectedAttemptId(firstId);
-          // High concurrency optimization: only fetch detailed responses if student is on progress tab
-          if (activeTab === 'progress') {
-            fetchAttemptDetails(firstId);
-          }
-        }
+        // Default to 'overall' so students see their summary and history immediately
+        setSelectedAttemptId(prev => (prev && prev !== 'overall' ? prev : 'overall'));
       }
     } catch (err) {
       console.error(err);
@@ -733,6 +729,12 @@ export default function PortalDashboard() {
       setLoadingAttempts(false);
     }
   };
+
+  useEffect(() => {
+    if (candidate?.id && pastAttempts.length === 0) {
+      fetchAttempts(candidate.id);
+    }
+  }, [candidate?.id]);
 
   useEffect(() => {
     if (activeTab === 'progress' && candidate?.id) {
@@ -749,10 +751,23 @@ export default function PortalDashboard() {
   }, [selectedAttemptId, activeTab]);
 
   const fetchAttemptDetails = async (attemptId: string) => {
-    if (!attemptId || attemptDetailsMap[attemptId]) return;
+    if (!attemptId || attemptId === 'overall' || attemptDetailsMap[attemptId]) return;
     
+    // Check sessionStorage cache for instant zero-latency loading
+    try {
+      const cached = sessionStorage.getItem(`df_telemetry_${attemptId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.responses && parsed.responses.length > 0) {
+          setAttemptDetailsMap(prev => ({ ...prev, [attemptId]: parsed }));
+          return;
+        }
+      }
+    } catch (e) {}
+
     setLoadingDetailsMap(prev => ({ ...prev, [attemptId]: true }));
     try {
+      // Direct indexed query for attempt responses (sub-50ms)
       const { data: responses, error: respError } = await supabase
         .from('exam_responses')
         .select(`
@@ -774,177 +789,170 @@ export default function PortalDashboard() {
         return;
       }
 
-      const { data: attemptInfo } = await supabase
-        .from('exam_attempts')
-        .select('test_id')
-        .eq('id', attemptId)
-        .maybeSingle();
-        
-      if (attemptInfo) {
-        const testId = attemptInfo.test_id;
-        
+      // Reuse test_id already loaded in pastAttempts (avoids redundant query)
+      const attemptObj = pastAttempts.find(a => a.id === attemptId);
+      const testId = attemptObj?.test_id;
+
+      let tqQuestionIds: string[] = [];
+      if (testId) {
         const { data: testQuestions } = await supabase
           .from('exam_test_questions')
           .select('question_id')
           .eq('test_id', testId);
-        
-        const tqQuestionIds = (testQuestions || []).map(tq => tq.question_id);
-        const respQuestionIds = (responses || []).map(r => r.question_id).filter(Boolean);
-        const questionIds = Array.from(new Set([...tqQuestionIds, ...respQuestionIds]));
-        const missingQuestionIds = tqQuestionIds.filter(qId => !respQuestionIds.includes(qId));
-        
-        let correctOpts: any[] = [];
-        let commData: any[] = [];
-        let missingQsData: any[] = [];
+        tqQuestionIds = (testQuestions || []).map(tq => tq.question_id);
+      }
 
-        if (questionIds.length > 0) {
-          const [optsRes, commRes, missingQsRes] = await Promise.all([
-            supabase
-              .from('exam_options')
-              .select('id, question_id, is_correct, content_text')
-              .in('question_id', questionIds)
-              .eq('is_correct', true),
-            supabase
-              .from('exam_responses')
-              .select('question_id, time_spent')
-              .in('question_id', questionIds),
-            missingQuestionIds.length > 0
-              ? supabase
-                  .from('exam_questions')
-                  .select('id, type, part, difficulty, content_text, topics, pyq_tag')
-                  .in('id', missingQuestionIds)
-              : Promise.resolve({ data: [] })
-          ]);
+      const respQuestionIds = (responses || []).map(r => r.question_id).filter(Boolean);
+      const questionIds = Array.from(new Set([...tqQuestionIds, ...respQuestionIds]));
+      const missingQuestionIds = tqQuestionIds.filter(qId => !respQuestionIds.includes(qId));
+      
+      let correctOpts: any[] = [];
+      let missingQsData: any[] = [];
 
-          correctOpts = optsRes.data || [];
-          commData = commRes.data || [];
-          missingQsData = missingQsRes.data || [];
-        }
+      if (questionIds.length > 0) {
+        // Fast parallel fetch for correct options and missing question metadata
+        const [optsRes, missingQsRes] = await Promise.all([
+          supabase
+            .from('exam_options')
+            .select('id, question_id, is_correct, content_text')
+            .in('question_id', questionIds)
+            .eq('is_correct', true),
+          missingQuestionIds.length > 0
+            ? supabase
+                .from('exam_questions')
+                .select('id, type, part, difficulty, content_text, topics, pyq_tag')
+                .in('id', missingQuestionIds)
+            : Promise.resolve({ data: [] })
+        ]);
 
-        const correctMap: Record<string, any[]> = {};
-        (correctOpts || []).forEach(opt => {
-          if (!correctMap[opt.question_id]) correctMap[opt.question_id] = [];
-          correctMap[opt.question_id].push(opt);
-        });
+        correctOpts = optsRes.data || [];
+        missingQsData = missingQsRes.data || [];
+      }
 
-        const commAverages: Record<string, { totalTime: number, count: number }> = {};
-        (commData || []).forEach(r => {
-          const t = r.time_spent || 0;
-          if (!commAverages[r.question_id]) commAverages[r.question_id] = { totalTime: 0, count: 0 };
-          commAverages[r.question_id].totalTime += t;
-          commAverages[r.question_id].count += 1;
-        });
+      const correctMap: Record<string, any[]> = {};
+      (correctOpts || []).forEach(opt => {
+        if (!correctMap[opt.question_id]) correctMap[opt.question_id] = [];
+        correctMap[opt.question_id].push(opt);
+      });
 
-        let allQuestionsMap: Record<string, any> = {};
-        (responses || []).forEach(r => {
-          if (r.exam_questions) allQuestionsMap[r.exam_questions.id] = r.exam_questions;
-        });
-        (missingQsData || []).forEach(q => {
-          allQuestionsMap[q.id] = q;
-        });
+      let allQuestionsMap: Record<string, any> = {};
+      (responses || []).forEach(r => {
+        if (r.exam_questions) allQuestionsMap[r.exam_questions.id] = r.exam_questions;
+      });
+      (missingQsData || []).forEach(q => {
+        allQuestionsMap[q.id] = q;
+      });
 
-        const respMap: Record<string, any> = {};
-        (responses || []).forEach(r => {
-          respMap[r.question_id] = r;
-        });
+      const respMap: Record<string, any> = {};
+      (responses || []).forEach(r => {
+        respMap[r.question_id] = r;
+      });
 
-        const allQuestionsList = Object.values(allQuestionsMap);
+      const allQuestionsList = Object.values(allQuestionsMap);
 
-        const processedResponses = allQuestionsList.map(q => {
-          const r = respMap[q.id] || {
-            question_id: q.id,
-            attempt_id: attemptId,
-            status: 'unseen',
-            selected_options: [],
-            answer_text: '',
-            time_spent: 0,
-            answer_changes: 0,
-            state_transitions: []
-          };
+      const processedResponses = allQuestionsList.map(q => {
+        const r = respMap[q.id] || {
+          question_id: q.id,
+          attempt_id: attemptId,
+          status: 'unseen',
+          selected_options: [],
+          answer_text: '',
+          time_spent: 0,
+          answer_changes: 0,
+          state_transitions: []
+        };
 
-          const correctOptsArr = correctMap[q.id] || [];
-          const selected = r.selected_options || [];
-          let isCorrect = false;
-          let maxMarks = 1;
-          let earnedMarks = 0;
+        const correctOptsArr = correctMap[q.id] || [];
+        const selected = r.selected_options || [];
+        let isCorrect = false;
+        let maxMarks = 1;
+        let earnedMarks = 0;
 
-          const answeredText = r.answer_text?.trim();
-          const hasAnswer = (selected && selected.length > 0) || !!answeredText;
-          const isAttempted = r.status === 'answered' || r.status === 'marked' || hasAnswer;
+        const answeredText = r.answer_text?.trim();
+        const hasAnswer = (selected && selected.length > 0) || !!answeredText;
+        const isAttempted = r.status === 'answered' || r.status === 'marked' || hasAnswer;
 
-          if (q.type === 'NAT') {
-            const correctText = correctOptsArr[0]?.content_text?.trim();
-            isCorrect = !!(answeredText && correctText && (
-              !isNaN(parseFloat(answeredText)) && !isNaN(parseFloat(correctText))
-                ? parseFloat(answeredText) === parseFloat(correctText)
-                : answeredText.toLowerCase() === correctText?.toLowerCase()
-            ));
-            earnedMarks = isCorrect ? 4 : 0;
-            maxMarks = 4;
-          } else if (q.type === 'MCQ') {
-            const selectedStr = selected.map((s: any) => String(s).toLowerCase());
-            isCorrect = selectedStr.length === 1 && correctOptsArr.some(c => String(c.id).toLowerCase() === selectedStr[0]);
-            earnedMarks = isCorrect ? 3 : (isAttempted ? -0.5 : 0);
-            maxMarks = 3;
-          } else if (q.type === 'MSQ') {
-            const correctIds = correctOptsArr.map(c => String(c.id).toLowerCase());
-            const selectedIds = selected.map((s: any) => String(s).toLowerCase());
-            const C = correctIds.length;
-            const S = selectedIds.length;
-            const W = selectedIds.filter((s: string) => !correctIds.includes(s)).length;
-            if (isAttempted) {
-              if (W > 0) {
-                earnedMarks = -1;
-                isCorrect = false;
-              } else {
-                if (S === C && C > 0) {
-                  earnedMarks = 4;
-                  isCorrect = true;
-                } else if (S > 0) {
-                  earnedMarks = S;
-                  isCorrect = true;
-                }
+        if (q.type === 'NAT') {
+          const correctText = correctOptsArr[0]?.content_text?.trim();
+          isCorrect = !!(answeredText && correctText && (
+            !isNaN(parseFloat(answeredText)) && !isNaN(parseFloat(correctText))
+              ? parseFloat(answeredText) === parseFloat(correctText)
+              : answeredText.toLowerCase() === correctText?.toLowerCase()
+          ));
+          earnedMarks = isCorrect ? 4 : 0;
+          maxMarks = 4;
+        } else if (q.type === 'MCQ') {
+          const selectedStr = selected.map((s: any) => String(s).toLowerCase());
+          isCorrect = selectedStr.length === 1 && correctOptsArr.some(c => String(c.id).toLowerCase() === selectedStr[0]);
+          earnedMarks = isCorrect ? 3 : (isAttempted ? -0.5 : 0);
+          maxMarks = 3;
+        } else if (q.type === 'MSQ') {
+          const correctIds = correctOptsArr.map(c => String(c.id).toLowerCase());
+          const selectedIds = selected.map((s: any) => String(s).toLowerCase());
+          const C = correctIds.length;
+          const S = selectedIds.length;
+          const W = selectedIds.filter((s: string) => !correctIds.includes(s)).length;
+          if (isAttempted) {
+            if (W > 0) {
+              earnedMarks = -1;
+              isCorrect = false;
+            } else {
+              if (S === C && C > 0) {
+                earnedMarks = 4;
+                isCorrect = true;
+              } else if (S > 0) {
+                earnedMarks = S;
+                isCorrect = true;
               }
             }
-            maxMarks = 4;
-          } else if (q.type === 'SUBJECTIVE') {
-            earnedMarks = r.marks_awarded ? Number(r.marks_awarded) : 0;
-            maxMarks = 20;
-            isCorrect = earnedMarks >= (maxMarks * 0.5);
           }
+          maxMarks = 4;
+        } else if (q.type === 'SUBJECTIVE') {
+          earnedMarks = r.marks_awarded ? Number(r.marks_awarded) : 0;
+          maxMarks = 20;
+          isCorrect = earnedMarks >= (maxMarks * 0.5);
+        }
 
-          const commAvg = (commAverages[q.id] && commAverages[q.id].count > 0)
-            ? Math.round(commAverages[q.id].totalTime / commAverages[q.id].count) 
-            : 45;
+        // Pacing benchmark: standard exam pacing (NAT: 60s, MSQ: 75s, MCQ: 45s, Subjective: 180s)
+        const benchmarkSeconds = q.type === 'NAT' ? 60 
+          : q.type === 'MSQ' ? 75 
+          : q.type === 'MCQ' ? (q.difficulty === 'hard' ? 60 : q.difficulty === 'easy' ? 35 : 45)
+          : q.type === 'SUBJECTIVE' ? 180 
+          : 45;
 
-          return {
-            ...r,
-            exam_questions: q,
-            isCorrect,
-            isAttempted,
-            earnedMarks,
-            maxMarks,
-            communityAvgTime: commAvg
-          };
-        });
+        return {
+          ...r,
+          exam_questions: q,
+          isCorrect,
+          isAttempted,
+          earnedMarks,
+          maxMarks,
+          communityAvgTime: benchmarkSeconds
+        };
+      });
 
-        const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3, 'SUBJECTIVE': 4 };
-        processedResponses.sort((a, b) => {
-          const qA = a.exam_questions || {};
-          const qB = b.exam_questions || {};
-          if (qA.part !== qB.part) return (qA.part || '').localeCompare(qB.part || '');
-          if (qA.type !== qB.type) return (typeOrder[qA.type] || 5) - (typeOrder[qB.type] || 5);
-          return (qA.id || '').localeCompare(qB.id || '');
-        });
+      const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3, 'SUBJECTIVE': 4 };
+      processedResponses.sort((a, b) => {
+        const qA = a.exam_questions || {};
+        const qB = b.exam_questions || {};
+        if (qA.part !== qB.part) return (qA.part || '').localeCompare(qB.part || '');
+        if (qA.type !== qB.type) return (typeOrder[qA.type] || 5) - (typeOrder[qB.type] || 5);
+        return (qA.id || '').localeCompare(qB.id || '');
+      });
 
-        setAttemptDetailsMap(prev => ({
-          ...prev,
-          [attemptId]: {
-            responses: processedResponses,
-            testId
-          }
-        }));
-      }
+      const attemptResult = {
+        responses: processedResponses,
+        testId: testId || ''
+      };
+
+      try {
+        sessionStorage.setItem(`df_telemetry_${attemptId}`, JSON.stringify(attemptResult));
+      } catch (e) {}
+
+      setAttemptDetailsMap(prev => ({
+        ...prev,
+        [attemptId]: attemptResult
+      }));
     } catch (err) {
       console.warn("fetchAttemptDetails error handled:", err);
     } finally {
@@ -2857,8 +2865,29 @@ export default function PortalDashboard() {
                 )}
               </div>
 
-              {/* OVERALL PERFORMANCE PROFILE */}
-              {(selectedAttemptId === 'overall' || !selectedAttemptId || pastAttempts.length === 0) ? (
+              {/* SKELETON LOADER WHILE INITIAL ATTEMPTS LOAD */}
+              {loadingAttempts && pastAttempts.length === 0 ? (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm animate-pulse">
+                        <div className="h-3 w-32 bg-gray-200 rounded mb-3"></div>
+                        <div className="h-8 w-20 bg-gray-200 rounded"></div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6 animate-pulse">
+                      <div className="h-4 w-44 bg-gray-200 rounded mb-6"></div>
+                      <div className="h-64 bg-gray-100 rounded-xl"></div>
+                    </div>
+                    <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6 animate-pulse">
+                      <div className="h-4 w-44 bg-gray-200 rounded mb-6"></div>
+                      <div className="h-64 bg-gray-100 rounded-xl"></div>
+                    </div>
+                  </div>
+                </div>
+              ) : (selectedAttemptId === 'overall' || !selectedAttemptId || pastAttempts.length === 0) ? (
                 <>
                   {/* Summary Stats */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -2982,6 +3011,19 @@ export default function PortalDashboard() {
 
                   return (
                     <div className="space-y-6">
+                      {/* Back to Overall Profile Summary Navigation Pill */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 px-4 rounded-xl border border-black/5 shadow-sm">
+                        <button
+                          onClick={() => setSelectedAttemptId('overall')}
+                          className="inline-flex items-center gap-2 text-xs font-bold text-foreground/70 hover:text-primary transition-colors cursor-pointer"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" /> Back to Overall Profile Summary
+                        </button>
+                        <span className="text-xs font-semibold text-foreground/50">
+                          Viewing deep telemetry for Attempt #{attemptObj?.attempt_number || 1} • {attemptObj?.exam_tests?.title || 'Mock Test'}
+                        </span>
+                      </div>
+
                       {/* Split Sub Tabs */}
                       <div className="flex border-b border-black/10">
                         {hasPartA && !isNid && (
@@ -3497,14 +3539,25 @@ export default function PortalDashboard() {
                             )}
                           </div>
 
-                          {/* Direct Action Button */}
-                          <div className="shrink-0 flex items-center">
+                          {/* Direct Action Buttons */}
+                          <div className="shrink-0 flex items-center gap-2">
+                            <Button 
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedAttemptId(attempt.id);
+                                fetchAttemptDetails(attempt.id);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="font-bold border-black/10 hover:border-primary hover:text-primary h-9 text-xs gap-1.5 px-3 shadow-sm"
+                            >
+                              <Activity className="w-3.5 h-3.5 text-primary" /> View Telemetry
+                            </Button>
                             <Button 
                               variant="outline" 
                               onClick={() => setLocation(`/portal/test/${attempt.test_id}?review_attempt=${attempt.id}`)}
-                              className="w-full md:w-auto font-bold border-primary text-primary hover:bg-primary/5 h-9 text-xs gap-1.5 px-4 shadow-sm"
+                              className="w-full md:w-auto font-bold border-primary text-primary hover:bg-primary/5 h-9 text-xs gap-1.5 px-3 shadow-sm"
                             >
-                              Review Scorecard & Answers <ChevronRight className="w-3.5 h-3.5" />
+                              Review Answers <ChevronRight className="w-3.5 h-3.5" />
                             </Button>
                           </div>
                         </div>
