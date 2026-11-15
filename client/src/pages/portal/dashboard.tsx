@@ -796,9 +796,9 @@ export default function PortalDashboard() {
   const fetchAttemptDetails = async (attemptId: string) => {
     if (!attemptId || attemptId === 'overall' || attemptDetailsMap[attemptId]) return;
     
-    // Check sessionStorage cache for instant zero-latency loading (v3 cache to invalidate un-migrated marks cache)
+    // Check sessionStorage cache for instant zero-latency loading (v4 cache to clear any bad cached states)
     try {
-      const cached = sessionStorage.getItem(`df_telemetry_v3_${attemptId}`);
+      const cached = sessionStorage.getItem(`df_telemetry_v4_${attemptId}`);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed && parsed.responses && parsed.responses.length > 0) {
@@ -822,8 +822,7 @@ export default function PortalDashboard() {
             difficulty,
             content_text,
             topics,
-            pyq_tag,
-            marks
+            pyq_tag
           )
         `)
         .eq('attempt_id', attemptId);
@@ -891,7 +890,7 @@ export default function PortalDashboard() {
           missingQuestionIds.length > 0
             ? supabase
                 .from('exam_questions')
-                .select('id, type, part, difficulty, content_text, topics, pyq_tag, marks')
+                .select('id, type, part, difficulty, content_text, topics, pyq_tag')
                 .in('id', missingQuestionIds)
             : Promise.resolve({ data: [] })
         ]);
@@ -1041,7 +1040,7 @@ export default function PortalDashboard() {
       };
 
       try {
-        sessionStorage.setItem(`df_telemetry_v3_${attemptId}`, JSON.stringify(attemptResult));
+        sessionStorage.setItem(`df_telemetry_v4_${attemptId}`, JSON.stringify(attemptResult));
       } catch (e) {}
 
       setAttemptDetailsMap(prev => ({
