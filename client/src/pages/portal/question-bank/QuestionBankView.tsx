@@ -10,6 +10,7 @@ import {
   QuestionOption, 
   QuestionBankFilters 
 } from './types';
+import { MOCK_QUESTIONS, MOCK_OPTIONS } from './mockQuestions';
 import { QuestionBankToolbar } from './components/QuestionBankToolbar';
 import { QuestionCardPartA } from './components/QuestionCardPartA';
 import { QuestionCardPartB } from './components/QuestionCardPartB';
@@ -165,47 +166,60 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
       }
 
       const items = (data || []) as QuestionItem[];
-      setRawQuestions(items);
+      if (items.length === 0) {
+        // Fallback to rich curated mock questions in preview mode / offline
+        let filteredMocks = [...MOCK_QUESTIONS];
+        if (filters.part !== 'all') filteredMocks = filteredMocks.filter(m => m.part === filters.part);
+        if (filters.type !== 'all') filteredMocks = filteredMocks.filter(m => m.type === filters.type);
+        if (filters.difficulty !== 'all') filteredMocks = filteredMocks.filter(m => m.difficulty === filters.difficulty);
+        if (filters.exam === 'nid') filteredMocks = filteredMocks.filter(m => (m.pyq_tag || '').includes('NID'));
+        if (filters.exam === 'uceed') filteredMocks = filteredMocks.filter(m => (m.pyq_tag || '').includes('UCEED'));
+        if (filters.exam === 'ceed') filteredMocks = filteredMocks.filter(m => (m.pyq_tag || '').includes('CEED'));
+        setRawQuestions(filteredMocks);
+        setOptionsMap(MOCK_OPTIONS);
+      } else {
+        setRawQuestions(items);
 
-      // Fetch options for Part A questions
-      const partAQIds = items.filter(q => q.part === 'A').map(q => q.id);
-      if (partAQIds.length > 0) {
-        // Fetch first batch of options
-        const batch1 = partAQIds.slice(0, 40);
-        const { data: optData } = await supabase
-          .from('exam_options')
-          .select('id, question_id, content_text, media_url, is_correct')
-          .in('question_id', batch1);
+        // Fetch options for Part A questions
+        const partAQIds = items.filter(q => q.part === 'A').map(q => q.id);
+        if (partAQIds.length > 0) {
+          // Fetch first batch of options
+          const batch1 = partAQIds.slice(0, 40);
+          const { data: optData } = await supabase
+            .from('exam_options')
+            .select('id, question_id, content_text, media_url, is_correct')
+            .in('question_id', batch1);
 
-        if (optData) {
-          const map: Record<string, QuestionOption[]> = {};
-          optData.forEach(opt => {
-            if (!map[opt.question_id]) map[opt.question_id] = [];
-            map[opt.question_id].push(opt);
-          });
-          setOptionsMap(prev => ({ ...prev, ...map }));
-        }
+          if (optData) {
+            const map: Record<string, QuestionOption[]> = {};
+            optData.forEach(opt => {
+              if (!map[opt.question_id]) map[opt.question_id] = [];
+              map[opt.question_id].push(opt);
+            });
+            setOptionsMap(prev => ({ ...prev, ...map }));
+          }
 
-        // Stream remaining options in background
-        if (partAQIds.length > 40) {
-          const remaining = partAQIds.slice(40);
-          const chunkSize = 50;
-          for (let i = 0; i < remaining.length; i += chunkSize) {
-            const chunk = remaining.slice(i, i + chunkSize);
-            supabase
-              .from('exam_options')
-              .select('id, question_id, content_text, media_url, is_correct')
-              .in('question_id', chunk)
-              .then(({ data: rData }) => {
-                if (rData) {
-                  const rMap: Record<string, QuestionOption[]> = {};
-                  rData.forEach(opt => {
-                    if (!rMap[opt.question_id]) rMap[opt.question_id] = [];
-                    rMap[opt.question_id].push(opt);
-                  });
-                  setOptionsMap(prev => ({ ...prev, ...rMap }));
-                }
-              });
+          // Stream remaining options in background
+          if (partAQIds.length > 40) {
+            const remaining = partAQIds.slice(40);
+            const chunkSize = 50;
+            for (let i = 0; i < remaining.length; i += chunkSize) {
+              const chunk = remaining.slice(i, i + chunkSize);
+              supabase
+                .from('exam_options')
+                .select('id, question_id, content_text, media_url, is_correct')
+                .in('question_id', chunk)
+                .then(({ data: rData }) => {
+                  if (rData) {
+                    const rMap: Record<string, QuestionOption[]> = {};
+                    rData.forEach(opt => {
+                      if (!rMap[opt.question_id]) rMap[opt.question_id] = [];
+                      rMap[opt.question_id].push(opt);
+                    });
+                    setOptionsMap(prev => ({ ...prev, ...rMap }));
+                  }
+                });
+            }
           }
         }
       }
@@ -391,6 +405,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         onLaunchDrill={onLaunchCustomDrill ? handleLaunchDrillClick : undefined}
         showAllAnswers={showAllAnswers}
         onToggleAllAnswers={() => setShowAllAnswers(prev => !prev)}
+        questions={rawQuestions}
       />
 
       {/* 2. Questions Feed or Empty State */}
