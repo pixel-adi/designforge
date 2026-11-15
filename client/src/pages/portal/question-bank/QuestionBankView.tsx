@@ -11,7 +11,7 @@ import {
   QuestionBankFilters 
 } from './types';
 import { MOCK_QUESTIONS, MOCK_OPTIONS } from './mockQuestions';
-import { QuestionBankToolbar, DOMAIN_OPTIONS } from './components/QuestionBankToolbar';
+import { QuestionBankToolbar, DOMAIN_OPTIONS, DOMAIN_TAXONOMY } from './components/QuestionBankToolbar';
 import { QuestionCardPartA } from './components/QuestionCardPartA';
 import { QuestionCardPartB } from './components/QuestionCardPartB';
 
@@ -278,15 +278,10 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         if (filters.domain === 'part_b') {
           query = query.eq('part', 'B');
         } else {
-          const domKeywords: Record<string, string> = {
-            spatial: 'spatial',
-            design: 'design',
-            analytical: 'reasoning',
-            color_type: 'color',
-            materials: 'material',
-          };
-          const keyword = domKeywords[filters.domain] || filters.domain;
-          query = query.or(`content_text.ilike.%${keyword}%,topics.cs.{${keyword}}`);
+          const topicTags = DOMAIN_TAXONOMY[filters.domain];
+          if (topicTags && topicTags.length > 0) {
+            query = query.overlaps('topics', topicTags);
+          }
         }
       }
 
@@ -423,6 +418,37 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
 
         if (debouncedSearchQuery.trim()) {
           nextQuery = nextQuery.or(`content_text.ilike.%${debouncedSearchQuery.trim()}%,pyq_tag.ilike.%${debouncedSearchQuery.trim()}%`);
+        }
+
+        if (filters.domain !== 'all') {
+          if (filters.domain === 'part_b') {
+            nextQuery = nextQuery.eq('part', 'B');
+          } else {
+            const topicTags = DOMAIN_TAXONOMY[filters.domain];
+            if (topicTags && topicTags.length > 0) {
+              nextQuery = nextQuery.overlaps('topics', topicTags);
+            }
+          }
+        }
+
+        const relevantPracticedIds = Object.entries(practicedMap)
+          .filter(([_, part]) => (filters.part === 'all' ? true : part === filters.part))
+          .map(([id]) => id)
+          .slice(0, 100);
+
+        if (filters.practiceStatus === 'practiced') {
+          if (relevantPracticedIds.length > 0) {
+            nextQuery = nextQuery.in('id', relevantPracticedIds);
+          }
+        } else if (filters.practiceStatus === 'unattempted') {
+          if (relevantPracticedIds.length > 0) {
+            nextQuery = nextQuery.not('id', 'in', `(${relevantPracticedIds.join(',')})`);
+          }
+        } else if (filters.practiceStatus === 'bookmarked') {
+          const bookmarkedArr = Array.from(bookmarkedIds).slice(0, 100);
+          if (bookmarkedArr.length > 0) {
+            nextQuery = nextQuery.in('id', bookmarkedArr);
+          }
         }
 
         const { data: nData, count: nCount } = await nextQuery.range(from, to);

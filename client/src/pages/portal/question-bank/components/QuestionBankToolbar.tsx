@@ -36,6 +36,36 @@ export const DOMAIN_OPTIONS = [
   { id: 'part_b', label: 'Creative Drawing (Part B)' },
 ];
 
+export const DOMAIN_TAXONOMY: Record<string, string[]> = {
+  spatial: [
+    'Spatial Reasoning', 'Spatial Ability', '3D Visualization', '3D Visualisation',
+    'Orthographic Projection', 'Solid Geometry', '3D Rotation', 'Mental Rotation',
+    'Paper Folding', 'Light and Shadow', 'Visual Reasoning', 'Visual Perception',
+    'Cross Sections', 'Perspective', 'Tangram', 'Tiling', 'Visual Matching',
+    'Mirror Image', 'Occlusion', 'Sequential Cutting', 'Cutting', 'Shape Matching'
+  ],
+  design: [
+    'Product Design', 'Ergonomics', 'Usability', 'Form sensitivity', 'Visual Sensitivity',
+    'Design Principles', 'Product Analysis', 'Product Redesign', 'Creativity',
+    'Indian Crafts', 'Indian Culture', 'Design Thinking', 'Problem Solving',
+    'Interaction Design', 'UI Principles', 'Visual Hierarchy', 'Gestalt'
+  ],
+  analytical: [
+    'Mechanisms', 'Linkages', 'Product Mechanisms', 'Kinematics', 'Logical Reasoning',
+    'Pattern Recognition', 'Number Series', 'Mensuration', 'Volume and Density',
+    'Arithmetic', 'Polyhedra', 'Data Interpretation', 'Curve Tracing', 'Topology'
+  ],
+  color_type: [
+    'Typography', 'Font Identification', 'Visual Discrimination', 'Visual Communication',
+    'Figure-Ground', 'Color Theory', 'Color Harmony', 'Palette', 'Visual Layout',
+    'Visual Language', 'Symbolic Equations'
+  ],
+  materials: [
+    'Manufacturing', 'Manufacturing Processes', 'Materials', 'Fabric Folding',
+    'Assembly', 'Ergonomics', 'Material Analysis', 'Sustainable Design'
+  ],
+};
+
 export const EXAM_OPTIONS: { id: ExamFilter; label: string; count: number }[] = [
   { id: 'all', label: 'All exams', count: 5098 },
   { id: 'ceed', label: 'CEED', count: 1290 },
@@ -362,7 +392,11 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
             onChange={(e) => onFilterChange('searchQuery', e.target.value)}
             onFocus={() => setIsInputFocused(true)}
             onKeyDown={handleKeyDown}
-            placeholder={`Search ${currentExamCount.toLocaleString()} questions by concept, keyword or tag`}
+            placeholder={
+              activeFilterCount > 0
+                ? `Search within ${totalQuestions.toLocaleString()} results...`
+                : `Search ${currentExamCount.toLocaleString()} questions by concept, keyword or tag`
+            }
             className="w-full h-8 bg-transparent text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none font-medium min-w-[120px]"
           />
 
