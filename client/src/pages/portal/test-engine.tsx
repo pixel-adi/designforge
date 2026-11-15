@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { sanitizeHtml, cleanPlainText } from "@/lib/sanitize";
-import { resolvePartBMaxMarks, formatScore } from "@/lib/utils";
+import { resolvePartBMaxMarks, formatScore, isValidUuid } from "@/lib/utils";
 
 // Deployment Protection: Guard against Vite chunk hash invalidation during live production pushes
 if (typeof window !== "undefined") {
@@ -69,8 +69,30 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const [loading, setLoading] = useState(true);
-  const [engineData, setEngineData] = useState<EngineState | null>(null);
+  const [engineData, setEngineData] = useState<EngineState | null>(() => {
+    try {
+      if (typeof window !== 'undefined' && id) {
+        const cached = sessionStorage.getItem(`df_test_cache_${id}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.test && parsed.questions && parsed.questions.length > 0) {
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {}
+    return null;
+  });
+
+  const [loading, setLoading] = useState(() => {
+    try {
+      if (typeof window !== 'undefined' && id) {
+        const cached = sessionStorage.getItem(`df_test_cache_${id}`);
+        if (cached) return false;
+      }
+    } catch (e) {}
+    return true;
+  });
 
   // Test State
   const [testStep, setTestStep] = useState<TestStep>('instructions');
@@ -454,77 +476,131 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   }, [attemptId, timeLeft, testStep]);
 
   const fetchTestEngineData = async () => {
-    setLoading(true);
+    // If not already cached, start loading; otherwise loading is already false
+    if (!engineData) setLoading(true);
+
+    // Guaranteed safety timeout: Never leave student stuck on loading screen
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 3500);
+
     try {
       if (!id) throw new Error("Invalid Test ID");
-      
-      // Safe defensive query for exam_test_questions (with marks)
-      const fetchTqDefensive = async () => {
-        const res = await supabase.from('exam_test_questions').select('question_id, marks').eq('test_id', id);
-        if (res.error && (res.error.message?.includes('marks') || res.error.code === '42703')) {
-          return supabase.from('exam_test_questions').select('question_id').eq('test_id', id);
-        }
-        return res;
-      };
 
-      // Parallel Batch 1: Fetch Test Details, Sections, and Question Links simultaneously
-      const [testRes, sectionsRes, tqRes] = await Promise.all([
-        supabase.from('exam_tests').select('*, exam_programs(name)').eq('id', id).single(),
-        supabase.from('exam_test_sections').select('*').eq('test_id', id),
-        fetchTqDefensive()
-      ]);
-
-      if (testRes.error) throw new Error(`DB Error: ${testRes.error.message}`);
-      if (!testRes.data) throw new Error(`Test not found in DB for ID: ${id}`);
-
-      const testData = testRes.data;
-      const sectionsData = sectionsRes.data || [];
-      const questionIds = tqRes.data?.map((t: any) => t.question_id) || [];
-
+      let fullTestLoaded = false;
+      let testData: any = null;
+      let sectionsData: any[] = [];
       let questionsData: any[] = [];
       let optionsMap: Record<string, any[]> = {};
       let initialResponses: Record<string, ResponseData> = {};
 
-      if (questionIds.length > 0) {
-        // Parallel Batch 2: Fetch Questions and Options simultaneously
-        const [qRes, optRes] = await Promise.all([
-          supabase.from('exam_questions').select('*').in('id', questionIds),
-          supabase.from('exam_options')
-            .select('id, question_id, content_text, media_url, created_at')
-            .in('question_id', questionIds)
-            .order('id', { ascending: true })
+      // 1. High-Performance 1-Roundtrip Combined Query
+      try {
+        const { data: combined, error: combErr } = await supabase
+          .from('exam_tests')
+          .select('*, exam_programs(name), exam_test_sections(*), exam_test_questions(marks, exam_questions(*, exam_options(id, question_id, content_text, media_url, created_at)))')
+          .eq('id', id)
+          .single();
+
+        if (!combErr && combined) {
+          testData = combined;
+          sectionsData = combined.exam_test_sections || [];
+          const tqList = combined.exam_test_questions || [];
+
+          tqList.forEach((tq: any) => {
+            const q = tq.exam_questions;
+            if (!q) return;
+
+            const explicitMarks = tq.marks != null && Number(tq.marks) > 0
+              ? Number(tq.marks)
+              : (q.marks != null && Number(q.marks) > 0 ? Number(q.marks) : null);
+
+            const finalMarks = explicitMarks != null
+              ? explicitMarks
+              : (q.part === 'B' ? resolvePartBMaxMarks(q, testData) : q.marks);
+
+            questionsData.push({
+              ...q,
+              marks: finalMarks
+            });
+
+            const opts = q.exam_options || [];
+            opts.sort((a: any, b: any) => String(a.id).localeCompare(String(b.id)));
+            optionsMap[q.id] = opts;
+          });
+
+          fullTestLoaded = true;
+        }
+      } catch (fastErr) {
+        console.warn("Combined test fetch fallback:", fastErr);
+      }
+
+      // 2. Defensive fallback if combined nested join was blocked
+      if (!fullTestLoaded) {
+        const fetchTqDefensive = async () => {
+          const res = await supabase.from('exam_test_questions').select('question_id, marks').eq('test_id', id);
+          if (res.error && (res.error.message?.includes('marks') || res.error.code === '42703')) {
+            return supabase.from('exam_test_questions').select('question_id').eq('test_id', id);
+          }
+          return res;
+        };
+
+        const [testRes, sectionsRes, tqRes] = await Promise.all([
+          supabase.from('exam_tests').select('*, exam_programs(name)').eq('id', id).single(),
+          supabase.from('exam_test_sections').select('*').eq('test_id', id),
+          fetchTqDefensive()
         ]);
 
-        const tqMarksMap = new Map((tqRes.data || []).map((t: any) => [t.question_id, t.marks]));
-        questionsData = (qRes.data || []).map((q: any) => {
-          const explicitMarks = tqMarksMap.get(q.id) != null && Number(tqMarksMap.get(q.id)) > 0
-            ? Number(tqMarksMap.get(q.id))
-            : (q.marks != null && Number(q.marks) > 0 ? Number(q.marks) : null);
+        if (testRes.error) throw new Error(`DB Error: ${testRes.error.message}`);
+        if (!testRes.data) throw new Error(`Test not found in DB for ID: ${id}`);
 
-          const finalMarks = explicitMarks != null
-            ? explicitMarks
-            : (q.part === 'B' ? resolvePartBMaxMarks(q, testData) : q.marks);
+        testData = testRes.data;
+        sectionsData = sectionsRes.data || [];
+        const questionIds = tqRes.data?.map((t: any) => t.question_id) || [];
 
-          return {
-            ...q,
-            marks: finalMarks
-          };
-        });
-        const optData = optRes.data || [];
-        optData.forEach(opt => {
-          if (!optionsMap[opt.question_id]) optionsMap[opt.question_id] = [];
-          optionsMap[opt.question_id].push(opt);
-        });
+        if (questionIds.length > 0) {
+          const [qRes, optRes] = await Promise.all([
+            supabase.from('exam_questions').select('*').in('id', questionIds),
+            supabase.from('exam_options')
+              .select('id, question_id, content_text, media_url, created_at')
+              .in('question_id', questionIds)
+              .order('id', { ascending: true })
+          ]);
 
-        // Sort questions by Part, then strictly NAT -> MSQ -> MCQ -> SUBJECTIVE, then ID for determinism
-        const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3, 'SUBJECTIVE': 4 };
-        questionsData.sort((a, b) => {
-          if (a.part !== b.part) return a.part.localeCompare(b.part);
-          if (a.type !== b.type) return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
-          return a.id.localeCompare(b.id);
-        });
+          const tqMarksMap = new Map((tqRes.data || []).map((t: any) => [t.question_id, t.marks]));
+          questionsData = (qRes.data || []).map((q: any) => {
+            const explicitMarks = tqMarksMap.get(q.id) != null && Number(tqMarksMap.get(q.id)) > 0
+              ? Number(tqMarksMap.get(q.id))
+              : (q.marks != null && Number(q.marks) > 0 ? Number(q.marks) : null);
 
-        // Image Preloader: Cache all media URLs in memory for instant rendering without flickering
+            const finalMarks = explicitMarks != null
+              ? explicitMarks
+              : (q.part === 'B' ? resolvePartBMaxMarks(q, testData) : q.marks);
+
+            return {
+              ...q,
+              marks: finalMarks
+            };
+          });
+
+          const optData = optRes.data || [];
+          optData.forEach(opt => {
+            if (!optionsMap[opt.question_id]) optionsMap[opt.question_id] = [];
+            optionsMap[opt.question_id].push(opt);
+          });
+        }
+      }
+
+      // Sort questions by Part, then strictly NAT -> MSQ -> MCQ -> SUBJECTIVE, then ID for determinism
+      const typeOrder: Record<string, number> = { 'NAT': 1, 'MSQ': 2, 'MCQ': 3, 'SUBJECTIVE': 4 };
+      questionsData.sort((a, b) => {
+        if (a.part !== b.part) return a.part.localeCompare(b.part);
+        if (a.type !== b.type) return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
+        return a.id.localeCompare(b.id);
+      });
+
+      // Background non-blocking image preloading
+      setTimeout(() => {
         const imageUrlsToPreload: string[] = [];
         questionsData.forEach(q => {
           if (q.media_url) imageUrlsToPreload.push(q.media_url);
@@ -543,26 +619,24 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             if (opt.media_url) imageUrlsToPreload.push(opt.media_url);
           });
         });
-
-        // Trigger asynchronous image preloading
         imageUrlsToPreload.forEach(url => {
           const img = new Image();
           img.src = url;
         });
+      }, 50);
 
-        // Initialize Responses State
-        questionsData.forEach(q => {
-          initialResponses[q.id] = {
-            status: 'unseen',
-            selectedOptions: [],
-            answerText: '',
-            fileUrl: '',
-            timeSpent: 0,
-            answerChanges: 0,
-            stateTransitions: []
-          };
-        });
-      }
+      // Initialize Responses State
+      questionsData.forEach(q => {
+        initialResponses[q.id] = {
+          status: 'unseen',
+          selectedOptions: [],
+          answerText: '',
+          fileUrl: '',
+          timeSpent: 0,
+          answerChanges: 0,
+          stateTransitions: []
+        };
+      });
 
       const titleUpper = (testData?.title || '').toUpperCase();
       const codeUpper = (testData?.test_code || '').toUpperCase();
@@ -625,7 +699,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       const hasTimedPartALock = !isNid && hasPartA && hasPartB && partAMins > 0 && partAMins < totalMins;
       const partA_TimeThreshold = hasTimedPartALock ? (totalMins * 60) - (partAMins * 60) : 0;
 
-      setEngineData({
+      const loadedEngineData: EngineState = {
         test: testData,
         sections: sectionsData || [],
         questions: normalizedQuestions,
@@ -637,152 +711,176 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         hasPartA,
         hasTimedPartALock,
         isNid
-      });
+      };
+
+      setEngineData(loadedEngineData);
+
+      // Cache for instant 0ms reload
+      try {
+        sessionStorage.setItem(`df_test_cache_${id}`, JSON.stringify(loadedEngineData));
+      } catch (e) {}
+
+      // UNBLOCK UI IMMEDIATELY: instructions screen renders now with zero wait
+      clearTimeout(safetyTimer);
+      setLoading(false);
+
       // 0ms Zero-Loss Auto-Recovery: Detect active in-progress attempt for this student
       let hasRestoredActiveAttempt = false;
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: candidate } = await supabase
-            .from('exam_candidates')
-            .select('id')
-            .eq('auth_user_id', user.id)
-            .maybeSingle();
+        let candidateId = typeof window !== 'undefined'
+          ? (sessionStorage.getItem('df_candidate_id') || localStorage.getItem('df_candidate_id'))
+          : null;
 
-          if (candidate) {
-            const { data: activeAttempt } = await supabase
-              .from('exam_attempts')
-              .select('*')
-              .eq('candidate_id', candidate.id)
-              .eq('test_id', id)
-              .eq('status', 'in_progress')
-              .order('attempt_number', { ascending: false })
-              .limit(1)
+        if (!candidateId || !isValidUuid(candidateId)) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            const { data: candidate } = await supabase
+              .from('exam_candidates')
+              .select('id')
+              .eq('auth_user_id', session.user.id)
               .maybeSingle();
 
-            if (activeAttempt) {
-              hasRestoredActiveAttempt = true;
-              setAttemptId(activeAttempt.id);
+            if (candidate && isValidUuid(candidate.id)) {
+              const cId: string = candidate.id;
+              candidateId = cId;
+              try { sessionStorage.setItem('df_candidate_id', cId); } catch (e) {}
+            }
+          }
+        }
 
-              // 1. Restore Responses: Merge DB responses + LocalStorage (for freshest inputs)
-              const recoveredResponses = { ...initialResponses };
+        if (candidateId && isValidUuid(candidateId)) {
+          const { data: activeAttempt } = await supabase
+            .from('exam_attempts')
+            .select('*')
+            .eq('candidate_id', candidateId)
+            .eq('test_id', id)
+            .eq('status', 'in_progress')
+            .order('attempt_number', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-              const { data: dbResponses } = await supabase
-                .from('exam_responses')
-                .select('*')
-                .eq('attempt_id', activeAttempt.id);
+          if (activeAttempt) {
+            hasRestoredActiveAttempt = true;
+            setAttemptId(activeAttempt.id);
 
-              if (dbResponses) {
-                dbResponses.forEach((r: any) => {
-                  if (recoveredResponses[r.question_id]) {
-                    recoveredResponses[r.question_id] = {
-                      status: r.status || 'visited',
-                      selectedOptions: r.selected_options || [],
-                      answerText: r.answer_text || '',
-                      fileUrl: r.file_url || '',
-                      timeSpent: r.time_spent || 0,
-                      answerChanges: r.answer_changes || 0,
-                      stateTransitions: r.state_transitions || []
-                    };
+            // 1. Restore Responses: Merge DB responses + LocalStorage (for freshest inputs)
+            const recoveredResponses = { ...initialResponses };
+
+            const { data: dbResponses } = await supabase
+              .from('exam_responses')
+              .select('*')
+              .eq('attempt_id', activeAttempt.id);
+
+            if (dbResponses) {
+              dbResponses.forEach((r: any) => {
+                if (recoveredResponses[r.question_id]) {
+                  recoveredResponses[r.question_id] = {
+                    status: r.status || 'visited',
+                    selectedOptions: r.selected_options || [],
+                    answerText: r.answer_text || '',
+                    fileUrl: r.file_url || '',
+                    timeSpent: r.time_spent || 0,
+                    answerChanges: r.answer_changes || 0,
+                    stateTransitions: r.state_transitions || []
+                  };
+                }
+              });
+            }
+
+            // Layer localStorage cache on top for any unsynced offline edits
+            try {
+              const localCached = localStorage.getItem(`df_attempt_${activeAttempt.id}`);
+              if (localCached) {
+                const parsedLocal = JSON.parse(localCached);
+                Object.keys(parsedLocal).forEach(qId => {
+                  if (recoveredResponses[qId]) {
+                    const localItem = parsedLocal[qId];
+                    if (
+                      (localItem.selectedOptions && localItem.selectedOptions.length > 0) ||
+                      (localItem.answerText && localItem.answerText.trim()) ||
+                      localItem.fileUrl
+                    ) {
+                      recoveredResponses[qId] = {
+                        ...recoveredResponses[qId],
+                        ...localItem
+                      };
+                    }
                   }
                 });
               }
+            } catch (e) {
+              console.warn("Could not parse local attempt cache:", e);
+            }
 
-              // Layer localStorage cache on top for any unsynced offline edits
-              try {
-                const localCached = localStorage.getItem(`df_attempt_${activeAttempt.id}`);
-                if (localCached) {
-                  const parsedLocal = JSON.parse(localCached);
-                  Object.keys(parsedLocal).forEach(qId => {
-                    if (recoveredResponses[qId]) {
-                      const localItem = parsedLocal[qId];
-                      if (
-                        (localItem.selectedOptions && localItem.selectedOptions.length > 0) ||
-                        (localItem.answerText && localItem.answerText.trim()) ||
-                        localItem.fileUrl
-                      ) {
-                        recoveredResponses[qId] = {
-                          ...recoveredResponses[qId],
-                          ...localItem
-                        };
-                      }
-                    }
-                  });
-                }
-              } catch (e) {
-                console.warn("Could not parse local attempt cache:", e);
+            latestResponsesRef.current = recoveredResponses;
+            setResponses(recoveredResponses);
+
+            // 2. Recover Exact Remaining Seconds (Frozen Seconds)
+            let remainingSecs = totalMins * 60;
+            const frozenSecondsStr = typeof window !== 'undefined' ? localStorage.getItem(`df_frozen_seconds_${activeAttempt.id}`) : null;
+
+            if (frozenSecondsStr && Number(frozenSecondsStr) > 0) {
+              remainingSecs = Number(frozenSecondsStr);
+            } else if (activeAttempt.start_time) {
+              const elapsed = Math.max(0, Math.floor((Date.now() - new Date(activeAttempt.start_time).getTime()) / 1000));
+              const storedTotalPaused = activeAttempt.total_paused_seconds || 0;
+              remainingSecs = Math.max(0, (totalMins * 60) - Math.max(0, elapsed - storedTotalPaused));
+            }
+
+            // Restore pause metadata
+            const storedResumes = (activeAttempt as any).pause_count ?? (Number(sessionStorage.getItem(`df_resumes_used_${activeAttempt.id}`)) || 0);
+            const storedTotalPaused = (activeAttempt as any).total_paused_seconds ?? (Number(sessionStorage.getItem(`df_total_paused_${activeAttempt.id}`)) || 0);
+            setResumesUsed(storedResumes);
+            setTotalPausedSecs(storedTotalPaused);
+
+            // 3. Check if upload buffer window is active or main exam timer expired
+            const bufferEndKey = `df_upload_buffer_end_${activeAttempt.id}`;
+            const storedBufferEnd = typeof window !== 'undefined' ? Number(localStorage.getItem(bufferEndKey)) : 0;
+
+            if (hasPartB && storedBufferEnd && storedBufferEnd > Date.now()) {
+              uploadBufferEndTimeRef.current = storedBufferEnd;
+              hasStartedUploadBufferRef.current = true;
+              setUploadBufferTimeLeft(Math.max(0, Math.round((storedBufferEnd - Date.now()) / 1000)));
+              setTestStep('upload_buffer');
+              setIsPaused(false);
+              setTimerRunning(false);
+              toast({
+                title: "Buffer Window Active ⏱️",
+                description: isNid
+                  ? "You are in the 10-minute solution upload window."
+                  : "You are in the 10-minute solution upload window. Objective answers are locked.",
+                duration: 6000
+              });
+            } else if (remainingSecs <= 0) {
+              // The attempt has already expired in the past and no active buffer window exists.
+              // Close this expired attempt so the candidate is NOT dropped into an artificial buffer window.
+              await supabase.from('exam_attempts').update({
+                status: 'completed',
+                completed_at: new Date().toISOString()
+              }).eq('id', activeAttempt.id);
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem(bufferEndKey);
+                localStorage.removeItem(`df_frozen_seconds_${activeAttempt.id}`);
               }
+              hasRestoredActiveAttempt = false;
+              setAttemptId(null);
+              setTestStep('instructions');
+            } else {
+              testEndTimeRef.current = Date.now() + (remainingSecs * 1000);
+              sessionStorage.setItem(`df_test_end_${id}`, String(testEndTimeRef.current));
+              setTimeLeft(remainingSecs);
 
-              latestResponsesRef.current = recoveredResponses;
-              setResponses(recoveredResponses);
+              setIsPaused(true);
+              setIsSystemRecovery(true);
+              setPausedAt(Date.now());
+              setTimerRunning(true);
+              setTestStep('test');
 
-              // 2. Recover Exact Remaining Seconds (Frozen Seconds)
-              let remainingSecs = totalMins * 60;
-              const frozenSecondsStr = typeof window !== 'undefined' ? localStorage.getItem(`df_frozen_seconds_${activeAttempt.id}`) : null;
-
-              if (frozenSecondsStr && Number(frozenSecondsStr) > 0) {
-                remainingSecs = Number(frozenSecondsStr);
-              } else if (activeAttempt.start_time) {
-                const elapsed = Math.max(0, Math.floor((Date.now() - new Date(activeAttempt.start_time).getTime()) / 1000));
-                const storedTotalPaused = activeAttempt.total_paused_seconds || 0;
-                remainingSecs = Math.max(0, (totalMins * 60) - Math.max(0, elapsed - storedTotalPaused));
-              }
-
-              // Restore pause metadata
-              const storedResumes = (activeAttempt as any).pause_count ?? (Number(sessionStorage.getItem(`df_resumes_used_${activeAttempt.id}`)) || 0);
-              const storedTotalPaused = (activeAttempt as any).total_paused_seconds ?? (Number(sessionStorage.getItem(`df_total_paused_${activeAttempt.id}`)) || 0);
-              setResumesUsed(storedResumes);
-              setTotalPausedSecs(storedTotalPaused);
-
-              // 3. Check if upload buffer window is active or main exam timer expired
-              const bufferEndKey = `df_upload_buffer_end_${activeAttempt.id}`;
-              const storedBufferEnd = typeof window !== 'undefined' ? Number(localStorage.getItem(bufferEndKey)) : 0;
-
-              if (hasPartB && storedBufferEnd && storedBufferEnd > Date.now()) {
-                uploadBufferEndTimeRef.current = storedBufferEnd;
-                hasStartedUploadBufferRef.current = true;
-                setUploadBufferTimeLeft(Math.max(0, Math.round((storedBufferEnd - Date.now()) / 1000)));
-                setTestStep('upload_buffer');
-                setIsPaused(false);
-                setTimerRunning(false);
-                toast({
-                  title: "Buffer Window Active ⏱️",
-                  description: isNid
-                    ? "You are in the 10-minute solution upload window."
-                    : "You are in the 10-minute solution upload window. Objective answers are locked.",
-                  duration: 6000
-                });
-              } else if (remainingSecs <= 0) {
-                // The attempt has already expired in the past and no active buffer window exists.
-                // Close this expired attempt so the candidate is NOT dropped into an artificial buffer window.
-                await supabase.from('exam_attempts').update({
-                  status: 'completed',
-                  completed_at: new Date().toISOString()
-                }).eq('id', activeAttempt.id);
-                if (typeof window !== 'undefined') {
-                  localStorage.removeItem(bufferEndKey);
-                  localStorage.removeItem(`df_frozen_seconds_${activeAttempt.id}`);
-                }
-                hasRestoredActiveAttempt = false;
-                setAttemptId(null);
-                setTestStep('instructions');
-              } else {
-                testEndTimeRef.current = Date.now() + (remainingSecs * 1000);
-                sessionStorage.setItem(`df_test_end_${id}`, String(testEndTimeRef.current));
-                setTimeLeft(remainingSecs);
-
-                setIsPaused(true);
-                setIsSystemRecovery(true);
-                setPausedAt(Date.now());
-                setTimerRunning(true);
-                setTestStep('test');
-
-                toast({
-                  title: "Exam Session Restored 🛡️",
-                  description: `All your answers are safe. Your timer was automatically frozen at ${formatTime(remainingSecs)}. Click 'Resume Examination' to continue.`,
-                  duration: 8000
-                });
-              }
+              toast({
+                title: "Exam Session Restored 🛡️",
+                description: `All your answers are safe. Your timer was automatically frozen at ${formatTime(remainingSecs)}. Click 'Resume Examination' to continue.`,
+                duration: 8000
+              });
             }
           }
         }
@@ -814,6 +912,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       toast({ title: "Failed to load test", description: err.message, variant: "destructive" });
       setLocation('/portal/dashboard');
     } finally {
+      clearTimeout(safetyTimer);
       setLoading(false);
     }
   };
@@ -832,7 +931,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         .select('id, access_level, has_focus_mocks_access')
         .eq('auth_user_id', user.id)
         .single();
-      if (!candidate) throw new Error('Candidate profile not found');
+      if (!candidate || !isValidUuid(candidate.id)) throw new Error('Candidate profile not found');
 
       // Access & 1-week deadline enforcement for Focus Batch tests
       const currentTest = engineData?.test;

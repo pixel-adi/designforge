@@ -48,3 +48,12 @@ export function resolvePartBMaxMarks(q: any, test?: any): number {
   }
   return 15;
 }
+
+/**
+ * Safely validates if a string is a valid PostgreSQL UUID.
+ * Prevents invalid input syntax errors (22P02) from dropping database API success rates.
+ */
+export function isValidUuid(id?: string | null): boolean {
+  if (!id || typeof id !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}

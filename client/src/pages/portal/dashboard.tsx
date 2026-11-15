@@ -15,7 +15,7 @@ import { PortalPrepTrackerSection } from "@/prep-tracker/components/PortalPrepTr
 import { PortalWeeklyUpdatesModal } from "@/prep-tracker/components/PortalWeeklyUpdatesModal";
 import { ExamCountdownTimer } from "@/prep-tracker/components/ExamCountdownTimer";
 import { sanitizeHtml } from "@/lib/sanitize";
-import { formatScore, resolvePartBMaxMarks } from "@/lib/utils";
+import { formatScore, resolvePartBMaxMarks, isValidUuid } from "@/lib/utils";
 import CustomTestCreatorModal from "./CustomTestCreatorModal";
 import { QuestionBankView } from "./question-bank/QuestionBankView";
 const CustomScatterTooltip = ({ active, payload }: any) => {
@@ -597,6 +597,12 @@ export default function PortalDashboard() {
         }
       } else if (active) {
         setCandidate(candidateData);
+        if (candidateData.id && isValidUuid(candidateData.id)) {
+          try {
+            sessionStorage.setItem('df_candidate_id', candidateData.id);
+            localStorage.setItem('df_candidate_id', candidateData.id);
+          } catch (e) {}
+        }
         setShowOnboarding(false);
         try {
           localStorage.setItem(`df_candidate_${user.id}`, JSON.stringify(candidateData));
@@ -671,7 +677,9 @@ export default function PortalDashboard() {
           .select(`id, title, category, is_focus_batch, access_tier, program_format, expires_at, created_at, is_custom_practice, created_by_candidate_id, practice_category, exam_test_sections(part, duration_minutes)`)
           .eq('status', 'published')
           .order('created_at', { ascending: false }),
-        supabase.from('exam_attempts').select('id, test_id, status, attempt_number').eq('candidate_id', candidateId).order('attempt_number', { ascending: true })
+        isValidUuid(candidateId)
+          ? supabase.from('exam_attempts').select('id, test_id, status, attempt_number').eq('candidate_id', candidateId).order('attempt_number', { ascending: true })
+          : Promise.resolve({ data: [], error: null } as any)
       ]);
 
       const tests = testsRes.status === 'fulfilled' && !testsRes.value.error ? testsRes.value.data : [];
@@ -687,7 +695,7 @@ export default function PortalDashboard() {
 
       // Group attempts by test_id as arrays
       const attemptMap: Record<string, any[]> = {};
-      (attempts || []).forEach(a => {
+      (attempts || []).forEach((a: any) => {
         if (!attemptMap[a.test_id]) attemptMap[a.test_id] = [];
         attemptMap[a.test_id].push(a);
       });
@@ -740,6 +748,11 @@ export default function PortalDashboard() {
   };
 
   const fetchAttempts = async (candidateId: string) => {
+    if (!isValidUuid(candidateId)) {
+      setPastAttempts([]);
+      setLoadingAttempts(false);
+      return;
+    }
     if (pastAttempts.length === 0) setLoadingAttempts(true);
     try {
       const { data, error } = await supabase
@@ -1899,12 +1912,14 @@ export default function PortalDashboard() {
     try {
       const [assignRes, subRes] = await Promise.all([
         supabase.from('class_assignments').select('*').eq('is_visible', true).order('created_at', { ascending: false }),
-        supabase.from('assignment_submissions').select('*').eq('candidate_id', candidate.id)
+        isValidUuid(candidate.id)
+          ? supabase.from('assignment_submissions').select('*').eq('candidate_id', candidate.id)
+          : Promise.resolve({ data: [], error: null } as any)
       ]);
       if (!assignRes.error && assignRes.data) setAssignments(assignRes.data);
       if (!subRes.error && subRes.data) {
         const subMap: Record<string, any> = {};
-        subRes.data.forEach(s => { subMap[s.assignment_id] = s; });
+        subRes.data.forEach((s: any) => { subMap[s.assignment_id] = s; });
         setAssignmentSubmissions(subMap);
       }
     } catch (err) { console.error(err); } finally { clearTimeout(safetyTimer); setLoadingAssignments(false); }

@@ -5,6 +5,7 @@ import {
   RotateCcw, Zap, HelpCircle, Layers, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { isValidUuid } from '@/lib/utils';
 import { 
   QuestionItem, 
   QuestionOption, 
@@ -121,7 +122,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
   useEffect(() => {
     let isMounted = true;
     const fetchHistoricalPracticed = async () => {
-      if (!candidate?.id) return;
+      if (!candidate?.id || !isValidUuid(candidate.id)) return;
       try {
         const { data: attempts } = await supabase
           .from('exam_attempts')
