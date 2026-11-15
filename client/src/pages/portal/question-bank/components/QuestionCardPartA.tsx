@@ -13,7 +13,7 @@ interface QuestionCardPartAProps {
   questionIndex: number;
   isPracticed: boolean;
   isBookmarked: boolean;
-  onTogglePracticed: (id: string) => void;
+  onTogglePracticed: (id: string, part?: 'A' | 'B') => void;
   onToggleBookmarked: (id: string) => void;
   forceShowAnswer?: boolean;
 }
@@ -39,7 +39,7 @@ export const QuestionCardPartA: React.FC<QuestionCardPartAProps> = ({
   const handleSelectOption = (optId: string) => {
     // Automatically mark as practiced when student attempts
     if (!isPracticed) {
-      onTogglePracticed(question.id);
+      onTogglePracticed(question.id, 'A');
     }
 
     if (isMSQ) {
@@ -123,7 +123,7 @@ export const QuestionCardPartA: React.FC<QuestionCardPartAProps> = ({
 
           <button
             type="button"
-            onClick={() => onTogglePracticed(question.id)}
+            onClick={() => onTogglePracticed(question.id, 'A')}
             className={`p-1.5 px-2 rounded-lg border text-[11px] font-bold transition-all ${
               isPracticed
                 ? 'bg-neutral-50 border-black/10 text-foreground/60 hover:bg-neutral-100'

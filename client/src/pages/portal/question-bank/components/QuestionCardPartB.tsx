@@ -12,7 +12,7 @@ interface QuestionCardPartBProps {
   questionIndex: number;
   isPracticed: boolean;
   isBookmarked: boolean;
-  onTogglePracticed: (id: string) => void;
+  onTogglePracticed: (id: string, part?: 'A' | 'B') => void;
   onToggleBookmarked: (id: string) => void;
   forceShowAnswer?: boolean;
 }
@@ -98,7 +98,7 @@ export const QuestionCardPartB: React.FC<QuestionCardPartBProps> = ({
 
           <button
             type="button"
-            onClick={() => onTogglePracticed(question.id)}
+            onClick={() => onTogglePracticed(question.id, 'B')}
             className={`p-1.5 px-2.5 rounded-lg border text-[11px] font-bold transition-all ${
               isPracticed
                 ? 'bg-neutral-50 border-black/10 text-foreground/60 hover:bg-neutral-100'

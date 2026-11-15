@@ -152,13 +152,14 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
-  // Compute Active In-Bar Chips (State 4)
-  const inBarChips: { id: string; label: string; onRemove: () => void; variant?: 'status' | 'default' }[] = [];
+  // Compute Active Filter Chips (displayed BELOW the search bar)
+  const activeFilterChips: { id: string; category: string; label: string; onRemove: () => void; variant?: 'status' | 'default' }[] = [];
 
   if (filters.part !== 'all') {
-    inBarChips.push({
+    activeFilterChips.push({
       id: 'part',
-      label: filters.part === 'B' ? 'Part B' : 'Part A',
+      category: 'Section',
+      label: filters.part === 'B' ? 'Part B · Creative Studio' : 'Part A · Aptitude & Visual',
       onRemove: () => onFilterChange('part', 'all'),
       variant: 'default',
     });
@@ -166,11 +167,12 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
 
   if (filters.type !== 'all') {
     const typeLabel = 
-      filters.type === 'SUBJECTIVE' ? 'Drawing' : 
+      filters.type === 'SUBJECTIVE' ? 'Drawing (Part B)' : 
       filters.type === 'MCQ' ? 'MCQ' : 
       filters.type === 'MSQ' ? 'MSQ' : 'NAT';
-    inBarChips.push({
+    activeFilterChips.push({
       id: 'type',
+      category: 'Type',
       label: typeLabel,
       onRemove: () => onFilterChange('type', 'all'),
       variant: 'default',
@@ -179,8 +181,9 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
 
   if (filters.domain !== 'all') {
     const matched = DOMAIN_OPTIONS.find(d => d.id === filters.domain);
-    inBarChips.push({
+    activeFilterChips.push({
       id: 'domain',
+      category: 'Topic',
       label: matched ? matched.label.replace(' (Part B)', '') : filters.domain,
       onRemove: () => onFilterChange('domain', 'all'),
       variant: 'default',
@@ -188,9 +191,10 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
   }
 
   if (filters.difficulty !== 'all') {
-    inBarChips.push({
+    activeFilterChips.push({
       id: 'difficulty',
-      label: `${filters.difficulty} diff`,
+      category: 'Difficulty',
+      label: filters.difficulty,
       onRemove: () => onFilterChange('difficulty', 'all'),
       variant: 'default',
     });
@@ -200,15 +204,26 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
     const statusLabel = 
       filters.practiceStatus === 'unattempted' ? 'Unattempted' :
       filters.practiceStatus === 'practiced' ? 'Practiced' : 'Starred';
-    inBarChips.push({
+    activeFilterChips.push({
       id: 'practiceStatus',
+      category: 'Status',
       label: statusLabel,
       onRemove: () => onFilterChange('practiceStatus', 'all'),
       variant: 'status',
     });
   }
 
-  const activeFilterCount = inBarChips.length;
+  if (filters.searchQuery.trim()) {
+    activeFilterChips.push({
+      id: 'searchQuery',
+      category: 'Search',
+      label: `"${filters.searchQuery.trim()}"`,
+      onRemove: () => onFilterChange('searchQuery', ''),
+      variant: 'default',
+    });
+  }
+
+  const activeFilterCount = activeFilterChips.length;
 
   // Current exam display text
   const currentExamObj = EXAM_OPTIONS.find(e => e.id === filters.exam) || EXAM_OPTIONS[0];
@@ -334,32 +349,10 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
         {/* Divider Line */}
         <div className="h-7 w-[1px] bg-neutral-200 shrink-0 hidden xs:block" />
 
-        {/* B. SEARCH INPUT & IN-BAR FILTER CHIPS (State 1 & State 4) */}
-        <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto scrollbar-none py-1">
+        {/* B. SEARCH INPUT (Clean without chips inside) */}
+        <div className="flex items-center gap-2 flex-1 min-w-0 py-1">
           {/* Search Icon */}
-          <Search className="w-4 h-4 text-neutral-400 shrink-0" />
-
-          {/* IN-BAR FILTER CHIPS (State 4) */}
-          {inBarChips.map(chip => (
-            <span
-              key={chip.id}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition-all ${
-                chip.variant === 'status'
-                  ? 'bg-[#ecfdf5] text-[#059669] border border-[#a7f3d0]'
-                  : 'bg-[#fef2f0] text-[#ef4444] border border-[#fecaca]'
-              }`}
-            >
-              <span>{chip.label}</span>
-              <button
-                type="button"
-                onClick={chip.onRemove}
-                className="text-inherit opacity-60 hover:opacity-100 hover:scale-110 transition-transform cursor-pointer"
-                title={`Remove ${chip.label} filter`}
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          ))}
+          <Search className="w-4 h-4 text-neutral-400 shrink-0 ml-1" />
 
           {/* Actual Input */}
           <input
@@ -369,11 +362,7 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
             onChange={(e) => onFilterChange('searchQuery', e.target.value)}
             onFocus={() => setIsInputFocused(true)}
             onKeyDown={handleKeyDown}
-            placeholder={
-              inBarChips.length > 0
-                ? `Search within ${totalQuestions} results`
-                : `Search ${currentExamCount.toLocaleString()} questions by concept, keyword or tag`
-            }
+            placeholder={`Search ${currentExamCount.toLocaleString()} questions by concept, keyword or tag`}
             className="w-full h-8 bg-transparent text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none font-medium min-w-[120px]"
           />
 
@@ -399,10 +388,10 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
 
         {/* C. RIGHT ACTIONS: RESULTS COUNT, ANSWERS TOGGLE, FILTERS BUTTON */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Result Count when filters applied (State 4) */}
-          {inBarChips.length > 0 && (
+          {/* Result Count when filters applied */}
+          {activeFilterCount > 0 && (
             <span className="text-xs sm:text-sm font-bold text-neutral-700 shrink-0 whitespace-nowrap hidden lg:inline mr-1">
-              {totalQuestions} questions
+              {totalQuestions.toLocaleString()} questions
             </span>
           )}
 
@@ -676,61 +665,85 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
         )}
       </div>
 
-      {/* 2. QUICK SUGGESTIONS ROW (State 1) */}
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-neutral-400 font-semibold mr-0.5">Quick:</span>
-        <button
-          type="button"
-          onClick={() => onFilterChange('part', filters.part === 'B' ? 'all' : 'B')}
-          className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
-            filters.part === 'B'
-              ? 'bg-[#fef2f0] text-[#ef4444] border-[#fecaca]'
-              : 'border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700'
-          }`}
-        >
-          Part B · Studio
-        </button>
-        <button
-          type="button"
-          onClick={() => onFilterChange('type', filters.type === 'SUBJECTIVE' ? 'all' : 'SUBJECTIVE')}
-          className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
-            filters.type === 'SUBJECTIVE'
-              ? 'bg-[#fef2f0] text-[#ef4444] border-[#fecaca]'
-              : 'border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700'
-          }`}
-        >
-          Drawing
-        </button>
-        <button
-          type="button"
-          onClick={() => onFilterChange('practiceStatus', filters.practiceStatus === 'unattempted' ? 'all' : 'unattempted')}
-          className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
-            filters.practiceStatus === 'unattempted'
-              ? 'bg-[#ecfdf5] text-[#059669] border-[#a7f3d0]'
-              : 'border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700'
-          }`}
-        >
-          Unattempted
-        </button>
-        <button
-          type="button"
-          onClick={() => onFilterChange('domain', filters.domain === 'spatial' ? 'all' : 'spatial')}
-          className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
-            filters.domain === 'spatial'
-              ? 'bg-[#fef2f0] text-[#ef4444] border-[#fecaca]'
-              : 'border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700'
-          }`}
-        >
-          Visual & Spatial
-        </button>
-        <button
-          type="button"
-          onClick={() => onFilterChange('searchQuery', 'isometric')}
-          className="px-2.5 py-1 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition-colors cursor-pointer"
-        >
-          Recent: "isometric"
-        </button>
-      </div>
+      {/* 2. AREA BELOW SEARCH BAR */}
+      {/* Case A: If NO filters are selected, show Quick Selections row */}
+      {activeFilterCount === 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-xs pt-0.5 animate-in fade-in duration-150">
+          <span className="text-neutral-400 font-semibold mr-0.5">Quick:</span>
+          <button
+            type="button"
+            onClick={() => onFilterChange('part', 'B')}
+            className="px-2.5 py-1 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-semibold transition-colors cursor-pointer"
+          >
+            Part B · Studio
+          </button>
+          <button
+            type="button"
+            onClick={() => onFilterChange('type', 'SUBJECTIVE')}
+            className="px-2.5 py-1 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-semibold transition-colors cursor-pointer"
+          >
+            Drawing
+          </button>
+          <button
+            type="button"
+            onClick={() => onFilterChange('practiceStatus', 'unattempted')}
+            className="px-2.5 py-1 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-semibold transition-colors cursor-pointer"
+          >
+            Unattempted
+          </button>
+          <button
+            type="button"
+            onClick={() => onFilterChange('domain', 'spatial')}
+            className="px-2.5 py-1 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-semibold transition-colors cursor-pointer"
+          >
+            Visual & Spatial
+          </button>
+          <button
+            type="button"
+            onClick={() => onFilterChange('searchQuery', 'isometric')}
+            className="px-2.5 py-1 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition-colors cursor-pointer"
+          >
+            Recent: "isometric"
+          </button>
+        </div>
+      )}
+
+      {/* Case B: If ANY filter IS selected, show Active Filter Chips BELOW the search bar */}
+      {activeFilterCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 animate-in fade-in slide-in-from-top-1 duration-150">
+          <div className="flex flex-wrap items-center gap-2">
+            {activeFilterChips.map(chip => (
+              <span
+                key={chip.id}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold transition-all ${
+                  chip.variant === 'status'
+                    ? 'bg-[#ecfdf5] text-[#059669] border border-[#a7f3d0]'
+                    : 'bg-[#fef2f0] text-[#ef4444] border border-[#fecaca]'
+                }`}
+              >
+                <span className="text-neutral-400 font-normal">{chip.category}:</span>
+                <span>{chip.label}</span>
+                <button
+                  type="button"
+                  onClick={chip.onRemove}
+                  className="ml-0.5 text-inherit opacity-60 hover:opacity-100 hover:scale-110 transition-transform cursor-pointer"
+                  title={`Remove ${chip.label} filter`}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={onResetFilters}
+            className="text-xs font-bold text-[#ef4444] hover:underline cursor-pointer ml-auto"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
 
       {/* 3. SUB-NAVIGATION TABS (All, Unattempted, Practiced) & "⚡ Launch timed drill" Button */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-black/10 pb-1 pt-1">

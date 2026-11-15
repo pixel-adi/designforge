@@ -38,6 +38,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
 }) => {
   const candidateId = candidate?.id || 'guest';
   const STORAGE_PRACTICED_KEY = `df_qb_practiced_${candidateId}`;
+  const STORAGE_PRACTICED_PARTS_KEY = `df_qb_practiced_parts_${candidateId}`;
   const STORAGE_BOOKMARKED_KEY = `df_qb_bookmarked_${candidateId}`;
 
   // Filter State
@@ -83,13 +84,22 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
     };
   });
 
-  // Practiced and Bookmarked State
-  const [practicedIds, setPracticedIds] = useState<Set<string>>(() => {
+  // Practiced Questions Mapped by Part ('A' | 'B') for section-specific tracking
+  const [practicedMap, setPracticedMap] = useState<Record<string, 'A' | 'B'>>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_PRACTICED_KEY);
-      if (saved) return new Set(JSON.parse(saved));
+      const savedParts = localStorage.getItem(STORAGE_PRACTICED_PARTS_KEY);
+      if (savedParts) return JSON.parse(savedParts);
+
+      // Backwards-compatible migration from flat array
+      const oldArr = localStorage.getItem(STORAGE_PRACTICED_KEY);
+      if (oldArr) {
+        const arr: string[] = JSON.parse(oldArr);
+        const map: Record<string, 'A' | 'B'> = {};
+        arr.forEach(id => { map[id] = 'A'; });
+        return map;
+      }
     } catch (e) {}
-    return new Set<string>();
+    return {};
   });
 
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(() => {
@@ -122,17 +132,21 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
           const attemptIds = attempts.map(a => a.id);
           const { data: responses } = await supabase
             .from('exam_responses')
-            .select('question_id')
+            .select('question_id, exam_questions(part)')
             .in('attempt_id', attemptIds.slice(0, 50));
 
           if (isMounted && responses && responses.length > 0) {
-            setPracticedIds(prev => {
-              const updated = new Set(prev);
-              responses.forEach(r => {
-                if (r.question_id) updated.add(r.question_id);
+            setPracticedMap(prev => {
+              const updated = { ...prev };
+              responses.forEach((r: any) => {
+                if (r.question_id) {
+                  const part = r.exam_questions?.part || 'A';
+                  updated[r.question_id] = part;
+                }
               });
               try {
-                localStorage.setItem(STORAGE_PRACTICED_KEY, JSON.stringify(Array.from(updated)));
+                localStorage.setItem(STORAGE_PRACTICED_PARTS_KEY, JSON.stringify(updated));
+                localStorage.setItem(STORAGE_PRACTICED_KEY, JSON.stringify(Object.keys(updated)));
               } catch (e) {}
               return updated;
             });
@@ -145,7 +159,24 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
 
     fetchHistoricalPracticed();
     return () => { isMounted = false; };
-  }, [candidate?.id, STORAGE_PRACTICED_KEY]);
+  }, [candidate?.id, STORAGE_PRACTICED_KEY, STORAGE_PRACTICED_PARTS_KEY]);
+
+  // Section-specific Practiced & Unattempted Counts
+  const partAPracticedCount = useMemo(() => {
+    return Object.values(practicedMap).filter(p => p === 'A').length;
+  }, [practicedMap]);
+
+  const partBPracticedCount = useMemo(() => {
+    return Object.values(practicedMap).filter(p => p === 'B').length;
+  }, [practicedMap]);
+
+  const activePracticedCount = useMemo(() => {
+    if (filters.part === 'A') return partAPracticedCount;
+    if (filters.part === 'B') return partBPracticedCount;
+    return Object.keys(practicedMap).length;
+  }, [filters.part, partAPracticedCount, partBPracticedCount, practicedMap]);
+
+  const activeUnattemptedCount = Math.max(0, totalCount - activePracticedCount);
 
   // Load exact exam counts in background and cache
   useEffect(() => {
@@ -259,11 +290,15 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         }
       }
 
-      // 7. Practice Status filter
+      // 7. Practice Status filter (Respecting Part A vs Part B isolation)
+      const relevantPracticedIds = Object.entries(practicedMap)
+        .filter(([_, part]) => (filters.part === 'all' ? true : part === filters.part))
+        .map(([id]) => id)
+        .slice(0, 100);
+
       if (filters.practiceStatus === 'practiced') {
-        const practicedArr = Array.from(practicedIds).slice(0, 100);
-        if (practicedArr.length > 0) {
-          query = query.in('id', practicedArr);
+        if (relevantPracticedIds.length > 0) {
+          query = query.in('id', relevantPracticedIds);
         } else {
           setQuestions([]);
           setTotalCount(0);
@@ -271,9 +306,8 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
           return;
         }
       } else if (filters.practiceStatus === 'unattempted') {
-        const practicedArr = Array.from(practicedIds).slice(0, 100);
-        if (practicedArr.length > 0) {
-          query = query.not('id', 'in', `(${practicedArr.join(',')})`);
+        if (relevantPracticedIds.length > 0) {
+          query = query.not('id', 'in', `(${relevantPracticedIds.join(',')})`);
         }
       } else if (filters.practiceStatus === 'bookmarked') {
         const bookmarkedArr = Array.from(bookmarkedIds).slice(0, 100);
@@ -349,7 +383,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
     filters.domain, 
     filters.practiceStatus,
     debouncedSearchQuery,
-    practicedIds,
+    practicedMap,
     bookmarkedIds
   ]);
 
@@ -360,8 +394,6 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
   // Pagination calculations
   const totalPages = Math.max(1, Math.ceil(totalCount / QUESTIONS_PER_PAGE));
   const startIndex = (currentPage - 1) * QUESTIONS_PER_PAGE;
-  const practicedCount = practicedIds.size;
-  const unattemptedCount = Math.max(0, totalCount - practicedCount);
 
   // Background Pre-fetch of Next Page for 0ms Instant Page Transitions
   useEffect(() => {
@@ -415,21 +447,24 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
     return () => clearTimeout(idleTimer);
   }, [currentPage, totalPages, loading, filters, debouncedSearchQuery]);
 
-  // Toggle Practiced
-  const handleTogglePracticed = useCallback((id: string) => {
-    setPracticedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
+  // Toggle Practiced with Part tracking ('A' | 'B')
+  const handleTogglePracticed = useCallback((id: string, part?: 'A' | 'B') => {
+    setPracticedMap(prev => {
+      const next = { ...prev };
+      if (next[id]) {
+        delete next[id];
       } else {
-        next.add(id);
+        const q = questions.find(item => item.id === id);
+        const resolvedPart = part || q?.part || (filters.part !== 'all' ? filters.part : 'A');
+        next[id] = resolvedPart;
       }
       try {
-        localStorage.setItem(STORAGE_PRACTICED_KEY, JSON.stringify(Array.from(next)));
+        localStorage.setItem(STORAGE_PRACTICED_PARTS_KEY, JSON.stringify(next));
+        localStorage.setItem(STORAGE_PRACTICED_KEY, JSON.stringify(Object.keys(next)));
       } catch (e) {}
       return next;
     });
-  }, [STORAGE_PRACTICED_KEY]);
+  }, [questions, filters.part, candidateId, STORAGE_PRACTICED_KEY, STORAGE_PRACTICED_PARTS_KEY]);
 
   // Toggle Bookmarked
   const handleToggleBookmarked = useCallback((id: string) => {
@@ -522,8 +557,8 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         onFilterChange={handleFilterChange}
         onResetFilters={handleResetFilters}
         totalQuestions={totalCount}
-        unattemptedCount={unattemptedCount}
-        practicedCount={practicedCount}
+        unattemptedCount={activeUnattemptedCount}
+        practicedCount={activePracticedCount}
         onLaunchDrill={onLaunchCustomDrill ? handleLaunchDrillClick : undefined}
         showAllAnswers={showAllAnswers}
         onToggleAllAnswers={() => setShowAllAnswers(prev => !prev)}
@@ -559,7 +594,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         <div className="space-y-5">
           {questions.map((question, idx) => {
             const actualIndex = startIndex + idx;
-            const isPracticed = practicedIds.has(question.id);
+            const isPracticed = Boolean(practicedMap[question.id]);
             const isBookmarked = bookmarkedIds.has(question.id);
 
             if (question.part === 'B') {
