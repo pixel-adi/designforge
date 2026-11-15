@@ -303,45 +303,36 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
           </div>
         </div>
 
-        {/* 2. Active Filter Pills & "+ Add filter" Row */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-black/5">
-          <div className="flex flex-wrap items-center gap-2">
-            {activeFilters.map((f) => (
-              <span
-                key={f.key}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  f.isDifficulty
-                    ? 'bg-[#fef2f2] text-[#991b1b] border border-[#fecaca]'
-                    : 'bg-[#f4f4f5] text-foreground/85 border border-black/5'
-                }`}
-              >
-                <span className="text-foreground/50 font-normal">{f.label}</span>
-                <strong className={f.isDifficulty ? 'text-[#991b1b]' : 'text-[#18181b]'}>
-                  {f.value}
-                </strong>
-                <button
-                  type="button"
-                  onClick={() => onFilterChange(f.key, 'all')}
-                  className="ml-1 text-foreground/40 hover:text-foreground hover:scale-110 transition-transform"
-                  title={`Remove ${f.label} filter`}
+        {/* 2. Active Filter Pills Row (when any filters active) */}
+        {activeFilterCount > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-black/5">
+            <div className="flex flex-wrap items-center gap-2">
+              {activeFilters.map((f) => (
+                <span
+                  key={f.key}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                    f.isDifficulty
+                      ? 'bg-[#fef2f2] text-[#991b1b] border border-[#fecaca]'
+                      : 'bg-[#f4f4f5] text-foreground/85 border border-black/5'
+                  }`}
                 >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </span>
-            ))}
+                  <span className="text-foreground/50 font-normal">{f.label}</span>
+                  <strong className={f.isDifficulty ? 'text-[#991b1b]' : 'text-[#18181b]'}>
+                    {f.value}
+                  </strong>
+                  <button
+                    type="button"
+                    onClick={() => onFilterChange(f.key, 'all')}
+                    className="ml-1 text-foreground/40 hover:text-foreground hover:scale-110 transition-transform"
+                    title={`Remove ${f.label} filter`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              ))}
+            </div>
 
-            {/* "+ Add filter" button */}
-            <button
-              type="button"
-              onClick={() => setShowFilterDropdown(true)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border border-dashed border-black/20 hover:border-black/40 text-foreground/70 bg-transparent transition-colors cursor-pointer"
-            >
-              <span>+ Add filter</span>
-            </button>
-          </div>
-
-          {/* "Clear all" red text link on the right */}
-          {activeFilterCount > 0 && (
+            {/* "Clear all" red text link on the right */}
             <button
               type="button"
               onClick={onResetFilters}
@@ -349,8 +340,8 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
             >
               Clear all
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* 3. Sub-Navigation Tabs (All, Unattempted, Practiced) & "⚡ Launch timed drill" Button */}
