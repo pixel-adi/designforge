@@ -336,6 +336,48 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
     }
   };
 
+  // Active Filter Count & Tightest Filter calculation for smart empty states
+  const activeFilterKeys: (keyof QuestionBankFilters)[] = [];
+  if (filters.part !== 'all') activeFilterKeys.push('part');
+  if (filters.domain !== 'all') activeFilterKeys.push('domain');
+  if (filters.type !== 'all') activeFilterKeys.push('type');
+  if (filters.difficulty !== 'all') activeFilterKeys.push('difficulty');
+  if (filters.exam !== 'all') activeFilterKeys.push('exam');
+  if (filters.practiceStatus !== 'all') activeFilterKeys.push('practiceStatus');
+  if (filters.searchQuery.trim()) activeFilterKeys.push('searchQuery');
+
+  const activeFilterCount = activeFilterKeys.length;
+
+  let tightestMessage = "Try broadening some filters to see what's available.";
+  let removeFilterAction = () => handleResetFilters();
+  let removeFilterLabel = "Clear all filters";
+
+  if (filters.difficulty !== 'all') {
+    tightestMessage = "Difficulty is the tightest one. Remove it to see what's available.";
+    removeFilterAction = () => handleFilterChange('difficulty', 'all');
+    removeFilterLabel = `Remove "${filters.difficulty} difficulty"`;
+  } else if (filters.searchQuery.trim()) {
+    tightestMessage = `No questions matched "${filters.searchQuery}". Remove it to see what's available.`;
+    removeFilterAction = () => handleFilterChange('searchQuery', '');
+    removeFilterLabel = "Clear search query";
+  } else if (filters.type !== 'all') {
+    tightestMessage = "Question type is the tightest filter. Remove it to see what's available.";
+    removeFilterAction = () => handleFilterChange('type', 'all');
+    removeFilterLabel = `Remove "${filters.type}" filter`;
+  } else if (filters.domain !== 'all') {
+    tightestMessage = "Topic domain filter is the tightest one. Remove it to see what's available.";
+    removeFilterAction = () => handleFilterChange('domain', 'all');
+    removeFilterLabel = "Remove topic filter";
+  } else if (filters.part !== 'all') {
+    tightestMessage = "Section filter is restricting results. Remove it to see what's available.";
+    removeFilterAction = () => handleFilterChange('part', 'all');
+    removeFilterLabel = "Show all sections";
+  } else if (filters.practiceStatus === 'unattempted') {
+    tightestMessage = "You've practiced all questions in this category. Switch to All to review.";
+    removeFilterAction = () => handleFilterChange('practiceStatus', 'all');
+    removeFilterLabel = 'Show All Questions';
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* 1. Header & Robust Dropdown Toolbar */}
@@ -346,7 +388,6 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         totalQuestions={totalCount}
         unattemptedCount={unattemptedCount}
         practicedCount={practicedCount}
-        bookmarkedCount={bookmarkedCount}
         onLaunchDrill={onLaunchCustomDrill ? handleLaunchDrillClick : undefined}
         showAllAnswers={showAllAnswers}
         onToggleAllAnswers={() => setShowAllAnswers(prev => !prev)}
@@ -359,22 +400,22 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
           <p className="text-xs font-bold text-foreground/50">Loading question bank studio...</p>
         </div>
       ) : paginatedQuestions.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-black/10 p-8 space-y-3">
-          <BookOpen className="w-12 h-12 text-foreground/20 mx-auto" />
-          <h3 className="text-base font-black text-[#18181b]">No matching questions found</h3>
-          <p className="text-xs text-foreground/50 max-w-md mx-auto leading-relaxed">
-            {filters.practiceStatus === 'unattempted'
-              ? 'Awesome! You have practiced all questions matching these filters. Try switching Practice Status to "All Questions" or selecting another topic.'
-              : 'Try broadening your exam, domain or difficulty filters, or clearing your search term.'}
+        <div className="border border-dashed border-black/15 rounded-2xl p-10 sm:p-14 text-center bg-white space-y-3">
+          <h3 className="text-base sm:text-lg font-black text-[#18181b]">
+            No questions match these {activeFilterCount > 0 ? activeFilterCount : ''} filters
+          </h3>
+          <p className="text-xs text-foreground/60 max-w-md mx-auto">
+            {tightestMessage}
           </p>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleResetFilters}
-            className="text-xs font-bold mt-2"
-          >
-            Reset Filters
-          </Button>
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={removeFilterAction}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-white border border-black/10 hover:bg-neutral-50 shadow-2xs text-[#18181b] transition-all cursor-pointer"
+            >
+              {removeFilterLabel}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-5">
