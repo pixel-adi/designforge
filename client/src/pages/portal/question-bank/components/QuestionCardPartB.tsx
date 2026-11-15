@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   PenTool, Clock, Sparkles, CheckCircle2, Star, 
-  Eye, EyeOff, BookOpen, Layers, Check, Compass, Palette
+  Eye, EyeOff, BookOpen, Layers, Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { sanitizeHtml } from '@/lib/sanitize';
@@ -150,38 +150,7 @@ export const QuestionCardPartB: React.FC<QuestionCardPartBProps> = ({
         </div>
       )}
 
-      {/* 5. Essential Drawing Studio Guidelines */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3.5 bg-neutral-50 rounded-xl border border-black/5 text-[11px]">
-        <div className="space-y-0.5">
-          <span className="font-black text-neutral-900 flex items-center gap-1">
-            <Compass className="w-3.5 h-3.5 text-purple-600" />
-            1. Perspective & Proportion
-          </span>
-          <p className="text-neutral-600 text-[10.5px] leading-snug">
-            Sketch with accurate 2-point or 3-point perspective lines. Include a human hand or figure for scale reference.
-          </p>
-        </div>
-        <div className="space-y-0.5">
-          <span className="font-black text-neutral-900 flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            2. Ideation & Diversity
-          </span>
-          <p className="text-neutral-600 text-[10.5px] leading-snug">
-            Propose non-cliché, functional solutions with distinctive physical features and intuitive user interaction touchpoints.
-          </p>
-        </div>
-        <div className="space-y-0.5">
-          <span className="font-black text-neutral-900 flex items-center gap-1">
-            <Palette className="w-3.5 h-3.5 text-blue-600" />
-            3. Callouts & Linework
-          </span>
-          <p className="text-neutral-600 text-[10.5px] leading-snug">
-            Use clean hierarchy of line weight. Annotate materials (e.g. brushed steel, matte silicone) and assembly joints.
-          </p>
-        </div>
-      </div>
-
-      {/* 6. Model Approach & 5-Axis Rubric Toggle */}
+      {/* 5. Model Approach & 5-Axis Rubric Toggle */}
       <div className="pt-2 border-t border-black/5 flex flex-wrap items-center justify-between gap-3">
         <Button
           type="button"

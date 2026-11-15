@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { 
   BookOpen, Loader2, Sparkles, ChevronLeft, ChevronRight, 
@@ -11,7 +11,7 @@ import {
   QuestionBankFilters 
 } from './types';
 import { MOCK_QUESTIONS, MOCK_OPTIONS } from './mockQuestions';
-import { QuestionBankToolbar } from './components/QuestionBankToolbar';
+import { QuestionBankToolbar, DOMAIN_OPTIONS } from './components/QuestionBankToolbar';
 import { QuestionCardPartA } from './components/QuestionCardPartA';
 import { QuestionCardPartB } from './components/QuestionCardPartB';
 
@@ -49,11 +49,21 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
     return DEFAULT_FILTERS;
   });
 
-  const [rawQuestions, setRawQuestions] = useState<QuestionItem[]>([]);
+  const [questions, setQuestions] = useState<QuestionItem[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(5098);
   const [optionsMap, setOptionsMap] = useState<Record<string, QuestionOption[]>>({});
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [showAllAnswers, setShowAllAnswers] = useState(false);
+  const fetchRequestIdRef = useRef<number>(0);
+
+  // Live Exam Counts across all questions
+  const [examCounts, setExamCounts] = useState<Record<string, number>>({
+    all: 5098,
+    ceed: 1290,
+    uceed: 721,
+    nid: 125,
+  });
 
   // Practiced and Bookmarked State
   const [practicedIds, setPracticedIds] = useState<Set<string>>(() => {
@@ -92,7 +102,6 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
 
         if (attempts && attempts.length > 0) {
           const attemptIds = attempts.map(a => a.id);
-          // Fetch up to 1000 response question IDs in chunks
           const { data: responses } = await supabase
             .from('exam_responses')
             .select('question_id')
@@ -120,15 +129,47 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
     return () => { isMounted = false; };
   }, [candidate?.id, STORAGE_PRACTICED_KEY]);
 
-  // Fetch Questions from Supabase with Server-Side Filters
+  // Load exact exam counts on mount
+  useEffect(() => {
+    const fetchExamCounts = async () => {
+      try {
+        const [
+          { count: allCount },
+          { count: ceedCount },
+          { count: uceedCount },
+          { count: nidCount },
+        ] = await Promise.all([
+          supabase.from('exam_questions').select('*', { count: 'exact', head: true }),
+          supabase.from('exam_questions').select('*', { count: 'exact', head: true }).ilike('pyq_tag', '%CEED%'),
+          supabase.from('exam_questions').select('*', { count: 'exact', head: true }).ilike('pyq_tag', '%UCEED%'),
+          supabase.from('exam_questions').select('*', { count: 'exact', head: true }).ilike('pyq_tag', '%NID%'),
+        ]);
+
+        setExamCounts({
+          all: allCount || 5098,
+          ceed: ceedCount || 1290,
+          uceed: uceedCount || 721,
+          nid: nidCount || 125,
+        });
+      } catch (err) {
+        console.warn('Could not load live exam counts:', err);
+      }
+    };
+    fetchExamCounts();
+  }, []);
+
+  // True Server-Side Query & Pagination (Handling all 5,098+ questions from admin question bank)
   const fetchQuestions = useCallback(async () => {
     setLoading(true);
+    const requestId = ++fetchRequestIdRef.current;
     try {
+      const from = (currentPage - 1) * QUESTIONS_PER_PAGE;
+      const to = from + QUESTIONS_PER_PAGE - 1;
+
       let query = supabase
         .from('exam_questions')
-        .select('id, type, part, difficulty, content_text, media_url, topics, pyq_tag, sample_answer, explanation, solution_text, created_at')
-        .order('created_at', { ascending: false })
-        .limit(250); // Increased headroom for robust search & domain filtering
+        .select('*, exam_options(id, question_id, is_correct, content_text, media_url)', { count: 'exact' })
+        .order('created_at', { ascending: false });
 
       // 1. Part filter
       if (filters.part !== 'all') {
@@ -145,7 +186,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         query = query.eq('difficulty', filters.difficulty);
       }
 
-      // 4. Exam / Source filter
+      // 4. Exam filter
       if (filters.exam === 'nid') {
         query = query.ilike('pyq_tag', '%NID%');
       } else if (filters.exam === 'uceed') {
@@ -157,17 +198,73 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
       } else if (filters.exam === 'pyq') {
         query = query.not('pyq_tag', 'is', null);
       } else if (filters.exam === 'focus') {
-        query = query.ilike('pyq_tag', '%Focus%');
+        query = query.or('pyq_tag.ilike.%Focus%,pyq_tag.ilike.%Designforge%');
       }
 
-      const { data, error } = await query;
+      // 5. Search query filter
+      if (filters.searchQuery.trim()) {
+        const term = filters.searchQuery.trim();
+        query = query.or(`content_text.ilike.%${term}%,pyq_tag.ilike.%${term}%`);
+      }
+
+      // 6. Topic Domain filter
+      if (filters.domain !== 'all') {
+        if (filters.domain === 'part_b') {
+          query = query.eq('part', 'B');
+        } else {
+          const domKeywords: Record<string, string> = {
+            spatial: 'spatial',
+            design: 'design',
+            analytical: 'reasoning',
+            color_type: 'color',
+            materials: 'material',
+          };
+          const keyword = domKeywords[filters.domain] || filters.domain;
+          query = query.or(`content_text.ilike.%${keyword}%,topics.cs.{${keyword}}`);
+        }
+      }
+
+      // 7. Practice Status filter
+      if (filters.practiceStatus === 'practiced') {
+        const practicedArr = Array.from(practicedIds).slice(0, 100);
+        if (practicedArr.length > 0) {
+          query = query.in('id', practicedArr);
+        } else {
+          // No practiced questions yet
+          setQuestions([]);
+          setTotalCount(0);
+          setLoading(false);
+          return;
+        }
+      } else if (filters.practiceStatus === 'unattempted') {
+        const practicedArr = Array.from(practicedIds).slice(0, 100);
+        if (practicedArr.length > 0) {
+          query = query.not('id', 'in', `(${practicedArr.join(',')})`);
+        }
+      } else if (filters.practiceStatus === 'bookmarked') {
+        const bookmarkedArr = Array.from(bookmarkedIds).slice(0, 100);
+        if (bookmarkedArr.length > 0) {
+          query = query.in('id', bookmarkedArr);
+        } else {
+          setQuestions([]);
+          setTotalCount(0);
+          setLoading(false);
+          return;
+        }
+      }
+
+      const { data, count, error } = await query.range(from, to);
+
+      if (requestId !== fetchRequestIdRef.current) return;
+
       if (error) {
-        console.error('Error fetching questions:', error);
+        console.error('Error fetching questions from Supabase:', error);
       }
 
-      const items = (data || []) as QuestionItem[];
-      if (items.length === 0) {
-        // Fallback to rich curated mock questions in preview mode / offline
+      const items = (data || []) as (QuestionItem & { exam_options?: QuestionOption[] })[];
+
+      if (items.length === 0 && (!data || data.length === 0) && (count === 0 || count === null)) {
+        // Fallback to MOCK_QUESTIONS only if completely empty / offline
         let filteredMocks = [...MOCK_QUESTIONS];
         if (filters.part !== 'all') filteredMocks = filteredMocks.filter(m => m.part === filters.part);
         if (filters.type !== 'all') filteredMocks = filteredMocks.filter(m => m.type === filters.type);
@@ -175,60 +272,41 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         if (filters.exam === 'nid') filteredMocks = filteredMocks.filter(m => (m.pyq_tag || '').includes('NID'));
         if (filters.exam === 'uceed') filteredMocks = filteredMocks.filter(m => (m.pyq_tag || '').includes('UCEED'));
         if (filters.exam === 'ceed') filteredMocks = filteredMocks.filter(m => (m.pyq_tag || '').includes('CEED'));
-        setRawQuestions(filteredMocks);
+
+        setQuestions(filteredMocks.slice(from, to + 1));
+        setTotalCount(filteredMocks.length);
         setOptionsMap(MOCK_OPTIONS);
       } else {
-        setRawQuestions(items);
-
-        // Fetch options for Part A questions
-        const partAQIds = items.filter(q => q.part === 'A').map(q => q.id);
-        if (partAQIds.length > 0) {
-          // Fetch first batch of options
-          const batch1 = partAQIds.slice(0, 40);
-          const { data: optData } = await supabase
-            .from('exam_options')
-            .select('id, question_id, content_text, media_url, is_correct')
-            .in('question_id', batch1);
-
-          if (optData) {
-            const map: Record<string, QuestionOption[]> = {};
-            optData.forEach(opt => {
-              if (!map[opt.question_id]) map[opt.question_id] = [];
-              map[opt.question_id].push(opt);
-            });
-            setOptionsMap(prev => ({ ...prev, ...map }));
+        // Collect joined options directly from exam_options relation
+        const newOptsMap: Record<string, QuestionOption[]> = {};
+        items.forEach(q => {
+          if (q.exam_options && q.exam_options.length > 0) {
+            newOptsMap[q.id] = q.exam_options;
           }
-
-          // Stream remaining options in background
-          if (partAQIds.length > 40) {
-            const remaining = partAQIds.slice(40);
-            const chunkSize = 50;
-            for (let i = 0; i < remaining.length; i += chunkSize) {
-              const chunk = remaining.slice(i, i + chunkSize);
-              supabase
-                .from('exam_options')
-                .select('id, question_id, content_text, media_url, is_correct')
-                .in('question_id', chunk)
-                .then(({ data: rData }) => {
-                  if (rData) {
-                    const rMap: Record<string, QuestionOption[]> = {};
-                    rData.forEach(opt => {
-                      if (!rMap[opt.question_id]) rMap[opt.question_id] = [];
-                      rMap[opt.question_id].push(opt);
-                    });
-                    setOptionsMap(prev => ({ ...prev, ...rMap }));
-                  }
-                });
-            }
-          }
-        }
+        });
+        setOptionsMap(prev => ({ ...prev, ...newOptsMap }));
+        setQuestions(items);
+        setTotalCount(count ?? items.length);
       }
     } catch (err) {
       console.error('Failed to load questions:', err);
     } finally {
-      setLoading(false);
+      if (requestId === fetchRequestIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [filters.part, filters.type, filters.difficulty, filters.exam]);
+  }, [
+    currentPage, 
+    filters.part, 
+    filters.type, 
+    filters.difficulty, 
+    filters.exam, 
+    filters.searchQuery, 
+    filters.domain, 
+    filters.practiceStatus,
+    practicedIds,
+    bookmarkedIds
+  ]);
 
   useEffect(() => {
     fetchQuestions();
@@ -266,68 +344,15 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
     });
   }, [STORAGE_BOOKMARKED_KEY]);
 
-  // Apply In-Memory Topic Domain & Search & Practice Status Filter
-  const filteredQuestions = useMemo(() => {
-    return rawQuestions.filter(q => {
-      // 1. Topic Domain filter
-      if (filters.domain !== 'all') {
-        if (filters.domain === 'part_b') {
-          if (q.part !== 'B') return false;
-        } else {
-          const domKeywords: Record<string, string[]> = {
-            spatial: ['spatial', 'perception', '3d', 'cube', 'projection', 'shadow', 'isometric', 'rotation'],
-            design: ['design', 'visual', 'observation', 'culture', 'symbol', 'identity', 'art'],
-            analytical: ['analytical', 'reasoning', 'logic', 'sequence', 'pattern', 'mechanical'],
-            color_type: ['color', 'font', 'typography', 'branding', 'palette'],
-            materials: ['material', 'wood', 'plastic', 'metal', 'texture', 'ergonomic'],
-          };
-          const words = domKeywords[filters.domain] || [filters.domain];
-          const hasMatch = 
-            (q.topics || []).some(t => words.some(w => t.toLowerCase().includes(w))) ||
-            words.some(w => (q.content_text || '').toLowerCase().includes(w));
-          if (!hasMatch) return false;
-        }
-      }
-
-      // 2. Practice Status filter
-      if (filters.practiceStatus === 'unattempted') {
-        if (practicedIds.has(q.id)) return false;
-      } else if (filters.practiceStatus === 'practiced') {
-        if (!practicedIds.has(q.id)) return false;
-      } else if (filters.practiceStatus === 'bookmarked') {
-        if (!bookmarkedIds.has(q.id)) return false;
-      }
-
-      // 3. Search query filter
-      if (filters.searchQuery.trim()) {
-        const qText = (q.content_text || '').toLowerCase();
-        const term = filters.searchQuery.toLowerCase().trim();
-        const pyq = (q.pyq_tag || '').toLowerCase();
-        const topics = (q.topics || []).map(t => t.toLowerCase()).join(' ');
-        if (!qText.includes(term) && !pyq.includes(term) && !topics.includes(term)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [rawQuestions, filters.domain, filters.practiceStatus, filters.searchQuery, practicedIds, bookmarkedIds]);
-
-  // Counts
-  const totalCount = filteredQuestions.length;
-  const unattemptedCount = filteredQuestions.filter(q => !practicedIds.has(q.id)).length;
-  const practicedCount = filteredQuestions.filter(q => practicedIds.has(q.id)).length;
-  const bookmarkedCount = bookmarkedIds.size;
-
-  // Pagination
+  // Pagination calculations
   const totalPages = Math.max(1, Math.ceil(totalCount / QUESTIONS_PER_PAGE));
   const startIndex = (currentPage - 1) * QUESTIONS_PER_PAGE;
-  const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + QUESTIONS_PER_PAGE);
+  const practicedCount = practicedIds.size;
+  const unattemptedCount = Math.max(0, totalCount - practicedCount);
 
   const handleFilterChange = (key: keyof QuestionBankFilters, value: any) => {
     setFilters(prev => {
       const next = { ...prev, [key]: value };
-      // Auto-switch Part if specific question type chosen
       if (key === 'type' && value === 'SUBJECTIVE') {
         next.part = 'B';
       } else if (key === 'type' && ['MCQ', 'MSQ', 'NAT'].includes(value)) {
@@ -345,7 +370,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
 
   const handleLaunchDrillClick = () => {
     if (onLaunchCustomDrill) {
-      const qIds = filteredQuestions.map(q => q.id);
+      const qIds = questions.map(q => q.id);
       onLaunchCustomDrill(qIds);
     }
   };
@@ -394,7 +419,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* 1. Header & Robust Dropdown Toolbar */}
+      {/* 1. Header & Robust Unified 4-State Search Bar */}
       <QuestionBankToolbar
         filters={filters}
         onFilterChange={handleFilterChange}
@@ -405,7 +430,8 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         onLaunchDrill={onLaunchCustomDrill ? handleLaunchDrillClick : undefined}
         showAllAnswers={showAllAnswers}
         onToggleAllAnswers={() => setShowAllAnswers(prev => !prev)}
-        questions={rawQuestions}
+        questions={questions}
+        examCounts={examCounts}
       />
 
       {/* 2. Questions Feed or Empty State */}
@@ -414,7 +440,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
           <p className="text-xs font-bold text-foreground/50">Loading question bank studio...</p>
         </div>
-      ) : paginatedQuestions.length === 0 ? (
+      ) : questions.length === 0 ? (
         <div className="border border-dashed border-black/15 rounded-2xl p-10 sm:p-14 text-center bg-white space-y-3">
           <h3 className="text-base sm:text-lg font-black text-[#18181b]">
             No questions match these {activeFilterCount > 0 ? activeFilterCount : ''} filters
@@ -434,7 +460,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         </div>
       ) : (
         <div className="space-y-5">
-          {paginatedQuestions.map((question, idx) => {
+          {questions.map((question, idx) => {
             const actualIndex = startIndex + idx;
             const isPracticed = practicedIds.has(question.id);
             const isBookmarked = bookmarkedIds.has(question.id);
@@ -458,7 +484,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
               <QuestionCardPartA
                 key={question.id}
                 question={question}
-                options={optionsMap[question.id] || []}
+                options={optionsMap[question.id] || question.exam_options || []}
                 questionIndex={actualIndex}
                 isPracticed={isPracticed}
                 isBookmarked={isBookmarked}
@@ -475,30 +501,36 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
               <span className="text-foreground/60 text-center sm:text-left">
                 Showing <strong className="text-[#18181b]">{startIndex + 1}</strong> to{' '}
                 <strong className="text-[#18181b]">{Math.min(startIndex + QUESTIONS_PER_PAGE, totalCount)}</strong> of{' '}
-                <strong className="text-[#18181b]">{totalCount}</strong> questions
+                <strong className="text-[#18181b]">{totalCount.toLocaleString()}</strong> questions
               </span>
 
               <div className="flex items-center justify-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  onClick={() => {
+                    setCurrentPage(p => Math.max(1, p - 1));
+                    window.scrollTo({ top: 120, behavior: 'smooth' });
+                  }}
                   disabled={currentPage <= 1}
-                  className="h-8 px-3 text-xs font-bold"
+                  className="h-8 px-3 text-xs font-bold cursor-pointer"
                 >
                   <ChevronLeft className="w-3.5 h-3.5 mr-1" /> Prev
                 </Button>
 
                 <span className="px-3 py-1 font-mono font-bold text-xs bg-neutral-100 rounded-lg text-foreground/80">
-                  Page {currentPage} of {totalPages}
+                  Page {currentPage} of {totalPages.toLocaleString()}
                 </span>
 
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  onClick={() => {
+                    setCurrentPage(p => Math.min(totalPages, p + 1));
+                    window.scrollTo({ top: 120, behavior: 'smooth' });
+                  }}
                   disabled={currentPage >= totalPages}
-                  className="h-8 px-3 text-xs font-bold"
+                  className="h-8 px-3 text-xs font-bold cursor-pointer"
                 >
                   Next <ChevronRight className="w-3.5 h-3.5 ml-1" />
                 </Button>

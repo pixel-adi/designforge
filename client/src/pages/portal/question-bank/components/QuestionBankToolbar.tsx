@@ -23,6 +23,7 @@ export interface QuestionBankToolbarProps {
   showAllAnswers: boolean;
   onToggleAllAnswers: () => void;
   questions?: QuestionItem[];
+  examCounts?: Record<string, number>;
 }
 
 export const DOMAIN_OPTIONS = [
@@ -36,10 +37,10 @@ export const DOMAIN_OPTIONS = [
 ];
 
 export const EXAM_OPTIONS: { id: ExamFilter; label: string; count: number }[] = [
-  { id: 'all', label: 'All exams', count: 1240 },
-  { id: 'uceed', label: 'UCEED', count: 512 },
-  { id: 'ceed', label: 'CEED', count: 438 },
-  { id: 'nid', label: 'NID DAT', count: 290 },
+  { id: 'all', label: 'All exams', count: 5098 },
+  { id: 'ceed', label: 'CEED', count: 1290 },
+  { id: 'uceed', label: 'UCEED', count: 721 },
+  { id: 'nid', label: 'NID DAT', count: 125 },
 ];
 
 // Curated concepts taxonomy mapped to exams
@@ -110,6 +111,7 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
   showAllAnswers,
   onToggleAllAnswers,
   questions = [],
+  examCounts,
 }) => {
   const [showExamDropdown, setShowExamDropdown] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -211,6 +213,9 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
   // Current exam display text
   const currentExamObj = EXAM_OPTIONS.find(e => e.id === filters.exam) || EXAM_OPTIONS[0];
   const currentExamLabel = currentExamObj.label;
+  const currentExamCount = (examCounts && examCounts[filters.exam] !== undefined)
+    ? examCounts[filters.exam]
+    : currentExamObj.count;
 
   // Autocomplete Suggestions computation (State 3)
   const query = filters.searchQuery.trim().toLowerCase();
@@ -298,6 +303,9 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
             <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-64 bg-white rounded-2xl border border-neutral-200/90 shadow-2xl p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150">
               {EXAM_OPTIONS.map(opt => {
                 const isSelected = filters.exam === opt.id;
+                const optCount = (examCounts && examCounts[opt.id] !== undefined)
+                  ? examCounts[opt.id]
+                  : opt.count;
                 return (
                   <button
                     key={opt.id}
@@ -314,7 +322,7 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
                   >
                     <span>{opt.label}</span>
                     <span className={`text-xs ${isSelected ? 'text-[#ef4444] font-bold' : 'text-neutral-400 font-normal'}`}>
-                      {opt.count.toLocaleString()}
+                      {optCount.toLocaleString()}
                     </span>
                   </button>
                 );
@@ -364,7 +372,7 @@ export const QuestionBankToolbar: React.FC<QuestionBankToolbarProps> = ({
             placeholder={
               inBarChips.length > 0
                 ? `Search within ${totalQuestions} results`
-                : `Search ${currentExamObj.count.toLocaleString()} questions by concept, keyword or tag`
+                : `Search ${currentExamCount.toLocaleString()} questions by concept, keyword or tag`
             }
             className="w-full h-8 bg-transparent text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none font-medium min-w-[120px]"
           />

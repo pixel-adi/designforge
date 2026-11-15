@@ -28,6 +28,7 @@ export interface QuestionItem {
   correct_answer?: string | null;
   answer_key?: string | null;
   answer?: string | null;
+  exam_options?: QuestionOption[];
 }
 
 export interface QuestionBankFilters {
