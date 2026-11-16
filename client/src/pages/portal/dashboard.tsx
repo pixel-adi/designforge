@@ -115,21 +115,64 @@ export default function PortalDashboard() {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search);
       const tabParam = p.get('tab');
-      if (tabParam === 'tracker' || window.location.pathname.includes('prep-tracker')) {
-        return 'tracker';
-      }
-      if (tabParam === 'progress' || tabParam === 'analytics') {
-        return 'progress';
-      }
-      if (tabParam === 'leaderboard') {
-        return 'leaderboard';
-      }
-      if (tabParam && ['questions', 'materials', 'assignments', 'notes', 'features', 'profile'].includes(tabParam)) {
+      const validTabs = ['overview', 'tracker', 'progress', 'leaderboard', 'questions', 'materials', 'assignments', 'notes', 'features', 'profile'];
+      
+      if (tabParam && validTabs.includes(tabParam)) {
         return tabParam;
       }
+      if (tabParam === 'analytics') {
+        return 'progress';
+      }
+      if (window.location.pathname.includes('prep-tracker')) {
+        return 'tracker';
+      }
+      if (window.location.pathname.includes('questions') || window.location.pathname.includes('question-bank')) {
+        return 'questions';
+      }
+
+      try {
+        const storedTab = sessionStorage.getItem('df_portal_active_tab') || localStorage.getItem('df_portal_active_tab');
+        if (storedTab && validTabs.includes(storedTab)) {
+          return storedTab;
+        }
+      } catch (e) {}
     }
     return 'overview';
   });
+
+  // Keep URL search query parameter and storage synced with active tab so page refresh preserves current view
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.setItem('df_portal_active_tab', activeTab);
+      localStorage.setItem('df_portal_active_tab', activeTab);
+
+      const currentUrl = new URL(window.location.href);
+      if (currentUrl.searchParams.get('tab') !== activeTab) {
+        currentUrl.searchParams.set('tab', activeTab);
+        window.history.replaceState(window.history.state, '', currentUrl.pathname + currentUrl.search + currentUrl.hash);
+      }
+    } catch (e) {}
+  }, [activeTab]);
+
+  // Support browser Back/Forward navigation between portal tabs
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handlePopState = () => {
+      try {
+        const p = new URLSearchParams(window.location.search);
+        const tabParam = p.get('tab');
+        const validTabs = ['overview', 'tracker', 'progress', 'leaderboard', 'questions', 'materials', 'assignments', 'notes', 'features', 'profile'];
+        if (tabParam && validTabs.includes(tabParam)) {
+          setActiveTab(tabParam);
+        } else if (tabParam === 'analytics') {
+          setActiveTab('progress');
+        }
+      } catch (e) {}
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [pastAttempts, setPastAttempts] = useState<any[]>([]);
   const [loadingAttempts, setLoadingAttempts] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -1819,6 +1862,10 @@ export default function PortalDashboard() {
   const handleLogout = async () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('df_device_id');
+      try {
+        sessionStorage.removeItem('df_portal_active_tab');
+        localStorage.removeItem('df_portal_active_tab');
+      } catch (e) {}
     }
     await supabase.auth.signOut();
     setLocation('/portal/login');
@@ -2008,6 +2055,24 @@ export default function PortalDashboard() {
       fetchClassNotes();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'leaderboard' && leaderboard.length === 0) {
+      fetchLeaderboard();
+    }
+  }, [activeTab, leaderboard.length]);
+
+  useEffect(() => {
+    if (activeTab === 'features' && featureRequests.length === 0) {
+      fetchFeatureRequests();
+    }
+  }, [activeTab, featureRequests.length]);
+
+  useEffect(() => {
+    if (activeTab === 'progress' && candidate?.id && pastAttempts.length === 0) {
+      fetchAttempts(candidate.id);
+    }
+  }, [activeTab, candidate?.id, pastAttempts.length]);
 
   const handleSubmitAssignment = async () => {
     if (!submissionFile || !selectedAssignment || !candidate?.id) return;

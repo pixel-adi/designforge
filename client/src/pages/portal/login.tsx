@@ -80,17 +80,6 @@ export default function PortalLogin() {
             )}
           </Button>
 
-          {/* Quick UI Testing / Preview Mode */}
-          <div className="pt-4 mt-4 border-t border-black/5 text-center">
-            <button
-              type="button"
-              onClick={() => setLocation('/portal/dashboard?preview=true&tab=questions')}
-              className="text-xs font-black text-primary hover:underline flex items-center justify-center gap-1.5 mx-auto bg-primary/5 hover:bg-primary/10 py-2 px-3 rounded-lg border border-primary/20 transition-all cursor-pointer"
-            >
-              <span>⚡ Preview Question Bank UI (Skip Login)</span>
-            </button>
-          </div>
-
           <p className="text-xs text-foreground/40 text-center mt-6 leading-relaxed">
             By continuing, you agree to Designforge's terms of service and privacy policy.
           </p>
