@@ -2603,7 +2603,15 @@ export default function PortalDashboard() {
                                           )}
                                         </div>
 
-                                        {hasCompletedAttempt && canReattempt && !isExpired ? (
+                                        {isExpired ? (
+                                          <Button
+                                            onClick={() => setLocation(`/portal/test/${test.id}`)}
+                                            className="w-full bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold gap-2 h-10 rounded-xl border border-white/10 shadow-sm transition-all"
+                                          >
+                                            <Eye className="w-4 h-4 text-amber-400" />
+                                            <span>View Paper (Expired)</span>
+                                          </Button>
+                                        ) : hasCompletedAttempt && canReattempt ? (
                                           <Button
                                             onClick={() => setLocation(`/portal/test/${test.id}`)}
                                             className="w-full bg-primary hover:bg-primary/90 text-white text-xs font-bold gap-2 h-10 rounded-xl"
@@ -2617,13 +2625,6 @@ export default function PortalDashboard() {
                                             className="w-full border-white/10 text-white/40 cursor-not-allowed bg-transparent text-xs h-10 rounded-xl"
                                           >
                                             All 3 Attempts Completed
-                                          </Button>
-                                        ) : isExpired ? (
-                                          <Button
-                                            disabled
-                                            className="w-full bg-neutral-800 text-neutral-500 cursor-not-allowed text-xs h-10 rounded-xl"
-                                          >
-                                            Strict 1-Week Window Expired
                                           </Button>
                                         ) : (
                                           <Button
@@ -2882,7 +2883,16 @@ export default function PortalDashboard() {
                           )}
                         </div>
 
-                        {hasCompletedAttempt && canReattempt && !isExpired ? (
+                        {isExpired ? (
+                          <Button
+                            onClick={() => setLocation(`/portal/test/${test.id}`)}
+                            variant="outline"
+                            className="w-full border-black/15 text-[#262626] hover:bg-black/5 text-xs font-bold gap-2 h-10 rounded-xl transition-all"
+                          >
+                            <Eye className="w-4 h-4 text-amber-600" />
+                            <span>View Paper (Expired)</span>
+                          </Button>
+                        ) : hasCompletedAttempt && canReattempt ? (
                           <Button
                             onClick={() => setLocation(`/portal/test/${test.id}`)}
                             className="w-full bg-primary hover:bg-primary/90 text-white gap-2 transition-all"
@@ -2896,13 +2906,6 @@ export default function PortalDashboard() {
                             className="w-full border-black/10 text-foreground/40 cursor-not-allowed"
                           >
                             All 3 Attempts Used
-                          </Button>
-                        ) : isExpired ? (
-                          <Button
-                            disabled
-                            className="w-full bg-gray-200 text-gray-500 cursor-not-allowed"
-                          >
-                            Missed Deadline
                           </Button>
                         ) : (
                           <Button

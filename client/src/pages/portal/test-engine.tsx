@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, EyeOff, FileCheck2, AlertTriangle, ShieldAlert, WifiOff, Lock, ClipboardList, Camera, Clipboard, Image as ImageIcon, Sparkles, CheckCircle2, PauseCircle, Play, Bookmark, ShieldCheck, X } from "lucide-react";
+import { Loader2, ArrowLeft, Clock, AlertCircle, FileText, UploadCloud, Eye, EyeOff, FileCheck2, AlertTriangle, ShieldAlert, WifiOff, Lock, ClipboardList, Camera, Clipboard, Image as ImageIcon, Sparkles, CheckCircle2, PauseCircle, Play, Bookmark, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -99,6 +99,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [responses, setResponses] = useState<Record<string, ResponseData>>({});
   const [isStartingTest, setIsStartingTest] = useState(false);
+
+  // Expired Paper Read-Only Mode
+  const isTestExpired = useMemo(() => {
+    const deadline = engineData?.test?.ends_at || engineData?.test?.expires_at;
+    return Boolean(deadline && new Date(deadline).getTime() < Date.now());
+  }, [engineData?.test?.ends_at, engineData?.test?.expires_at]);
 
   // Timer State
   const [timeLeft, setTimeLeft] = useState(0); // in seconds
@@ -991,17 +997,25 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           setLocation('/portal/dashboard');
           return null;
         }
+      }
 
-        const deadline = currentTest.ends_at || currentTest.expires_at;
-        if (deadline && new Date(deadline).getTime() < Date.now()) {
-          toast({
-            title: "Challenge Expired",
-            description: "The 1-week submission deadline for this Focus Batch mock has passed.",
-            variant: "destructive"
-          });
-          setLocation('/portal/dashboard');
-          return null;
-        }
+      // Check if this test's deadline has expired (applicable for any expired mock)
+      const deadline = currentTest?.ends_at || currentTest?.expires_at;
+      const isExpired = deadline ? new Date(deadline).getTime() < Date.now() : false;
+      if (isExpired) {
+        // Allow students to view the expired question paper in read-only mode, but submissions are blocked
+        const viewAttemptId = `expired-view-${id}-${candidate.id || 'student'}`;
+        setAttemptId(viewAttemptId);
+        const totalSecs = (engineData?.totalMins || 180) * 60;
+        testEndTimeRef.current = Date.now() + (totalSecs * 1000);
+        sessionStorage.setItem(`df_test_end_${id}`, String(testEndTimeRef.current));
+        setTimeLeft(totalSecs);
+        toast({
+          title: "Viewing Expired Question Paper",
+          description: "This paper has expired. You can review all questions in read-only mode, but submissions are closed.",
+          duration: 6000
+        });
+        return viewAttemptId;
       }
 
       // Fetch all existing attempts for this candidate + test
@@ -1162,7 +1176,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       }
     });
 
-    if (responsesToUpsert.length > 0) {
+    if (responsesToUpsert.length > 0 && isValidUuid(currentAttemptId)) {
       try {
         const { error } = await supabase.from('exam_responses').upsert(responsesToUpsert, { onConflict: 'attempt_id,question_id' });
         if (error) console.warn('Batched auto-save warn:', error.message);
@@ -1485,6 +1499,11 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   };
 
   const handleAutoSubmit = async (reason: string) => {
+    if (isTestExpired || (attemptId && attemptId.startsWith('expired-view-'))) {
+      setShowSubmitModal(false);
+      setTimerRunning(false);
+      return;
+    }
     setLoading(true);
     testEndTimeRef.current = null;
     sessionStorage.removeItem(`df_test_end_${id}`);
@@ -1497,6 +1516,15 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
   };
 
   const confirmSubmit = async (force: boolean = false) => {
+    if (isTestExpired || (attemptId && attemptId.startsWith('expired-view-'))) {
+      setShowSubmitModal(false);
+      toast({
+        title: "Submissions Closed",
+        description: "This question paper has expired. Answers cannot be submitted.",
+        variant: "destructive"
+      });
+      return;
+    }
     // If not forced (manual student submit), enforce that all subjective questions have at least 1 image/answer OR are marked noSolutionAttached
     if (!force) {
       const subjectiveQs = (engineData?.questions || []).filter(
@@ -1556,7 +1584,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
     const q = engineData!.questions[idx];
     const isPartBActive = checkIsPartBActive(timeLeft);
 
-    if (!skipChecks && testStep !== 'review' && testStep !== 'submitted') {
+    if (!skipChecks && testStep !== 'review' && testStep !== 'submitted' && !isTestExpired) {
       // Part Locking Logic: Only enforced when the exam has an active timed Part A lock (e.g. CEED/UCEED)
       if (engineData?.hasTimedPartALock) {
         // Cannot access Part B if Part A time is still running
@@ -1577,7 +1605,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
     // Telemetry navigation flush: save previous question response data immediately
     const prevQ = engineData?.questions[activeQuestionIndex];
-    if (prevQ && attemptId) {
+    if (prevQ && attemptId && isValidUuid(attemptId)) {
       const prevQId = prevQ.id;
       const prevResponse = responses[prevQId];
       if (prevResponse) {
@@ -1824,7 +1852,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
       latestResponsesRef.current[qId] = updated;
 
-      if (attemptId) {
+      if (attemptId && isValidUuid(attemptId)) {
         try {
           const stored = { ...prev, [qId]: updated };
           localStorage.setItem(`df_attempt_${attemptId}`, JSON.stringify(stored));
@@ -1887,7 +1915,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       };
       latestResponsesRef.current[qId] = updated;
 
-      if (attemptId) {
+      if (attemptId && isValidUuid(attemptId)) {
         supabase.from('exam_responses').upsert({
           attempt_id: attemptId,
           question_id: qId,
@@ -2444,10 +2472,22 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               );
             })()}
 
-            <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-start gap-4 mb-8">
-              <ShieldAlert className="w-6 h-6 text-primary shrink-0 mt-1" />
-              <p className="text-sm font-medium text-primary">I have read and understood the instructions. All computer hardware allotted to me are in proper working condition. I agree that in case of not adhering to the instructions, I shall be liable to be debarred from this Test.</p>
-            </div>
+            {isTestExpired ? (
+              <div className="bg-amber-50 border border-amber-300 p-4 rounded-xl flex items-start gap-3.5 mb-8 text-amber-900 shadow-2xs">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1 text-xs leading-relaxed">
+                  <p className="font-extrabold text-sm text-amber-950">Notice: Submission Window Expired (View Only Mode)</p>
+                  <p className="font-medium text-amber-900/90">
+                    The scheduled deadline for this question paper has passed. You are viewing this paper in read-only practice mode. You can navigate through all questions, prompts, and options, but answers cannot be submitted for scoring or evaluation.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-start gap-4 mb-8">
+                <ShieldAlert className="w-6 h-6 text-primary shrink-0 mt-1" />
+                <p className="text-sm font-medium text-primary">I have read and understood the instructions. All computer hardware allotted to me are in proper working condition. I agree that in case of not adhering to the instructions, I shall be liable to be debarred from this Test.</p>
+              </div>
+            )}
 
             <div className="flex justify-center border-t border-black/10 pt-8">
               <Button 
@@ -2458,7 +2498,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                 {isStartingTest ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Starting Examination...</span>
+                    <span>{isTestExpired ? "Opening Paper..." : "Starting Examination..."}</span>
+                  </div>
+                ) : isTestExpired ? (
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-5 h-5" />
+                    <span>View Question Paper (Expired)</span>
                   </div>
                 ) : (
                   "I am ready to begin"
@@ -2553,14 +2598,23 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               <span>{formatTime(uploadBufferTimeLeft)} remaining</span>
             </div>
 
-            <Button
-              onClick={() => confirmSubmit()}
-              disabled={loading}
-              className="bg-primary hover:bg-primary/90 text-white font-bold text-sm h-10 px-5 rounded-xl shadow-xs gap-1.5"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck2 className="w-4 h-4" />}
-              <span>Finalize & Submit All</span>
-            </Button>
+            {isTestExpired ? (
+              <Button
+                disabled
+                className="bg-neutral-200 text-neutral-500 font-bold text-sm h-10 px-5 rounded-xl cursor-not-allowed"
+              >
+                Submissions Closed
+              </Button>
+            ) : (
+              <Button
+                onClick={() => confirmSubmit()}
+                disabled={loading}
+                className="bg-primary hover:bg-primary/90 text-white font-bold text-sm h-10 px-5 rounded-xl shadow-xs gap-1.5"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck2 className="w-4 h-4" />}
+                <span>Finalize & Submit All</span>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -2585,9 +2639,15 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               <p className="text-xs text-foreground/50 mt-1 max-w-md mx-auto mb-6">
                 All questions in this test were objective and have been submitted. You can finalize your attempt.
               </p>
-              <Button onClick={() => confirmSubmit()} className="bg-primary text-white font-bold px-6">
-                Complete Attempt
-              </Button>
+              {isTestExpired ? (
+                <Button onClick={() => setLocation('/portal/dashboard')} className="bg-primary text-white font-bold px-6">
+                  Exit to Dashboard
+                </Button>
+              ) : (
+                <Button onClick={() => confirmSubmit()} className="bg-primary text-white font-bold px-6">
+                  Complete Attempt
+                </Button>
+              )}
             </div>
           ) : (
             partBQuestions.map((q, qIndex) => {
@@ -2759,13 +2819,31 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               <p className="text-xs font-bold text-[#262626]">Finished uploading your solutions?</p>
               <p className="text-[11px] text-foreground/50">You can submit early or let the timer finalize automatically.</p>
             </div>
-            <Button
-              onClick={() => confirmSubmit()}
-              disabled={loading}
-              className="bg-primary hover:bg-primary/90 text-white font-bold text-sm h-10 px-6 rounded-xl shadow-xs"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Submit All Solutions"}
-            </Button>
+            {isTestExpired ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  disabled
+                  className="bg-neutral-200 text-neutral-500 font-bold text-sm h-10 px-6 rounded-xl cursor-not-allowed"
+                >
+                  Submissions Closed (Expired)
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setLocation('/portal/dashboard')}
+                  className="font-bold text-sm h-10 px-5 rounded-xl border-black/20 hover:bg-black/5"
+                >
+                  Exit to Dashboard
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={() => confirmSubmit()}
+                disabled={loading}
+                className="bg-primary hover:bg-primary/90 text-white font-bold text-sm h-10 px-6 rounded-xl shadow-xs"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Submit All Solutions"}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -2917,21 +2995,47 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               <Clock className="w-4 h-4" />
               {formatTime(timeLeft)}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePauseExam}
-              disabled={resumesUsed >= 2 || isPaused}
-              className="rounded-full px-4 h-9 font-bold border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
-              title={resumesUsed >= 2 ? "All 2 resumes used" : `Pause examination (${2 - resumesUsed} resume${2 - resumesUsed === 1 ? '' : 's'} remaining)`}
-            >
-              <PauseCircle className="w-4 h-4" />
-              <span className="hidden sm:inline">Pause</span>
-              <span className="text-[10px] bg-amber-200/80 px-1.5 py-0.2 rounded-full font-mono">{2 - resumesUsed}</span>
-            </Button>
-            <Button variant="destructive" onClick={() => openSubmitModal('submit')} className="rounded-full px-6 font-bold shadow-sm">
-              Submit Test
-            </Button>
+            {isTestExpired ? (
+              <div className="flex items-center gap-2.5">
+                <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold shadow-2xs">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Paper Expired (View Only)</span>
+                </div>
+                <Button
+                  disabled
+                  className="rounded-full px-5 font-bold shadow-sm bg-neutral-200 text-neutral-500 cursor-not-allowed text-xs h-9"
+                  title="This test has expired. Submissions are disabled."
+                >
+                  Submission Closed
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLocation('/portal/dashboard')}
+                  className="rounded-full px-5 font-bold shadow-sm border-black/20 text-xs h-9 hover:bg-black/5"
+                >
+                  Exit to Dashboard
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePauseExam}
+                  disabled={resumesUsed >= 2 || isPaused}
+                  className="rounded-full px-4 h-9 font-bold border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+                  title={resumesUsed >= 2 ? "All 2 resumes used" : `Pause examination (${2 - resumesUsed} resume${2 - resumesUsed === 1 ? '' : 's'} remaining)`}
+                >
+                  <PauseCircle className="w-4 h-4" />
+                  <span className="hidden sm:inline">Pause</span>
+                  <span className="text-[10px] bg-amber-200/80 px-1.5 py-0.2 rounded-full font-mono">{2 - resumesUsed}</span>
+                </Button>
+                <Button variant="destructive" onClick={() => openSubmitModal('submit')} className="rounded-full px-6 font-bold shadow-sm">
+                  Submit Test
+                </Button>
+              </>
+            )}
           </div>
         ) : (
           <Button variant="outline" onClick={() => setTestStep('submitted')} className="rounded-full px-6 font-bold shadow-sm border-black/20">
@@ -3600,10 +3704,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-[#262626]">
-              {modalType === 'submit' ? 'Submit Test?' : 'Leave Test?'}
+              {isTestExpired ? 'Exit Question Paper?' : modalType === 'submit' ? 'Submit Test?' : 'Leave Test?'}
             </DialogTitle>
             <DialogDescription className="text-foreground/70 font-medium pt-2">
-              {modalType === 'submit'
+              {isTestExpired
+                ? "This question paper has expired. You are in read-only practice mode. You can exit to the portal dashboard at any time."
+                : modalType === 'submit'
                 ? "Are you sure you want to submit your test? You will not be able to change your answers after submission."
                 : "You are attempting to leave the test engine. You can submit now, or pause and resume later."
               }
@@ -3612,30 +3718,38 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
           <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-start gap-3 my-4">
             <AlertCircle className="w-5 h-5 text-primary shrink-0" />
             <div className="text-sm font-bold text-primary">
-              Answered: {Object.values(responses).filter(r => r.status === 'answered' || (r.status === 'marked' && (r.selectedOptions?.length || r.answerText || r.fileUrl))).length} / {totalQuestions}
+              {isTestExpired ? 'Viewing Questions: ' : 'Answered: '} {Object.values(responses).filter(r => r.status === 'answered' || (r.status === 'marked' && (r.selectedOptions?.length || r.answerText || r.fileUrl))).length} / {totalQuestions}
             </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-3 sm:space-x-0 mt-2">
             <Button variant="outline" onClick={() => setShowSubmitModal(false)} className="w-full font-bold">
               Cancel
             </Button>
-            {modalType === 'exit' && (
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  if (resumesUsed < 2) {
-                    await handlePauseExam();
-                  }
-                  setLocation('/portal/dashboard');
-                }}
-                className="w-full font-bold border-orange-200 text-orange-600 hover:bg-orange-50"
-              >
-                {resumesUsed < 2 ? `Pause & Resume Later (${2 - resumesUsed} left)` : 'Exit to Dashboard'}
+            {isTestExpired ? (
+              <Button onClick={() => setLocation('/portal/dashboard')} className="w-full font-bold bg-primary text-white hover:bg-primary/90">
+                Exit to Dashboard
               </Button>
+            ) : (
+              <>
+                {modalType === 'exit' && (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      if (resumesUsed < 2) {
+                        await handlePauseExam();
+                      }
+                      setLocation('/portal/dashboard');
+                    }}
+                    className="w-full font-bold border-orange-200 text-orange-600 hover:bg-orange-50"
+                  >
+                    {resumesUsed < 2 ? `Pause & Resume Later (${2 - resumesUsed} left)` : 'Exit to Dashboard'}
+                  </Button>
+                )}
+                <Button onClick={() => confirmSubmit()} className="w-full font-bold bg-primary text-white hover:bg-primary/90">
+                  {modalType === 'submit' ? 'Yes, Submit' : 'Submit & Exit'}
+                </Button>
+              </>
             )}
-            <Button onClick={() => confirmSubmit()} className="w-full font-bold bg-primary text-white hover:bg-primary/90">
-              {modalType === 'submit' ? 'Yes, Submit' : 'Submit & Exit'}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
