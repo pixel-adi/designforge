@@ -52,7 +52,7 @@ GRANT EXECUTE ON FUNCTION private.is_admin() TO authenticated, anon, postgres, s
 GRANT EXECUTE ON FUNCTION private.is_sme_or_admin() TO authenticated, anon, postgres, service_role;
 
 -- Update prep_is_owner to evaluate auth.uid() via InitPlan
-CREATE OR REPLACE FUNCTION public.prep_is_owner(p_candidate_id UUID)
+CREATE OR REPLACE FUNCTION private.prep_is_owner(p_candidate_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
@@ -61,6 +61,18 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+GRANT EXECUTE ON FUNCTION private.prep_is_owner(UUID) TO authenticated, postgres, service_role;
+
+-- Public compatibility wrapper
+CREATE OR REPLACE FUNCTION public.prep_is_owner(p_candidate_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN private.prep_is_owner(p_candidate_id);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+GRANT EXECUTE ON FUNCTION public.prep_is_owner(UUID) TO authenticated, postgres, service_role;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
