@@ -64,13 +64,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION private.prep_is_owner(UUID) TO authenticated, postgres, service_role;
 
--- Public compatibility wrapper
+-- Public compatibility wrapper (SECURITY INVOKER to satisfy Supabase security linter)
 CREATE OR REPLACE FUNCTION public.prep_is_owner(p_candidate_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN private.prep_is_owner(p_candidate_id);
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY INVOKER SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION public.prep_is_owner(UUID) TO authenticated, postgres, service_role;
 
@@ -96,6 +96,31 @@ DROP INDEX IF EXISTS public.idx_prep_simulations_candidate_date;
 -- Table: prep_task_completions (keep idx_prep_comp_cand_task)
 DROP INDEX IF EXISTS public.idx_prep_completions_candidate_task;
 
+-- Covering Indexes for Unindexed Foreign Keys
+CREATE INDEX IF NOT EXISTS idx_exam_feature_requests_candidate_id 
+  ON public.exam_feature_requests(candidate_id);
+
+CREATE INDEX IF NOT EXISTS idx_exam_test_questions_question_id 
+  ON public.exam_test_questions(question_id);
+
+CREATE INDEX IF NOT EXISTS idx_exam_tests_program_id 
+  ON public.exam_tests(program_id);
+
+CREATE INDEX IF NOT EXISTS idx_prep_articulation_logs_candidate_id 
+  ON public.prep_articulation_logs(candidate_id);
+
+CREATE INDEX IF NOT EXISTS idx_prep_awareness_cards_candidate_id 
+  ON public.prep_awareness_cards(candidate_id);
+
+CREATE INDEX IF NOT EXISTS idx_prep_build_records_candidate_id 
+  ON public.prep_build_records(candidate_id);
+
+CREATE INDEX IF NOT EXISTS idx_prep_error_ledger_entries_sim_log_id 
+  ON public.prep_error_ledger_entries(simulation_log_id);
+
+CREATE INDEX IF NOT EXISTS idx_prep_explanation_cards_candidate_id 
+  ON public.prep_explanation_cards(candidate_id);
+
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. EXAM CANDIDATES (exam_candidates)
@@ -120,8 +145,7 @@ CREATE POLICY "Candidates and staff insert profile"
   ON public.exam_candidates FOR INSERT TO authenticated
   WITH CHECK (
     auth_user_id = (SELECT auth.uid()) 
-    OR lower(email) = lower(coalesce((SELECT auth.jwt()->>'email'), ''))
-    OR coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    OR private.is_admin()
   );
 
 -- Single permissive UPDATE policy with InitPlan subquery caching
@@ -129,19 +153,17 @@ CREATE POLICY "Candidates and staff update profile"
   ON public.exam_candidates FOR UPDATE TO authenticated
   USING (
     auth_user_id = (SELECT auth.uid()) 
-    OR lower(email) = lower(coalesce((SELECT auth.jwt()->>'email'), ''))
-    OR coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    OR private.is_admin()
   )
   WITH CHECK (
     auth_user_id = (SELECT auth.uid()) 
-    OR lower(email) = lower(coalesce((SELECT auth.jwt()->>'email'), ''))
-    OR coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    OR private.is_admin()
   );
 
 -- Single permissive DELETE policy restricted to staff
 CREATE POLICY "Staff delete profiles"
   ON public.exam_candidates FOR DELETE TO authenticated
-  USING (coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in');
+  USING (private.is_admin());
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -161,32 +183,29 @@ CREATE POLICY "Candidates and staff insert attempts"
   ON public.exam_attempts FOR INSERT TO authenticated
   WITH CHECK (
     candidate_id IN (
-      SELECT id FROM public.exam_candidates 
-      WHERE auth_user_id = (SELECT auth.uid()) OR lower(email) = lower(coalesce((SELECT auth.jwt()->>'email'), ''))
+      SELECT id FROM public.exam_candidates WHERE auth_user_id = (SELECT auth.uid())
     ) 
-    OR coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    OR private.is_admin()
   );
 
 CREATE POLICY "Candidates and staff update attempts"
   ON public.exam_attempts FOR UPDATE TO authenticated
   USING (
     candidate_id IN (
-      SELECT id FROM public.exam_candidates 
-      WHERE auth_user_id = (SELECT auth.uid()) OR lower(email) = lower(coalesce((SELECT auth.jwt()->>'email'), ''))
+      SELECT id FROM public.exam_candidates WHERE auth_user_id = (SELECT auth.uid())
     ) 
-    OR coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    OR private.is_admin()
   )
   WITH CHECK (
     candidate_id IN (
-      SELECT id FROM public.exam_candidates 
-      WHERE auth_user_id = (SELECT auth.uid()) OR lower(email) = lower(coalesce((SELECT auth.jwt()->>'email'), ''))
+      SELECT id FROM public.exam_candidates WHERE auth_user_id = (SELECT auth.uid())
     ) 
-    OR coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    OR private.is_admin()
   );
 
 CREATE POLICY "Staff delete attempts"
   ON public.exam_attempts FOR DELETE TO authenticated
-  USING (coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in');
+  USING (private.is_admin());
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -204,11 +223,10 @@ CREATE POLICY "Manage own responses insert"
   WITH CHECK (
     attempt_id IN (
       SELECT id FROM public.exam_attempts WHERE candidate_id IN (
-        SELECT id FROM public.exam_candidates 
-        WHERE auth_user_id = (SELECT auth.uid()) OR lower(email) = lower(coalesce((SELECT auth.jwt()->>'email'), ''))
+        SELECT id FROM public.exam_candidates WHERE auth_user_id = (SELECT auth.uid())
       )
     ) 
-    OR coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    OR private.is_admin()
   );
 
 CREATE POLICY "Manage own responses update"
@@ -216,20 +234,18 @@ CREATE POLICY "Manage own responses update"
   USING (
     attempt_id IN (
       SELECT id FROM public.exam_attempts WHERE candidate_id IN (
-        SELECT id FROM public.exam_candidates 
-        WHERE auth_user_id = (SELECT auth.uid()) OR lower(email) = lower(coalesce((SELECT auth.jwt()->>'email'), ''))
+        SELECT id FROM public.exam_candidates WHERE auth_user_id = (SELECT auth.uid())
       )
     ) 
-    OR coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    OR private.is_admin()
   )
   WITH CHECK (
     attempt_id IN (
       SELECT id FROM public.exam_attempts WHERE candidate_id IN (
-        SELECT id FROM public.exam_candidates 
-        WHERE auth_user_id = (SELECT auth.uid()) OR lower(email) = lower(coalesce((SELECT auth.jwt()->>'email'), ''))
+        SELECT id FROM public.exam_candidates WHERE auth_user_id = (SELECT auth.uid())
       )
     ) 
-    OR coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    OR private.is_admin()
   );
 
 CREATE POLICY "Manage own responses delete"
@@ -237,11 +253,10 @@ CREATE POLICY "Manage own responses delete"
   USING (
     attempt_id IN (
       SELECT id FROM public.exam_attempts WHERE candidate_id IN (
-        SELECT id FROM public.exam_candidates 
-        WHERE auth_user_id = (SELECT auth.uid()) OR lower(email) = lower(coalesce((SELECT auth.jwt()->>'email'), ''))
+        SELECT id FROM public.exam_candidates WHERE auth_user_id = (SELECT auth.uid())
       )
     ) 
-    OR coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    OR private.is_admin()
   );
 
 
@@ -517,10 +532,7 @@ BEGIN
        FOR SELECT TO authenticated
        USING (
          public.prep_is_owner(candidate_id)
-         OR EXISTS (
-           SELECT 1 FROM public.staff_users WHERE auth_user_id = (SELECT auth.uid())
-         )
-         OR coalesce((SELECT auth.jwt()->>''email''), '''') LIKE ''%%@designforge.co.in''
+         OR private.is_admin()
        )',
       tbl, tbl
     );
@@ -636,7 +648,7 @@ DROP POLICY IF EXISTS "No anonymous access to submissions" ON public.assignment_
 CREATE POLICY "Read assignment submissions"
   ON public.assignment_submissions FOR SELECT TO authenticated
   USING (
-    coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    private.is_sme_or_admin()
     OR EXISTS (
       SELECT 1 FROM public.exam_candidates
       WHERE id = assignment_submissions.candidate_id
@@ -647,7 +659,7 @@ CREATE POLICY "Read assignment submissions"
 CREATE POLICY "Insert assignment submissions"
   ON public.assignment_submissions FOR INSERT TO authenticated
   WITH CHECK (
-    coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    private.is_sme_or_admin()
     OR EXISTS (
       SELECT 1 FROM public.exam_candidates
       WHERE id = assignment_submissions.candidate_id
@@ -658,7 +670,7 @@ CREATE POLICY "Insert assignment submissions"
 CREATE POLICY "Update assignment submissions"
   ON public.assignment_submissions FOR UPDATE TO authenticated
   USING (
-    coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    private.is_sme_or_admin()
     OR EXISTS (
       SELECT 1 FROM public.exam_candidates
       WHERE id = assignment_submissions.candidate_id
@@ -666,7 +678,7 @@ CREATE POLICY "Update assignment submissions"
     )
   )
   WITH CHECK (
-    coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    private.is_sme_or_admin()
     OR EXISTS (
       SELECT 1 FROM public.exam_candidates
       WHERE id = assignment_submissions.candidate_id
@@ -676,14 +688,7 @@ CREATE POLICY "Update assignment submissions"
 
 CREATE POLICY "Delete assignment submissions"
   ON public.assignment_submissions FOR DELETE TO authenticated
-  USING (
-    coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
-    OR EXISTS (
-      SELECT 1 FROM public.exam_candidates
-      WHERE id = assignment_submissions.candidate_id
-      AND auth_user_id = (SELECT auth.uid())
-    )
-  );
+  USING (private.is_sme_or_admin());
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -699,22 +704,21 @@ CREATE POLICY "Read staff profile"
   ON public.staff_users FOR SELECT TO authenticated
   USING (
     auth_user_id = (SELECT auth.uid()) 
-    OR lower(email) = lower(coalesce((SELECT auth.jwt()->>'email'), ''))
-    OR coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in'
+    OR private.is_admin()
   );
 
 CREATE POLICY "Admins insert staff_users"
   ON public.staff_users FOR INSERT TO authenticated
-  WITH CHECK (coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in');
+  WITH CHECK (private.is_admin());
 
 CREATE POLICY "Admins update staff_users"
   ON public.staff_users FOR UPDATE TO authenticated
-  USING (coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in')
-  WITH CHECK (coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in');
+  USING (private.is_admin())
+  WITH CHECK (private.is_admin());
 
 CREATE POLICY "Admins delete staff_users"
   ON public.staff_users FOR DELETE TO authenticated
-  USING (coalesce((SELECT auth.jwt()->>'email'), '') LIKE '%@designforge.co.in');
+  USING (private.is_admin());
 
 -- system_settings
 DROP POLICY IF EXISTS "Allow staff to read settings" ON public.system_settings;
