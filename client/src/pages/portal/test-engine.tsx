@@ -3723,7 +3723,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
       {/* Submit/Exit Modal */}
       <Dialog open={showSubmitModal} onOpenChange={setShowSubmitModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[94vw] sm:max-w-[560px] p-6 rounded-2xl overflow-hidden">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-[#262626]">
               {isTestExpired ? 'Exit Question Paper?' : modalType === 'submit' ? 'Submit Test?' : 'Leave Test?'}
@@ -3737,18 +3737,18 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
               }
             </DialogDescription>
           </DialogHeader>
-          <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-start gap-3 my-4">
+          <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-center gap-3 my-2 w-full">
             <AlertCircle className="w-5 h-5 text-primary shrink-0" />
             <div className="text-sm font-bold text-primary">
               {isTestExpired ? 'Viewing Questions: ' : 'Answered: '} {Object.values(responses).filter(r => r.status === 'answered' || (r.status === 'marked' && (r.selectedOptions?.length || r.answerText || r.fileUrl))).length} / {totalQuestions}
             </div>
           </div>
-          <DialogFooter className="flex-col sm:flex-row gap-3 sm:space-x-0 mt-2">
-            <Button variant="outline" onClick={() => setShowSubmitModal(false)} className="w-full font-bold">
+          <DialogFooter className="flex-col sm:flex-row gap-2.5 sm:space-x-0 mt-3 pt-1">
+            <Button variant="outline" onClick={() => setShowSubmitModal(false)} className="w-full sm:w-auto font-bold px-4 shrink-0">
               Cancel
             </Button>
             {isTestExpired ? (
-              <Button onClick={() => setLocation('/portal/dashboard')} className="w-full font-bold bg-primary text-white hover:bg-primary/90">
+              <Button onClick={() => setLocation('/portal/dashboard')} className="w-full sm:flex-1 font-bold bg-primary text-white hover:bg-primary/90">
                 Exit to Dashboard
               </Button>
             ) : (
@@ -3762,12 +3762,12 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
                       }
                       setLocation('/portal/dashboard');
                     }}
-                    className="w-full font-bold border-orange-200 text-orange-600 hover:bg-orange-50"
+                    className="w-full sm:flex-1 font-bold border-orange-200 text-orange-600 hover:bg-orange-50 px-3"
                   >
                     {resumesUsed < 2 ? `Pause & Resume Later (${2 - resumesUsed} left)` : 'Exit to Dashboard'}
                   </Button>
                 )}
-                <Button onClick={() => confirmSubmit()} className="w-full font-bold bg-primary text-white hover:bg-primary/90">
+                <Button onClick={() => confirmSubmit()} className="w-full sm:w-auto font-bold bg-primary text-white hover:bg-primary/90 px-5 shrink-0">
                   {modalType === 'submit' ? 'Yes, Submit' : 'Submit & Exit'}
                 </Button>
               </>
