@@ -70,6 +70,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
 
   // In-Memory Result & Page Cache for 0ms Instant Navigation
   const queryCacheRef = useRef<Map<string, { items: QuestionItem[]; count: number; optionsMap: Record<string, QuestionOption[]> }>>(new Map());
+  const filterCountsCacheRef = useRef<Map<string, number>>(new Map());
 
   // Live Exam Counts across all questions (cached in sessionStorage for 0ms startup)
   const [examCounts, setExamCounts] = useState<Record<string, number>>(() => {
@@ -179,8 +180,19 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
 
   const activeUnattemptedCount = Math.max(0, totalCount - activePracticedCount);
 
-  // Load exact exam counts in background and cache
+  // Load exact exam counts in background and cache with 12h freshness window
   useEffect(() => {
+    try {
+      const cachedRaw = localStorage.getItem('df_exam_counts_v2') || sessionStorage.getItem('df_exam_counts_v2');
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        if (cached && typeof cached.counts === 'object' && Date.now() - (cached.timestamp || 0) < 12 * 60 * 60 * 1000) {
+          setExamCounts(cached.counts);
+          return;
+        }
+      }
+    } catch (e) {}
+
     const fetchExamCounts = async () => {
       try {
         const [
@@ -203,7 +215,9 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         };
         setExamCounts(counts);
         try {
-          sessionStorage.setItem('df_exam_counts_v1', JSON.stringify(counts));
+          const payload = JSON.stringify({ counts, timestamp: Date.now() });
+          localStorage.setItem('df_exam_counts_v2', payload);
+          sessionStorage.setItem('df_exam_counts_v2', payload);
         } catch (e) {}
       } catch (err) {
         console.warn('Could not load live exam counts:', err);
@@ -233,9 +247,16 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
       const from = (currentPage - 1) * QUESTIONS_PER_PAGE;
       const to = from + QUESTIONS_PER_PAGE - 1;
 
+      const filterSignature = `${filters.exam}_${filters.part}_${filters.type}_${filters.difficulty}_${filters.domain}_${filters.practiceStatus}_${debouncedSearchQuery}`;
+      const cachedFilterCount = filterCountsCacheRef.current.get(filterSignature);
+      const needsExactCount = cachedFilterCount === undefined || currentPage === 1;
+
       let query = supabase
         .from('exam_questions')
-        .select('*, exam_options(id, question_id, is_correct, content_text, media_url)', { count: 'exact' })
+        .select(
+          '*, exam_options(id, question_id, is_correct, content_text, media_url)',
+          needsExactCount ? { count: 'exact' } : undefined
+        )
         .order('created_at', { ascending: false });
 
       // 1. Part filter
@@ -349,7 +370,10 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
           }
         });
 
-        const effectiveCount = count ?? items.length;
+        const effectiveCount = count ?? cachedFilterCount ?? items.length;
+        if (count !== null && count !== undefined) {
+          filterCountsCacheRef.current.set(filterSignature, count);
+        }
 
         // Store in cache for 0ms instant retrieval
         queryCacheRef.current.set(cacheKey, {
@@ -404,7 +428,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({
         const to = from + QUESTIONS_PER_PAGE - 1;
         let nextQuery = supabase
           .from('exam_questions')
-          .select('*, exam_options(id, question_id, is_correct, content_text, media_url)', { count: 'exact' })
+          .select('*, exam_options(id, question_id, is_correct, content_text, media_url)')
           .order('created_at', { ascending: false });
 
         if (filters.part !== 'all') nextQuery = nextQuery.eq('part', filters.part);

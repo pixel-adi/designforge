@@ -1033,7 +1033,10 @@ export default function AdminExamQuestions() {
 
       let query = supabase
         .from("exam_questions")
-        .select("*, exam_options(id, question_id, is_correct, content_text, media_url)", { count: "exact" });
+        .select(
+          "*, exam_options(id, question_id, is_correct, content_text, media_url)",
+          pageToFetch === 1 || totalServerQuestionsCount === 0 ? { count: "exact" } : undefined
+        );
 
       if (filterPart !== "ALL") query = query.eq("part", filterPart);
       if (filterType !== "ALL") query = query.eq("type", filterType);
@@ -1052,7 +1055,9 @@ export default function AdminExamQuestions() {
       if (error) throw error;
 
       setQuestions(data || []);
-      setTotalServerQuestionsCount(count || 0);
+      if (count !== null && count !== undefined) {
+        setTotalServerQuestionsCount(count);
+      }
     } catch (error: any) {
       if (requestId === fetchRequestIdRef.current) {
         toast({ title: "Error fetching questions", description: error.message, variant: "destructive" });
