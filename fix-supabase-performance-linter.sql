@@ -121,6 +121,25 @@ CREATE INDEX IF NOT EXISTS idx_prep_error_ledger_entries_sim_log_id
 CREATE INDEX IF NOT EXISTS idx_prep_explanation_cards_candidate_id 
   ON public.prep_explanation_cards(candidate_id);
 
+-- Performance & GIN Trigram Indexes for Question Bank, Test Engine & Admin
+CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA extensions;
+GRANT USAGE ON SCHEMA extensions TO authenticated, anon, postgres, service_role;
+
+CREATE INDEX IF NOT EXISTS idx_exam_questions_created_at_desc 
+  ON public.exam_questions (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_exam_questions_composite_filter
+  ON public.exam_questions (part, type, difficulty, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_exam_options_question_id_cover
+  ON public.exam_options (question_id, is_correct);
+
+CREATE INDEX IF NOT EXISTS idx_exam_questions_pyq_tag_trgm
+  ON public.exam_questions USING gin (pyq_tag extensions.gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_exam_questions_content_trgm
+  ON public.exam_questions USING gin (content_text extensions.gin_trgm_ops);
+
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. EXAM CANDIDATES (exam_candidates)
