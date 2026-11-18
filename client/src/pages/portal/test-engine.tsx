@@ -501,45 +501,64 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
       let optionsMap: Record<string, any[]> = {};
       let initialResponses: Record<string, ResponseData> = {};
 
-      // 1. High-Performance 1-Roundtrip Combined Query
+      // 0. Instant Session Cache Recovery (Protects Supabase under 1,000+ candidate spikes & 0ms instant reload)
       try {
-        const { data: combined, error: combErr } = await supabase
-          .from('exam_tests')
-          .select('*, exam_programs(name), exam_test_sections(*), exam_test_questions(marks, exam_questions(*, exam_options(id, question_id, content_text, media_url, created_at)))')
-          .eq('id', id)
-          .single();
+        const cachedRaw = sessionStorage.getItem(`df_test_cache_${id}`);
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (cached && cached.test && Array.isArray(cached.questions) && cached.questions.length > 0) {
+            testData = cached.test;
+            sectionsData = cached.sections || [];
+            questionsData = cached.questions || [];
+            optionsMap = cached.options || {};
+            fullTestLoaded = true;
+          }
+        }
+      } catch (cacheErr) {
+        console.warn("Test spec session recovery fallback:", cacheErr);
+      }
 
-        if (!combErr && combined) {
-          testData = combined;
-          sectionsData = combined.exam_test_sections || [];
-          const tqList = combined.exam_test_questions || [];
+      // 1. High-Performance 1-Roundtrip Combined Query
+      if (!fullTestLoaded) {
+        try {
+          const { data: combined, error: combErr } = await supabase
+            .from('exam_tests')
+            .select('*, exam_programs(name), exam_test_sections(*), exam_test_questions(marks, exam_questions(*, exam_options(id, question_id, content_text, media_url, created_at)))')
+            .eq('id', id)
+            .single();
 
-          tqList.forEach((tq: any) => {
-            const q = tq.exam_questions;
-            if (!q) return;
+          if (!combErr && combined) {
+            testData = combined;
+            sectionsData = combined.exam_test_sections || [];
+            const tqList = combined.exam_test_questions || [];
 
-            const explicitMarks = tq.marks != null && Number(tq.marks) > 0
-              ? Number(tq.marks)
-              : (q.marks != null && Number(q.marks) > 0 ? Number(q.marks) : null);
+            tqList.forEach((tq: any) => {
+              const q = tq.exam_questions;
+              if (!q) return;
 
-            const finalMarks = explicitMarks != null
-              ? explicitMarks
-              : (q.part === 'B' ? resolvePartBMaxMarks(q, testData) : q.marks);
+              const explicitMarks = tq.marks != null && Number(tq.marks) > 0
+                ? Number(tq.marks)
+                : (q.marks != null && Number(q.marks) > 0 ? Number(q.marks) : null);
 
-            questionsData.push({
-              ...q,
-              marks: finalMarks
+              const finalMarks = explicitMarks != null
+                ? explicitMarks
+                : (q.part === 'B' ? resolvePartBMaxMarks(q, testData) : q.marks);
+
+              questionsData.push({
+                ...q,
+                marks: finalMarks
+              });
+
+              const opts = q.exam_options || [];
+              opts.sort((a: any, b: any) => String(a.id).localeCompare(String(b.id)));
+              optionsMap[q.id] = opts;
             });
 
-            const opts = q.exam_options || [];
-            opts.sort((a: any, b: any) => String(a.id).localeCompare(String(b.id)));
-            optionsMap[q.id] = opts;
-          });
-
-          fullTestLoaded = true;
+            fullTestLoaded = true;
+          }
+        } catch (fastErr) {
+          console.warn("Combined test fetch fallback:", fastErr);
         }
-      } catch (fastErr) {
-        console.warn("Combined test fetch fallback:", fastErr);
       }
 
       // 2. Defensive fallback if combined nested join was blocked
@@ -750,7 +769,10 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
             if (candidate && isValidUuid(candidate.id)) {
               const cId: string = candidate.id;
               candidateId = cId;
-              try { sessionStorage.setItem('df_candidate_id', cId); } catch (e) {}
+              try {
+                sessionStorage.setItem('df_candidate_id', cId);
+                localStorage.setItem('df_candidate_id', cId);
+              } catch (e) {}
             }
           }
         }
@@ -775,7 +797,7 @@ export default function PortalTestEngine({ params }: { params?: { id: string } }
 
             const { data: dbResponses } = await supabase
               .from('exam_responses')
-              .select('*')
+              .select('question_id, status, selected_options, answer_text, file_url, time_spent, answer_changes, state_transitions')
               .eq('attempt_id', activeAttempt.id);
 
             if (dbResponses) {
